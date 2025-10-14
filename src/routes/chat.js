@@ -7,16 +7,16 @@ const router = express.Router();
  * Chat Routes
  */
 
-// שליחת הודעה
+// Message route
 router.post("/message", sendMessage);
 
-// איפוס סשן
+// Reset session
 router.post("/reset", resetSession);
 
-// קבלת היסטוריה
+// History retrieval
 router.get("/history/:sessionId", getHistory);
 
-// בדיקת בריאות
+// Health check
 router.get("/health", healthCheck);
 
 export default router;

@@ -4,73 +4,73 @@ import { toolDefinitions, executeToolCall } from "./toolFunctions.js";
 import { SYSTEM_PROMPT } from "./prompts.js";
 
 /**
- * Agent Controller - הבקר המרכזי של האגנט
+ * Agent Controller - The central controller for the agent
  */
 export class AgentController {
   constructor(apiKey) {
     this.gemini = new GeminiAdapter(apiKey);
-    this.maxIterations = 5; // מקסימום סיבובים למניעת לולאות אינסופיות
+    this.maxIterations = 5; // Maximum iterations to prevent infinite loops
   }
 
   /**
-   * עיבוד הודעה מהמשתמש
+   * Process a user message
    */
   async processMessage(sessionId, userMessage, userId) {
     try {
-      // הוספת הודעת המשתמש לזיכרון
+      // Add the user's message to memory
       memoryStore.addUserMessage(sessionId, userMessage);
 
-      // קבלת ההיסטוריה
+      // Retrieve the history
       let history = memoryStore.getHistory(sessionId);
 
-      // הוספת system prompt אם זו ההודעה הראשונה
+      // Add system prompt if this is the first message
       if (history.length === 1) {
         history = [{ role: "system", content: SYSTEM_PROMPT }, ...history];
       }
 
-      // לולאה לטיפול בקריאות פונקציות
+      // Loop to handle function calls
       let iteration = 0;
       let finalResponse = null;
 
       while (iteration < this.maxIterations) {
         iteration++;
 
-        // שליחת בקשה ל-Gemini
+        // Send request to Gemini
         const geminiResponse = await this.gemini.generateContent(history, toolDefinitions);
 
-        // חילוץ התשובה
+        // Extract the response
         const response = this.gemini.extractResponse(geminiResponse);
 
-        // אם זו תשובה טקסטואלית - סיימנו
+        // If it's a textual response - we're done
         if (response.type === "text") {
           finalResponse = response.text;
           memoryStore.addAssistantMessage(sessionId, finalResponse);
           break;
         }
 
-        // אם זו קריאה לפונקציה - נבצע אותה
+        // If it's a function call - execute it
         if (response.type === "function_call") {
           const { name, args } = response.functionCall;
 
           console.log(`Executing function: ${name}`, args);
 
-          // הוספת הקריאה לזיכרון
+          // Add the call to memory
           memoryStore.addFunctionCall(sessionId, response.functionCall);
 
           try {
-            // ביצוע הפונקציה
+            // Execute the function
             const functionResult = await executeToolCall(name, args);
 
-            // הוספת התוצאה לזיכרון
+            // Add the result to memory
             const resultString = JSON.stringify(functionResult);
             memoryStore.addFunctionResult(sessionId, name, resultString);
 
-            // עדכון ההיסטוריה
+            // Update the history
             history = memoryStore.getHistory(sessionId);
           } catch (error) {
             console.error("Function execution error:", error);
 
-            // הוספת שגיאה לזיכרון
+            // Add the error to memory
             const errorMessage = JSON.stringify({
               error: error.message,
             });
@@ -81,9 +81,9 @@ export class AgentController {
         }
       }
 
-      // אם הגענו למקסימום איטרציות ללא תשובה
+      // If we reached the maximum iterations without a response
       if (!finalResponse) {
-        finalResponse = "מצטער, נתקלתי בבעיה בעיבוד הבקשה. אנא נסה שוב.";
+        finalResponse = "Sorry, I encountered an issue processing the request. Please try again.";
         memoryStore.addAssistantMessage(sessionId, finalResponse);
       }
 
@@ -100,7 +100,7 @@ export class AgentController {
   }
 
   /**
-   * איפוס סשן
+   * Reset a session
    */
   resetSession(sessionId) {
     memoryStore.clearSession(sessionId);
@@ -108,7 +108,7 @@ export class AgentController {
   }
 
   /**
-   * קבלת היסטוריית סשן
+   * Retrieve session history
    */
   getSessionHistory(sessionId) {
     return memoryStore.getHistory(sessionId);

@@ -1,22 +1,22 @@
 import { AgentController } from "../agent/agentController.js";
 import { config } from "../config/env.js";
 
-// יצירת instance של האגנט
+// Create an instance of the agent
 const agent = new AgentController(config.geminiApiKey);
 
 /**
- * Chat Controller - נקודות קצה ל-API
+ * Chat Controller - API Endpoints
  */
 
 /**
- * שליחת הודעה לאגנט
+ * Send a message to the agent
  * POST /api/chat/message
  */
 export async function sendMessage(req, res, next) {
   try {
     const { message, sessionId, userId } = req.body;
 
-    // ווידוא שיש הודעה
+    // Ensure a message is provided
     if (!message || message.trim().length === 0) {
       return res.status(400).json({
         success: false,
@@ -24,11 +24,11 @@ export async function sendMessage(req, res, next) {
       });
     }
 
-    // יצירת sessionId אוטומטי אם לא סופק
+    // Automatically create a sessionId if not provided
     const session = sessionId || `session_${Date.now()}`;
     const user = userId || "anonymous";
 
-    // עיבוד ההודעה
+    // Process the message
     const result = await agent.processMessage(session, message, user);
 
     res.json(result);
@@ -38,7 +38,7 @@ export async function sendMessage(req, res, next) {
 }
 
 /**
- * איפוס סשן
+ * Reset a session
  * POST /api/chat/reset
  */
 export async function resetSession(req, res, next) {
@@ -60,7 +60,7 @@ export async function resetSession(req, res, next) {
 }
 
 /**
- * קבלת היסטוריית שיחה
+ * Get chat history
  * GET /api/chat/history/:sessionId
  */
 export async function getHistory(req, res, next) {
@@ -88,7 +88,7 @@ export async function getHistory(req, res, next) {
 }
 
 /**
- * בדיקת בריאות
+ * Health check
  * GET /api/chat/health
  */
 export async function healthCheck(req, res) {

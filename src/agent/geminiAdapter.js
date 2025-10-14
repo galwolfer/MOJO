@@ -2,17 +2,17 @@ import fetch from "node-fetch";
 
 /**
  * Gemini API Adapter
- * מתאם לעבודה עם Google Gemini API
+ * Adapter for working with the Google Gemini API
  */
 export class GeminiAdapter {
-  constructor(apiKey, model = "gemini-1.5-pro") {
+  constructor(apiKey, model = "gemini-2.5-flash") {
     this.apiKey = apiKey;
     this.model = model;
     this.baseUrl = "https://generativelanguage.googleapis.com/v1beta/models";
   }
 
   /**
-   * שליחת בקשה ל-Gemini
+   * Sending a request to Gemini
    */
   async generateContent(messages, tools = null) {
     const url = `${this.baseUrl}/${this.model}:generateContent?key=${this.apiKey}`;
@@ -29,7 +29,7 @@ export class GeminiAdapter {
       },
     };
 
-    // אם יש כלים, נוסיף אותם
+    // If there are tools, add them
     if (tools && tools.length > 0) {
       requestBody.tools = [
         {
@@ -55,12 +55,12 @@ export class GeminiAdapter {
   }
 
   /**
-   * המרת הודעות לפורמט של Gemini
+   * Convert messages to Gemini format
    */
   convertMessagesToGeminiFormat(messages) {
     return messages.map((msg) => {
       if (msg.role === "system") {
-        // Gemini לא תומך ב-system role, נהפוך ל-user
+        // Gemini does not support the system role, convert to user
         return {
           role: "user",
           parts: [{ text: `[System]: ${msg.content}` }],
@@ -100,7 +100,7 @@ export class GeminiAdapter {
   }
 
   /**
-   * חילוץ התשובה מתגובת Gemini
+   * Extract the response from Gemini's reply
    */
   extractResponse(geminiResponse) {
     const candidate = geminiResponse.candidates?.[0];
@@ -113,7 +113,7 @@ export class GeminiAdapter {
       throw new Error("No parts in Gemini response");
     }
 
-    // אם יש קריאה לפונקציה
+    // If there is a function call
     if (part.functionCall) {
       return {
         type: "function_call",
@@ -121,7 +121,7 @@ export class GeminiAdapter {
       };
     }
 
-    // אם יש טקסט רגיל
+    // If there is plain text
     if (part.text) {
       return {
         type: "text",

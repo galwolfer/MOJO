@@ -22,16 +22,12 @@ const router = Router();
 // Shared/infra routes
 router.use(healthRouter);
 
+// ==================== OFEK — ROUTES (START) ====================
+// Base path for Ofek's feature-set
+
 // Chat/Agent routes
 router.use("/chat", chatRouter);
 
-// ==================== OFEK — ROUTES (START) ====================
-// Base path for Ofek's feature-set
-router.get("/ofek/items", ofekListItems);
-router.post("/ofek/items", ofekCreateItem);
-// Add more Ofek routes below
-// router.put('/ofek/items/:id', ...);
-// router.delete('/ofek/items/:id', ...);
 // ==================== OFEK — ROUTES (END) ======================
 
 // ==================== GAL — ROUTES (START) =====================

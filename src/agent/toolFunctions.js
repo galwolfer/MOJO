@@ -7,21 +7,21 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 /**
- * כלים זמינים לאגנט
+ * Available tools for the agent
  */
 
-// אתחול DB
+// Initialize DB
 const dbPath = join(__dirname, "../../data/db.json");
 const adapter = new JSONFile(dbPath);
 const db = new Low(adapter, { users: [], tasks: [], notes: [] });
 
 /**
- * הגדרת הכלים ב-Gemini Format
+ * Define tools in Gemini Format
  */
 export const toolDefinitions = [
   {
     name: "get_current_time",
-    description: "מחזיר את השעה והתאריך הנוכחיים",
+    description: "Returns the current date and time",
     parameters: {
       type: "object",
       properties: {},
@@ -29,21 +29,21 @@ export const toolDefinitions = [
   },
   {
     name: "add_task",
-    description: "מוסיף משימה חדשה למשתמש",
+    description: "Adds a new task for a user",
     parameters: {
       type: "object",
       properties: {
         userId: {
           type: "string",
-          description: "מזהה המשתמש",
+          description: "User identifier",
         },
         title: {
           type: "string",
-          description: "כותרת המשימה",
+          description: "Task title",
         },
         description: {
           type: "string",
-          description: "תיאור המשימה (אופציונלי)",
+          description: "Task description (optional)",
         },
       },
       required: ["userId", "title"],
@@ -51,13 +51,13 @@ export const toolDefinitions = [
   },
   {
     name: "get_tasks",
-    description: "מחזיר את רשימת המשימות של משתמש",
+    description: "Returns the list of tasks for a user",
     parameters: {
       type: "object",
       properties: {
         userId: {
           type: "string",
-          description: "מזהה המשתמש",
+          description: "User identifier",
         },
       },
       required: ["userId"],
@@ -65,22 +65,22 @@ export const toolDefinitions = [
   },
   {
     name: "create_note",
-    description: "יוצר הערה חדשה",
+    description: "Creates a new note",
     parameters: {
       type: "object",
       properties: {
         userId: {
           type: "string",
-          description: "מזהה המשתמש",
+          description: "User identifier",
         },
         content: {
           type: "string",
-          description: "תוכן ההערה",
+          description: "Note content",
         },
         tags: {
           type: "array",
           items: { type: "string" },
-          description: "תגיות (אופציונלי)",
+          description: "Tags (optional)",
         },
       },
       required: ["userId", "content"],
@@ -89,14 +89,14 @@ export const toolDefinitions = [
 ];
 
 /**
- * מימוש הכלים
+ * Tool implementations
  */
 export const toolImplementations = {
   get_current_time: async () => {
     const now = new Date();
     return {
-      date: now.toLocaleDateString("he-IL"),
-      time: now.toLocaleTimeString("he-IL"),
+      date: now.toLocaleDateString("en-US"),
+      time: now.toLocaleTimeString("en-US"),
       timestamp: now.toISOString(),
     };
   },
@@ -155,7 +155,7 @@ export const toolImplementations = {
 };
 
 /**
- * מנהל ביצוע הכלים
+ * Tool execution manager
  */
 export async function executeToolCall(functionName, args) {
   const implementation = toolImplementations[functionName];

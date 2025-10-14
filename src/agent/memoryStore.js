@@ -1,17 +1,17 @@
 /**
- * Memory Store - ניהול זיכרון השיחות
+ * Memory Store - Manages conversation memory
  */
 
 class MemoryStore {
   constructor() {
-    // Map של sessionId -> array של הודעות
+    // Map of sessionId -> array of messages
     this.sessions = new Map();
-    // הגדרת מקסימום הודעות לשמור בזיכרון
+    // Define the maximum number of messages to keep in memory
     this.maxMessages = 50;
   }
 
   /**
-   * קבלת היסטוריית השיחה
+   * Retrieve conversation history
    */
   getHistory(sessionId) {
     if (!this.sessions.has(sessionId)) {
@@ -21,20 +21,20 @@ class MemoryStore {
   }
 
   /**
-   * הוספת הודעה להיסטוריה
+   * Add a message to the history
    */
   addMessage(sessionId, message) {
     const history = this.getHistory(sessionId);
     history.push(message);
 
-    // שמירה על מגבלת ההודעות
+    // Maintain the message limit
     if (history.length > this.maxMessages) {
-      history.shift(); // הסרת ההודעה הישנה ביותר
+      history.shift(); // Remove the oldest message
     }
   }
 
   /**
-   * הוספת הודעת משתמש
+   * Add a user message
    */
   addUserMessage(sessionId, content) {
     this.addMessage(sessionId, {
@@ -45,7 +45,7 @@ class MemoryStore {
   }
 
   /**
-   * הוספת הודעת עוזר
+   * Add an assistant message
    */
   addAssistantMessage(sessionId, content) {
     this.addMessage(sessionId, {
@@ -56,7 +56,7 @@ class MemoryStore {
   }
 
   /**
-   * הוספת קריאת פונקציה
+   * Add a function call
    */
   addFunctionCall(sessionId, functionCall) {
     this.addMessage(sessionId, {
@@ -67,7 +67,7 @@ class MemoryStore {
   }
 
   /**
-   * הוספת תוצאת פונקציה
+   * Add a function result
    */
   addFunctionResult(sessionId, name, result) {
     this.addMessage(sessionId, {
@@ -79,26 +79,26 @@ class MemoryStore {
   }
 
   /**
-   * ניקוי היסטוריה של סשן
+   * Clear session history
    */
   clearSession(sessionId) {
     this.sessions.delete(sessionId);
   }
 
   /**
-   * ניקוי כל הסשנים
+   * Clear all sessions
    */
   clearAll() {
     this.sessions.clear();
   }
 
   /**
-   * קבלת מספר ההודעות בסשן
+   * Get the number of messages in a session
    */
   getMessageCount(sessionId) {
     return this.getHistory(sessionId).length;
   }
 }
 
-// יצירת instance יחיד
+// Create a single instance
 export const memoryStore = new MemoryStore();
