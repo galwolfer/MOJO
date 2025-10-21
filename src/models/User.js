@@ -25,6 +25,11 @@ const userSchema = new mongoose.Schema(
       required: true,
     },
     profile: {
+      name: {
+        type: String,
+        trim: true,
+        default: "",
+      },
       tone: {
         type: String,
         enum: ["friendly", "professional", "casual", "formal", "enthusiastic"],

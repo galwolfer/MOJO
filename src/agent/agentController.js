@@ -1,7 +1,8 @@
 import { GeminiAdapter } from "./geminiAdapter.js";
 import { memoryStore } from "./mongoMemoryStore.js";
 import { toolDefinitions, executeToolCall } from "./toolFunctions.js";
-import { SYSTEM_PROMPT } from "./prompts.js";
+import { buildSystemPromptWithUserContext } from "./prompts.js";
+import { User } from "../models/index.js";
 
 /**
  * Agent Controller - The central controller for the agent
@@ -17,21 +18,34 @@ export class AgentController {
    */
   async processMessage(sessionId, userMessage, userId) {
     try {
+      console.log(`[AgentController] Processing message for user: ${userId}, session: ${sessionId}`);
+
       // Add the user's message to memory
       await memoryStore.addUserMessage(sessionId, userId, userMessage);
 
       // Retrieve the history
       let history = await memoryStore.getHistory(sessionId);
+      console.log(`[AgentController] History length: ${history.length}`);
 
-      // Add system prompt if this is the first message
-      if (history.length === 1) {
-        // Include userId in system prompt so the agent knows who the user is
-        const systemPromptWithUser = `${SYSTEM_PROMPT}
+      // Always load user profile and add system prompt at the beginning
+      // (Gemini needs it in every request, not saved in DB)
+      const user = await User.findById(userId);
+      console.log(`[AgentController] User found:`, user ? `${user.username} (${user._id})` : "NOT FOUND");
 
-IMPORTANT: The current user's ID is: ${userId}
-When you need to perform actions for the user (like adding tasks, creating notes, etc.), use this userId: ${userId}`;
-        history = [{ role: "system", content: systemPromptWithUser }, ...history];
-      }
+      const userProfile = user?.profile || {};
+      console.log(`[AgentController] User profile:`, {
+        name: userProfile.name,
+        tone: userProfile.tone,
+        persona: userProfile.persona,
+      });
+
+      // Build personalized system prompt with user context
+      const systemPrompt = buildSystemPromptWithUserContext(userProfile, userId);
+      console.log(`[AgentController] System prompt length: ${systemPrompt.length} chars`);
+      console.log(`[AgentController] System prompt preview:`, systemPrompt.substring(0, 200) + "...");
+
+      // Add system prompt at the beginning of history
+      history = [{ role: "system", content: systemPrompt }, ...history];
 
       // Loop to handle function calls
       let iteration = 0;

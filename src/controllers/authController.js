@@ -183,7 +183,7 @@ export async function getMe(req, res, next) {
  */
 export async function updateProfile(req, res, next) {
   try {
-    const { tone, persona, settings } = req.body;
+    const { name, tone, persona, settings } = req.body;
     const userId = req.user.userId;
 
     const user = await User.findById(userId);
@@ -196,6 +196,7 @@ export async function updateProfile(req, res, next) {
     }
 
     // Update profile fields
+    if (name !== undefined) user.profile.name = name;
     if (tone) user.profile.tone = tone;
     if (persona) user.profile.persona = persona;
     if (settings) {
