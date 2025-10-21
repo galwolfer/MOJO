@@ -1,7 +1,10 @@
 import mongoose from "mongoose";
 
 /**
- * Embedding Schema - Stores vector embeddings for semantic search
+ * Embedding Schema - DEPRECATED - Vector embeddings now stored in Memory model
+ * This model is kept for backward compatibility only
+ *
+ * @deprecated Use Memory model with embedded vectors instead
  */
 const embeddingSchema = new mongoose.Schema(
   {

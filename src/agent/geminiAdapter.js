@@ -79,13 +79,24 @@ export class GeminiAdapter {
       }
 
       if (msg.role === "function") {
+        // Parse the content if it's a string (from JSON.stringify)
+        let responseContent = msg.content;
+        if (typeof responseContent === "string") {
+          try {
+            responseContent = JSON.parse(responseContent);
+          } catch (e) {
+            // If parsing fails, keep as string
+            console.warn("Could not parse function response:", e);
+          }
+        }
+
         return {
           role: "function",
           parts: [
             {
               functionResponse: {
                 name: msg.name,
-                response: msg.content,
+                response: responseContent,
               },
             },
           ],

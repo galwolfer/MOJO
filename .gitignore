@@ -12,7 +12,7 @@ dist
 dist-ssr
 *.local
 ./.env
-md/
+md
 
 # Editor directories and files
 .vscode/*
@@ -34,3 +34,7 @@ data/memory.db
 data/memory.db-shm
 data/memory.db-wal
 data/vector_db/
+
+# Test users and data (optional)
+# Uncomment to ignore test data
+# data/test_*

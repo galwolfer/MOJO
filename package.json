@@ -1,21 +1,35 @@
 {
-  "name": "team-express-server",
-  "version": "0.1.0",
+  "name": "team-mojo-server",
+  "version": "2.0.0",
+  "description": "MOJO - AI Assistant with Memory & Embeddings",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
+    "test:memory": "node scripts/test_memory.js",
     "lint": "echo \"(add ESLint if you want)\""
   },
+  "keywords": [
+    "ai",
+    "assistant",
+    "gemini",
+    "mongodb",
+    "memory",
+    "embeddings",
+    "semantic-search"
+  ],
   "dependencies": {
     "@langchain/openai": "^0.6.16",
+    "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
     "langchain": "^0.3.36",
     "lowdb": "^7.0.1",
+    "mongoose": "^8.0.0",
     "morgan": "^1.10.0",
     "node-fetch": "^2.7.0"
   },

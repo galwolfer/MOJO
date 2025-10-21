@@ -14,15 +14,16 @@ Always be kind, helpful, and accurate in your responses.
 If you are unsure about something, say so honestly.
 
 When a user requests an action, use the tools available to you.
-Provide clear and concise answers in English.`;
+IMPORTANT: Always respond in the same language the user is using. If the user writes in Hebrew, respond in Hebrew. If they write in English, respond in English.`;
 
 /**
- * Build a personalized system prompt with user context
+ * Build a personalized system prompt with user context and memories
  * @param {Object} userProfile - The user's profile information
  * @param {string} userId - The user's ID
+ * @param {string} memoryContext - Formatted memory context (optional)
  * @returns {string} The personalized system prompt
  */
-export function buildSystemPromptWithUserContext(userProfile, userId) {
+export function buildSystemPromptWithUserContext(userProfile, userId, memoryContext = "") {
   let userContext = `\n\n=== USER CONTEXT ===`;
 
   if (userProfile?.name) {
@@ -65,7 +66,15 @@ export function buildSystemPromptWithUserContext(userProfile, userId) {
   userContext += `\n\nIMPORTANT: When you need to perform actions for the user (like adding tasks, creating notes, etc.), use this userId: ${userId}`;
   userContext += `\n===================\n`;
 
-  return SYSTEM_PROMPT + userContext;
+  // Add semantic memory context if provided
+  let fullPrompt = SYSTEM_PROMPT + userContext;
+
+  if (memoryContext && memoryContext.trim().length > 0) {
+    fullPrompt += `\n${memoryContext}`;
+    fullPrompt += `\n\nUse the above information about the user and past conversations to provide more personalized and contextual responses.\n`;
+  }
+
+  return fullPrompt;
 }
 
 export const USER_GREETING = `Hello! I am MOJO, your digital assistant.

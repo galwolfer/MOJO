@@ -2,8 +2,16 @@
  * MongoDB Memory Store - Replaces SQLite-based memory store
  * Manages conversation memory, user profiles, and embeddings using MongoDB
  */
-import { User, Session, Memory, Embedding } from "../models/index.js";
-import { storeMemory, retrieveRelevantMemories as retrieveFromVectorStore } from "./vectorStore.js";
+import { User, Session, Memory } from "../models/index.js";
+import {
+  storePrimaryMemory,
+  storeConversationMemory,
+  retrievePrimaryMemories,
+  retrieveConversationMemories,
+  retrieveRelevantMemories as retrieveFromVectorStore,
+  getAllMemories as getAllMemoriesFromStore,
+  pruneOldConversationMemories,
+} from "./vectorStore.js";
 
 class MongoMemoryStore {
   constructor() {
@@ -220,29 +228,42 @@ class MongoMemoryStore {
   }
 
   /**
-   * Save a memory to MongoDB
+   * Save a memory to MongoDB with embeddings
+   *
+   * @param {string} userId - User ID
+   * @param {string} memoryText - Memory text
+   * @param {string} memoryType - Memory type
+   * @param {number} importance - Importance (1-10)
+   * @param {Object} options - Additional options
+   * @returns {Promise<string>} Memory ID
    */
-  async saveMemory(userId, memoryText, memoryType = "general", importance = 5) {
+  async saveMemory(userId, memoryText, memoryType = "general", importance = 5, options = {}) {
     try {
-      const memory = new Memory({
-        userId,
-        text: memoryText,
-        type: memoryType,
-        importance,
-        source: "chat",
-      });
+      // Determine category based on type
+      let category = "conversation";
+      if (["profile", "preference", "user_fact"].includes(memoryType)) {
+        category = "primary";
+      }
 
-      await memory.save();
+      // Store using appropriate function
+      let memoryId;
+      if (category === "primary") {
+        memoryId = await storePrimaryMemory(userId, memoryText, {
+          type: memoryType,
+          importance,
+          metadata: options.metadata || {},
+        });
+      } else {
+        memoryId = await storeConversationMemory(userId, memoryText, {
+          type: memoryType,
+          importance,
+          sessionId: options.sessionId || null,
+          metadata: options.metadata || {},
+        });
+      }
 
-      // Also save to vector store for semantic search
-      await storeMemory(userId, memoryText, {
-        memoryType,
-        importance,
-        memoryId: memory._id.toString(),
-      });
-
-      console.log(`✅ Memory saved for user ${userId}`);
-      return memory._id;
+      console.log(`✅ Memory saved for user ${userId} [${category}/${memoryType}]`);
+      return memoryId;
     } catch (error) {
       console.error("Error saving memory:", error);
       throw error;
@@ -250,13 +271,57 @@ class MongoMemoryStore {
   }
 
   /**
-   * Get all memories for a user
+   * Save primary memory (זיכרון ראשי)
+   * הגדרות, העדפות, עובדות על המשתמש
    */
-  async getMemories(userId, limit = 50) {
+  async savePrimaryMemory(userId, memoryText, type = "user_fact", importance = 8, metadata = {}) {
     try {
-      const memories = await Memory.find({ userId }).sort({ createdAt: -1 }).limit(limit).lean();
+      const memoryId = await storePrimaryMemory(userId, memoryText, {
+        type,
+        importance,
+        metadata,
+      });
 
-      return memories;
+      console.log(`✅ Primary memory saved: ${type}`);
+      return memoryId;
+    } catch (error) {
+      console.error("Error saving primary memory:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save conversation memory (זיכרון שיחות)
+   * מידע חשוב מהשיחות
+   */
+  async saveConversationMemory(userId, memoryText, type = "conversation", importance = 5, options = {}) {
+    try {
+      const memoryId = await storeConversationMemory(userId, memoryText, {
+        type,
+        importance,
+        sessionId: options.sessionId || null,
+        metadata: options.metadata || {},
+      });
+
+      console.log(`✅ Conversation memory saved: ${type}`);
+      return memoryId;
+    } catch (error) {
+      console.error("Error saving conversation memory:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all memories for a user
+   *
+   * @param {string} userId - User ID
+   * @param {string} category - Filter by category ("primary", "conversation", or null for all)
+   * @param {number} limit - Max number of memories to retrieve
+   * @returns {Promise<Array>} Memories
+   */
+  async getMemories(userId, category = null, limit = 50) {
+    try {
+      return await getAllMemoriesFromStore(userId, category, limit);
     } catch (error) {
       console.error("Error getting memories:", error);
       return [];
@@ -264,15 +329,81 @@ class MongoMemoryStore {
   }
 
   /**
-   * Retrieve relevant memories using semantic search
+   * Get primary memories (זיכרון ראשי)
    */
-  async retrieveRelevantMemories(userId, query, topK = 5) {
+  async getPrimaryMemories(userId, limit = 20) {
+    try {
+      return await getAllMemoriesFromStore(userId, "primary", limit);
+    } catch (error) {
+      console.error("Error getting primary memories:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Get conversation memories (זיכרון שיחות)
+   */
+  async getConversationMemories(userId, limit = 50) {
+    try {
+      return await getAllMemoriesFromStore(userId, "conversation", limit);
+    } catch (error) {
+      console.error("Error getting conversation memories:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Retrieve relevant memories using semantic search
+   * מחזיר גם זיכרון ראשי וגם זיכרון שיחות
+   *
+   * @param {string} userId - User ID
+   * @param {string} query - Search query
+   * @param {number} topK - Number of results to return
+   * @returns {Promise<Object>} Object with primary, conversation, and all memories
+   */
+  async retrieveRelevantMemories(userId, query, topK = 10) {
     try {
       const memories = await retrieveFromVectorStore(userId, query, topK);
-      console.log(`✅ Retrieved ${memories.length} relevant memories`);
+      console.log(`✅ Retrieved memories:`, {
+        primary: memories.primary.length,
+        conversation: memories.conversation.length,
+        total: memories.all.length,
+      });
       return memories;
     } catch (error) {
       console.error("Error retrieving relevant memories:", error);
+      return {
+        primary: [],
+        conversation: [],
+        all: [],
+      };
+    }
+  }
+
+  /**
+   * Retrieve only primary memories (זיכרון ראשי)
+   */
+  async retrievePrimaryMemories(userId, query, topK = 5) {
+    try {
+      const memories = await retrievePrimaryMemories(userId, query, topK);
+      console.log(`✅ Retrieved ${memories.length} primary memories`);
+      return memories;
+    } catch (error) {
+      console.error("Error retrieving primary memories:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Retrieve only conversation memories (זיכרון שיחות)
+   */
+  async retrieveConversationMemories(userId, query, topK = 10, options = {}) {
+    try {
+      const memories = await retrieveConversationMemories(userId, query, topK, options);
+      console.log(`✅ Retrieved ${memories.length} conversation memories`);
+      return memories;
+    } catch (error) {
+      console.error("Error retrieving conversation memories:", error);
       return [];
     }
   }
@@ -311,22 +442,34 @@ class MongoMemoryStore {
   }
 
   /**
-   * Prune old conversations
+   * Prune old conversations and memories
    */
   async pruneOldConversations(userId, daysOld = 30) {
     try {
+      // Prune old sessions
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - daysOld);
 
-      const result = await Session.deleteMany({
+      const sessionResult = await Session.deleteMany({
         userId,
         lastActiveAt: { $lt: cutoffDate },
       });
 
-      return result.deletedCount;
+      // Prune old conversation memories (but keep important ones)
+      const memoryCount = await pruneOldConversationMemories(userId, daysOld);
+
+      console.log(`✅ Pruned ${sessionResult.deletedCount} sessions and ${memoryCount} memories`);
+
+      return {
+        sessions: sessionResult.deletedCount,
+        memories: memoryCount,
+      };
     } catch (error) {
       console.error("Error pruning conversations:", error);
-      return 0;
+      return {
+        sessions: 0,
+        memories: 0,
+      };
     }
   }
 

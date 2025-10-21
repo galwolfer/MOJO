@@ -3,6 +3,7 @@ import { memoryStore } from "./mongoMemoryStore.js";
 import { toolDefinitions, executeToolCall } from "./toolFunctions.js";
 import { buildSystemPromptWithUserContext } from "./prompts.js";
 import { User } from "../models/index.js";
+import { analyzeAndExtractMemories } from "./memoryExtractor.js";
 
 /**
  * Agent Controller - The central controller for the agent
@@ -14,7 +15,7 @@ export class AgentController {
   }
 
   /**
-   * Process a user message
+   * Process a user message with semantic memory retrieval
    */
   async processMessage(sessionId, userMessage, userId) {
     try {
@@ -27,8 +28,7 @@ export class AgentController {
       let history = await memoryStore.getHistory(sessionId);
       console.log(`[AgentController] History length: ${history.length}`);
 
-      // Always load user profile and add system prompt at the beginning
-      // (Gemini needs it in every request, not saved in DB)
+      // Load user profile
       const user = await User.findById(userId);
       console.log(`[AgentController] User found:`, user ? `${user.username} (${user._id})` : "NOT FOUND");
 
@@ -39,10 +39,43 @@ export class AgentController {
         persona: userProfile.persona,
       });
 
-      // Build personalized system prompt with user context
-      const systemPrompt = buildSystemPromptWithUserContext(userProfile, userId);
+      // ===== SEMANTIC MEMORY RETRIEVAL =====
+      // Retrieve relevant memories based on the user's message
+      console.log(`[AgentController] Retrieving relevant memories for query: "${userMessage.substring(0, 50)}..."`);
+
+      const relevantMemories = await memoryStore.retrieveRelevantMemories(
+        userId,
+        userMessage,
+        10 // Retrieve top 10 relevant memories
+      );
+
+      // Format memories for prompt
+      let memoryContext = "";
+
+      // Add primary memories (הגדרות, העדפות, עובדות)
+      if (relevantMemories.primary && relevantMemories.primary.length > 0) {
+        memoryContext += "\n\n=== USER PROFILE & PREFERENCES ===\n";
+        relevantMemories.primary.forEach((mem, idx) => {
+          memoryContext += `${idx + 1}. [${mem.type}] ${mem.text}\n`;
+        });
+      }
+
+      // Add conversation memories (מידע מהשיחות הקודמות)
+      if (relevantMemories.conversation && relevantMemories.conversation.length > 0) {
+        memoryContext += "\n=== RELEVANT PAST CONVERSATIONS ===\n";
+        relevantMemories.conversation.forEach((mem, idx) => {
+          memoryContext += `${idx + 1}. ${mem.text}\n`;
+        });
+      }
+
+      console.log(`[AgentController] Memory context length: ${memoryContext.length} chars`);
+      console.log(
+        `[AgentController] Retrieved ${relevantMemories.primary.length} primary + ${relevantMemories.conversation.length} conversation memories`
+      );
+
+      // Build personalized system prompt with user context AND memories
+      const systemPrompt = buildSystemPromptWithUserContext(userProfile, userId, memoryContext);
       console.log(`[AgentController] System prompt length: ${systemPrompt.length} chars`);
-      console.log(`[AgentController] System prompt preview:`, systemPrompt.substring(0, 200) + "...");
 
       // Add system prompt at the beginning of history
       history = [{ role: "system", content: systemPrompt }, ...history];
@@ -104,6 +137,17 @@ export class AgentController {
       if (!finalResponse) {
         finalResponse = "Sorry, I encountered an issue processing the request. Please try again.";
         await memoryStore.addAssistantMessage(sessionId, userId, finalResponse);
+      }
+
+      // ===== AUTO EXTRACT MEMORIES =====
+      // Extract important information from the conversation
+      console.log(`🔍 Starting memory extraction for session ${sessionId}`);
+      try {
+        await analyzeAndExtractMemories(userId, sessionId, userMessage, finalResponse);
+        console.log(`✅ Memory extraction completed for session ${sessionId}`);
+      } catch (error) {
+        console.error("❌ Error extracting memories:", error);
+        // Don't fail the whole request if memory extraction fails
       }
 
       return {
