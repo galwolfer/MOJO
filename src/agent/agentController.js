@@ -1,5 +1,5 @@
 import { GeminiAdapter } from "./geminiAdapter.js";
-import { memoryStore } from "./memoryStore.js";
+import { memoryStore } from "./mongoMemoryStore.js";
 import { toolDefinitions, executeToolCall } from "./toolFunctions.js";
 import { SYSTEM_PROMPT } from "./prompts.js";
 
@@ -18,14 +18,19 @@ export class AgentController {
   async processMessage(sessionId, userMessage, userId) {
     try {
       // Add the user's message to memory
-      memoryStore.addUserMessage(sessionId, userMessage);
+      await memoryStore.addUserMessage(sessionId, userId, userMessage);
 
       // Retrieve the history
-      let history = memoryStore.getHistory(sessionId);
+      let history = await memoryStore.getHistory(sessionId);
 
       // Add system prompt if this is the first message
       if (history.length === 1) {
-        history = [{ role: "system", content: SYSTEM_PROMPT }, ...history];
+        // Include userId in system prompt so the agent knows who the user is
+        const systemPromptWithUser = `${SYSTEM_PROMPT}
+
+IMPORTANT: The current user's ID is: ${userId}
+When you need to perform actions for the user (like adding tasks, creating notes, etc.), use this userId: ${userId}`;
+        history = [{ role: "system", content: systemPromptWithUser }, ...history];
       }
 
       // Loop to handle function calls
@@ -44,7 +49,7 @@ export class AgentController {
         // If it's a textual response - we're done
         if (response.type === "text") {
           finalResponse = response.text;
-          memoryStore.addAssistantMessage(sessionId, finalResponse);
+          await memoryStore.addAssistantMessage(sessionId, userId, finalResponse);
           break;
         }
 
@@ -55,7 +60,7 @@ export class AgentController {
           console.log(`Executing function: ${name}`, args);
 
           // Add the call to memory
-          memoryStore.addFunctionCall(sessionId, response.functionCall);
+          await memoryStore.addFunctionCall(sessionId, userId, response.functionCall);
 
           try {
             // Execute the function
@@ -63,10 +68,10 @@ export class AgentController {
 
             // Add the result to memory
             const resultString = JSON.stringify(functionResult);
-            memoryStore.addFunctionResult(sessionId, name, resultString);
+            await memoryStore.addFunctionResult(sessionId, userId, name, resultString);
 
             // Update the history
-            history = memoryStore.getHistory(sessionId);
+            history = await memoryStore.getHistory(sessionId);
           } catch (error) {
             console.error("Function execution error:", error);
 
@@ -74,9 +79,9 @@ export class AgentController {
             const errorMessage = JSON.stringify({
               error: error.message,
             });
-            memoryStore.addFunctionResult(sessionId, name, errorMessage);
+            await memoryStore.addFunctionResult(sessionId, userId, name, errorMessage);
 
-            history = memoryStore.getHistory(sessionId);
+            history = await memoryStore.getHistory(sessionId);
           }
         }
       }
@@ -84,14 +89,14 @@ export class AgentController {
       // If we reached the maximum iterations without a response
       if (!finalResponse) {
         finalResponse = "Sorry, I encountered an issue processing the request. Please try again.";
-        memoryStore.addAssistantMessage(sessionId, finalResponse);
+        await memoryStore.addAssistantMessage(sessionId, userId, finalResponse);
       }
 
       return {
         success: true,
         response: finalResponse,
         sessionId,
-        messageCount: memoryStore.getMessageCount(sessionId),
+        messageCount: await memoryStore.getMessageCount(sessionId),
       };
     } catch (error) {
       console.error("Agent processing error:", error);
@@ -102,15 +107,15 @@ export class AgentController {
   /**
    * Reset a session
    */
-  resetSession(sessionId) {
-    memoryStore.clearSession(sessionId);
+  async resetSession(sessionId, userId) {
+    await memoryStore.clearSession(sessionId);
     return { success: true, message: "Session reset successfully" };
   }
 
   /**
    * Retrieve session history
    */
-  getSessionHistory(sessionId) {
-    return memoryStore.getHistory(sessionId);
+  async getSessionHistory(sessionId, userId) {
+    return await memoryStore.getHistory(sessionId);
   }
 }

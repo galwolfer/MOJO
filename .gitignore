@@ -25,3 +25,12 @@ md/
 *.sln
 *.sw?
 *.env
+
+# Authentication tokens (CLI)
+scripts/.token
+
+# Database files
+data/memory.db
+data/memory.db-shm
+data/memory.db-wal
+data/vector_db/

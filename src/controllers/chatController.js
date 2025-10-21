@@ -14,7 +14,8 @@ const agent = new AgentController(config.geminiApiKey);
  */
 export async function sendMessage(req, res, next) {
   try {
-    const { message, sessionId, userId } = req.body;
+    const { message, sessionId } = req.body;
+    const userId = req.user.userId; // From auth middleware
 
     // Ensure a message is provided
     if (!message || message.trim().length === 0) {
@@ -26,10 +27,9 @@ export async function sendMessage(req, res, next) {
 
     // Automatically create a sessionId if not provided
     const session = sessionId || `session_${Date.now()}`;
-    const user = userId || "anonymous";
 
     // Process the message
-    const result = await agent.processMessage(session, message, user);
+    const result = await agent.processMessage(session, message, userId);
 
     res.json(result);
   } catch (error) {
@@ -44,6 +44,7 @@ export async function sendMessage(req, res, next) {
 export async function resetSession(req, res, next) {
   try {
     const { sessionId } = req.body;
+    const userId = req.user.userId; // From auth middleware
 
     if (!sessionId) {
       return res.status(400).json({
@@ -52,7 +53,7 @@ export async function resetSession(req, res, next) {
       });
     }
 
-    const result = agent.resetSession(sessionId);
+    const result = agent.resetSession(sessionId, userId);
     res.json(result);
   } catch (error) {
     next(error);
@@ -66,6 +67,7 @@ export async function resetSession(req, res, next) {
 export async function getHistory(req, res, next) {
   try {
     const { sessionId } = req.params;
+    const userId = req.user.userId; // From auth middleware
 
     if (!sessionId) {
       return res.status(400).json({
@@ -74,7 +76,7 @@ export async function getHistory(req, res, next) {
       });
     }
 
-    const history = agent.getSessionHistory(sessionId);
+    const history = await agent.getSessionHistory(sessionId, userId);
 
     res.json({
       success: true,

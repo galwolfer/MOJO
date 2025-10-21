@@ -5,6 +5,7 @@
 import { Router } from "express";
 import healthRouter from "./health.js";
 import chatRouter from "./chat.js";
+import authRouter from "./auth.js";
 import {
   // Ofek controllers
   ofekListItems,
@@ -21,6 +22,9 @@ const router = Router();
 
 // Shared/infra routes
 router.use(healthRouter);
+
+// Authentication routes (public)
+router.use("/auth", authRouter);
 
 // ==================== OFEK — ROUTES (START) ====================
 // Base path for Ofek's feature-set
