@@ -12,6 +12,8 @@ import {
   galGetProfile,
   galUpdateProfile,
   // Joni controllers
+  joniCoachNext,
+  joniCoachFeedback,
   joniStats,
   joniTriggerJob,
 } from "../controllers/index.js";
@@ -39,11 +41,11 @@ router.put("/gal/profile", galUpdateProfile);
 // ==================== GAL — ROUTES (END) =======================
 
 // ==================== JONI — ROUTES (START) ====================
-// Base path for Joni's feature-set
+router.post("/joni/coach/next", joniCoachNext);
+router.post("/joni/coach/feedback", joniCoachFeedback);
+
 router.get("/joni/stats", joniStats);
 router.post("/joni/job", joniTriggerJob);
-// Add more Joni routes below
-// router.delete('/joni/resource/:id', ...);
 // ==================== JONI — ROUTES (END) ======================
 
 export default router;
