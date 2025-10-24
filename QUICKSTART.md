@@ -1,131 +1,215 @@
-# 🚀 Quick Start — MOJO with MongoDB & Authentication
+# מדריך התחלה מהירה - MOJO Chat Agent ⚡
 
-This quick start will get you a running MOJO server (local MongoDB), create a user, and show how to send messages from the PowerShell CLI.
-
-Prerequisites
-- Node.js (16+)
-- MongoDB running locally or a MongoDB Atlas connection string
-
-1) Configure environment
-
-Create a `.env` file in the project root with values similar to:
+## צעד 1: התקנה (2 דקות)
 
 ```bash
-# MongoDB connection (local example)
-MONGODB_URI=mongodb://localhost:27017/mojo
+# שכפל את הפרויקט (אם עוד לא עשית)
+git clone <repository-url>
+cd Mojo
 
-# Authentication
-JWT_SECRET=replace-with-a-secure-secret
-
-# Gemini (optional)
-GEMINI_API_KEY=your_gemini_api_key_here
-
-# Server
-PORT=3000
+# התקן dependencies
+npm install
 ```
 
-2) Start the server
+## צעד 2: הגדרת Gemini API (1 דקה)
 
-Run in PowerShell:
+1. **קבל API Key:**
+   - גש ל-[Google AI Studio](https://makersuite.google.com/app/apikey)
+   - לחץ על "Get API Key" או "Create API Key"
+   - העתק את המפתח
 
-```powershell
+2. **הגדר את קובץ .env:**
+```bash
+# העתק את קובץ הדוגמה
+cp .env.example .env
+
+# פתח את .env ושנה:
+GEMINI_API_KEY=your_actual_api_key_here
+```
+
+## צעד 3: הרץ את השרת (10 שניות)
+
+```bash
 npm run dev
 ```
 
-You should see logs like:
-
+אמור להופיע:
 ```
-✅ MongoDB connected successfully
-[LOG] HTTP server listening on http://localhost:3000
-✅ Vector store initialized
+🚀 Server running on http://localhost:3000
 ```
 
-3) Register a user
+## צעד 4: בדוק שהכל עובד ✅
 
-Register a new user (this prints a JWT and saves it to `scripts/.token`):
+פתח טרמינל חדש והרץ:
 
-```powershell
-.\scripts\register.ps1 -Username "ofek" -Email "ofek@example.com" -Password "123456"
+```bash
+curl -X POST http://localhost:3000/api/chat/message \
+  -H "Content-Type: application/json" \
+  -d "{\"message\": \"שלום!\"}"
 ```
 
-If the user already exists, use the login command below.
+אמורה להתקבל תשובה מהאגנט! 🎉
 
-4) Login (if needed)
+## דוגמאות מהירות
 
-Login will produce and save a JWT to `scripts/.token` as well:
-
-```powershell
-.\scripts\login.ps1 -Username "ofek" -Password "123456"
+### 1. שאל מה השעה
+```bash
+curl -X POST http://localhost:3000/api/chat/message \
+  -H "Content-Type: application/json" \
+  -d "{\"message\": \"מה השעה?\"}"
 ```
 
-5) Send a single message (CLI)
-
-Send a one-time message to the server (uses the token saved in `scripts/.token`):
-
-```powershell
-.\scripts\send-message.ps1 -Message "Hello from CLI!"
+### 2. הוסף משימה
+```bash
+curl -X POST http://localhost:3000/api/chat/message \
+  -H "Content-Type: application/json" \
+  -d "{\"message\": \"תוסיף משימה: לקנות חלב\", \"userId\": \"user1\"}"
 ```
 
-6) Start interactive chat session
-
-For an interactive chat (like a chat room), run:
-
-```powershell
-.\scripts\chat.ps1
+### 3. ראה את המשימות
+```bash
+curl -X POST http://localhost:3000/api/chat/message \
+  -H "Content-Type: application/json" \
+  -d "{\"message\": \"תראה לי את המשימות שלי\", \"userId\": \"user1\"}"
 ```
 
-This will:
-- Load your token from `scripts/.token`
-- Create a persistent chat session
-- Let you send messages and receive MOJO's replies in a loop
-- Type `exit` or `quit` to end the session
+## בדיקה מהדפדפן
 
-Example interaction:
-```
-You: Hello, who are you?
-MOJO: Hi! I'm MOJO, your AI assistant...
+אפשר גם להשתמש ב-Postman או לשלוח בקשה מקוד JavaScript:
 
-You: Add a task to review the presentation tomorrow at 2pm
-MOJO: I've added the task...
-
-You: exit
-Goodbye!
-```
-
-7) Continue with other commands
-
-```powershell
-.\scripts\chat.ps1
+```javascript
+// הדבק בקונסול של הדפדפן (F12)
+fetch('http://localhost:3000/api/chat/message', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    message: 'שלום MOJO!'
+  })
+})
+.then(r => r.json())
+.then(data => console.log(data.response));
 ```
 
-Useful commands
+## מה הלאה?
 
-- Show saved token (if any):
-```powershell
-Get-Content .\scripts\.token
+### יצירת UI פשוט (HTML)
+
+צור קובץ `test-chat.html`:
+
+```html
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+  <meta charset="UTF-8">
+  <title>MOJO Chat</title>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    #messages { 
+      border: 1px solid #ccc; 
+      height: 400px; 
+      overflow-y: auto; 
+      padding: 10px; 
+      margin-bottom: 10px;
+    }
+    .message { margin: 10px 0; padding: 10px; border-radius: 5px; }
+    .user { background: #e3f2fd; text-align: left; }
+    .assistant { background: #f1f8e9; text-align: right; }
+    #input { width: 80%; padding: 10px; }
+    #send { padding: 10px 20px; }
+  </style>
+</head>
+<body>
+  <h1>MOJO Chat 🤖</h1>
+  <div id="messages"></div>
+  <input type="text" id="input" placeholder="כתוב הודעה...">
+  <button id="send">שלח</button>
+
+  <script>
+    const messagesDiv = document.getElementById('messages');
+    const input = document.getElementById('input');
+    const sendBtn = document.getElementById('send');
+    let sessionId = null;
+
+    async function sendMessage() {
+      const message = input.value.trim();
+      if (!message) return;
+
+      // הצג הודעת משתמש
+      addMessage(message, 'user');
+      input.value = '';
+
+      try {
+        const response = await fetch('http://localhost:3000/api/chat/message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message, sessionId })
+        });
+
+        const data = await response.json();
+        
+        // שמור session ID
+        if (!sessionId) sessionId = data.sessionId;
+        
+        // הצג תשובה
+        addMessage(data.response, 'assistant');
+      } catch (error) {
+        addMessage('שגיאה: ' + error.message, 'assistant');
+      }
+    }
+
+    function addMessage(text, type) {
+      const div = document.createElement('div');
+      div.className = `message ${type}`;
+      div.textContent = text;
+      messagesDiv.appendChild(div);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    sendBtn.onclick = sendMessage;
+    input.onkeypress = (e) => {
+      if (e.key === 'Enter') sendMessage();
+    };
+  </script>
+</body>
+</html>
 ```
-- Send single message:
-```powershell
-.\scripts\send-message.ps1 -Message "What's the weather like?"
+
+פתח את הקובץ בדפדפן ותוכל לדבר עם האגנט! 💬
+
+## פתרון בעיות נפוצות
+
+### שגיאה: "GEMINI_API_KEY is not defined"
+✅ ודא שהעתקת את `.env.example` ל-`.env` ועדכנת את המפתח
+
+### שגיאה: "EADDRINUSE: port 3000 already in use"
+✅ הרוג את התהליך הקודם:
+```bash
+# Windows PowerShell
+Get-Process -Name node | Stop-Process -Force
+
+# או שנה את הפורט ב-.env
+PORT=3001
 ```
-- View profile:
-```powershell
-.\scripts\get-profile.ps1
-```
 
-Troubleshooting
+### השרת לא מגיב
+✅ בדוק ש-`npm run dev` רץ ללא שגיאות
 
-- "MongoDB connection failed": verify MongoDB is running and the `MONGODB_URI` in `.env` is correct.
-- "No token found": run `.\scripts\login.ps1` or `.\scripts\register.ps1` first — they save a token to `scripts/.token`.
-- "User already exists": use `.\scripts\login.ps1` instead of `register`.
+### תשובות לא בעברית
+✅ זה תלוי במודל - Gemini אמור לתמוך בעברית היטב
 
-Next steps
+## שלבים הבאים
 
-1. Try all CLI commands
-2. Inspect data with MongoDB Compass (refresh collections view if empty)
-3. Build a UI on top of the API
-4. Add external data sources
-5. Deploy to the cloud
+1. ✅ קרא את [EXAMPLES.md](./EXAMPLES.md) לדוגמאות מתקדמות
+2. ✅ קרא את [README_CHAT.md](./README_CHAT.md) להבנה מעמיקה
+3. ✅ התחל לשחק עם הכלים - הוסף משימות, הערות ועוד
+4. ✅ נסה ליצור UI משלך או להשתמש ב-React/Vue
 
-That's it — you're ready to use MOJO locally.
+## זקוק לעזרה?
 
+- 📖 [תיעוד מלא](./README_CHAT.md)
+- 💡 [דוגמאות](./EXAMPLES.md)
+- 🐛 בעיות? פתח issue
+
+---
+
+**מוכן להתחיל? בהצלחה! 🚀**
