@@ -1,7 +1,11 @@
 import mongoose from "mongoose";
 
 /**
- * Memory Schema - Stores user-level memories with embeddings
+ * Memory Schema - DEPRECATED
+ * Memories are now stored embedded within User documents
+ * This model is kept for backward compatibility and migration purposes only
+ *
+ * @deprecated Use User.memories array instead
  */
 const memorySchema = new mongoose.Schema(
   {

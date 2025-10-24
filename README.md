@@ -1,17 +1,22 @@
 ﻿# Team MOJO Server 🚀
 
-## 🎯 Phase 2 Complete - Memory & Embedding System ✅
+## 🎯 Phase 2 Complete - User-Centric Memory System ✅
 
-**מערכת זיכרון ואינדקס סמנטי מתקדמת מוטמעת ב-MongoDB**
+**Advanced user-centric memory and embedding system with MongoDB**
 
-### ✨ תכונות חדשות
-- 🧠 **זיכרון ראשי** - העדפות ועובדות על המשתמש
-- 💬 **זיכרון שיחות** - מידע חשוב מהשיחות הקודמות
-- 🔍 **חיפוש סמנטי** - מציאת מידע רלוונטי באופן חכם
-- 🤖 **הפקה אוטומטית** - זיהוי ושמירת מידע חשוב אוטומטית
-- ⚡ **ביצועים גבוהים** - embeddings מוטמעים ב-MongoDB
+### ✨ Latest Features (Refactored)
+- 🧠 **User-Centric Architecture** - All memories embedded in User documents
+- � **Dynamic User Embedding** - Auto-updated based on memories and interactions
+- 🔍 **Semantic Search** - Smart retrieval of relevant information
+- 📊 **Memory Statistics** - Track memory usage per user
+- ⚡ **High Performance** - Single query for user + all memories
+- 🎯 **Priority Management** - Importance × Recency weighting
 
-📚 **קרא את המדריך המלא**: [`md/MEMORY_EMBEDDING_SYSTEM.md`](./md/MEMORY_EMBEDDING_SYSTEM.md)
+### 📚 Documentation
+- **Quick Start**: [`MEMORY_QUICKSTART.md`](./MEMORY_QUICKSTART.md)
+- **Full Documentation**: [`md/MEMORY_REFACTOR.md`](./md/MEMORY_REFACTOR.md)
+- **Hebrew Summary**: [`md/MEMORY_REFACTOR_HE.md`](./md/MEMORY_REFACTOR_HE.md)
+- **Refactor Summary**: [`REFACTOR_SUMMARY.md`](./REFACTOR_SUMMARY.md)
 
 ---
 
@@ -45,8 +50,14 @@ npm run dev
 ## 🧪 Testing the Memory System
 
 ```bash
-# Run memory system tests
-node scripts/test_memory.js
+# Test new user-centric memory system
+npm run test:user-memory
+
+# Test backward compatibility
+npm run test:memory
+
+# Migrate existing data (if needed)
+npm run migrate:memories
 ```
 
 Or with PowerShell:

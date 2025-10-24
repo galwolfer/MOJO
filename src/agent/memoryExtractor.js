@@ -50,8 +50,13 @@ export async function extractMemoriesFromMessage(userId, sessionId, message, rol
 
     // 2. User facts (עובדות על המשתמש) - English + Hebrew
     const factPatterns = [
+      // Explicit "remember" commands (highest priority!)
+      /(?:remember|recall|note|keep in mind|don't forget|save) (?:that |this: ?)?(.+)/i,
+      /(?:תזכור|לזכור|תשמור|תזכרי|שמור|שמרי) (?:את |זה: ?|ש)?(.+)/iu,
+      
+      // Personal facts
       /(?:My|my) name is (.+)/,
-      /(?:I|i) (?:am|work as|study|am studying) (.+)/,
+      /(?:I|i) (?:am|work as|study|am studying|learn) (?:at |in |for )?(.+)/,
       /(?:I|i) (?:live|reside) in (.+)/,
       /(?:I|i) was born in (.+)/,
       /(?:I|i) speak (.+)/,
