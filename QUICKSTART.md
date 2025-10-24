@@ -1,128 +1,122 @@
-# מדריך התחלה מהירה - MOJO Chat Agent ⚡
+# Quickstart — MOJO Chat Agent ⚡
 
-## צעד 1: התקנה (2 דקות)
+This quickstart helps you get the MOJO chat agent running locally.
+
+## Step 1 — Install (2 minutes)
 
 ```bash
-# שכפל את הפרויקט (אם עוד לא עשית)
+# clone the repository (if you haven't already)
 git clone <repository-url>
 cd Mojo
 
-# התקן dependencies
+# install dependencies
 npm install
 ```
 
-## צעד 2: הגדרת Gemini API (1 דקה)
+## Step 2 — Configure Gemini API (1 minute)
 
-1. **קבל API Key:**
-   - גש ל-[Google AI Studio](https://makersuite.google.com/app/apikey)
-   - לחץ על "Get API Key" או "Create API Key"
-   - העתק את המפתח
+1. Get an API key from Google/Vertex AI (Gemini).
+   - In Google AI Studio (or your provider), create or retrieve an API key.
 
-2. **הגדר את קובץ .env:**
+2. Create a `.env` file and set the key:
+
 ```bash
-# העתק את קובץ הדוגמה
+# copy the example env
 cp .env.example .env
 
-# פתח את .env ושנה:
+# edit .env and add your key
 GEMINI_API_KEY=your_actual_api_key_here
 ```
 
-## צעד 3: הרץ את השרת (10 שניות)
+On Windows PowerShell you can copy the file with `Copy-Item .env.example .env`.
+
+## Step 3 — Run the server (10 seconds)
 
 ```bash
 npm run dev
 ```
 
-אמור להופיע:
+You should see:
+
 ```
 🚀 Server running on http://localhost:3000
 ```
 
-## צעד 4: בדוק שהכל עובד ✅
+## Step 4 — Smoke test (verify)
 
-פתח טרמינל חדש והרץ:
+From another terminal, send a POST request to the chat endpoint:
 
 ```bash
 curl -X POST http://localhost:3000/api/chat/message \
   -H "Content-Type: application/json" \
-  -d "{\"message\": \"שלום!\"}"
+  -d '{"message": "Hello!"}'
 ```
 
-אמורה להתקבל תשובה מהאגנט! 🎉
+You should receive a JSON response from the agent.
 
-## דוגמאות מהירות
+## Quick examples
 
-### 1. שאל מה השעה
+1) Ask for the time:
+
 ```bash
 curl -X POST http://localhost:3000/api/chat/message \
   -H "Content-Type: application/json" \
-  -d "{\"message\": \"מה השעה?\"}"
+  -d '{"message": "What time is it?"}'
 ```
 
-### 2. הוסף משימה
+2) Add a task (example):
+
 ```bash
 curl -X POST http://localhost:3000/api/chat/message \
   -H "Content-Type: application/json" \
-  -d "{\"message\": \"תוסיף משימה: לקנות חלב\", \"userId\": \"user1\"}"
+  -d '{"message": "Add task: buy milk", "userId": "user1"}'
 ```
 
-### 3. ראה את המשימות
+3) Ask to show tasks:
+
 ```bash
 curl -X POST http://localhost:3000/api/chat/message \
   -H "Content-Type: application/json" \
-  -d "{\"message\": \"תראה לי את המשימות שלי\", \"userId\": \"user1\"}"
+  -d '{"message": "Show my tasks", "userId": "user1"}'
 ```
 
-## בדיקה מהדפדפן
+## Browser / JavaScript example
 
-אפשר גם להשתמש ב-Postman או לשלוח בקשה מקוד JavaScript:
+You can also call the API from browser JS (or Postman):
 
 ```javascript
-// הדבק בקונסול של הדפדפן (F12)
 fetch('http://localhost:3000/api/chat/message', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    message: 'שלום MOJO!'
-  })
+  body: JSON.stringify({ message: 'Hello MOJO!' })
 })
 .then(r => r.json())
 .then(data => console.log(data.response));
 ```
 
-## מה הלאה?
+## Simple HTML test UI
 
-### יצירת UI פשוט (HTML)
-
-צור קובץ `test-chat.html`:
+Create a file called `test-chat.html` and open it in a browser:
 
 ```html
 <!DOCTYPE html>
-<html dir="rtl" lang="he">
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8" />
   <title>MOJO Chat</title>
   <style>
     body { font-family: Arial; padding: 20px; }
-    #messages { 
-      border: 1px solid #ccc; 
-      height: 400px; 
-      overflow-y: auto; 
-      padding: 10px; 
-      margin-bottom: 10px;
-    }
+    #messages { border: 1px solid #ccc; height: 400px; overflow-y: auto; padding: 10px; margin-bottom: 10px; }
     .message { margin: 10px 0; padding: 10px; border-radius: 5px; }
     .user { background: #e3f2fd; text-align: left; }
     .assistant { background: #f1f8e9; text-align: right; }
-    #input { width: 80%; padding: 10px; }
-    #send { padding: 10px 20px; }
   </style>
 </head>
 <body>
-  <h1>MOJO Chat 🤖</h1>
+  <h1>MOJO Chat</h1>
   <div id="messages"></div>
-  <input type="text" id="input" placeholder="כתוב הודעה...">
-  <button id="send">שלח</button>
+  <input id="input" placeholder="Type a message..." />
+  <button id="send">Send</button>
 
   <script>
     const messagesDiv = document.getElementById('messages');
@@ -133,27 +127,19 @@ fetch('http://localhost:3000/api/chat/message', {
     async function sendMessage() {
       const message = input.value.trim();
       if (!message) return;
-
-      // הצג הודעת משתמש
       addMessage(message, 'user');
       input.value = '';
-
       try {
-        const response = await fetch('http://localhost:3000/api/chat/message', {
+        const res = await fetch('http://localhost:3000/api/chat/message', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message, sessionId })
         });
-
-        const data = await response.json();
-        
-        // שמור session ID
+        const data = await res.json();
         if (!sessionId) sessionId = data.sessionId;
-        
-        // הצג תשובה
-        addMessage(data.response, 'assistant');
-      } catch (error) {
-        addMessage('שגיאה: ' + error.message, 'assistant');
+        addMessage(data.response || JSON.stringify(data), 'assistant');
+      } catch (err) {
+        addMessage('Error: ' + err.message, 'assistant');
       }
     }
 
@@ -166,50 +152,36 @@ fetch('http://localhost:3000/api/chat/message', {
     }
 
     sendBtn.onclick = sendMessage;
-    input.onkeypress = (e) => {
-      if (e.key === 'Enter') sendMessage();
-    };
+    input.onkeypress = (e) => { if (e.key === 'Enter') sendMessage(); };
   </script>
 </body>
 </html>
 ```
 
-פתח את הקובץ בדפדפן ותוכל לדבר עם האגנט! 💬
+## Troubleshooting
 
-## פתרון בעיות נפוצות
+- `GEMINI_API_KEY is not defined` — ensure you copied `.env.example` to `.env` and set `GEMINI_API_KEY`.
+- `EADDRINUSE: port 3000 already in use` — stop the previous Node process or change the port in `.env`.
 
-### שגיאה: "GEMINI_API_KEY is not defined"
-✅ ודא שהעתקת את `.env.example` ל-`.env` ועדכנת את המפתח
+Windows PowerShell example to stop node processes:
 
-### שגיאה: "EADDRINUSE: port 3000 already in use"
-✅ הרוג את התהליך הקודם:
-```bash
-# Windows PowerShell
+```powershell
 Get-Process -Name node | Stop-Process -Force
-
-# או שנה את הפורט ב-.env
-PORT=3001
 ```
 
-### השרת לא מגיב
-✅ בדוק ש-`npm run dev` רץ ללא שגיאות
+## Next steps
 
-### תשובות לא בעברית
-✅ זה תלוי במודל - Gemini אמור לתמוך בעברית היטב
+1. Read `EXAMPLES.md` for advanced examples
+2. Read `README_CHAT.md` for deeper explanation
+3. Try the agent and add tasks, notes or preferences
+4. Build a UI (React/Vue) or use the simple HTML test
 
-## שלבים הבאים
+## Need help?
 
-1. ✅ קרא את [EXAMPLES.md](./EXAMPLES.md) לדוגמאות מתקדמות
-2. ✅ קרא את [README_CHAT.md](./README_CHAT.md) להבנה מעמיקה
-3. ✅ התחל לשחק עם הכלים - הוסף משימות, הערות ועוד
-4. ✅ נסה ליצור UI משלך או להשתמש ב-React/Vue
-
-## זקוק לעזרה?
-
-- 📖 [תיעוד מלא](./README_CHAT.md)
-- 💡 [דוגמאות](./EXAMPLES.md)
-- 🐛 בעיות? פתח issue
+- Full docs: `README_CHAT.md`
+- Examples: `EXAMPLES.md`
+- Problems? Open an issue
 
 ---
 
-**מוכן להתחיל? בהצלחה! 🚀**
+Good luck — enjoy building with MOJO! 🚀

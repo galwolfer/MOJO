@@ -15,30 +15,120 @@ import { User } from "../models/index.js";
  */
 function normalizeTextForEmbedding(text) {
   if (!text) return "";
-  
+
+  // Convert to string if needed (in case we get an object)
+  if (typeof text !== "string") {
+    console.warn("⚠️ normalizeTextForEmbedding received non-string:", typeof text, text);
+    text = String(text);
+  }
+
   let normalized = text.toLowerCase();
-  normalized = normalized.replace(/[.,?!;:()[\]{}'"]/g, ' ');
-  
+  normalized = normalized.replace(/[.,?!;:()[\]{}'"]/g, " ");
+
   // Stop words (English + Hebrew)
   const stopWords = new Set([
-    'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 
-    'has', 'he', 'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the', 
-    'to', 'was', 'will', 'with', 'you', 'your', 'do', 'does', 'did',
-    'i', 'me', 'my', 'we', 'our', 'where', 'when', 'what', 'who', 'how',
-    'this', 'these', 'those', 'can', 'could', 'would', 'should', 'may',
-    'am', 'have', 'had', 'remember', 'recall', 'know', 'tell',
-    'את', 'של', 'על', 'אני', 'זה', 'היא', 'הוא', 'שלי', 'לא', 'כן',
-    'אבל', 'או', 'גם', 'רק', 'עוד', 'יש', 'היה', 'הייתי',
-    'אתה', 'אתם', 'אנחנו', 'הם', 'הן', 'מה', 'איפה', 'מתי', 'איך',
-    'למה', 'כי', 'אם', 'אז', 'כל', 'כבר', 'עדיין', 'פה', 'שם',
-    'תזכור', 'לזכור', 'תזכרי', 'אתזכר'
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "by",
+    "for",
+    "from",
+    "has",
+    "he",
+    "in",
+    "is",
+    "it",
+    "its",
+    "of",
+    "on",
+    "that",
+    "the",
+    "to",
+    "was",
+    "will",
+    "with",
+    "you",
+    "your",
+    "do",
+    "does",
+    "did",
+    "i",
+    "me",
+    "my",
+    "we",
+    "our",
+    "where",
+    "when",
+    "what",
+    "who",
+    "how",
+    "this",
+    "these",
+    "those",
+    "can",
+    "could",
+    "would",
+    "should",
+    "may",
+    "am",
+    "have",
+    "had",
+    "remember",
+    "recall",
+    "know",
+    "tell",
+    "את",
+    "של",
+    "על",
+    "אני",
+    "זה",
+    "היא",
+    "הוא",
+    "שלי",
+    "לא",
+    "כן",
+    "אבל",
+    "או",
+    "גם",
+    "רק",
+    "עוד",
+    "יש",
+    "היה",
+    "הייתי",
+    "אתה",
+    "אתם",
+    "אנחנו",
+    "הם",
+    "הן",
+    "מה",
+    "איפה",
+    "מתי",
+    "איך",
+    "למה",
+    "כי",
+    "אם",
+    "אז",
+    "כל",
+    "כבר",
+    "עדיין",
+    "פה",
+    "שם",
+    "תזכור",
+    "לזכור",
+    "תזכרי",
+    "אתזכר",
   ]);
-  
-  const words = normalized.split(/\s+/)
-    .filter(word => word.length > 2)
-    .filter(word => !stopWords.has(word));
-  
-  return words.join(' ');
+
+  const words = normalized
+    .split(/\s+/)
+    .filter((word) => word.length > 2)
+    .filter((word) => !stopWords.has(word));
+
+  return words.join(" ");
 }
 
 /**
@@ -462,8 +552,8 @@ export async function retrieveConversationMemories(userId, query, topK = 10, opt
 }
 
 /**
- * Retrieve ALL relevant memories (זיכרון ראשי + שיחות)
- * חיפוש סמנטי בכל סוגי הזיכרון
+ * Retrieve ALL relevant memories (primary + conversation)
+ * Semantic search across all memory types
  *
  * @param {string} userId - User ID
  * @param {string} query - Search query

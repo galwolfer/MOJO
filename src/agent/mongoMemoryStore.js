@@ -271,8 +271,8 @@ class MongoMemoryStore {
   }
 
   /**
-   * Save primary memory (זיכרון ראשי)
-   * הגדרות, העדפות, עובדות על המשתמש
+   * Save primary memory (primary)
+   * Settings, preferences, and facts about the user
    */
   async savePrimaryMemory(userId, memoryText, type = "user_fact", importance = 8, metadata = {}) {
     try {
@@ -291,8 +291,8 @@ class MongoMemoryStore {
   }
 
   /**
-   * Save conversation memory (זיכרון שיחות)
-   * מידע חשוב מהשיחות
+   * Save conversation memory (conversation)
+   * Important information from conversations
    */
   async saveConversationMemory(userId, memoryText, type = "conversation", importance = 5, options = {}) {
     try {
@@ -329,7 +329,7 @@ class MongoMemoryStore {
   }
 
   /**
-   * Get primary memories (זיכרון ראשי)
+   * Get primary memories (primary)
    */
   async getPrimaryMemories(userId, limit = 20) {
     try {
@@ -341,7 +341,7 @@ class MongoMemoryStore {
   }
 
   /**
-   * Get conversation memories (זיכרון שיחות)
+   * Get conversation memories (conversation)
    */
   async getConversationMemories(userId, limit = 50) {
     try {
@@ -354,7 +354,7 @@ class MongoMemoryStore {
 
   /**
    * Retrieve relevant memories using semantic search
-   * מחזיר גם זיכרון ראשי וגם זיכרון שיחות
+   * Returns both primary and conversation memories
    *
    * @param {string} userId - User ID
    * @param {string} query - Search query
@@ -381,7 +381,7 @@ class MongoMemoryStore {
   }
 
   /**
-   * Retrieve only primary memories (זיכרון ראשי)
+   * Retrieve only primary memories (primary)
    */
   async retrievePrimaryMemories(userId, query, topK = 5) {
     try {
@@ -395,7 +395,7 @@ class MongoMemoryStore {
   }
 
   /**
-   * Retrieve only conversation memories (זיכרון שיחות)
+   * Retrieve only conversation memories (conversation)
    */
   async retrieveConversationMemories(userId, query, topK = 10, options = {}) {
     try {

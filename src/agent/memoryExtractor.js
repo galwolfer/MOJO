@@ -1,13 +1,82 @@
 /**
  * Memory Extractor - Extracts important information from conversations
- * מפיק זיכרונות חשובים מהשיחות באופן אוטומטי
+ * (English translation of previous Hebrew comment)
  */
 
 import { memoryStore } from "./mongoMemoryStore.js";
+import { GeminiAdapter } from "./geminiAdapter.js";
+import { env } from "../config/env.js";
+
+// Initialize Gemini adapter for memory extraction
+const gemini = new GeminiAdapter(env.GEMINI_API_KEY);
+
+/**
+ * Use LLM to intelligently extract memorable facts from a message
+ * (Uses the LLM to intelligently extract important facts)
+ *
+ * @param {string} userId - User ID
+ * @param {string} message - User message
+ * @param {Array} existingMemories - Array of existing primary memories to check for duplicates
+ * @returns {Promise<Array>} Array of extracted facts (short, concise)
+ */
+async function extractFactsWithLLM(userId, message, existingMemories = []) {
+  try {
+    const existingFactsText =
+      existingMemories.length > 0
+        ? `\nExisting memories:\n${existingMemories.map((m) => `- ${m.text || m.content}`).join("\n")}`
+        : "\nNo existing memories.";
+
+    const prompt = `You are an assistant that identifies important facts about the user that should be remembered.
+
+User's message: "${message}"
+${existingFactsText}
+
+Task:
+1. Identify NEW and important facts about the user (name, age, work, education, location, preferences, etc.)
+2. DO NOT save facts that already exist in the memories above
+3. Write each fact concisely (2-5 words) in the SAME LANGUAGE as the user's message
+4. If there's no new information to remember - return an empty list
+
+Response format (JSON):
+{
+  "facts": [
+    {"text": "studies at Bar Ilan University", "category": "education"},
+    {"text": "lives in Tel Aviv", "category": "location"}
+  ]
+}
+
+Available categories: education, work, location, age, name, preference, skill, other
+
+If there's nothing new to remember, return:
+{"facts": []}`;
+
+    const messages = [{ role: "user", content: prompt }];
+
+    const response = await gemini.generateContent(messages);
+    const text = response.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+    console.log(`🔍 LLM memory extraction response: ${text.substring(0, 200)}...`);
+
+    // Parse JSON response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.log("❌ LLM didn't return valid JSON for memory extraction");
+      console.log("Full response:", text);
+      return [];
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    console.log(`📝 Parsed facts:`, parsed.facts);
+    return parsed.facts || [];
+  } catch (error) {
+    console.error("Error extracting facts with LLM:", error);
+    return [];
+  }
+}
 
 /**
  * Extract important facts from a conversation message
- * מזהה מידע חשוב בהודעה ומחליט אם לשמור כזיכרון
+ * (Identifies important information in a message and decides whether to save it as a memory)
  *
  * @param {string} userId - User ID
  * @param {string} sessionId - Session ID
@@ -18,127 +87,87 @@ import { memoryStore } from "./mongoMemoryStore.js";
 export async function extractMemoriesFromMessage(userId, sessionId, message, role = "user") {
   const extractedMemories = [];
 
+  console.log(`🎯 extractMemoriesFromMessage called with role="${role}", message="${message.substring(0, 50)}..."`);
+
   // Skip if message is too short
   if (!message || message.length < 10) {
+    console.log(`⏭️ Message too short (${message?.length || 0} chars), skipping`);
     return extractedMemories;
   }
 
   try {
-    // === PRIMARY MEMORY PATTERNS (זיכרון ראשי) ===
+    // === PRIMARY MEMORY EXTRACTION ===
     // ONLY extract from USER messages, not assistant responses!
-
-    // 1. User preferences (העדפות) - English + Hebrew
-    const preferencePatterns = [
-      /(?:I|i) (?:prefer|like|love|enjoy|want) (.+)/,
-      /(?:My|my) (?:favorite|preferred) (.+) is (.+)/,
-      /(?:I|i) (?:don't like|hate|dislike) (.+)/,
-      /(?:I|i) (?:always|usually|often|never) (.+)/,
-      /(?:אני|אנ(?:'|י)) (?:אוהב|אוהבת|מעדיף|מעדיפה|רוצה) (.+)/u,
-      /(?:ה|ה(?:־))(?:מועדף|מועדפת|אהוב|אהובה) (?:שלי|עלי) (?:הוא|היא|זה) (.+)/u,
-    ];
-
-    // ONLY extract preferences from USER messages
     if (role === "user") {
-      for (const pattern of preferencePatterns) {
-        const match = message.match(pattern);
-        if (match) {
-          await memoryStore.savePrimaryMemory(userId, match[0], "preference", 7, { source: "auto_extract", sessionId });
-          extractedMemories.push({ type: "preference", text: match[0] });
-        }
-      }
-    }
+      console.log(`🔍 Extracting memories from user message: "${message.substring(0, 100)}..."`);
 
-    // 2. User facts (עובדות על המשתמש) - English + Hebrew
-    const factPatterns = [
-      // Explicit "remember" commands (highest priority!)
-      /(?:remember|recall|note|keep in mind|don't forget|save) (?:that |this: ?)?(.+)/i,
-      /(?:תזכור|לזכור|תשמור|תזכרי|שמור|שמרי) (?:את |זה: ?|ש)?(.+)/iu,
-      
-      // Personal facts
-      /(?:My|my) name is (.+)/,
-      /(?:I|i) (?:am|work as|study|am studying|learn) (?:at |in |for )?(.+)/,
-      /(?:I|i) (?:live|reside) in (.+)/,
-      /(?:I|i) was born in (.+)/,
-      /(?:I|i) speak (.+)/,
-      /(?:My|my) (?:birthday|age) is (.+)/,
-      /(?:I|i)'m a (.+)/,
-      /(?:I|i)'m (?:from|currently in) (.+)/,
-      // Hebrew patterns
-      /(?:אני|אנ(?:'|י)|שמי) (.+)/u,
-      /(?:אני|אנ(?:'|י)) (?:לומד|לומדת|עובד|עובדת|גר|גרה) (.+)/u,
-      /(?:אני|אנ(?:'|י)) (?:סטודנט|סטודנטית|תלמיד|תלמידה) (.+)/u,
-      /(?:אני|אנ(?:'|י)) (?:ב|באוניברסיטת|במכללת|בטכניון|ב(?:־))(.+)/u,
-      /(?:מ|מה)(?:אוניברסיטה|מכללה|בי(?:")?ס) (.+)/u,
-    ];
+      // Get ALL existing primary memories to check for duplicates
+      const existingPrimaryMemories = await memoryStore.getMemories(userId, "primary", 50);
+      console.log(`📚 Found ${existingPrimaryMemories.length} existing primary memories`);
 
-    // ONLY extract user facts from USER messages
-    if (role === "user") {
-      console.log(`🔍 Checking for user facts in message: ${message.substring(0, 50)}...`);
-      for (const pattern of factPatterns) {
-        const match = message.match(pattern);
-        if (match) {
-          console.log(`✅ Found user fact match: ${match[0]}`);
+      // Use LLM to intelligently extract facts
+      const facts = await extractFactsWithLLM(userId, message, existingPrimaryMemories);
+
+      if (facts.length > 0) {
+        console.log(`🧠 LLM extracted ${facts.length} new facts from message`);
+
+        for (const fact of facts) {
+          const category = fact.category || "other";
+
+          // Map LLM categories to valid primary memory types
+          let type = "user_fact"; // default
+          if (category === "preference") {
+            type = "preference";
+          } else if (category === "name" || category === "age" || category === "location") {
+            type = "profile";
+          } else {
+            // education, work, skill, other -> all go to user_fact
+            type = "user_fact";
+          }
+
+          const importance = category === "name" ? 10 : category === "education" || category === "work" ? 9 : 7;
+
           await memoryStore.savePrimaryMemory(
             userId,
-            match[0],
-            "user_fact",
-            9, // Higher importance for facts
-            { source: "auto_extract", sessionId }
+            fact.text, // Concise fact (not full sentence!)
+            type, // Use mapped type instead of category!
+            importance,
+            { source: "llm_extract", sessionId, category } // Save original category in metadata
           );
-          extractedMemories.push({ type: "user_fact", text: match[0] });
+
+          extractedMemories.push({ type: category, text: fact.text });
+          console.log(
+            `✅ Saved fact: "${fact.text}" (category: ${category}, type: ${type}, importance: ${importance})`
+          );
         }
+      } else {
+        console.log(`ℹ️ No new facts extracted from message`);
       }
     }
 
-    // === CONVERSATION MEMORY PATTERNS (זיכרון שיחות) ===
+    // === CONVERSATION MEMORY PATTERNS ===
+    // Keep simple pattern matching for tasks and questions
 
-    // 3. Tasks mentioned - English + Hebrew
+    // Tasks mentioned - English + Hebrew (pattern matching)
     const taskPatterns = [
       /(?:remind me to|I need to|I have to|I must|I should) (.+)/,
-      /(?:task|todo|assignment)(?::|\s)(.+)/i,
-      /(?:אני|אנ(?:'|י)) (?:צריך|צריכה|חייב|חייבת|מוכרח|מוכרחה) (.+)/u,
+      /(?:אני|אנ(?:'|י)) (?:צריך|צריכה|חייב|חייבת) (?:ל)?(.+)/u,
       /(?:תזכיר|תזכור|להזכיר) לי (.+)/u,
-      /(?:משימה|מטלה|תרגיל|תר(?:")?ג|שיעורי בית)(?::|\s)?(.+)/iu,
     ];
 
     for (const pattern of taskPatterns) {
       const match = message.match(pattern);
       if (match) {
-        await memoryStore.saveConversationMemory(userId, match[0], "task", 7, { sessionId, source: "auto_extract" });
-        extractedMemories.push({ type: "task", text: match[0] });
+        // Extract just the task (captured group)
+        const taskText = match[1].trim();
+        await memoryStore.saveConversationMemory(userId, taskText, "task", 7, { sessionId, source: "pattern_extract" });
+        extractedMemories.push({ type: "task", text: taskText });
+        break; // Only save once per message
       }
     }
 
-    // 4. Important decisions or conclusions
-    if (role === "assistant") {
-      const decisionPatterns = [
-        /(?:decided|concluded|agreed) that (.+)/,
-        /(?:plan is to|will|going to) (.+)/,
-        /(?:recommendation|suggestion) is (.+)/,
-      ];
-
-      for (const pattern of decisionPatterns) {
-        const match = message.match(pattern);
-        if (match) {
-          await memoryStore.saveConversationMemory(userId, match[0], "conversation", 6, {
-            sessionId,
-            source: "auto_extract",
-          });
-          extractedMemories.push({ type: "conversation", text: match[0] });
-        }
-      }
-    }
-
-    // 5. Questions and answers (important context)
-    if (message.includes("?") && role === "user") {
-      // Save important questions
-      await memoryStore.saveConversationMemory(userId, message, "conversation", 4, {
-        sessionId,
-        source: "auto_extract",
-        tag: "question",
-      });
-      extractedMemories.push({ type: "conversation", text: message });
-    }
+    // DON'T save questions - they're not memories!
+    // Questions are for context only and shouldn't be stored
   } catch (error) {
     console.error("Error extracting memories:", error);
   }
@@ -150,9 +179,8 @@ export async function extractMemoriesFromMessage(userId, sessionId, message, rol
   return extractedMemories;
 }
 
-/**
- * Summarize a conversation and save as memory
- * מסכם שיחה שלמה ושומר כזיכרון
+/**n * Summarize a conversation and save as memory
+ * (Creates a short summary of the conversation and stores it as a conversation memory)
  *
  * @param {string} userId - User ID
  * @param {string} sessionId - Session ID
@@ -190,7 +218,7 @@ Assistant helped with: ${assistantMessages.slice(0, 2).join("; ")}`;
 
 /**
  * Analyze user message and extract memories with better context
- * ניתוח מתקדם יותר של הודעות להפקת זיכרונות
+ * (Advanced analysis of messages to extract memories)
  *
  * @param {string} userId - User ID
  * @param {string} sessionId - Session ID
@@ -200,6 +228,9 @@ Assistant helped with: ${assistantMessages.slice(0, 2).join("; ")}`;
  */
 export async function analyzeAndExtractMemories(userId, sessionId, userMessage, assistantResponse = null) {
   try {
+    console.log(`📝 analyzeAndExtractMemories called for user ${userId}, session ${sessionId}`);
+    console.log(`   User message: "${userMessage.substring(0, 100)}..."`);
+
     // Extract from user message
     await extractMemoriesFromMessage(userId, sessionId, userMessage, "user");
 
@@ -210,7 +241,8 @@ export async function analyzeAndExtractMemories(userId, sessionId, userMessage, 
 
     console.log(`✅ Memory analysis complete for session ${sessionId}`);
   } catch (error) {
-    console.error("Error analyzing and extracting memories:", error);
+    console.error("❌ Error analyzing and extracting memories:", error);
+    console.error("Stack:", error.stack);
   }
 }
 

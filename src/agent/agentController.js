@@ -52,7 +52,7 @@ export class AgentController {
       // Format memories for prompt
       let memoryContext = "";
 
-      // Add primary memories (הגדרות, העדפות, עובדות)
+      // Add primary memories (settings, preferences, facts)
       if (relevantMemories.primary && relevantMemories.primary.length > 0) {
         memoryContext += "\n\n=== USER PROFILE & PREFERENCES ===\n";
         relevantMemories.primary.forEach((mem, idx) => {
@@ -60,7 +60,7 @@ export class AgentController {
         });
       }
 
-      // Add conversation memories (מידע מהשיחות הקודמות)
+      // Add conversation memories (information from previous conversations)
       if (relevantMemories.conversation && relevantMemories.conversation.length > 0) {
         memoryContext += "\n=== RELEVANT PAST CONVERSATIONS ===\n";
         relevantMemories.conversation.forEach((mem, idx) => {

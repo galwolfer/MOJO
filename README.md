@@ -39,6 +39,46 @@ cp .env.example .env
 # MONGODB_URI=mongodb://localhost:27017/mojo
 
 # 3. Install dependencies
+# Team MOJO Server — English README
+
+## Phase 2 Complete — User-Centric Memory System
+
+This repository contains the MOJO chat agent with a refactored user-centric memory and embedding system using MongoDB.
+
+### Highlights
+
+- User-centric architecture: all memories are embedded inside the `User` documents
+- Dynamic user embeddings: auto-updated from memory embeddings
+- Semantic search using cosine-similarity over embeddings
+- Memory statistics per user and priority management
+
+### Documentation
+
+- Quick Start: `MEMORY_QUICKSTART.md`
+- Memory refactor documentation: `md/MEMORY_REFACTOR.md`
+- Full docs directory: `md/`
+
+---
+
+## Team
+
+- Ofek — Agent & Tools
+- Gal — API & Routes
+- Joni — Services & DB
+
+---
+
+## Quick Start
+
+```bash
+# 1. Copy example environment file
+cp .env.example .env
+
+# 2. Edit .env and insert your API key and MongoDB URI
+# GEMINI_API_KEY=your_key_here
+# MONGO_URI=mongodb://localhost:27017/mojo
+
+# 3. Install dependencies
 npm install
 
 # 4. Run the server
@@ -47,42 +87,36 @@ npm run dev
 
 ---
 
-## 🧪 Testing the Memory System
+## Testing
 
 ```bash
-# Test new user-centric memory system
+# Test the user-centric memory system
 npm run test:user-memory
 
-# Test backward compatibility
-npm run test:memory
-
-# Migrate existing data (if needed)
+# Migrate existing memories (if needed)
 npm run migrate:memories
-```
-
-Or with PowerShell:
-```powershell
-.\scripts\test_memory.ps1
 ```
 
 ---
 
-## Gemini API Key Setup
+## Gemini API Key
 
-1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Insert the key into `.env`
+1. Obtain a Gemini/Vertex AI API key (or other provider).
+2. Add it to your `.env` as `GEMINI_API_KEY`.
 
 ---
 
 ## Example Usage
 
-### Chat with Memory
+Chat endpoint example:
 
 ```bash
 curl -X POST http://localhost:3000/api/chat/message \
   -H "Content-Type: application/json" \
-  -d '{"message": "What is the time?"}'
+  -d '{"message": "Hello!"}'
 ```
+
+PowerShell example:
 
 ```powershell
 Invoke-WebRequest -Uri "http://localhost:3000/api/chat/message" `
@@ -93,91 +127,42 @@ Invoke-WebRequest -Uri "http://localhost:3000/api/chat/message" `
 
 ---
 
-## 📚 Documentation
-
-- **[Memory & Embedding System](./md/MEMORY_EMBEDDING_SYSTEM.md)** - מדריך מלא בעברית
-- **[Memory Update](./md/MEMORY_UPDATE.md)** - סיכום השינויים
-- **[Implementation Summary](./md/IMPLEMENTATION_SUMMARY.md)** - סיכום טכני
-- **[Phase 2 Spec](./md/phase2.md)** - מפרט Phase 2
-
----
-
-## 🎯 Features
-
-### Phase 1 ✅
-- Express.js server with MongoDB
-- Gemini API integration
-- Basic chat functionality
-- User authentication & sessions
-- Tool functions (tasks, notes, time)
-
-### Phase 2 ✅ NEW!
-- **Persistent memory with embeddings**
-- **Semantic search** (cosine similarity)
-- **Memory categories**: Primary (profile, preferences) + Conversation
-- **Auto-extraction** of important information
-- **Context-aware responses**
-- **Memory pruning** for old conversations
-
----
-
-## 🏗️ Project Structure
+## Project Structure (overview)
 
 ```
 Mojo/
 ├── src/
-│   ├── agent/
-│   │   ├── agentController.js      # Main agent logic + memory integration ✨
-│   │   ├── geminiAdapter.js        # Gemini API adapter
-│   │   ├── memoryStore.js          # (deprecated)
-│   │   ├── mongoMemoryStore.js     # MongoDB memory management ✨
-│   │   ├── vectorStore.js          # Embedding & semantic search ✨
-│   │   ├── memoryExtractor.js      # Auto memory extraction ✨ NEW!
-│   │   ├── prompts.js              # System prompts with memory ✨
-│   │   └── toolFunctions.js        # Tool definitions
-│   ├── models/
-│   │   ├── Memory.js               # Memory model with embeddings ✨
-│   │   ├── Embedding.js            # (deprecated)
-│   │   ├── User.js
-│   │   └── Session.js
+│   ├── agent/            # agent logic, memory extraction, vector store
+│   ├── models/           # User, Session (Memory model kept for migration)
 │   ├── routes/
 │   ├── controllers/
 │   └── config/
-├── scripts/
-│   ├── test_memory.js              # Memory system tests ✨ NEW!
-│   └── test_memory.ps1             # PowerShell test runner ✨ NEW!
-├── md/
-│   ├── MEMORY_EMBEDDING_SYSTEM.md  # Full documentation ✨ NEW!
-│   ├── MEMORY_UPDATE.md            # Update summary ✨ NEW!
-│   └── IMPLEMENTATION_SUMMARY.md   # Technical summary ✨ NEW!
+├── scripts/              # admin scripts and migration helpers
+├── md/                   # documentation (English)
 └── README.md
 ```
 
 ---
 
-## 🚀 Next Steps (Optional)
+## Next steps & ideas
 
-### Phase 2.1
-- [ ] Gemini Embeddings API (768 dimensions)
-- [ ] MongoDB Atlas Vector Search
-- [ ] Smart context pruning
-
-### Phase 3
-- [ ] UI widgets
-- [ ] Full automation
-- [ ] Deployment
+- Add production embeddings and vector search (MongoDB Atlas)
+- Improve memory consolidation (clustering, summarization)
+- Add UI components and deployment flow
 
 ---
 
-## 📞 Support
+## Support
 
-בעיות? שאלות?
-1. קרא את [`md/MEMORY_EMBEDDING_SYSTEM.md`](./md/MEMORY_EMBEDDING_SYSTEM.md)
-2. הרץ `node scripts/test_memory.js`
-3. בדוק את הלוגים
+If you run into issues:
+
+1. Check `md/` documentation
+2. Run `node scripts/test_memory.js`
+3. Inspect server logs
 
 ---
 
-**Version**: Phase 2 Complete  
-**Status**: ✅ Production Ready  
+**Version**: Phase 2 Complete
+**Status**: ✅ Ready for development
 **Date**: October 21, 2025
+- [ ] Deployment

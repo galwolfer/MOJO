@@ -22,21 +22,21 @@ const memorySchema = new mongoose.Schema(
     type: {
       type: String,
       enum: [
-        "profile", // זיכרון ראשי - הגדרות משתמש
-        "preference", // זיכרון ראשי - העדפות
-        "user_fact", // זיכרון ראשי - עובדות על המשתמש
-        "conversation", // זיכרון שיחות - מידע מהשיחות
-        "conversation_summary", // זיכרון שיחות - סיכום שיחה
-        "task", // זיכרון שיחות - משימות
-        "note", // זיכרון שיחות - הערות
-        "message", // NEW: הודעת session גולמית
-        "general", // כללי
+        "profile", // primary memory - user settings
+        "preference", // primary memory - user preferences
+        "user_fact", // primary memory - facts about the user
+        "conversation", // conversation memory - information from chats
+        "conversation_summary", // conversation memory - conversation summary
+        "task", // conversation memory - tasks
+        "note", // conversation memory - notes
+        "message", // NEW: raw session message
+        "general", // general
       ],
       default: "general",
     },
     category: {
       type: String,
-      enum: ["primary", "conversation", "session_message"], // קטגוריה עיקרית
+      enum: ["primary", "conversation", "session_message"], // main category
       required: true,
       index: true,
     },
@@ -76,7 +76,7 @@ const memorySchema = new mongoose.Schema(
       default: null,
     },
     embedding: {
-      type: [Number], // Vector embedding מוטמע ישירות ב-Memory
+      type: [Number], // Vector embedding stored directly on the Memory
       default: null,
     },
     metadata: {
@@ -95,7 +95,7 @@ const memorySchema = new mongoose.Schema(
   }
 );
 
-// Indexes מורחבים
+// Extended indexes
 memorySchema.index({ userId: 1, category: 1, createdAt: -1 });
 memorySchema.index({ userId: 1, type: 1 });
 memorySchema.index({ userId: 1, importance: -1 });

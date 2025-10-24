@@ -1,40 +1,59 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import { Memory } from "../src/models/index.js";
+import { User } from "../src/models/index.js";
 
 dotenv.config();
 
-async function cleanBadMemories() {
+/**
+ * clean_memories.js
+ * Clears all embedded memories for every user in the database.
+ * This will set each User.memories = [] and reset related memoryStats and embedding.
+ */
+async function cleanAllMemories() {
   try {
     await mongoose.connect(process.env.MONGO_URI || "mongodb://localhost:27017/mojo");
     console.log("✅ Connected to MongoDB\n");
 
-    // Delete memories that are clearly assistant responses saved as user facts
-    const result = await Memory.deleteMany({
-      category: "primary",
-      type: { $in: ["user_fact", "preference"] },
-      $or: [
-        { text: /^(?:אני בסדר גמור|אני שמח לעזור|אני יכול להביא|בטח, אני|שלום אופק)/u },
-        { text: /^(?:I can help|I'm happy to|Sure, I|Hello|Hi there)/ },
-      ],
-    });
+    // Count total embedded memories before
+    const beforeAgg = await User.aggregate([
+      { $unwind: { path: "$memories", preserveNullAndEmptyArrays: true } },
+      { $match: { memories: { $exists: true, $ne: null } } },
+      { $count: "n" },
+    ]);
+    const before = (beforeAgg[0] && beforeAgg[0].n) || 0;
+    console.log(`🗂️  Total embedded memories before cleanup: ${before}`);
 
-    console.log(`🗑️  Deleted ${result.deletedCount} bad memories (assistant responses saved as user facts)\n`);
+    // Clear memories and reset basic stats on all users
+    const res = await User.updateMany(
+      {},
+      {
+        $set: {
+          memories: [],
+          "memoryStats.primaryCount": 0,
+          "memoryStats.conversationCount": 0,
+          "memoryStats.lastMemoryUpdate": new Date(),
+          embedding: null,
+        },
+      }
+    );
 
-    // Show remaining memories
-    const remaining = await Memory.find({}).sort({ createdAt: -1 }).limit(10).lean();
+    console.log(`🧹 Updated ${res.matchedCount} user documents (memories cleared)`);
 
-    console.log(`📊 Remaining ${remaining.length} recent memories:\n`);
-    remaining.forEach((m, i) => {
-      console.log(`${i + 1}. [${m.category}/${m.type}] ${m.text.substring(0, 60)}`);
-    });
+    // Count total embedded memories after
+    const afterAgg = await User.aggregate([
+      { $unwind: { path: "$memories", preserveNullAndEmptyArrays: true } },
+      { $match: { memories: { $exists: true, $ne: null } } },
+      { $count: "n" },
+    ]);
+    const after = (afterAgg[0] && afterAgg[0].n) || 0;
+    console.log(`✅ Total embedded memories after cleanup: ${after}`);
 
     await mongoose.disconnect();
-    console.log("\n✅ Cleanup complete!");
+    console.log("\n✅ Memory cleanup complete!");
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error during memory cleanup:", error);
     process.exit(1);
   }
 }
 
-cleanBadMemories();
+cleanAllMemories();
