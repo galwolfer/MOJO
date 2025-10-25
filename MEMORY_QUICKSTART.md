@@ -187,11 +187,6 @@ npm run test:memory
 npm run migrate:memories
 ```
 
-## 📚 More Information
-
-- **Full Documentation**: See `md/MEMORY_REFACTOR.md` (English)
-- **Hebrew Summary**: See `md/MEMORY_REFACTOR_HE.md` (עברית)
-- **Technical Details**: See `REFACTOR_SUMMARY.md`
 
 ## 🎉 You're Ready!
 
