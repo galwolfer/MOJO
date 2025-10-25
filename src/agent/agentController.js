@@ -46,25 +46,25 @@ export class AgentController {
       const relevantMemories = await memoryStore.retrieveRelevantMemories(
         userId,
         userMessage,
-        10 // Retrieve top 10 relevant memories
+        5 // Reduce to top 5 (was 10) to save tokens
       );
 
-      // Format memories for prompt
+      // Format memories for prompt - COMPACT FORMAT to save tokens
       let memoryContext = "";
 
-      // Add primary memories (settings, preferences, facts)
+      // Add primary memories (settings, preferences, facts) - compact format
       if (relevantMemories.primary && relevantMemories.primary.length > 0) {
-        memoryContext += "\n\n=== USER PROFILE & PREFERENCES ===\n";
+        memoryContext += "\nMemory: ";
         relevantMemories.primary.forEach((mem, idx) => {
-          memoryContext += `${idx + 1}. [${mem.type}] ${mem.text}\n`;
+          memoryContext += `${mem.text}; `;
         });
       }
 
-      // Add conversation memories (information from previous conversations)
+      // Add conversation memories - compact format
       if (relevantMemories.conversation && relevantMemories.conversation.length > 0) {
-        memoryContext += "\n=== RELEVANT PAST CONVERSATIONS ===\n";
+        memoryContext += "\nPast: ";
         relevantMemories.conversation.forEach((mem, idx) => {
-          memoryContext += `${idx + 1}. ${mem.text}\n`;
+          memoryContext += `${mem.text}; `;
         });
       }
 
@@ -73,9 +73,27 @@ export class AgentController {
         `[AgentController] Retrieved ${relevantMemories.primary.length} primary + ${relevantMemories.conversation.length} conversation memories`
       );
 
-      // Build personalized system prompt with user context AND memories
+      // ----- Safety: truncate long memory context to avoid huge prompts -----
+      const MAX_MEMORY_CHARS = 600; // Reduced from 1200 - keep it very short
+      if (memoryContext.length > MAX_MEMORY_CHARS) {
+        console.warn(
+          `[AgentController] memoryContext is ${memoryContext.length} chars; truncating to ${MAX_MEMORY_CHARS} chars to reduce token usage.`
+        );
+        memoryContext = memoryContext.substring(0, MAX_MEMORY_CHARS) + "...";
+      }
+
+      // Build personalized system prompt with user context AND (possibly truncated) memories
       const systemPrompt = buildSystemPromptWithUserContext(userProfile, userId, memoryContext);
       console.log(`[AgentController] System prompt length: ${systemPrompt.length} chars`);
+
+      // Safety: trim conversation history to last N messages BEFORE adding system prompt
+      const MAX_HISTORY_MESSAGES = 10; // Reduced from 20 to 10 to save significant tokens
+      if (history.length > MAX_HISTORY_MESSAGES) {
+        console.warn(
+          `[AgentController] history length is ${history.length}; trimming to last ${MAX_HISTORY_MESSAGES} messages to reduce prompt size.`
+        );
+        history = history.slice(-MAX_HISTORY_MESSAGES);
+      }
 
       // Add system prompt at the beginning of history
       history = [{ role: "system", content: systemPrompt }, ...history];
@@ -92,6 +110,30 @@ export class AgentController {
 
         // Extract the response
         const response = this.gemini.extractResponse(geminiResponse);
+
+        // If the model hit MAX_TOKENS, retry with a request for shorter response
+        if (response.type === "max_tokens") {
+          console.warn(
+            `⚠️ Model hit MAX_TOKENS (${response.usageMetadata?.totalTokenCount} total tokens). Retrying with request for concise response...`
+          );
+
+          // Add a user message asking for a shorter response
+          await memoryStore.addUserMessage(
+            sessionId,
+            userId,
+            "[System: Please provide a brief, concise response. Keep it short.]"
+          );
+          history = await memoryStore.getHistory(sessionId);
+
+          // Re-add system prompt and trim history
+          if (history.length > MAX_HISTORY_MESSAGES) {
+            history = history.slice(-MAX_HISTORY_MESSAGES);
+          }
+          history = [{ role: "system", content: systemPrompt }, ...history];
+
+          // Continue to retry
+          continue;
+        }
 
         // If it's a textual response - we're done
         if (response.type === "text") {
