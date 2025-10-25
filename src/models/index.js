@@ -4,3 +4,4 @@ export { Session } from "./Session.js";
 // DEPRECATED: Memory model - kept for backward compatibility only
 // Use User.memories array instead
 export { Memory } from "./Memory.js";
+export { Task } from "./Task.js";

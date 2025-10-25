@@ -6,6 +6,7 @@ import { Router } from "express";
 import healthRouter from "./health.js";
 import chatRouter from "./chat.js";
 import authRouter from "./auth.js";
+import tasksRouter from "./tasks.js";
 import {
   // Ofek controllers
   ofekListItems,
@@ -31,6 +32,9 @@ router.use("/auth", authRouter);
 
 // Chat/Agent routes
 router.use("/chat", chatRouter);
+
+// Tasks routes
+router.use("/tasks", tasksRouter);
 
 // ==================== OFEK — ROUTES (END) ======================
 

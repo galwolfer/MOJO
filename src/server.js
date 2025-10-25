@@ -14,6 +14,9 @@ connectDatabase()
     // Start HTTP server
     server.listen(port, () => {
       logger.info(`HTTP server listening on http://localhost:${port}`);
+      logger.info("✅ Tasks Module: Enabled (Phase 4)");
+      logger.info("   Endpoints: /api/tasks");
+      logger.info("   LLM Tools: add_task, get_tasks, update_task, delete_task");
     });
   })
   .catch((error) => {

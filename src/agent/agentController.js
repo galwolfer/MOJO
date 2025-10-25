@@ -110,8 +110,9 @@ export class AgentController {
           await memoryStore.addFunctionCall(sessionId, userId, response.functionCall);
 
           try {
-            // Execute the function
-            const functionResult = await executeToolCall(name, args);
+            // Execute the function with user context
+            const context = { userId };
+            const functionResult = await executeToolCall(name, args, context);
 
             // Add the result to memory
             const resultString = JSON.stringify(functionResult);
