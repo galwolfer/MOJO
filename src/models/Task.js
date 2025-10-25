@@ -35,6 +35,7 @@ const taskSchema = new mongoose.Schema(
       default: false,
       index: true,
     },
+
     metadata: {
       type: Map,
       of: mongoose.Schema.Types.Mixed,
@@ -54,12 +55,60 @@ taskSchema.index({ userId: 1, completed: 1 });
 // Methods
 taskSchema.methods.markComplete = function () {
   this.completed = true;
-  return this.save();
 };
 
 taskSchema.methods.markIncomplete = function () {
   this.completed = false;
   return this.save();
+};
+
+// Calculate next deadline for recurring task
+taskSchema.methods.calculateNextDeadline = function () {
+  if (!this.recurrence || !this.recurrence.type) {
+    return this.deadline;
+  }
+
+  const current = new Date(this.deadline);
+  const interval = this.recurrence.interval || 1;
+
+  switch (this.recurrence.type) {
+    case "daily":
+      current.setDate(current.getDate() + interval);
+      break;
+    case "weekly":
+      current.setDate(current.getDate() + 7 * interval);
+      break;
+    case "monthly":
+      current.setMonth(current.getMonth() + interval);
+      break;
+    case "yearly":
+      current.setFullYear(current.getFullYear() + interval);
+      break;
+  }
+
+  return current;
+};
+
+// Check if recurring task should continue
+taskSchema.methods.shouldContinueRecurrence = function () {
+  if (!this.recurrence || !this.recurrence.type) {
+    return false;
+  }
+
+  // Check count limit
+  if (this.recurrence.count && this.recurrence.completedDates.length >= this.recurrence.count) {
+    return false;
+  }
+
+  // Check end date
+  if (this.recurrence.endDate) {
+    const nextDeadline = this.calculateNextDeadline();
+    if (nextDeadline > this.recurrence.endDate) {
+      return false;
+    }
+  }
+
+  return true;
 };
 
 // Static methods

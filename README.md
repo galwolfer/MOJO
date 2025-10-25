@@ -1,22 +1,27 @@
 ﻿# Team MOJO Server 🚀
 
-## 🎯 Phase 2 Complete - User-Centric Memory System ✅
+## 🎯 Latest Updates
 
-**Advanced user-centric memory and embedding system with MongoDB**
+### Phase 4 Complete - Tasks Management System ✅
+- 🎯 **Task Management** - Full CRUD operations for user tasks
+- 🤖 **LLM Integration** - Natural language task creation
+- 🔐 **Secure & Isolated** - JWT authentication with per-user data
+- 📝 **Rich API** - 8 endpoints with filtering and queries
 
-### ✨ Latest Features (Refactored)
+### Phase 2 Complete - User-Centric Memory System ✅
 - 🧠 **User-Centric Architecture** - All memories embedded in User documents
-- � **Dynamic User Embedding** - Auto-updated based on memories and interactions
+- 🔍 **Dynamic User Embedding** - Auto-updated based on memories and interactions
 - 🔍 **Semantic Search** - Smart retrieval of relevant information
 - 📊 **Memory Statistics** - Track memory usage per user
 - ⚡ **High Performance** - Single query for user + all memories
 - 🎯 **Priority Management** - Importance × Recency weighting
 
 ### 📚 Documentation
-- **Quick Start**: [`MEMORY_QUICKSTART.md`](./MEMORY_QUICKSTART.md)
-- **Full Documentation**: [`md/MEMORY_REFACTOR.md`](./md/MEMORY_REFACTOR.md)
-- **Hebrew Summary**: [`md/MEMORY_REFACTOR_HE.md`](./md/MEMORY_REFACTOR_HE.md)
-- **Refactor Summary**: [`REFACTOR_SUMMARY.md`](./REFACTOR_SUMMARY.md)
+- **Quick Start**: [`QUICKSTART.md`](./QUICKSTART.md) 👈 **Start here!**
+- **Tasks Module**: [`md/PHASE4_START_HERE.md`](./md/PHASE4_START_HERE.md)
+- **Tasks API**: [`md/TASKS_API.md`](./md/TASKS_API.md)
+- **Memory System**: [`MEMORY_QUICKSTART.md`](./MEMORY_QUICKSTART.md)
+- **Full Docs**: [`md/`](./md/)
 
 ---
 
@@ -28,141 +33,426 @@
 
 ---
 
-## Quick Start
+## Quick Start (5 Minutes)
 
+### 1. Install Dependencies
 ```bash
-# 1. Copy the example environment file
+npm install
+```
+
+### 2. Configure Environment
+```bash
+# Copy example env file
 cp .env.example .env
 
-# 2. Edit .env and insert your API key
+# Edit .env and set:
 # GEMINI_API_KEY=your_key_here
 # MONGODB_URI=mongodb://localhost:27017/mojo
+# JWT_SECRET=your-secret-key-change-in-production
+```
 
-# 3. Install dependencies
-# Team MOJO Server — English README
+**Important:** Make sure MongoDB is running!
 
-## Phase 2 Complete — User-Centric Memory System
-
-This repository contains the MOJO chat agent with a refactored user-centric memory and embedding system using MongoDB.
-
-### Highlights
-
-- User-centric architecture: all memories are embedded inside the `User` documents
-- Dynamic user embeddings: auto-updated from memory embeddings
-- Semantic search using cosine-similarity over embeddings
-- Memory statistics per user and priority management
-
-### Documentation
-
-- Quick Start: `MEMORY_QUICKSTART.md`
-- Memory refactor documentation: `md/MEMORY_REFACTOR.md`
-- Full docs directory: `md/`
-
----
-
-## Team
-
-- Ofek — Agent & Tools
-- Gal — API & Routes
-- Joni — Services & DB
-
----
-
-## Quick Start
-
+### 3. Run the Server
 ```bash
-# 1. Copy example environment file
-cp .env.example .env
-
-# 2. Edit .env and insert your API key and MongoDB URI
-# GEMINI_API_KEY=your_key_here
-# MONGO_URI=mongodb://localhost:27017/mojo
-
-# 3. Install dependencies
-npm install
-
-# 4. Run the server
 npm run dev
+```
+
+You should see:
+```
+🚀 Server running on http://localhost:3000
+✅ Tasks Module: Enabled (Phase 4)
+```
+
+### 4. Register a User
+
+**Option 1: PowerShell Script (Recommended)**
+```powershell
+.\scripts\register.ps1
+```
+
+**Option 2: Direct API Call**
+```powershell
+$body = @{
+    username = "yourname"
+    email = "you@example.com"
+    password = "your-secure-password"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://localhost:3000/api/auth/register" `
+  -Method POST -Headers @{"Content-Type"="application/json"} -Body $body
+```
+
+### 5. Login
+
+**Option 1: PowerShell Script (Recommended)**
+```powershell
+.\scripts\login.ps1
+```
+
+**Copy the token from the response!**
+
+**Option 2: Direct API Call**
+```powershell
+$body = @{
+    email = "you@example.com"
+    password = "your-password"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://localhost:3000/api/auth/login" `
+  -Method POST -Headers @{"Content-Type"="application/json"} -Body $body
+```
+
+### 6. Start Chatting!
+
+**Interactive Chat (Easiest)**
+```powershell
+.\scripts\chat.ps1
+```
+
+**Or use the API directly:**
+```powershell
+$token = "YOUR_TOKEN_HERE"
+$headers = @{
+    "Authorization" = "Bearer $token"
+    "Content-Type" = "application/json"
+}
+$body = @{
+    message = "Add a task to study for exam next Friday"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://localhost:3000/api/chat/message" `
+  -Method POST -Headers $headers -Body $body
+```
+
+---
+
+## Features
+
+### 🎯 Task Management (Phase 4)
+- Create, read, update, delete tasks
+- Natural language task creation via LLM
+- Tag-based organization
+- Deadline tracking (upcoming/overdue)
+- Per-user data isolation
+
+**Example:**
+```
+User: "Add a task to do my linear algebra homework for next week"
+Agent: Creates task with calculated deadline
+```
+
+### 🧠 Memory System (Phase 2)
+- User-centric memory storage
+- Semantic search with embeddings
+- Automatic memory extraction from conversations
+- Priority-based retrieval
+
+### 🔐 Authentication
+- JWT-based authentication
+- Secure password hashing (bcrypt)
+- Per-user data isolation
+- Token-based API access
+
+---
+
+## API Endpoints
+
+### Authentication
+- `POST /api/auth/register` - Register new user
+- `POST /api/auth/login` - Login and get JWT token
+
+### Chat
+- `POST /api/chat/message` - Send message to agent (requires auth)
+- `POST /api/chat/reset` - Reset chat session
+- `GET /api/chat/history/:sessionId` - Get chat history
+
+### Tasks (Phase 4)
+- `POST /api/tasks` - Create task
+- `GET /api/tasks` - List tasks (with filters)
+- `GET /api/tasks/:id` - Get specific task
+- `PATCH /api/tasks/:id` - Update task
+- `DELETE /api/tasks/:id` - Delete task
+- `GET /api/tasks/upcoming/:days` - Get upcoming tasks
+- `GET /api/tasks/overdue` - Get overdue tasks
+- `POST /api/tasks/:id/toggle` - Toggle completion
+
+**All authenticated endpoints require:**
+```
+Authorization: Bearer <your-jwt-token>
 ```
 
 ---
 
 ## Testing
 
-```bash
-# Test the user-centric memory system
-npm run test:user-memory
+### Test the Tasks Module
+```powershell
+# Get your token first
+.\scripts\login.ps1
 
-# Migrate existing memories (if needed)
-npm run migrate:memories
+# Run automated tests
+.\scripts\test_tasks.ps1 -Token "YOUR_TOKEN"
 ```
+
+### Test Memory System
+```bash
+npm run test:user-memory
+```
+
+### Test Chat
+```powershell
+.\scripts\chat.ps1
+```
+
+Try these commands:
+- "Add a task to study for exam next Friday"
+- "Show me all my tasks"
+- "What tasks are due this week?"
+- "Mark my exam task as completed"
 
 ---
 
-## Gemini API Key
+## PowerShell Scripts
 
-1. Obtain a Gemini/Vertex AI API key (or other provider).
-2. Add it to your `.env` as `GEMINI_API_KEY`.
+Convenient scripts for common operations:
+
+- **`.\scripts\register.ps1`** - Register a new user account
+- **`.\scripts\login.ps1`** - Login and get JWT token
+- **`.\scripts\chat.ps1`** - Interactive chat session
+- **`.\scripts\test_tasks.ps1`** - Test the tasks API
 
 ---
 
 ## Example Usage
 
-Chat endpoint example:
+### Register & Login
+```powershell
+# Register
+.\scripts\register.ps1
 
-```bash
-curl -X POST http://localhost:3000/api/chat/message \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Hello!"}'
+# Login (get token)
+.\scripts\login.ps1
 ```
 
-PowerShell example:
-
+### Chat with Agent
 ```powershell
-Invoke-WebRequest -Uri "http://localhost:3000/api/chat/message" `
-  -Method POST `
-  -Headers @{ "Content-Type" = "application/json" } `
-  -Body '{ "message": "Hello!" }'
+.\scripts\chat.ps1
+# Then type: "Add a task to buy groceries tomorrow"
+```
+
+### Direct API Calls
+```powershell
+# Set your token
+$token = "YOUR_JWT_TOKEN"
+$headers = @{
+    "Authorization" = "Bearer $token"
+    "Content-Type" = "application/json"
+}
+
+# Create a task
+$body = @{
+    name = "Study for exam"
+    tag = "school"
+    deadline = "2025-11-01T12:00:00Z"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://localhost:3000/api/tasks" `
+  -Method POST -Headers $headers -Body $body
+
+# Get all tasks
+Invoke-RestMethod -Uri "http://localhost:3000/api/tasks" `
+  -Method GET -Headers $headers
 ```
 
 ---
 
-## Project Structure (overview)
+## Project Structure
 
 ```
 Mojo/
 ├── src/
-│   ├── agent/            # agent logic, memory extraction, vector store
-│   ├── models/           # User, Session (Memory model kept for migration)
-│   ├── routes/
-│   ├── controllers/
-│   └── config/
-├── scripts/              # admin scripts and migration helpers
-├── md/                   # documentation (English)
-└── README.md
+│   ├── agent/              # Agent logic, tools, memory extraction
+│   │   ├── agentController.js
+│   │   ├── geminiAdapter.js
+│   │   ├── toolFunctions.js    # LLM tools (tasks, notes, etc.)
+│   │   ├── memoryExtractor.js
+│   │   └── prompts.js
+│   ├── models/             # MongoDB models
+│   │   ├── User.js         # User with embedded memories
+│   │   ├── Task.js         # Task model (Phase 4)
+│   │   ├── Session.js
+│   │   └── Memory.js       # (deprecated, kept for migration)
+│   ├── services/           # Business logic
+│   │   └── taskService.js  # Task operations
+│   ├── controllers/        # HTTP handlers
+│   │   ├── authController.js
+│   │   ├── chatController.js
+│   │   └── taskController.js
+│   ├── routes/             # API routes
+│   │   ├── auth.js
+│   │   ├── chat.js
+│   │   ├── tasks.js        # Tasks endpoints (Phase 4)
+│   │   └── index.js
+│   ├── middlewares/        # Express middlewares
+│   │   └── auth.js         # JWT authentication
+│   └── config/             # Configuration
+│       ├── database.js
+│       └── env.js
+├── scripts/                # Helper scripts
+│   ├── register.ps1        # User registration
+│   ├── login.ps1           # User login
+│   ├── chat.ps1            # Interactive chat
+│   └── test_tasks.ps1      # Tasks API tests
+├── md/                     # Documentation
+│   ├── PHASE4_START_HERE.md    # Tasks quick start
+│   ├── TASKS_API.md            # API documentation
+│   ├── TASKS_QUICKSTART.md     # Tasks guide
+│   └── ...
+├── .env                    # Environment variables (create from .env.example)
+├── package.json
+├── QUICKSTART.md           # Main quick start guide
+└── README.md               # This file
 ```
 
 ---
 
-## Next steps & ideas
+## Environment Variables
 
-- Add production embeddings and vector search (MongoDB Atlas)
-- Improve memory consolidation (clustering, summarization)
-- Add UI components and deployment flow
+Create a `.env` file with:
+
+```env
+# Gemini API
+GEMINI_API_KEY=your-gemini-api-key
+
+# MongoDB
+MONGODB_URI=mongodb://localhost:27017/mojo
+
+# JWT Authentication
+JWT_SECRET=your-secret-key-change-in-production
+
+# Server
+PORT=3000
+NODE_ENV=development
+```
 
 ---
 
-## Support
+## Troubleshooting
 
-If you run into issues:
+### Common Issues
 
-1. Check `md/` documentation
-2. Run `node scripts/test_memory.js`
-3. Inspect server logs
+**"MongoDB connection error"**
+- Make sure MongoDB is running: `mongod` or start the MongoDB service
+- Check `MONGODB_URI` in `.env`
+
+**"No token provided"**
+- You need to login first: `.\scripts\login.ps1`
+- Include token in `Authorization: Bearer <token>` header
+
+**"Invalid token"**
+- Token may have expired, login again
+- Check that you're using the correct token
+
+**"GEMINI_API_KEY is not defined"**
+- Create `.env` file from `.env.example`
+- Add your Gemini API key
+
+**"Port 3000 already in use"**
+- Stop existing Node processes: `Get-Process -Name node | Stop-Process -Force`
+- Or change `PORT` in `.env`
+
+### MongoDB Setup
+
+**Install MongoDB:**
+- Download from [mongodb.com](https://www.mongodb.com/try/download/community)
+- Or use Docker: `docker run -d -p 27017:27017 mongo`
+
+**Check if running:**
+```powershell
+Get-Service MongoDB
+# or
+Get-Process mongod
+```
 
 ---
 
-**Version**: Phase 2 Complete
-**Status**: ✅ Ready for development
-**Date**: October 21, 2025
-- [ ] Deployment
+## Next Steps & Future Ideas
+
+### Current Features
+- ✅ User authentication with JWT
+- ✅ Task management system
+- ✅ User-centric memory system
+- ✅ LLM natural language interface
+- ✅ Semantic search with embeddings
+
+### Future Enhancements
+- [ ] Task priorities and recurring tasks
+- [ ] Subtasks and checklists
+- [ ] Task notifications and reminders
+- [ ] Notes module (following same pattern)
+- [ ] Goals tracking module
+- [ ] Calendar/events integration
+- [ ] Production embeddings (MongoDB Atlas Vector Search)
+- [ ] Memory consolidation and summarization
+- [ ] Web UI (React/Vue)
+- [ ] Mobile app
+- [ ] Deployment guide
+
+---
+
+## Documentation
+
+### Quick Start Guides
+- **Main Quick Start**: [`QUICKSTART.md`](./QUICKSTART.md) 👈 Start here
+- **Memory System**: [`MEMORY_QUICKSTART.md`](./MEMORY_QUICKSTART.md)
+- **Tasks Module**: [`md/TASKS_QUICKSTART.md`](./md/TASKS_QUICKSTART.md)
+
+### Complete Documentation
+- **Tasks API Reference**: [`md/TASKS_API.md`](./md/TASKS_API.md)
+- **Tasks Overview**: [`md/TASKS_README.md`](./md/TASKS_README.md)
+- **Phase 4 Summary**: [`md/PHASE4_START_HERE.md`](./md/PHASE4_START_HERE.md)
+- **Memory Architecture**: [`md/MEMORY_REFACTOR.md`](./md/MEMORY_REFACTOR.md)
+- **All Documentation**: [`md/`](./md/) directory
+
+### Code Examples
+- **Tasks Examples**: [`md/TASKS_EXAMPLES.js`](./md/TASKS_EXAMPLES.js)
+- **Test Script**: [`scripts/test_tasks.ps1`](./scripts/test_tasks.ps1)
+
+---
+
+## Support & Contributing
+
+### Getting Help
+1. Check the documentation in [`md/`](./md/)
+2. Read [`QUICKSTART.md`](./QUICKSTART.md)
+3. Run the test scripts
+4. Open an issue on GitHub
+
+### Contributing
+We welcome contributions! Please:
+1. Follow the existing code structure
+2. Maintain user isolation in all queries
+3. Add comprehensive error handling
+4. Update documentation
+5. Add tests for new features
+
+---
+
+## Version History
+
+- **Phase 4** (Oct 2025) - Tasks management system with LLM integration
+- **Phase 2** (Oct 2025) - User-centric memory system refactor
+- **Phase 1** (Oct 2025) - Initial chat agent with basic memory
+
+---
+
+**Version**: Phase 4 Complete
+**Status**: ✅ Production Ready
+**Last Updated**: October 25, 2025
+
+---
+
+**Built with ❤️ by Team MOJO**
+
+*Modular. Secure. Intelligent.*

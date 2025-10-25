@@ -31,7 +31,7 @@ export const toolDefinitions = [
   {
     name: "add_task",
     description:
-      "Creates a new task for the user with a name, optional tag, and deadline. Use this when the user wants to add or create a task/reminder/todo.",
+      "Creates a new task for the user with a name, optional tag, deadline, and optional recurrence. Use this when the user wants to add or create a task/reminder/todo. IMPORTANT: You MUST calculate the exact deadline date from relative expressions (like 'Sunday', 'next week', 'tomorrow'). Never ask the user for a date.",
     parameters: {
       type: "object",
       properties: {
@@ -46,7 +46,31 @@ export const toolDefinitions = [
         deadline: {
           type: "string",
           description:
-            "Deadline in ISO 8601 format (e.g., '2025-11-01T12:00:00Z'). Calculate from current time if relative deadline given.",
+            "Deadline in ISO 8601 format (e.g., '2025-11-01T12:00:00Z'). YOU MUST calculate this from relative dates like 'Sunday', 'next week', 'tomorrow', etc. NEVER ask the user for a date.",
+        },
+        recurrence: {
+          type: "object",
+          description: "Optional recurrence pattern for repeating tasks. Include this when user wants task to repeat.",
+          properties: {
+            type: {
+              type: "string",
+              enum: ["daily", "weekly", "monthly", "yearly"],
+              description: "How often the task repeats",
+            },
+            interval: {
+              type: "number",
+              description: "Repeat every N periods (e.g., interval:2 with type:weekly = every 2 weeks). Default: 1",
+            },
+            endDate: {
+              type: "string",
+              description: "Optional end date in ISO 8601 format. Task stops recurring after this date.",
+            },
+            count: {
+              type: "number",
+              description: "Optional max number of occurrences. Task stops after completing this many times.",
+            },
+          },
+          required: ["type"],
         },
       },
       required: ["name", "deadline"],
@@ -181,19 +205,32 @@ export const toolImplementations = {
   },
 
   // New MongoDB-based task tools
-  add_task: async ({ name, tag, deadline }, context) => {
+  add_task: async ({ name, tag, deadline, recurrence }, context) => {
     if (!context?.userId) {
       throw new Error("User authentication required");
     }
 
     try {
-      const task = await taskService.createTask(context.userId, {
+      const taskData = {
         name,
         tag,
         deadline,
-      });
+      };
 
-      return {
+      // Add recurrence if provided
+      if (recurrence && recurrence.type) {
+        taskData.recurrence = {
+          type: recurrence.type,
+          interval: recurrence.interval || 1,
+          endDate: recurrence.endDate || null,
+          count: recurrence.count || null,
+          completedDates: [],
+        };
+      }
+
+      const task = await taskService.createTask(context.userId, taskData);
+
+      const response = {
         success: true,
         message: `Task "${name}" created successfully`,
         task: {
@@ -204,6 +241,26 @@ export const toolImplementations = {
           completed: task.completed,
         },
       };
+
+      // Add recurrence info if present
+      if (task.recurrence && task.recurrence.type) {
+        response.task.recurrence = {
+          type: task.recurrence.type,
+          interval: task.recurrence.interval,
+        };
+
+        if (task.recurrence.endDate) {
+          response.message += ` (repeats ${task.recurrence.type}, until ${new Date(
+            task.recurrence.endDate
+          ).toLocaleDateString()})`;
+        } else if (task.recurrence.count) {
+          response.message += ` (repeats ${task.recurrence.type}, ${task.recurrence.count} times)`;
+        } else {
+          response.message += ` (repeats ${task.recurrence.type})`;
+        }
+      }
+
+      return response;
     } catch (error) {
       return {
         success: false,

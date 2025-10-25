@@ -13,7 +13,7 @@ import { logger } from "../utils/logger.js";
 export async function createTask(req, res) {
   try {
     const userId = req.user.userId;
-    const { name, tag, deadline } = req.body;
+    const { name, tag, deadline, recurrence } = req.body;
 
     // Validation
     if (!name || !name.trim()) {
@@ -30,10 +30,35 @@ export async function createTask(req, res) {
       });
     }
 
+    // Validate recurrence if provided
+    if (recurrence) {
+      if (!recurrence.type || !["daily", "weekly", "monthly", "yearly"].includes(recurrence.type)) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid recurrence type. Must be: daily, weekly, monthly, or yearly",
+        });
+      }
+
+      if (recurrence.interval && recurrence.interval < 1) {
+        return res.status(400).json({
+          success: false,
+          error: "Recurrence interval must be at least 1",
+        });
+      }
+
+      if (recurrence.count && recurrence.count < 1) {
+        return res.status(400).json({
+          success: false,
+          error: "Recurrence count must be at least 1",
+        });
+      }
+    }
+
     const task = await taskService.createTask(userId, {
       name: name.trim(),
       tag: tag?.trim(),
       deadline,
+      recurrence,
     });
 
     return res.status(201).json({
@@ -145,7 +170,7 @@ export async function updateTask(req, res) {
     const updates = req.body;
 
     // Validate that at least one field is being updated
-    const allowedFields = ["name", "tag", "deadline", "completed"];
+    const allowedFields = ["name", "tag", "deadline", "completed", "recurrence"];
     const updateFields = Object.keys(updates).filter((key) => allowedFields.includes(key));
 
     if (updateFields.length === 0) {
@@ -153,6 +178,16 @@ export async function updateTask(req, res) {
         success: false,
         error: "No valid fields to update",
       });
+    }
+
+    // Validate recurrence if provided
+    if (updates.recurrence) {
+      if (!updates.recurrence.type || !["daily", "weekly", "monthly", "yearly"].includes(updates.recurrence.type)) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid recurrence type. Must be: daily, weekly, monthly, or yearly",
+        });
+      }
     }
 
     const task = await taskService.updateTask(id, userId, updates);

@@ -14,7 +14,7 @@ import { logger } from "../utils/logger.js";
  */
 export async function createTask(userId, taskData) {
   try {
-    const { name, tag, deadline } = taskData;
+    const { name, tag, deadline, recurrence } = taskData;
 
     // Validate deadline is in the future
     const deadlineDate = new Date(deadline);
@@ -22,16 +22,29 @@ export async function createTask(userId, taskData) {
       throw new Error("Invalid deadline format");
     }
 
-    const task = new Task({
+    const taskDoc = {
       userId,
       name,
       tag: tag || null,
       deadline: deadlineDate,
-    });
+    };
+
+    // Add recurrence if provided
+    if (recurrence && recurrence.type) {
+      taskDoc.recurrence = {
+        type: recurrence.type,
+        interval: recurrence.interval || 1,
+        endDate: recurrence.endDate ? new Date(recurrence.endDate) : null,
+        count: recurrence.count || null,
+        completedDates: [],
+      };
+    }
+
+    const task = new Task(taskDoc);
 
     await task.save();
 
-    logger.info(`Task created for user ${userId}: ${task._id}`);
+    logger.info(`Task created for user ${userId}: ${task._id}${recurrence ? " (recurring)" : ""}`);
 
     return task.toObject();
   } catch (error) {
@@ -122,7 +135,7 @@ export async function updateTask(taskId, userId, updates) {
     }
 
     // Only allow specific fields to be updated
-    const allowedUpdates = ["name", "tag", "deadline", "completed"];
+    const allowedUpdates = ["name", "tag", "deadline", "completed", "recurrence"];
     const filteredUpdates = {};
 
     for (const key of allowedUpdates) {
@@ -223,10 +236,23 @@ export async function toggleTaskCompletion(taskId, userId) {
       return null;
     }
 
-    task.completed = !task.completed;
-    await task.save();
+    // If marking as incomplete, just toggle
+    if (task.completed) {
+      task.completed = false;
+      await task.save();
+      logger.info(`Task ${taskId} marked as incomplete`);
+      return task.toObject();
+    }
 
-    logger.info(`Task ${taskId} marked as ${task.completed ? "completed" : "incomplete"}`);
+    // If marking as complete, use the model's markComplete method
+    // This handles recurring tasks automatically
+    const result = await task.markComplete();
+
+    if (result.nextTask) {
+      logger.info(`Task ${taskId} completed. Next occurrence created: ${result.nextTask._id}`);
+    } else {
+      logger.info(`Task ${taskId} marked as completed`);
+    }
 
     return task.toObject();
   } catch (error) {
