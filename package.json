@@ -6,13 +6,16 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
+    "cli": "node src/cli.js",
     "lint": "echo \"(add ESLint if you want)\""
   },
   "dependencies": {
+    "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "helmet": "^7.1.0",
+    "mongoose": "^8.19.2",
     "morgan": "^1.10.0"
   },
   "devDependencies": {

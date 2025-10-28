@@ -4,6 +4,7 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import routes from "./routes/index.js";
+import usersRouter from "./routes/Users.js";
 import { notFound, errorHandler } from "./middlewares/error.js";
 
 const app = express();
@@ -15,6 +16,7 @@ app.use(express.json()); // JSON body parsing
 app.use(morgan("dev")); // HTTP logging
 
 // Routes
+app.use("/api/users", usersRouter);
 app.use("/api", routes);
 
 // Health & root

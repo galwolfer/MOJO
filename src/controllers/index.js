@@ -26,7 +26,7 @@ export const galUpdateProfile = async (req, res, _next) => {
 // ==================== JONI — CONTROLLERS (START) ====================
 // Controllers for Joni's feature set (Coacher Algorithm / Priority Engine)
 
-import { joniService } from "../services/index.js";
+// import { joniService } from "../services/index.js";
 
 export const joniCoachNext = async (req, res, _next) => {
   // TODO(Joni): compute next recommended activity using the Coacher Algorithm
