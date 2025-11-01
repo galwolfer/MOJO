@@ -1,19 +1,28 @@
-import { GeminiAdapter } from "./geminiAdapter.js";
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 import { memoryStore } from "./mongoMemoryStore.js";
-import { toolDefinitions, executeToolCall } from "./toolFunctions.js";
+import { createLangChainTools } from "./langchainTools.js";
 import { buildSystemPromptWithUserContext } from "./prompts.js";
 import { User } from "../models/index.js";
 import { analyzeAndExtractMemories } from "./memoryExtractor.js";
 
 /**
  * Agent Controller - The central controller for the agent
+ * Now using LangChain for tool calling and agent orchestration
  */
 export class AgentController {
   constructor(apiKey) {
-    this.gemini = new GeminiAdapter(apiKey);
+    this.apiKey = apiKey;
     this.maxIterations = 5; // Maximum iterations to prevent infinite loops
-  }
 
+    // Initialize LangChain LLM
+    this.llm = new ChatGoogleGenerativeAI({
+      model: "gemini-2.0-flash-exp",
+      apiKey: apiKey,
+      temperature: 0.2,
+      maxOutputTokens: 768,
+    });
+  }
   /**
    * Process a user message with semantic memory retrieval
    */
@@ -95,89 +104,98 @@ export class AgentController {
         history = history.slice(-MAX_HISTORY_MESSAGES);
       }
 
-      // Add system prompt at the beginning of history
-      history = [{ role: "system", content: systemPrompt }, ...history];
+      // ===== LANGCHAIN TOOL CALLING =====
+      // Create tools with user context
+      const tools = createLangChainTools(userId);
 
-      // Loop to handle function calls
-      let iteration = 0;
+      // Bind tools to LLM
+      const llmWithTools = this.llm.bindTools(tools);
+
+      // Convert history to LangChain messages
+      const messages = [new SystemMessage(systemPrompt)];
+
+      for (const msg of history) {
+        if (msg.role === "user") {
+          messages.push(new HumanMessage(msg.content));
+        } else if (msg.role === "assistant") {
+          messages.push(new AIMessage(msg.content));
+        }
+      }
+
+      // Add current user message
+      messages.push(new HumanMessage(userMessage));
+
+      console.log(`[AgentController] Invoking LLM with ${messages.length} messages`);
+
+      // Agent loop
       let finalResponse = null;
+      let iteration = 0;
+      let currentMessages = [...messages];
 
-      while (iteration < this.maxIterations) {
+      while (iteration < this.maxIterations && !finalResponse) {
         iteration++;
 
-        // Send request to Gemini
-        const geminiResponse = await this.gemini.generateContent(history, toolDefinitions);
+        try {
+          const response = await llmWithTools.invoke(currentMessages);
 
-        // Extract the response
-        const response = this.gemini.extractResponse(geminiResponse);
+          // Check if there are tool calls
+          if (response.tool_calls && response.tool_calls.length > 0) {
+            console.log(`[AgentController] Tool calls requested: ${response.tool_calls.length}`);
 
-        // If the model hit MAX_TOKENS, retry with a request for shorter response
-        if (response.type === "max_tokens") {
-          console.warn(
-            `⚠️ Model hit MAX_TOKENS (${response.usageMetadata?.totalTokenCount} total tokens). Retrying with request for concise response...`
-          );
+            // Add AI response to messages
+            currentMessages.push(response);
 
-          // Add a user message asking for a shorter response
-          await memoryStore.addUserMessage(
-            sessionId,
-            userId,
-            "[System: Please provide a brief, concise response. Keep it short.]"
-          );
-          history = await memoryStore.getHistory(sessionId);
+            // Execute each tool call
+            for (const toolCall of response.tool_calls) {
+              const tool = tools.find((t) => t.name === toolCall.name);
 
-          // Re-add system prompt and trim history
-          if (history.length > MAX_HISTORY_MESSAGES) {
-            history = history.slice(-MAX_HISTORY_MESSAGES);
+              if (tool) {
+                console.log(`[AgentController] Executing tool: ${toolCall.name}`);
+
+                try {
+                  const result = await tool.func(toolCall.args);
+
+                  // Add tool result to messages
+                  currentMessages.push({
+                    role: "tool",
+                    content: result,
+                    tool_call_id: toolCall.id,
+                  });
+                } catch (error) {
+                  console.error(`[AgentController] Tool execution error:`, error);
+                  currentMessages.push({
+                    role: "tool",
+                    content: JSON.stringify({ error: error.message }),
+                    tool_call_id: toolCall.id,
+                  });
+                }
+              }
+            }
+          } else {
+            // No tool calls, this is the final response
+            finalResponse = response.content;
+            console.log(`[AgentController] Final response received`);
           }
-          history = [{ role: "system", content: systemPrompt }, ...history];
+        } catch (error) {
+          console.error(`[AgentController] LLM invocation error:`, error);
 
-          // Continue to retry
-          continue;
-        }
+          // Check if it's a MAX_TOKENS error
+          if (error.message && error.message.includes("MAX_TOKENS")) {
+            console.warn(`⚠️ Model hit MAX_TOKENS. Retrying with shorter request...`);
 
-        // If it's a textual response - we're done
-        if (response.type === "text") {
-          finalResponse = response.text;
-          await memoryStore.addAssistantMessage(sessionId, userId, finalResponse);
-          break;
-        }
-
-        // If it's a function call - execute it
-        if (response.type === "function_call") {
-          const { name, args } = response.functionCall;
-
-          console.log(`Executing function: ${name}`, args);
-
-          // Add the call to memory
-          await memoryStore.addFunctionCall(sessionId, userId, response.functionCall);
-
-          try {
-            // Execute the function with user context
-            const context = { userId };
-            const functionResult = await executeToolCall(name, args, context);
-
-            // Add the result to memory
-            const resultString = JSON.stringify(functionResult);
-            await memoryStore.addFunctionResult(sessionId, userId, name, resultString);
-
-            // Update the history
-            history = await memoryStore.getHistory(sessionId);
-          } catch (error) {
-            console.error("Function execution error:", error);
-
-            // Add the error to memory
-            const errorMessage = JSON.stringify({
-              error: error.message,
-            });
-            await memoryStore.addFunctionResult(sessionId, userId, name, errorMessage);
-
-            history = await memoryStore.getHistory(sessionId);
+            // Add explicit request for brevity
+            currentMessages.push(new HumanMessage("[System: Please provide a brief, concise response.]"));
+            continue;
+          } else {
+            throw error;
           }
         }
       }
 
-      // If we reached the maximum iterations without a response
-      if (!finalResponse) {
+      // Save assistant response to memory
+      if (finalResponse) {
+        await memoryStore.addAssistantMessage(sessionId, userId, finalResponse);
+      } else {
         finalResponse = "Sorry, I encountered an issue processing the request. Please try again.";
         await memoryStore.addAssistantMessage(sessionId, userId, finalResponse);
       }
