@@ -76,6 +76,7 @@ export const coacherAlgorithm = {
       status: mapStatus(t.status), // critical
       deadline: t.dueDate ? new Date(t.dueDate).toISOString() : null,
       required_context: { timeOfDay: t.timeOfDay || "any" },
+      tags: Array.isArray(t.tags) ? t.tags : [],
     }));
 
     const result = scoreActivities(activities, userProfile);
@@ -87,4 +88,3 @@ export const coacherAlgorithm = {
 export default coacherAlgorithm;
 
 // ==================== JONI — SERVICES (END) ======================
-

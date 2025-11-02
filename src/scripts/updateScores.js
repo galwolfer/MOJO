@@ -19,6 +19,7 @@ const toActivity = (task) => ({
   status: mapStatus(task.status),
   deadline: task.dueDate ? new Date(task.dueDate).toISOString() : null,
   required_context: { timeOfDay: task.timeOfDay || "any" },
+  tags: Array.isArray(task.tags) ? task.tags : [],
 });
 
 export async function updateAllScores() {

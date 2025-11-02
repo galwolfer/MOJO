@@ -152,12 +152,20 @@ async function addTask() {
   if (!ensureLoggedIn()) return;
 
   const title = (await ask("Task title: ")).trim();
+  const description = (await ask("Short description (optional): ")).trim();
   const importance = Number((await ask("Importance 1–5 (default 3): ")).trim() || 3);
   const effort = Number((await ask("Effort 1–5 (default 3): ")).trim() || 3);
   const due = (await ask("Due date (YYYY-MM-DD, optional): ")).trim();
   const dueDate = due ? new Date(due) : undefined;
 
-  await Task.create({ userId: currentUser._id, title, importance, effort, dueDate });
+  await Task.create({
+    userId: currentUser._id,
+    title,
+    description,
+    importance,
+    effort,
+    dueDate,
+  });
   console.log(theme.success("✅ Task added! We'll keep its score in sync."));
 }
 
@@ -172,7 +180,10 @@ async function listTasks() {
 
   console.log(theme.accent(`\n${currentUser.username}'s tasks:`));
   tasks.forEach((task, index) => {
-    const line = `${index + 1}. ${paint(task.title, ansi.bold)}`;
+    const tags = Array.isArray(task.tags) && task.tags.length ? task.tags.join(", ") : "misc";
+    const line = `${index + 1}. ${paint(task.title, ansi.bold)}  ${theme.muted(
+      `(importance ${task.importance}, effort ${task.effort}, score ${task.priorityScore ?? 0}, tags: ${tags})`
+    )}`;
     console.log(line);
   });
 }
@@ -193,6 +204,7 @@ async function recommendTask() {
   console.log(theme.accent("\n✨ Recommended next task"));
   console.log(`${theme.title(top.title)} - score ${paint(top.score.toFixed(2), ansi.bold, ansi.yellow)}`);
   if (top.reason) console.log(theme.muted(`Reason: ${top.reason}`));
+  if (top.tags?.length) console.log(theme.muted(`Tags: ${top.tags.join(", ")}`));
   if (top.window) {
     console.log(theme.muted(`Suggested slot: ${top.window.start} -> ${top.window.end}`));
   }

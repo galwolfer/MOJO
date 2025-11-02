@@ -1,4 +1,6 @@
 // src/services/priority.js
+import { computeTagMultiplier, describeTagWeights, summarizeTags } from "./tagging.js";
+
 export function scoreActivities(activities, profile = {}) {
   const now = new Date();
 
@@ -32,13 +34,23 @@ export function scoreActivities(activities, profile = {}) {
     return { start: start.toISOString(), end: end.toISOString(), duration: durationMin || 30 };
   };
 
-  const buildReason = ({ U, I, C, S, E }) => {
+  const capitalize = (s = "") => s.charAt(0).toUpperCase() + s.slice(1);
+
+  const buildReason = ({ U, I, C, S, E, tagInfo, multiplier }) => {
     const parts = [];
     if (U > 0.6) parts.push("Urgent");
     if (I > 0.6) parts.push("Important");
     if (S > 0.5) parts.push("Maintains streak");
     if (C < 0.4) parts.push("Poor timing");
     if (E > 0.6) parts.push("High effort required");
+    const topTag = tagInfo?.[0];
+    if (topTag && topTag.weight > 1.02) {
+      parts.push(`Tag boost: ${capitalize(topTag.tag)}`);
+    } else if (topTag && topTag.weight < 0.98) {
+      parts.push(`Lower priority tag: ${capitalize(topTag.tag)}`);
+    } else if (multiplier && Math.abs(multiplier - 1) > 0.02) {
+      parts.push("Adjusted by tags");
+    }
     return parts.join(" · ") || "Good overall match";
   };
 
@@ -56,10 +68,21 @@ export function scoreActivities(activities, profile = {}) {
     const V = diversityBonus(a);
     const eps = 0; // ללא רנדומליות
 
-    const score = clamp(100 * (0.35 * U + 0.25 * I + 0.15 * C + 0.1 * S + 0.05 * V + 0.05 * eps - 0.2 * E), 0, 100);
+    const normalizedTags = summarizeTags(a.tags);
+    const tagWeights = describeTagWeights(normalizedTags);
+    const multiplier = computeTagMultiplier(normalizedTags);
+    const rawScore = clamp(100 * (0.35 * U + 0.25 * I + 0.15 * C + 0.1 * S + 0.05 * V + 0.05 * eps - 0.2 * E), 0, 100);
+    const score = clamp(rawScore * multiplier, 0, 100);
     const window = nextFreeSlot(a.duration_min);
-    const reason = buildReason({ U, I, C, S, E });
-    out.push({ activityId: a.id, title: a.title, score, window, reason });
+    const reason = buildReason({ U, I, C, S, E, tagInfo: tagWeights, multiplier });
+    out.push({
+      activityId: a.id,
+      title: a.title,
+      score,
+      window,
+      reason,
+      tags: summarizeTags(a.tags),
+    });
   }
 
   out.sort((a, b) => b.score - a.score || a.window.duration - b.window.duration);

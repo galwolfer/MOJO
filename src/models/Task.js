@@ -1,6 +1,7 @@
 // Notes are in English as requested.
 import mongoose from "mongoose";
 import { updateAllScores } from "../scripts/updateScores.js";
+import { detectTags } from "../services/tagging.js";
 
 const taskSchema = new mongoose.Schema(
   {
@@ -30,5 +31,19 @@ taskSchema.post("remove", async function () {
   await updateAllScores();
 });
 
+taskSchema.pre("save", function (next) {
+  if (!this.isModified("title") && !this.isModified("description") && !this.isNew && this.tags?.length) {
+    return next();
+  }
+
+  const autoTags = detectTags({
+    title: this.title,
+    description: this.description,
+    tags: this.tags,
+  });
+
+  this.tags = autoTags;
+  next();
+});
 
 export default mongoose.model("Task", taskSchema);
