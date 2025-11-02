@@ -79,6 +79,38 @@ const menuOptions = [
   { key: "0", label: "Exit" },
 ];
 
+// Questionnaire mapping each life area to the prompt we show the user
+const preferenceQuestions = [
+  {
+    key: "work",
+    prompt: "How central is work or your main project right now? (1=low, 5=critical): ",
+  },
+  {
+    key: "study",
+    prompt: "How much focus do studies or learning need? (1=low, 5=critical): ",
+  },
+  {
+    key: "health",
+    prompt: "How often do you invest in health or fitness? (1=rarely, 5=daily): ",
+  },
+  {
+    key: "social",
+    prompt: "How important are social or family commitments? (1=low, 5=high): ",
+  },
+  {
+    key: "finance",
+    prompt: "How urgent are finance/admin tasks? (1=chill, 5=urgent): ",
+  },
+  {
+    key: "household",
+    prompt: "How much attention do household chores need? (1=low, 5=high): ",
+  },
+  {
+    key: "creative",
+    prompt: "How motivated are you to pursue creative projects? (1=low, 5=high): ",
+  },
+];
+
 (async function main() {
   await connectDatabase();
   console.log(theme.success("✅ Connected to MongoDB - welcome to Mojo Coacher CLI!"));
@@ -131,8 +163,14 @@ async function register() {
     return;
   }
 
+  const priorities = await collectPriorities();
   const passwordHash = await bcrypt.hash(password, 10);
-  await User.create({ username, email, passwordHash });
+  await User.create({
+    username,
+    email,
+    passwordHash,
+    profile: { priorities },
+  });
   console.log(theme.success("🎉 Registered successfully! You can log in now."));
 }
 
@@ -146,6 +184,31 @@ async function login() {
   }
   currentUser = user;
   console.log(theme.success(`🙌 Logged in as ${user.username}`));
+}
+
+async function collectPriorities() {
+  // Ask the user to rate each life area on a 1-5 scale
+  console.log(theme.subtitle("\nLet's personalize your experience (answer 1-5)."));
+  const result = {};
+  for (const { key, prompt } of preferenceQuestions) {
+    let value = 3;
+    while (true) {
+      const raw = (await ask(prompt)).trim();
+      if (!raw) {
+        value = 3; // default midpoint if they skip the answer
+        break;
+      }
+      const parsed = Number(raw);
+      if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 5) {
+        value = Math.round(parsed); // clamp to integer for storage
+        break;
+      }
+      console.log(theme.warning("Please enter a number between 1 and 5."));
+    }
+    result[key] = value; // store by category key (e.g. work, health)
+  }
+  console.log("");
+  return result;
 }
 
 async function addTask() {

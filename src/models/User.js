@@ -35,6 +35,15 @@ const userSchema = new mongoose.Schema(
         of: mongoose.Schema.Types.Mixed,
         default: {},
       },
+      priorities: {
+        work: { type: Number, min: 1, max: 5, default: 3 },
+        study: { type: Number, min: 1, max: 5, default: 3 },
+        health: { type: Number, min: 1, max: 5, default: 3 },
+        social: { type: Number, min: 1, max: 5, default: 3 },
+        finance: { type: Number, min: 1, max: 5, default: 3 },
+        household: { type: Number, min: 1, max: 5, default: 3 },
+        creative: { type: Number, min: 1, max: 5, default: 3 },
+      },
     },
   },
   {

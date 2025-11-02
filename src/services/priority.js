@@ -36,25 +36,31 @@ export function scoreActivities(activities, profile = {}) {
 
   const capitalize = (s = "") => s.charAt(0).toUpperCase() + s.slice(1);
 
-  const buildReason = ({ U, I, C, S, E, tagInfo, multiplier }) => {
+  const buildReason = ({ U, I, C, S, E, tagInfo }) => {
     const parts = [];
     if (U > 0.6) parts.push("Urgent");
     if (I > 0.6) parts.push("Important");
     if (S > 0.5) parts.push("Maintains streak");
     if (C < 0.4) parts.push("Poor timing");
     if (E > 0.6) parts.push("High effort required");
-    const topTag = tagInfo?.[0];
-    if (topTag && topTag.weight > 1.02) {
-      parts.push(`Tag boost: ${capitalize(topTag.tag)}`);
-    } else if (topTag && topTag.weight < 0.98) {
-      parts.push(`Lower priority tag: ${capitalize(topTag.tag)}`);
-    } else if (multiplier && Math.abs(multiplier - 1) > 0.02) {
-      parts.push("Adjusted by tags");
+    const boostedTag =
+      tagInfo?.find((info) => info.source === "preference" && info.weight > 1.05) ||
+      tagInfo?.find((info) => info.weight > 1.05);
+    const loweredTag =
+      tagInfo?.find((info) => info.source === "preference" && info.weight < 0.95) ||
+      tagInfo?.find((info) => info.weight < 0.95);
+    if (boostedTag) {
+      const label = boostedTag.source === "preference" ? boostedTag.category : boostedTag.tag;
+      parts.push(`Boosted by ${capitalize(label)}`);
+    } else if (loweredTag) {
+      const label = loweredTag.source === "preference" ? loweredTag.category : loweredTag.tag;
+      parts.push(`Lower priority (${capitalize(label)})`);
     }
     return parts.join(" · ") || "Good overall match";
   };
 
   const out = [];
+  const preferences = profile?.priorities || {};
   for (const a of activities) {
     if (a.status !== "open") continue; // רק פתוחות
     const importance = Number.isFinite(a.importance) ? a.importance : 3;
@@ -69,12 +75,12 @@ export function scoreActivities(activities, profile = {}) {
     const eps = 0; // ללא רנדומליות
 
     const normalizedTags = summarizeTags(a.tags);
-    const tagWeights = describeTagWeights(normalizedTags);
-    const multiplier = computeTagMultiplier(normalizedTags);
+    const tagDetails = describeTagWeights(normalizedTags, preferences);
+    const multiplier = computeTagMultiplier(normalizedTags, preferences);
     const rawScore = clamp(100 * (0.35 * U + 0.25 * I + 0.15 * C + 0.1 * S + 0.05 * V + 0.05 * eps - 0.2 * E), 0, 100);
     const score = clamp(rawScore * multiplier, 0, 100);
     const window = nextFreeSlot(a.duration_min);
-    const reason = buildReason({ U, I, C, S, E, tagInfo: tagWeights, multiplier });
+    const reason = buildReason({ U, I, C, S, E, tagInfo: tagDetails });
     out.push({
       activityId: a.id,
       title: a.title,
@@ -82,6 +88,7 @@ export function scoreActivities(activities, profile = {}) {
       window,
       reason,
       tags: summarizeTags(a.tags),
+      tagDetails,
     });
   }
 

@@ -68,6 +68,20 @@ const TAG_WEIGHTS = TAG_BLUEPRINTS.reduce((acc, { tag, weight }) => {
   return acc;
 }, {});
 
+// Map tags to broader life categories for user preferences
+const TAG_TO_CATEGORY = {
+  work: "work",
+  study: "study",
+  health: "health",
+  sports: "health",
+  finance: "finance",
+  family: "social",
+  social: "social",
+  household: "household",
+  creative: "creative",
+  misc: "misc",
+};
+
 const DEFAULT_TAG = "misc";
 
 // Extract lowercased tokens from free-form text
@@ -96,14 +110,31 @@ export function detectTags({ title = "", description = "", tags = [] } = {}) {
   return [...found];
 }
 
-export function computeTagMultiplier(taskTags = []) {
+const preferenceToFactor = (value) => {
+  const safe = Number.isFinite(value) ? value : 3;
+  return 1 + (safe - 3) * 0.2;
+};
+
+const mapTagToCategory = (tag) => TAG_TO_CATEGORY[tag] || "misc";
+
+const hasPreferences = (preferences) =>
+  preferences && Object.values(preferences).some((v) => Number.isFinite(v));
+
+export function computeTagMultiplier(taskTags = [], preferences = {}) {
   const tags = Array.isArray(taskTags) && taskTags.length ? taskTags : [DEFAULT_TAG];
   let multiplier = 0;
   let weightSum = 0;
+  const usePreferences = hasPreferences(preferences);
 
   tags.forEach((tag) => {
     const normalized = String(tag || "").toLowerCase();
-    const weight = TAG_WEIGHTS[normalized] ?? TAG_WEIGHTS[DEFAULT_TAG];
+    const category = mapTagToCategory(normalized);
+    let weight;
+    if (usePreferences && preferences && preferences[category] != null) {
+      weight = preferenceToFactor(preferences[category]);
+    } else {
+      weight = TAG_WEIGHTS[normalized] ?? TAG_WEIGHTS[DEFAULT_TAG];
+    }
     multiplier += weight;
     weightSum += 1;
   });
@@ -121,10 +152,17 @@ export function getTagBlueprints() {
   return TAG_BLUEPRINTS.map(({ tag, weight }) => ({ tag, weight }));
 }
 
-export function describeTagWeights(tags = []) {
+export function describeTagWeights(tags = [], preferences = {}) {
   const normalized = summarizeTags(tags);
+  const usePreferences = hasPreferences(preferences);
   return normalized.map((tag) => ({
     tag,
-    weight: TAG_WEIGHTS[tag] ?? TAG_WEIGHTS[DEFAULT_TAG],
+    category: mapTagToCategory(tag),
+    source: usePreferences && preferences[mapTagToCategory(tag)] != null ? "preference" : "baseline",
+    preference: usePreferences ? preferences[mapTagToCategory(tag)] ?? null : null,
+    weight:
+      usePreferences && preferences[mapTagToCategory(tag)] != null
+        ? preferenceToFactor(preferences[mapTagToCategory(tag)])
+        : TAG_WEIGHTS[tag] ?? TAG_WEIGHTS[DEFAULT_TAG],
   }));
 }
