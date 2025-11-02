@@ -32,7 +32,7 @@ const TAG_BLUEPRINTS = [
   {
     tag: "social",
     weight: 1.05,
-    keywords: ["call", "meet", "hangout", "coffee", "friend", "party", "network"],
+    keywords: ["call", "meet", "hangout", "coffee", "friend", "party", "network", "friends", "dinner"],
   },
   {
     tag: "sports",
@@ -115,7 +115,7 @@ const preferenceToFactor = (value) => {
   return 1 + (safe - 3) * 0.2;
 };
 
-const mapTagToCategory = (tag) => TAG_TO_CATEGORY[tag] || "misc";
+export const categoryForTag = (tag) => TAG_TO_CATEGORY[tag] || "misc";
 
 const hasPreferences = (preferences) =>
   preferences && Object.values(preferences).some((v) => Number.isFinite(v));
@@ -128,7 +128,7 @@ export function computeTagMultiplier(taskTags = [], preferences = {}) {
 
   tags.forEach((tag) => {
     const normalized = String(tag || "").toLowerCase();
-    const category = mapTagToCategory(normalized);
+    const category = categoryForTag(normalized);
     let weight;
     if (usePreferences && preferences && preferences[category] != null) {
       weight = preferenceToFactor(preferences[category]);
@@ -157,12 +157,12 @@ export function describeTagWeights(tags = [], preferences = {}) {
   const usePreferences = hasPreferences(preferences);
   return normalized.map((tag) => ({
     tag,
-    category: mapTagToCategory(tag),
-    source: usePreferences && preferences[mapTagToCategory(tag)] != null ? "preference" : "baseline",
-    preference: usePreferences ? preferences[mapTagToCategory(tag)] ?? null : null,
+    category: categoryForTag(tag),
+    source: usePreferences && preferences[categoryForTag(tag)] != null ? "preference" : "baseline",
+    preference: usePreferences ? preferences[categoryForTag(tag)] ?? null : null,
     weight:
-      usePreferences && preferences[mapTagToCategory(tag)] != null
-        ? preferenceToFactor(preferences[mapTagToCategory(tag)])
+      usePreferences && preferences[categoryForTag(tag)] != null
+        ? preferenceToFactor(preferences[categoryForTag(tag)])
         : TAG_WEIGHTS[tag] ?? TAG_WEIGHTS[DEFAULT_TAG],
   }));
 }

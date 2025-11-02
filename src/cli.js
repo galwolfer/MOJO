@@ -4,6 +4,9 @@ import { connectDatabase } from "./config/database.js";
 import User from "./models/User.js";
 import Task from "./models/Task.js";
 import { coacherAlgorithm } from "./services/index.js";
+import { suggestTaskFromProfile } from "./services/suggestions.js";
+import { logEvent } from "./services/telemetry.js";
+import { categoryForTag } from "./services/tagging.js";
 
 // Simple ANSI styling helpers to keep the CLI lively without extra deps
 const ansi = {
@@ -69,6 +72,8 @@ const ask = (question, { hidden = false } = {}) =>
   });
 
 let currentUser = null;
+let lastSuggestion = null;
+const SUGGESTION_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
 
 const menuOptions = [
   { key: "1", label: "Register" },
@@ -76,6 +81,7 @@ const menuOptions = [
   { key: "3", label: "Add Task" },
   { key: "4", label: "List Tasks" },
   { key: "5", label: "Recommend Next Task" },
+  { key: "6", label: "Suggest a New Task" },
   { key: "0", label: "Exit" },
 ];
 
@@ -123,6 +129,7 @@ const preferenceQuestions = [
     else if (choice === "3") await addTask();
     else if (choice === "4") await listTasks();
     else if (choice === "5") await recommendTask();
+    else if (choice === "6") await suggestNewTask();
     else if (choice === "0") break;
     else console.log(theme.warning("🤔 Not sure what you meant. Please pick one of the options above."));
   }
@@ -165,11 +172,16 @@ async function register() {
 
   const priorities = await collectPriorities();
   const passwordHash = await bcrypt.hash(password, 10);
-  await User.create({
+  const user = await User.create({
     username,
     email,
     passwordHash,
     profile: { priorities },
+  });
+  await logEvent({
+    type: "onboarding_questionnaire_completed",
+    userId: user._id,
+    payload: { priorities },
   });
   console.log(theme.success("🎉 Registered successfully! You can log in now."));
 }
@@ -221,7 +233,7 @@ async function addTask() {
   const due = (await ask("Due date (YYYY-MM-DD, optional): ")).trim();
   const dueDate = due ? new Date(due) : undefined;
 
-  await Task.create({
+  const created = await Task.create({
     userId: currentUser._id,
     title,
     description,
@@ -230,6 +242,39 @@ async function addTask() {
     dueDate,
   });
   console.log(theme.success("✅ Task added! We'll keep its score in sync."));
+
+  await logEvent({
+    type: "task_created",
+    userId: currentUser._id,
+    payload: {
+      taskId: created._id.toString(),
+      title: created.title,
+      tags: created.tags || [],
+      importance: created.importance,
+      effort: created.effort,
+    },
+  });
+
+  if (lastSuggestion) {
+    const withinWindow = Date.now() - lastSuggestion.at <= SUGGESTION_WINDOW_MS;
+    if (withinWindow) {
+      const taskCategories = new Set((created.tags || []).map((tag) => categoryForTag(tag)));
+      if (taskCategories.has(lastSuggestion.category)) {
+        await logEvent({
+          type: "suggestion_followed",
+          userId: currentUser._id,
+          payload: {
+            trackingId: lastSuggestion.trackingId,
+            taskId: created._id.toString(),
+            category: lastSuggestion.category,
+          },
+        });
+        lastSuggestion = null;
+      }
+    } else {
+      lastSuggestion = null;
+    }
+  }
 }
 
 async function listTasks() {
@@ -271,6 +316,39 @@ async function recommendTask() {
   if (top.window) {
     console.log(theme.muted(`Suggested slot: ${top.window.start} -> ${top.window.end}`));
   }
+}
+
+async function suggestNewTask() {
+  if (!ensureLoggedIn()) return;
+
+  // Reload user profile to pick up the latest preferences
+  const freshUser = await User.findById(currentUser._id).lean();
+  if (freshUser) {
+    currentUser = freshUser;
+  }
+  const profile = currentUser.profile || {};
+
+  const tasks = await Task.find(
+    { userId: currentUser._id, status: { $in: ["todo", "in_progress"] } },
+    { title: 1, tags: 1 }
+  ).lean();
+
+  const suggestion = suggestTaskFromProfile(profile, tasks);
+
+  console.log(theme.accent("\n🆕 Suggested new task idea"));
+  console.log(`${theme.title(suggestion.title)} (${suggestion.category})`);
+  console.log(theme.muted(`Why: ${suggestion.reason}`));
+  if (suggestion.description) {
+    console.log(theme.muted(`Idea: ${suggestion.description}`));
+  }
+  console.log(theme.muted("Add it via option 3 to include it in your queue."));
+
+  lastSuggestion = { ...suggestion, at: Date.now() };
+  await logEvent({
+    type: "suggestion_shown",
+    userId: currentUser._id,
+    payload: suggestion,
+  });
 }
 
 function ensureLoggedIn() {
