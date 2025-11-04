@@ -55,5 +55,4 @@ const userSchema = new mongoose.Schema(
 // Note: `unique: true` on the schema fields already creates indexes for username and email.
 // Removing explicit duplicate index declarations to avoid Mongoose warnings.
 
-const User = mongoose.model("User", userSchema);
-export default User;
+export const User = mongoose.model("User", userSchema);

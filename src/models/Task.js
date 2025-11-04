@@ -14,6 +14,7 @@ const taskSchema = new mongoose.Schema(
     effort: { type: Number, min: 1, max: 5, default: 3 },     // 1=small, 5=big
     tags: { type: [String], default: [] },
     // Cached score so we can sort quickly (optional)
+    // add field: user's behaviour default value ineffective
     priorityScore: { type: Number, default: 0 },
   },
   { timestamps: true }
