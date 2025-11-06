@@ -1,12 +1,13 @@
 import readline from "readline";
 import bcrypt from "bcrypt";
 import { connectDatabase } from "./config/database.js";
-import User from "./models/User.js";
+import { User } from "./models/User.js";
 import Task from "./models/Task.js";
 import { coacherAlgorithm } from "./services/index.js";
 import { suggestTaskFromProfile } from "./services/suggestions.js";
 import { logEvent } from "./services/telemetry.js";
 import { categoryForTag } from "./services/tagging.js";
+import { planTasks } from "./services/planner.js";
 
 // Simple ANSI styling helpers to keep the CLI lively without extra deps
 const ansi = {
@@ -82,6 +83,7 @@ const menuOptions = [
   { key: "4", label: "List Tasks" },
   { key: "5", label: "Recommend Next Task" },
   { key: "6", label: "Suggest a New Task" },
+  { key: "7", label: "Plan Tasks" },
   { key: "0", label: "Exit" },
 ];
 
@@ -130,6 +132,7 @@ const preferenceQuestions = [
     else if (choice === "4") await listTasks();
     else if (choice === "5") await recommendTask();
     else if (choice === "6") await suggestNewTask();
+    else if (choice === "7") await planTasksOption();
     else if (choice === "0") break;
     else console.log(theme.warning("🤔 Not sure what you meant. Please pick one of the options above."));
   }
@@ -226,10 +229,24 @@ async function collectPriorities() {
 async function addTask() {
   if (!ensureLoggedIn()) return;
 
+  const toNumber = (value, fallback) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+
   const title = (await ask("Task title: ")).trim();
   const description = (await ask("Short description (optional): ")).trim();
-  const importance = Number((await ask("Importance 1–5 (default 3): ")).trim() || 3);
-  const effort = Number((await ask("Effort 1–5 (default 3): ")).trim() || 3);
+  const importance = toNumber((await ask("Importance 1–5 (default 3): ")).trim(), 3);
+  const effort = toNumber((await ask("Effort 1–5 (default 3): ")).trim(), 3);
+  const durationInput = (await ask("Estimated duration in minutes (default 60): ")).trim();
+  const estimatedDuration = Math.max(15, toNumber(durationInput || 60, 60));
+  const splitInput = (await ask("Can we split it across sessions? (Y/n, default Y): ")).trim().toLowerCase();
+  const canSplit = splitInput === "" || splitInput === "y" || splitInput === "yes";
+  const minChunkInput = (await ask("Minimum chunk size in minutes (default 30): ")).trim();
+  const minChunk = Math.min(
+    estimatedDuration,
+    Math.max(15, toNumber(minChunkInput || 30, 30))
+  );
   const due = (await ask("Due date (YYYY-MM-DD, optional): ")).trim();
   const dueDate = due ? new Date(due) : undefined;
 
@@ -239,6 +256,9 @@ async function addTask() {
     description,
     importance,
     effort,
+    estimatedDuration,
+    canSplit,
+    minChunk,
     dueDate,
   });
   console.log(theme.success("✅ Task added! We'll keep its score in sync."));
@@ -252,6 +272,9 @@ async function addTask() {
       tags: created.tags || [],
       importance: created.importance,
       effort: created.effort,
+      estimatedDuration: created.estimatedDuration,
+      canSplit: created.canSplit,
+      minChunk: created.minChunk,
     },
   });
 
@@ -333,11 +356,18 @@ async function suggestNewTask() {
     { title: 1, tags: 1 }
   ).lean();
 
-  const suggestion = suggestTaskFromProfile(profile, tasks);
+  const suggestion = await suggestTaskFromProfile(profile, tasks);
 
   console.log(theme.accent("\n🆕 Suggested new task idea"));
   console.log(`${theme.title(suggestion.title)} (${suggestion.category})`);
   console.log(theme.muted(`Why: ${suggestion.reason}`));
+  if (suggestion.algorithm === "logreg" && typeof suggestion.modelScore === "number") {
+    console.log(
+      theme.muted(
+        `Model confidence: ${(suggestion.modelScore * 100).toFixed(1)}%`
+      )
+    );
+  }
   if (suggestion.description) {
     console.log(theme.muted(`Idea: ${suggestion.description}`));
   }
@@ -348,6 +378,71 @@ async function suggestNewTask() {
     type: "suggestion_shown",
     userId: currentUser._id,
     payload: suggestion,
+  });
+}
+
+async function planTasksOption() {
+  if (!ensureLoggedIn()) return;
+
+  const tasks = await Task.find({
+    userId: currentUser._id,
+    status: { $in: ["todo", "in_progress"] },
+  }).lean();
+
+  if (!tasks.length) {
+    console.log(theme.info("📭 No open tasks to plan."));
+    return;
+  }
+
+  const busyBlocksByDate = {};
+
+  const { plan, unscheduled } = planTasks(tasks, { busyBlocksByDate });
+
+  if (!plan.length) {
+    console.log(theme.warning("⚠️ Unable to schedule any tasks within the planning window."));
+  } else {
+    const grouped = plan.reduce((acc, entry) => {
+      if (!acc[entry.date]) acc[entry.date] = [];
+      acc[entry.date].push(entry);
+      return acc;
+    }, {});
+
+    const dates = Object.keys(grouped).sort();
+    console.log(theme.accent("\n🗓️  Draft schedule"));
+    for (const date of dates) {
+      console.log(theme.title(`\n${date}`));
+      grouped[date]
+        .sort((a, b) => a.start - b.start)
+        .forEach((slot) => {
+          const start = slot.start.toTimeString().slice(0, 5);
+          const end = slot.end.toTimeString().slice(0, 5);
+          console.log(
+            theme.muted(
+              `${start}–${end} (${slot.minutes} min) → ${slot.title}`
+            )
+          );
+        });
+    }
+  }
+
+  if (unscheduled.length) {
+    console.log(theme.warning("\n⚠️ Unscheduled tasks:"));
+    unscheduled.forEach((item) => {
+      console.log(
+        theme.muted(
+          `• ${item.title} (needs ${item.remainingMinutes} more minutes)`
+        )
+      );
+    });
+  }
+
+  await logEvent({
+    type: "tasks_planned",
+    userId: currentUser._id,
+    payload: {
+      plannedCount: plan.length,
+      unscheduledCount: unscheduled.length,
+    },
   });
 }
 

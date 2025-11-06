@@ -13,6 +13,10 @@ const taskSchema = new mongoose.Schema(
     importance: { type: Number, min: 1, max: 5, default: 3 }, // 1=low, 5=high
     effort: { type: Number, min: 1, max: 5, default: 3 },     // 1=small, 5=big
     tags: { type: [String], default: [] },
+    estimatedDuration: { type: Number, min: 15, default: 60 }, // minutes
+    canSplit: { type: Boolean, default: true },
+    minChunk: { type: Number, min: 15, default: 30 },          // minimum chunk length in minutes when splitting
+    earliestStart: { type: Date },
     // Cached score so we can sort quickly (optional)
     // add field: user's behaviour default value ineffective
     priorityScore: { type: Number, default: 0 },
