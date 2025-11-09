@@ -1,8 +1,9 @@
 // src/services/planner.js
 // Schedules task durations into available calendar slots.
 
-import { getFreeIntervalsForDay, subtractInterval, findSlot, buildWorkingWindow } from "./calendar.js";
+import { getFreeIntervalsForDay, subtractInterval, buildWorkingWindow } from "./calendar.js";
 import { addDays, startOfDay, addMinutes } from "./calendarUtils.js";
+import { TaskSchedule } from "../models/TaskSchedule.js";
 
 const DEFAULT_WORKING_HOURS = {
   startHour: 9,
@@ -12,6 +13,80 @@ const DEFAULT_WORKING_HOURS = {
 };
 
 const DEFAULT_BREAK_MINUTES = 15;
+const MIN_SPLIT_CHUNK = 15;
+
+const minutesBetween = (start, end) => Math.max(0, Math.round((end - start) / 60000));
+
+const enumerateDates = (start, end) => {
+  const dates = [];
+  let cursor = new Date(start);
+  while (cursor <= end) {
+    dates.push({ date: cursor, dateKey: toDateKey(cursor) });
+    cursor = addDays(cursor, 1);
+  }
+  return dates;
+};
+
+const ensureWorkingWindow = (cache, dateKey, date, workingHours) => {
+  if (!cache[dateKey]) {
+    cache[dateKey] = buildWorkingWindow(date, workingHours);
+  }
+  return cache[dateKey];
+};
+
+const ensureFreeIntervals = (cache, dateKey, date, workingHours, busyBlocksByDate) => {
+  if (!cache[dateKey]) {
+    cache[dateKey] = getFreeIntervalsForDay(date, workingHours, busyBlocksByDate[dateKey] || []);
+  }
+  return cache[dateKey];
+};
+
+const pickBestFitSlot = ({ candidateDates, chunkMinutes, freeCache, busyBlocksByDate, workingHours, workingWindowCache }) => {
+  let best = null;
+
+  for (const { date, dateKey } of candidateDates) {
+    const intervals = ensureFreeIntervals(freeCache, dateKey, date, workingHours, busyBlocksByDate);
+    if (!intervals.length) continue;
+
+    for (const interval of intervals) {
+      const available = minutesBetween(interval.start, interval.end);
+      if (available < chunkMinutes) continue;
+
+      const leftover = available - chunkMinutes;
+      if (
+        !best ||
+        date.getTime() < best.date.getTime() ||
+        (date.getTime() === best.date.getTime() && leftover < best.leftover) ||
+        (
+          date.getTime() === best.date.getTime() &&
+          leftover === best.leftover &&
+          interval.start.getTime() < best.interval.start.getTime()
+        )
+      ) {
+        const window = ensureWorkingWindow(workingWindowCache, dateKey, date, workingHours);
+        best = {
+          date,
+          dateKey,
+          interval,
+          leftover,
+          workingWindow: window,
+        };
+      }
+    }
+  }
+
+  if (!best) return null;
+
+  const start = best.interval.start;
+  const end = addMinutes(start, chunkMinutes);
+  return {
+    date: best.date,
+    dateKey: best.dateKey,
+    start,
+    end,
+    workingWindow: best.workingWindow,
+  };
+};
 
 const toDateKey = (date) => {
   const d = new Date(date);
@@ -41,67 +116,56 @@ export function planTasks(tasks, { busyBlocksByDate = {}, workingHours = DEFAULT
     if (!remaining) continue;
 
     const dueDate = task.dueDate ? startOfDay(new Date(task.dueDate)) : horizonEnd;
-    let cursor = today;
+    const rangeEnd = dueDate < horizonEnd ? dueDate : horizonEnd;
+    const candidateDates = enumerateDates(today, rangeEnd);
 
     let freeCache = {};
-    let scheduledMinutes = 0;
+    let workingWindowCache = {};
 
-    while (cursor <= dueDate && cursor <= horizonEnd && remaining > 0) {
-      const dateKey = toDateKey(cursor);
-      const workingWindow = buildWorkingWindow(cursor, workingHours);
-      if (!freeCache[dateKey]) {
-        freeCache[dateKey] = getFreeIntervalsForDay(cursor, workingHours, busyBlocksByDate[dateKey] || []);
-      }
+    while (remaining > 0) {
+      const chunkSize = task.canSplit
+        ? Math.min(remaining, Math.max(task.minChunk || 30, MIN_SPLIT_CHUNK))
+        : remaining;
 
-      let freeIntervals = freeCache[dateKey];
-      if (!freeIntervals.length) {
-        cursor = addDays(cursor, 1);
-        continue;
-      }
+      const slot = pickBestFitSlot({
+        candidateDates,
+        chunkMinutes: chunkSize,
+        freeCache,
+        busyBlocksByDate,
+        workingHours,
+        workingWindowCache,
+      });
 
-      const chunkSize = Math.min(
-        remaining,
-        task.canSplit ? Math.max(task.minChunk || 30, 15) : remaining
-      );
-
-      const slot = findSlot(freeIntervals, chunkSize);
-      if (!slot) {
-        cursor = addDays(cursor, 1);
-        continue;
-      }
+      if (!slot) break;
 
       plan.push({
         taskId: task._id,
         title: task.title,
-        date: dateKey,
+        date: slot.dateKey,
         start: slot.start,
         end: slot.end,
         minutes: chunkSize,
       });
 
-      scheduledMinutes += chunkSize;
       remaining -= chunkSize;
-      freeCache[dateKey] = subtractInterval(freeIntervals, slot);
-      busyBlocksByDate[dateKey] = (busyBlocksByDate[dateKey] || []).concat(slot);
+      const slotInterval = { start: slot.start, end: slot.end };
+      freeCache[slot.dateKey] = subtractInterval(freeCache[slot.dateKey], slotInterval);
+      if (!busyBlocksByDate[slot.dateKey]) busyBlocksByDate[slot.dateKey] = [];
+      busyBlocksByDate[slot.dateKey].push(slotInterval);
 
-      if (DEFAULT_BREAK_MINUTES > 0 && slot.end < workingWindow.end) {
-        const breakEnd = addMinutes(slot.end, DEFAULT_BREAK_MINUTES);
+      if (DEFAULT_BREAK_MINUTES > 0 && slot.end < slot.workingWindow.end) {
+        const breakEndCandidate = addMinutes(slot.end, DEFAULT_BREAK_MINUTES);
         const breakInterval = {
           start: slot.end,
-          end: breakEnd > workingWindow.end ? workingWindow.end : breakEnd,
+          end: breakEndCandidate > slot.workingWindow.end ? slot.workingWindow.end : breakEndCandidate,
         };
-        busyBlocksByDate[dateKey].push(breakInterval);
-        freeCache[dateKey] = subtractInterval(freeCache[dateKey], breakInterval);
+        if (breakInterval.end > breakInterval.start) {
+          busyBlocksByDate[slot.dateKey].push(breakInterval);
+          freeCache[slot.dateKey] = subtractInterval(freeCache[slot.dateKey], breakInterval);
+        }
       }
 
-      if (!task.canSplit && remaining > 0) {
-        break;
-      }
-
-      if (remaining > 0 && task.canSplit) {
-        cursor = addDays(cursor, 1);
-        continue;
-      }
+      if (!task.canSplit && remaining > 0) break;
     }
 
     if (remaining > 0) {
@@ -114,4 +178,18 @@ export function planTasks(tasks, { busyBlocksByDate = {}, workingHours = DEFAULT
   }
 
   return { plan, unscheduled };
+}
+
+export async function persistPlan(userId, plan) {
+  if (!plan.length) return;
+
+  const docs = plan.map((slot) => ({
+    userId,
+    taskId: slot.taskId,
+    start: slot.start,
+    end: slot.end,
+    minutes: slot.minutes,
+  }));
+
+  await TaskSchedule.insertMany(docs);
 }

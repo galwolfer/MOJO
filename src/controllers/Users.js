@@ -1,5 +1,5 @@
 // Notes are in English as requested.
-import User from "../models/User.js";
+import { User } from "../models/User.js";
 
 // Get all users
 export async function list(_req, res, next) {

@@ -1,8 +1,9 @@
 // src/services/suggestions.js
-// Heuristic suggestions for new tasks based on user priorities and current backlog.
+// Suggest new tasks by blending model scores with heuristic fallbacks.
 
 import crypto from "crypto";
 import { summarizeTags, categoryForTag } from "./tagging.js";
+import { loadSuggestionModel, scoreCategory } from "./modelScorer.js";
 
 const SUGGESTION_LIBRARY = {
   work: [
@@ -102,15 +103,29 @@ const DEFAULT_PRIORITY = 3;
 
 const categories = Object.keys(SUGGESTION_LIBRARY);
 
-export function suggestTaskFromProfile(profile = {}, tasks = []) {
+export async function suggestTaskFromProfile(profile = {}, tasks = []) {
   const priorities = profile?.priorities || {};
   const counts = countTasksByCategory(tasks);
+  const timestamp = new Date();
+  const model = await loadSuggestionModel();
 
   const scoredCategories = categories.map((category) => {
     const priority = Number.isFinite(priorities[category]) ? Number(priorities[category]) : DEFAULT_PRIORITY;
     const count = counts[category] ?? 0;
-    const score = priority / (count + 1);
-    return { category, priority, count, score };
+    let modelScore = null;
+    if (model) {
+      try {
+        modelScore = scoreCategory(model, { category, priorities, recentCounts: counts, timestamp });
+      } catch (err) {
+        console.error("Model scoring failed:", err?.message || err);
+        modelScore = null;
+      }
+    }
+    const score = modelScore ?? priority / (count + 1);
+    const reason = modelScore != null
+      ? buildModelReason({ category, priority, count, modelScore })
+      : buildHeuristicReason({ category, priority, count });
+    return { category, priority, count, score, modelScore, reason };
   });
 
   scoredCategories.sort((a, b) => b.score - a.score || b.priority - a.priority);
@@ -125,7 +140,9 @@ export function suggestTaskFromProfile(profile = {}, tasks = []) {
     category: best.category,
     priority: best.priority,
     currentCount: best.count,
-    reason: buildReason(best),
+    reason: best.reason,
+    modelScore: best.modelScore,
+    algorithm: best.modelScore != null ? "logreg" : "heuristic",
     trackingId,
     generatedAt: new Date().toISOString(),
   };
@@ -146,10 +163,19 @@ function countTasksByCategory(tasks) {
   return counts;
 }
 
-function buildReason({ category, priority, count }) {
+function buildHeuristicReason({ category, priority, count }) {
   const label = CATEGORY_LABELS[category] || category;
   if (count === 0) {
     return `You rated ${label} at ${priority}/5, but have no tasks in that area yet.`;
   }
   return `You rated ${label} at ${priority}/5 and only track ${count} task(s) there.`;
+}
+
+function buildModelReason({ category, priority, count, modelScore }) {
+  const label = CATEGORY_LABELS[category] || category;
+  const confidence = (modelScore * 100).toFixed(1);
+  if (count === 0) {
+    return `Model confidence ${confidence}% this is next for ${label} (priority ${priority}/5, no tasks logged).`;
+  }
+  return `Model confidence ${confidence}% for ${label} (priority ${priority}/5, backlog ${count}).`;
 }

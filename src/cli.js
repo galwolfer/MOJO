@@ -7,7 +7,11 @@ import { coacherAlgorithm } from "./services/index.js";
 import { suggestTaskFromProfile } from "./services/suggestions.js";
 import { logEvent } from "./services/telemetry.js";
 import { categoryForTag } from "./services/tagging.js";
-import { planTasks } from "./services/planner.js";
+import { planTasks, persistPlan } from "./services/planner.js";
+import { TaskSchedule } from "./models/TaskSchedule.js";
+import { BusyBlock } from "./models/BusyBlock.js";
+import { startOfDay, addDays } from "./services/calendarUtils.js";
+import { buildRoutineBusyBlocks, getRoutineSettings, describeRoutineWindows } from "./services/routineBlocks.js";
 
 // Simple ANSI styling helpers to keep the CLI lively without extra deps
 const ansi = {
@@ -36,6 +40,31 @@ const theme = {
   option: (text) => paint(text, ansi.bold, ansi.yellow),
   accent: (text) => paint(text, ansi.bold, ansi.blue),
   muted: (text) => paint(text, ansi.dim, ansi.gray),
+};
+
+const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const pad = (value) => String(value).padStart(2, "0");
+
+const formatLocalDateTime = (date) => {
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
+};
+
+const formatLocalDate = (date) => {
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  return `${year}-${month}-${day}`;
+};
+
+const parseDateOnly = (input) => {
+  if (!DATE_ONLY_REGEX.test(input)) return null;
+  const parsed = new Date(`${input}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -84,6 +113,9 @@ const menuOptions = [
   { key: "5", label: "Recommend Next Task" },
   { key: "6", label: "Suggest a New Task" },
   { key: "7", label: "Plan Tasks" },
+  { key: "8", label: "View Schedule" },
+  { key: "9", label: "Update Schedule Entry" },
+  { key: "10", label: "Calendar Constraints" },
   { key: "0", label: "Exit" },
 ];
 
@@ -133,6 +165,9 @@ const preferenceQuestions = [
     else if (choice === "5") await recommendTask();
     else if (choice === "6") await suggestNewTask();
     else if (choice === "7") await planTasksOption();
+    else if (choice === "8") await viewScheduleOption();
+    else if (choice === "9") await updateScheduleEntryOption();
+    else if (choice === "10") await calendarConstraintsMenu();
     else if (choice === "0") break;
     else console.log(theme.warning("🤔 Not sure what you meant. Please pick one of the options above."));
   }
@@ -247,8 +282,18 @@ async function addTask() {
     estimatedDuration,
     Math.max(15, toNumber(minChunkInput || 30, 30))
   );
-  const due = (await ask("Due date (YYYY-MM-DD, optional): ")).trim();
-  const dueDate = due ? new Date(due) : undefined;
+  let dueDate;
+  while (true) {
+    const due = (await ask("Due date (YYYY-MM-DD, optional): ")).trim();
+    if (!due) break;
+    const parsed = parseDateOnly(due);
+    if (!parsed) {
+      console.log(theme.warning("⚠️ Please enter a due date like 2025-11-14."));
+      continue;
+    }
+    dueDate = parsed;
+    break;
+  }
 
   const created = await Task.create({
     userId: currentUser._id,
@@ -394,9 +439,72 @@ async function planTasksOption() {
     return;
   }
 
-  const busyBlocksByDate = {};
+  const now = new Date();
+  const planningHorizonDays = 14;
+  const todayStart = startOfDay(now);
+  const horizonEnd = addDays(todayStart, planningHorizonDays);
 
-  const { plan, unscheduled } = planTasks(tasks, { busyBlocksByDate });
+  const autoRoutineBlocks = buildRoutineBusyBlocks({
+    startDate: todayStart,
+    endDate: horizonEnd,
+    profile: currentUser.profile || {},
+  });
+
+  const busyBlocksByDate = Object.entries(autoRoutineBlocks).reduce((acc, [key, intervals]) => {
+    acc[key] = intervals.map((interval) => ({
+      start: new Date(interval.start),
+      end: new Date(interval.end),
+    }));
+    return acc;
+  }, {});
+
+  const existingSessions = await TaskSchedule.find({
+    userId: currentUser._id,
+    end: { $gte: now },
+    status: "planned",
+  }).lean();
+
+  const remainingByTaskId = new Map(
+    tasks.map((task) => [task._id.toString(), task.estimatedDuration || 0])
+  );
+
+  for (const session of existingSessions) {
+    const key = session.start.toISOString().slice(0, 10);
+    if (!busyBlocksByDate[key]) busyBlocksByDate[key] = [];
+    busyBlocksByDate[key].push({ start: new Date(session.start), end: new Date(session.end) });
+
+    const taskId = session.taskId?.toString();
+    if (taskId && remainingByTaskId.has(taskId)) {
+      const remaining = Math.max(0, remainingByTaskId.get(taskId) - session.minutes);
+      remainingByTaskId.set(taskId, remaining);
+    }
+  }
+
+  const busyBlocks = await BusyBlock.find({
+    userId: currentUser._id,
+    start: { $lt: horizonEnd },
+    end: { $gt: todayStart },
+  }).lean();
+
+  for (const block of busyBlocks) {
+    const key = block.start.toISOString().slice(0, 10);
+    if (!busyBlocksByDate[key]) busyBlocksByDate[key] = [];
+    busyBlocksByDate[key].push({ start: new Date(block.start), end: new Date(block.end) });
+  }
+
+  const tasksForPlanning = tasks
+    .map((task) => {
+      const remaining = remainingByTaskId.get(task._id.toString());
+      return { ...task, estimatedDuration: remaining };
+    })
+    .filter((task) => (task.estimatedDuration || 0) > 0);
+
+  if (!tasksForPlanning.length) {
+    console.log(theme.info("🎉 All tasks already scheduled."));
+    return;
+  }
+
+  const { plan, unscheduled } = planTasks(tasksForPlanning, { busyBlocksByDate, planningHorizonDays });
 
   if (!plan.length) {
     console.log(theme.warning("⚠️ Unable to schedule any tasks within the planning window."));
@@ -436,6 +544,13 @@ async function planTasksOption() {
     });
   }
 
+  try {
+    await persistPlan(currentUser._id, plan);
+    console.log(theme.success("\n💾 Plan saved."));
+  } catch (err) {
+    console.error("Failed to save plan:", err);
+  }
+
   await logEvent({
     type: "tasks_planned",
     userId: currentUser._id,
@@ -444,6 +559,244 @@ async function planTasksOption() {
       unscheduledCount: unscheduled.length,
     },
   });
+}
+
+async function viewScheduleOption() {
+  if (!ensureLoggedIn()) return;
+
+  const now = new Date();
+  const todayStart = startOfDay(now);
+  const upcoming = await TaskSchedule.find({
+    userId: currentUser._id,
+    start: { $gte: todayStart },
+  })
+    .sort({ start: 1 })
+    .populate("taskId", "title")
+    .lean();
+
+  if (!upcoming.length) {
+    console.log(theme.info("📭 No upcoming sessions found."));
+    return;
+  }
+
+  console.log(theme.accent("\n🗓️  Upcoming sessions"));
+  const grouped = upcoming.reduce((acc, entry) => {
+    const key = formatLocalDate(entry.start);
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(entry);
+    return acc;
+  }, {});
+
+  for (const date of Object.keys(grouped).sort()) {
+    console.log(theme.title(`\n${date}`));
+    grouped[date].forEach((item) => {
+      const start = item.start.toTimeString().slice(0, 5);
+      const end = item.end.toTimeString().slice(0, 5);
+      const status = item.status;
+      const title = item.taskId?.title || "(deleted task)";
+      console.log(theme.muted(`${start}–${end} (${status}) → ${title}`));
+    });
+  }
+}
+
+async function updateScheduleEntryOption() {
+  if (!ensureLoggedIn()) return;
+
+  const todayStart = startOfDay(new Date());
+  const upcoming = await TaskSchedule.find({
+    userId: currentUser._id,
+    start: { $gte: todayStart },
+  })
+    .sort({ start: 1 })
+    .limit(20)
+    .populate("taskId", "title")
+    .lean();
+
+  if (!upcoming.length) {
+    console.log(theme.info("📭 No sessions available to update."));
+    return;
+  }
+
+  console.log(theme.accent("\nSelect a session to update:"));
+  upcoming.forEach((session, index) => {
+    const start = session.start.toTimeString().slice(0, 5);
+    const end = session.end.toTimeString().slice(0, 5);
+    const dateLabel = formatLocalDate(session.start);
+    const title = session.taskId?.title || "(deleted task)";
+    console.log(
+      theme.muted(
+        `${index + 1}) ${dateLabel} ${start}-${end} (${session.status}) → ${title}`
+      )
+    );
+  });
+
+  const choiceRaw = (await ask("Session number: ")).trim();
+  const choiceIndex = Number(choiceRaw) - 1;
+  if (!Number.isInteger(choiceIndex) || choiceIndex < 0 || choiceIndex >= upcoming.length) {
+    console.log(theme.warning("⚠️ Invalid selection."));
+    return;
+  }
+
+  const session = upcoming[choiceIndex];
+
+  const statusRaw = (await ask("New status (planned/completed/skipped): ")).trim().toLowerCase();
+  if (!["planned", "completed", "skipped"].includes(statusRaw)) {
+    console.log(theme.warning("⚠️ Invalid status."));
+    return;
+  }
+
+  await TaskSchedule.updateOne({ _id: session._id }, { $set: { status: statusRaw } });
+  console.log(theme.success("✅ Session updated."));
+
+  await logEvent({
+    type: "schedule_updated",
+    userId: currentUser._id,
+    payload: {
+      sessionId: session._id.toString(),
+      status: statusRaw,
+    },
+  });
+}
+
+const calendarMenuOptions = [
+  { key: "1", label: "Add Busy Block", action: addBusyBlockOption },
+  { key: "2", label: "View Busy Blocks", action: viewBusyBlocksOption },
+  { key: "3", label: "Routine Busy Blocks", action: routineBlocksSettingsOption },
+  { key: "0", label: "Back to main menu" },
+];
+
+async function calendarConstraintsMenu() {
+  if (!ensureLoggedIn()) return;
+
+  while (true) {
+    console.log(theme.muted("\n════════ Calendar Constraints ════════"));
+    calendarMenuOptions.forEach(({ key, label }) => {
+      console.log(`${theme.option(`${key})`)} ${label}`);
+    });
+    const choice = (await ask("Choose an option ➤ ")).trim();
+    if (choice === "0" || choice === "") break;
+    const selected = calendarMenuOptions.find((option) => option.key === choice);
+    if (!selected || !selected.action) {
+      console.log(theme.warning("⚠️ Not a valid calendar option."));
+      continue;
+    }
+    await selected.action();
+  }
+}
+
+async function addBusyBlockOption() {
+  if (!ensureLoggedIn()) return;
+
+  const title = (await ask("Busy block title (optional): ")).trim();
+  const parseDateTimeInput = (value) => {
+    if (!value) return null;
+    const normalized = value.replace(" ", "T");
+    const d = new Date(normalized);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
+  const promptDateTime = async (label) => {
+    while (true) {
+      const raw = (await ask(label)).trim();
+      const parsed = parseDateTimeInput(raw);
+      if (parsed) return parsed;
+      console.log(theme.warning("⚠️ Please use the format YYYY-MM-DD HH:mm."));
+    }
+  };
+
+  const start = await promptDateTime("Start (YYYY-MM-DD HH:mm): ");
+  let end = null;
+  while (true) {
+    end = await promptDateTime("End (YYYY-MM-DD HH:mm): ");
+    if (end <= start) {
+      console.log(theme.warning("⚠️ End time must be after the start time."));
+      continue;
+    }
+    break;
+  }
+
+  await BusyBlock.create({
+    userId: currentUser._id,
+    title,
+    start,
+    end,
+  });
+
+  console.log(theme.success("✅ Busy block added."));
+}
+
+async function viewBusyBlocksOption() {
+  if (!ensureLoggedIn()) return;
+
+  const now = startOfDay(new Date());
+  const blocks = await BusyBlock.find({
+    userId: currentUser._id,
+    end: { $gte: now },
+  })
+    .sort({ start: 1 })
+    .lean();
+
+  if (!blocks.length) {
+    console.log(theme.info("📭 No busy blocks found."));
+    return;
+  }
+
+  console.log(theme.accent("\n🗂️  Busy blocks"));
+  blocks.forEach((block, index) => {
+    const start = formatLocalDateTime(new Date(block.start));
+    const end = formatLocalDateTime(new Date(block.end));
+    const label = block.title || "(no title)";
+    console.log(theme.muted(`${index + 1}) ${start} → ${end} — ${label}`));
+  });
+}
+
+async function routineBlocksSettingsOption() {
+  if (!ensureLoggedIn()) return;
+
+  const profile = currentUser.profile || {};
+  const routineSettings = getRoutineSettings(profile);
+  const statusText = routineSettings.enabled ? theme.success("ENABLED") : theme.warning("DISABLED");
+  console.log(theme.accent(`\nAutomatic routine blocks are currently ${statusText}.`));
+
+  const descriptions = describeRoutineWindows(routineSettings.blocks);
+  console.log(theme.muted("Default windows:"));
+  descriptions.forEach((line) => console.log(theme.muted(` • ${line}`)));
+
+  const answer = (await ask("Enable automatic routine busy blocks? (y/n, blank to cancel): "))
+    .trim()
+    .toLowerCase();
+
+  if (!answer) {
+    console.log(theme.muted("No changes made."));
+    return;
+  }
+
+  if (!["y", "yes", "n", "no"].includes(answer)) {
+    console.log(theme.warning("⚠️ Please respond with 'y' or 'n'."));
+    return;
+  }
+
+  const enabled = answer === "y" || answer === "yes";
+  const payload = {
+    enabled,
+    blocks: routineSettings.blocks,
+  };
+
+  await User.updateOne(
+    { _id: currentUser._id },
+    { $set: { "profile.settings.routineBlocks": payload } }
+  );
+
+  const refreshed = await User.findById(currentUser._id).lean();
+  if (refreshed) currentUser = refreshed;
+
+  const updatedText = enabled ? theme.success("enabled") : theme.warning("disabled");
+  console.log(theme.info(`Routine busy blocks ${updatedText}.`));
+
+  if (enabled) {
+    console.log(theme.muted("We'll protect the following times automatically:"));
+    describeRoutineWindows(payload.blocks).forEach((line) => console.log(theme.muted(` • ${line}`)));
+  }
 }
 
 function ensureLoggedIn() {
