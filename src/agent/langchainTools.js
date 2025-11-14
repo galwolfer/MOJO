@@ -1,6 +1,7 @@
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
 import * as taskService from "../services/taskService.js";
+import { memoryStore } from "../services/memoryService.js";
 
 /**
  * LangChain-compatible tools for MOJO agent
@@ -21,6 +22,120 @@ export function createLangChainTools(userId) {
           time: now.toLocaleTimeString("en-US"),
           timestamp: now.toISOString(),
         });
+      },
+    }),
+
+    // Save user memory - PRIMARY MEMORY (facts about user)
+    new DynamicStructuredTool({
+      name: "save_user_fact",
+      description:
+        "Save important facts about the user (name, age, location, education, work, preferences, skills). Use this when user shares personal information that should be remembered for future conversations. Write facts concisely (2-5 words).",
+      schema: z.object({
+        fact: z.string().describe("Concise fact about user (2-5 words, e.g., 'studies at Bar Ilan')"),
+        category: z
+          .enum(["name", "age", "location", "education", "work", "preference", "skill", "other"])
+          .describe("Category of the fact"),
+        importance: z.number().min(1).max(10).optional().default(7).describe("Importance level 1-10 (default: 7)"),
+      }),
+      func: async ({ fact, category, importance = 7 }) => {
+        try {
+          // Map category to memory type
+          let type = "user_fact";
+          if (category === "preference") {
+            type = "preference";
+          } else if (["name", "age", "location"].includes(category)) {
+            type = "profile";
+          }
+
+          await memoryStore.savePrimaryMemory(userId, fact, type, importance, {
+            source: "llm_tool",
+            category,
+          });
+
+          return JSON.stringify({
+            success: true,
+            message: `Saved: ${fact}`,
+            category,
+            importance,
+          });
+        } catch (error) {
+          return JSON.stringify({ success: false, error: error.message });
+        }
+      },
+    }),
+
+    // Save conversation memory - CONVERSATION MEMORY (important from chat)
+    new DynamicStructuredTool({
+      name: "save_conversation_note",
+      description:
+        "Save important information from the conversation (decisions, plans, requests, topics discussed). Use this for context that might be relevant in future conversations.",
+      schema: z.object({
+        note: z.string().describe("Brief note about the conversation (5-20 words)"),
+        importance: z.number().min(1).max(10).optional().default(5).describe("Importance level 1-10 (default: 5)"),
+      }),
+      func: async ({ note, importance = 5 }) => {
+        try {
+          await memoryStore.saveConversationMemory(userId, note, "conversation", importance, {
+            source: "llm_tool",
+          });
+
+          return JSON.stringify({
+            success: true,
+            message: `Saved note: ${note}`,
+            importance,
+          });
+        } catch (error) {
+          return JSON.stringify({ success: false, error: error.message });
+        }
+      },
+    }),
+
+    // Search memories
+    new DynamicStructuredTool({
+      name: "search_memories",
+      description:
+        "Search user's saved memories (facts about user, previous conversations). Use this when you need to recall information about the user that isn't in recent context.",
+      schema: z.object({
+        query: z.string().describe("What to search for in memories"),
+        category: z
+          .enum(["primary", "conversation", "all"])
+          .optional()
+          .default("all")
+          .describe("Which category to search: primary (user facts), conversation (past discussions), or all"),
+      }),
+      func: async ({ query, category = "all" }) => {
+        try {
+          let memories;
+          if (category === "primary") {
+            memories = await memoryStore.retrievePrimaryMemories(userId, query, 5);
+          } else if (category === "conversation") {
+            memories = await memoryStore.retrieveConversationMemories(userId, query, 5);
+          } else {
+            const result = await memoryStore.retrieveRelevantMemories(userId, query, 5);
+            memories = result.all;
+          }
+
+          if (memories.length === 0) {
+            return JSON.stringify({
+              success: true,
+              message: "No relevant memories found",
+              memories: [],
+            });
+          }
+
+          return JSON.stringify({
+            success: true,
+            count: memories.length,
+            memories: memories.map((m) => ({
+              text: m.text,
+              type: m.type,
+              importance: m.importance,
+              timestamp: m.timestamp,
+            })),
+          });
+        } catch (error) {
+          return JSON.stringify({ success: false, error: error.message });
+        }
       },
     }),
 

@@ -9,6 +9,12 @@ RULES:
 - Calculate ISO dates for relative expressions (never ask user)
 - Current: ${new Date().toISOString()}
 
+MEMORY TOOLS:
+- save_user_fact: When user shares personal info (name, location, education, work, preferences)
+- save_conversation_note: When user makes decisions/plans/requests
+- search_memories: To recall past info about user not in recent context
+- Write concisely (2-5 words for facts, 5-20 for notes)
+
 DATES: "tomorrow"/"מחר"→+1d | "next week"→+7d | "Sunday"/"ראשון"→next Sun | "in X days"→+Xd
 RECUR: "daily"/"כל יום"→{type:"daily",interval:1} | "weekly"/"כל שבוע"→{type:"weekly",interval:1}
 `;
@@ -29,8 +35,3 @@ export function buildSystemPromptWithUserContext(userProfile, userId, memoryCont
 
   return prompt;
 }
-
-export const USER_GREETING = `Hello! I am MOJO, your digital assistant.
-How can I assist you today?`;
-
-export const ERROR_MESSAGE = `Sorry, I encountered an issue. Please try again.`;

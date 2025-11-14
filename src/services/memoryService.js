@@ -1,5 +1,5 @@
 /**
- * MongoDB Memory Store - Replaces SQLite-based memory store
+ * Memory Service - Memory and conversation management
  * Manages conversation memory, user profiles, and embeddings using MongoDB
  */
 import { User, Session, Memory } from "../models/index.js";
@@ -11,7 +11,7 @@ import {
   retrieveRelevantMemories as retrieveFromVectorStore,
   getAllMemories as getAllMemoriesFromStore,
   pruneOldConversationMemories,
-} from "./vectorStore.js";
+} from "../agent/vectorStore.js";
 
 class MongoMemoryStore {
   constructor() {

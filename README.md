@@ -273,18 +273,20 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/tasks" `
 Mojo/
 ├── src/
 │   ├── agent/              # Agent logic, tools, memory extraction
-│   │   ├── agentController.js
-│   │   ├── geminiAdapter.js
-│   │   ├── toolFunctions.js    # LLM tools (tasks, notes, etc.)
-│   │   ├── memoryExtractor.js
-│   │   └── prompts.js
+│   │   ├── agentController.js    # Main agent controller with LangChain
+│   │   ├── geminiAdapter.js      # Gemini API adapter (for future use)
+│   │   ├── langchainTools.js     # LangChain tools (tasks, time, memories)
+│   │   ├── prompts.js            # System prompts
+│   │   └── vectorStore.js        # Vector embeddings and memory storage
 │   ├── models/             # MongoDB models
 │   │   ├── User.js         # User with embedded memories
 │   │   ├── Task.js         # Task model (Phase 4)
 │   │   ├── Session.js
 │   │   └── Memory.js       # (deprecated, kept for migration)
 │   ├── services/           # Business logic
-│   │   └── taskService.js  # Task operations
+│   │   ├── taskService.js  # Task operations
+│   │   ├── memoryService.js # Memory and conversation management
+│   │   └── index.js        # Services index
 │   ├── controllers/        # HTTP handlers
 │   │   ├── authController.js
 │   │   ├── chatController.js

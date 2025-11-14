@@ -1,10 +1,9 @@
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
-import { memoryStore } from "./mongoMemoryStore.js";
+import { memoryStore } from "../services/memoryService.js";
 import { createLangChainTools } from "./langchainTools.js";
 import { buildSystemPromptWithUserContext } from "./prompts.js";
 import { User } from "../models/index.js";
-import { analyzeAndExtractMemories } from "./memoryExtractor.js";
 
 /**
  * Agent Controller - The central controller for the agent
@@ -83,10 +82,11 @@ export class AgentController {
       );
 
       // ----- Safety: truncate long memory context to avoid huge prompts -----
-      const MAX_MEMORY_CHARS = 600; // Reduced from 1200 - keep it very short
+      // Context is now supplementary - LLM can use search_memories tool for deeper recall
+      const MAX_MEMORY_CHARS = 200;
       if (memoryContext.length > MAX_MEMORY_CHARS) {
         console.warn(
-          `[AgentController] memoryContext is ${memoryContext.length} chars; truncating to ${MAX_MEMORY_CHARS} chars to reduce token usage.`
+          `[AgentController] memoryContext is ${memoryContext.length} chars; truncating to ${MAX_MEMORY_CHARS} chars. LLM can use search_memories tool for more.`
         );
         memoryContext = memoryContext.substring(0, MAX_MEMORY_CHARS) + "...";
       }
@@ -150,8 +150,6 @@ export class AgentController {
               const tool = tools.find((t) => t.name === toolCall.name);
 
               if (tool) {
-                console.log(`[AgentController] Executing tool: ${toolCall.name}`);
-
                 try {
                   const result = await tool.func(toolCall.args);
 
@@ -200,16 +198,8 @@ export class AgentController {
         await memoryStore.addAssistantMessage(sessionId, userId, finalResponse);
       }
 
-      // ===== AUTO EXTRACT MEMORIES =====
-      // Extract important information from the conversation
-      console.log(`🔍 Starting memory extraction for session ${sessionId}`);
-      try {
-        await analyzeAndExtractMemories(userId, sessionId, userMessage, finalResponse);
-        console.log(`✅ Memory extraction completed for session ${sessionId}`);
-      } catch (error) {
-        console.error("❌ Error extracting memories:", error);
-        // Don't fail the whole request if memory extraction fails
-      }
+      // Memory extraction is now handled by LangChain tools (save_user_fact, save_conversation_note)
+      // The LLM decides what to save during the conversation, providing better control and transparency
 
       return {
         success: true,
