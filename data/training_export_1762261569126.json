@@ -1,0 +1,115 @@
+[
+  {
+    "userId": "69077bacdd50789fac63545b",
+    "timestamp": "2025-11-02T15:42:08.616Z",
+    "suggestedCategory": "work",
+    "priorities": {},
+    "recentCounts": {},
+    "accepted": true,
+    "timeToCreateMinutes": 1,
+    "suggestionPayload": {
+      "title": "Plan upcoming work sprint",
+      "description": "Outline key goals and deliverables for the next work cycle.",
+      "category": "work",
+      "priority": 5,
+      "currentCount": 0,
+      "reason": "You rated work & projects at 5/5, but have no tasks in that area yet.",
+      "trackingId": "6235d0b9-9c20-48ec-8eb2-b246e285736d",
+      "generatedAt": "2025-11-02T15:42:08.614Z"
+    },
+    "tasksCreatedAfter": [
+      {
+        "taskId": "69077bf7dd50789fac635464",
+        "tags": [
+          "work"
+        ],
+        "createdAt": "2025-11-02T15:42:47.455Z"
+      },
+      {
+        "taskId": "69077c0add50789fac63546d",
+        "tags": [
+          "social"
+        ],
+        "createdAt": "2025-11-02T15:43:06.095Z"
+      }
+    ]
+  },
+  {
+    "userId": "69077c974d97f353117d915f",
+    "timestamp": "2025-11-02T15:45:37.953Z",
+    "suggestedCategory": "work",
+    "priorities": {},
+    "recentCounts": {},
+    "accepted": true,
+    "timeToCreateMinutes": 1,
+    "suggestionPayload": {
+      "title": "Review project roadmap",
+      "description": "Check milestones and adjust priorities with stakeholders.",
+      "category": "work",
+      "priority": 5,
+      "currentCount": 0,
+      "reason": "You rated work & projects at 5/5, but have no tasks in that area yet.",
+      "trackingId": "3c75a180-1d7d-40b2-9cc7-4ce1218ed7cc",
+      "generatedAt": "2025-11-02T15:45:37.952Z"
+    },
+    "tasksCreatedAfter": [
+      {
+        "taskId": "69077ccc4d97f353117d9168",
+        "tags": [
+          "work"
+        ],
+        "createdAt": "2025-11-02T15:46:20.960Z"
+      },
+      {
+        "taskId": "69077cde4d97f353117d9171",
+        "tags": [
+          "misc"
+        ],
+        "createdAt": "2025-11-02T15:46:38.498Z"
+      }
+    ]
+  },
+  {
+    "userId": "69079d87139ff68f52d46e8b",
+    "timestamp": "2025-11-02T18:06:23.852Z",
+    "suggestedCategory": "work",
+    "priorities": {
+      "work": 5,
+      "study": 5,
+      "health": 3,
+      "social": 4,
+      "finance": 1,
+      "household": 3,
+      "creative": 3
+    },
+    "recentCounts": {},
+    "accepted": true,
+    "timeToCreateMinutes": 1,
+    "suggestionPayload": {
+      "title": "Plan upcoming work sprint",
+      "description": "Outline key goals and deliverables for the next work cycle.",
+      "category": "work",
+      "priority": 5,
+      "currentCount": 0,
+      "reason": "You rated work & projects at 5/5, but have no tasks in that area yet.",
+      "trackingId": "ef5644a5-370e-453d-ae94-7fdd21606644",
+      "generatedAt": "2025-11-02T18:06:23.851Z"
+    },
+    "tasksCreatedAfter": [
+      {
+        "taskId": "69079ddf139ff68f52d46e95",
+        "tags": [
+          "work"
+        ],
+        "createdAt": "2025-11-02T18:07:27.790Z"
+      },
+      {
+        "taskId": "69079df3139ff68f52d46e9e",
+        "tags": [
+          "social"
+        ],
+        "createdAt": "2025-11-02T18:07:47.728Z"
+      }
+    ]
+  }
+]

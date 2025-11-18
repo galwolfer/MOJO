@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 import { env } from "../config/env.js";
 import { scoreActivities } from "../services/priority.js";
 import Task from "../models/Task.js";
-import User from "../models/User.js";
+import { User } from "../models/User.js";
 
 const mapStatus = (status) =>
   status === "todo" || status === "in_progress" ? "open" : "closed";

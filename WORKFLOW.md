@@ -1,6 +1,88 @@
 # Mojo Workflow Flowchart
 
-## System Architecture
+## High-Level System Overview
+
+```mermaid
+flowchart TB
+    User([User]) --> CLI[Interactive CLI]
+    CLI --> Auth{Authenticated?}
+    Auth -->|No| Register[Register/Login]
+    Register --> Auth
+    Auth -->|Yes| Actions[Main Actions]
+    
+    Actions --> ManageTasks[Manage Tasks]
+    Actions --> GetRecommendations[Get Recommendations]
+    Actions --> ScheduleTasks[Schedule Tasks]
+    
+    ManageTasks --> DB[(MongoDB)]
+    GetRecommendations --> Algorithm[Priority Algorithm]
+    ScheduleTasks --> Calendar[Calendar Planner]
+    
+    Algorithm --> DB
+    Calendar --> DB
+    DB --> Display[Display Results]
+    Display --> CLI
+    
+    style User fill:#90EE90
+    style DB fill:#87CEEB
+    style Algorithm fill:#FFD700
+    style Calendar fill:#9370DB
+```
+
+## Simple Architecture
+
+```mermaid
+flowchart LR
+    CLI[CLI Interface] --> Services[Business Logic]
+    Services --> Database[(MongoDB)]
+    Database --> Services
+    Services --> CLI
+    
+    subgraph Services
+        Priority[Task Priority]
+        Tags[Auto-Tagging]
+        Schedule[Calendar Scheduling]
+    end
+    
+    subgraph Database
+        Users[(Users)]
+        Tasks[(Tasks)]
+        Schedules[(Schedules)]
+    end
+```
+
+## Core Workflow
+
+```mermaid
+flowchart TD
+    Start([Start Application]) --> Connect[Connect to Database]
+    Connect --> MainLoop{Main Menu}
+    
+    MainLoop -->|Add Task| CreateTask[Create Task with Details]
+    CreateTask --> AutoProcess[Auto-tag & Score Task]
+    AutoProcess --> Save[Save to Database]
+    Save --> MainLoop
+    
+    MainLoop -->|Get Recommendation| Fetch[Fetch Open Tasks]
+    Fetch --> Score[Calculate Priority Scores]
+    Score --> Rank[Return Top Task]
+    Rank --> MainLoop
+    
+    MainLoop -->|Plan Schedule| GetTasks[Get Unscheduled Tasks]
+    GetTasks --> FindSlots[Find Available Time Slots]
+    FindSlots --> Assign[Assign Tasks to Slots]
+    Assign --> SaveSchedule[Save Schedule]
+    SaveSchedule --> MainLoop
+    
+    MainLoop -->|Exit| End([Exit])
+    
+    style Start fill:#90EE90
+    style End fill:#FFB6C1
+    style AutoProcess fill:#FFD700
+    style Score fill:#9370DB
+```
+
+## Detailed System Architecture
 
 ```mermaid
 flowchart TB
