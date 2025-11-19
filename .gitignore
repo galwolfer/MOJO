@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Backups and DB dumps
+/backups/
+/dump/
+mongodump-
+*.dump

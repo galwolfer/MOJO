@@ -42,7 +42,7 @@ export const coacherAlgorithm = {
     // Only user's open tasks
     const tasks = await Task.find(
       { userId, status: { $in: ["todo", "in-progress"] } },
-      { title: 1, importance: 1, effort: 1, dueDate: 1, status: 1, tags: 1, duration_min: 1, recurrence: 1, timeOfDay: 1, userId: 1 }
+      { taskname: 1, importance: 1, effort: 1, dueDate: 1, status: 1, tags: 1, duration_min: 1, recurrence: 1, timeOfDay: 1, userId: 1 }
     ).lean();
 
     if (!tasks || tasks.length === 0) {
@@ -67,7 +67,7 @@ export const coacherAlgorithm = {
     const activities = tasks.map((t) => ({
       id: t._id.toString(),
       userId: t.userId?.toString(),
-      title: t.title,
+      title: t.taskname || t.title,
       type: t.type || "general",
       duration_min: t.duration_min || 30,
       importance: t.importance ?? 3,

@@ -61,12 +61,14 @@ const KEYWORD_MAP = TAG_BLUEPRINTS.reduce((acc, { tag, keywords }) => {
   keywords.forEach((kw) => acc.set(kw.toLowerCase(), tag));
   return acc;
 }, new Map());
+// KEYWORD_MAP: maps token -> canonical tag for quick detection
 
 // Direct tag -> weight mapping to reuse later
 const TAG_WEIGHTS = TAG_BLUEPRINTS.reduce((acc, { tag, weight }) => {
   acc[tag] = weight;
   return acc;
 }, {});
+// TAG_WEIGHTS: baseline multipliers per tag used when no user preference exists
 
 // Map tags to broader life categories for user preferences
 const TAG_TO_CATEGORY = {
@@ -92,6 +94,8 @@ const normalizeTokens = (text = "") =>
     .split(/\s+/)
     .filter(Boolean);
 
+// normalizeTokens: produce keyword tokens from title/description
+
 export function detectTags({ title = "", description = "", tags = [] } = {}) {
   const base = Array.isArray(tags) ? tags.filter(Boolean) : [];
   const tokens = [...normalizeTokens(title), ...normalizeTokens(description)];
@@ -110,12 +114,16 @@ export function detectTags({ title = "", description = "", tags = [] } = {}) {
   return [...found];
 }
 
+// detectTags: infer tags from text + any provided tags (fall back to 'misc')
+
 const preferenceToFactor = (value) => {
   const safe = Number.isFinite(value) ? value : 3;
   return 1 + (safe - 3) * 0.2;
 };
 
 export const categoryForTag = (tag) => TAG_TO_CATEGORY[tag] || "misc";
+
+// categoryForTag: map a tag to a higher-level category for user prefs
 
 const hasPreferences = (preferences) =>
   preferences && Object.values(preferences).some((v) => Number.isFinite(v));
@@ -143,10 +151,14 @@ export function computeTagMultiplier(taskTags = [], preferences = {}) {
   return multiplier / weightSum;
 }
 
+// computeTagMultiplier: average weight for a task's tags, using user preferences when available
+
 export function summarizeTags(tags = []) {
   if (!Array.isArray(tags) || !tags.length) return ["misc"];
   return tags.map((t) => String(t).toLowerCase());
 }
+
+// summarizeTags: normalize tag list to lowercase array (fall back to 'misc')
 
 export function getTagBlueprints() {
   return TAG_BLUEPRINTS.map(({ tag, weight }) => ({ tag, weight }));
@@ -166,3 +178,5 @@ export function describeTagWeights(tags = [], preferences = {}) {
         : TAG_WEIGHTS[tag] ?? TAG_WEIGHTS[DEFAULT_TAG],
   }));
 }
+
+// describeTagWeights: return per-tag metadata (weight, source) helpful for explanations

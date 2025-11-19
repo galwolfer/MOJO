@@ -6,6 +6,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const CATEGORY_ORDER = ["work", "study", "health", "social", "finance", "household", "creative", "misc"];
+// CATEGORY_ORDER: ordered list of categories used to one-hot encode labels
 const MODEL_PREFIX = "model_logreg_";
 const DEFAULT_MODEL_DIR = "data";
 
@@ -17,9 +18,11 @@ let cachedModel = null;
 let cachedPath = null;
 
 const sigmoid = (x) => 1 / (1 + Math.exp(-x));
+// sigmoid: logistic function used to convert linear score -> probability
 
 const encodeCategory = (category) =>
   CATEGORY_ORDER.map((name) => (name === category ? 1 : 0));
+// encodeCategory: one-hot encode the category for model features
 
 const timeFeatures = (timestamp) => {
   const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
@@ -33,6 +36,7 @@ const timeFeatures = (timestamp) => {
     day === 0 || day === 6 ? 1 : 0,
   ];
 };
+// timeFeatures: normalized hour + time-of-day + weekend flag used by model
 
 export function buildFeatureVector({ category, priorities = {}, recentCounts = {}, timestamp = new Date() }) {
   const normalizedCategory = CATEGORY_ORDER.includes(category) ? category : "misc";
@@ -48,6 +52,7 @@ export function buildFeatureVector({ category, priorities = {}, recentCounts = {
     ...encodeCategory(normalizedCategory),
   ];
 }
+// buildFeatureVector: create numeric input expected by logistic regression weights
 
 export async function loadSuggestionModel(modelPath = process.env.MODEL_WEIGHTS_PATH) {
   try {
@@ -61,6 +66,7 @@ export async function loadSuggestionModel(modelPath = process.env.MODEL_WEIGHTS_
       resolved = path.resolve(projectRoot, resolved);
     }
 
+    // return cached model if same path to avoid repeated file reads
     if (cachedModel && cachedPath === resolved) {
       return cachedModel;
     }
@@ -68,6 +74,7 @@ export async function loadSuggestionModel(modelPath = process.env.MODEL_WEIGHTS_
     const raw = await fs.readFile(resolved, "utf8");
     const parsed = JSON.parse(raw);
 
+    // verify expected model shape (weights array + bias number)
     if (!Array.isArray(parsed.weights) || typeof parsed.bias !== "number") {
       throw new Error("Model file missing weights or bias");
     }
@@ -95,6 +102,7 @@ async function findLatestModel(dir) {
     return null;
   }
 }
+// findLatestModel: pick newest model file matching prefix in the data directory
 
 export function scoreCategory(model, options) {
   if (!model) return null;
@@ -105,6 +113,7 @@ export function scoreCategory(model, options) {
     );
   }
   const z = model.weights.reduce((sum, w, idx) => sum + w * vector[idx], model.bias);
+  // compute linear combination + bias, then pass through sigmoid to get probability
   return sigmoid(z);
 }
 

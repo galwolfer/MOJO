@@ -6,7 +6,7 @@ import { detectTags } from "../services/tagging.js";
 const taskSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    title: { type: String, required: true, trim: true },
+    taskname: { type: String, required: true, trim: true }, // user-facing short name for the task
     description: { type: String, default: "", trim: true },
     dueDate: { type: Date },                 // optional deadline
     status: { type: String, enum: ["todo", "in_progress", "done"], default: "todo" },
@@ -26,23 +26,25 @@ const taskSchema = new mongoose.Schema(
 
 // (add/edit) after each task save
 taskSchema.post("save", async function () {
+  // When a task is created or updated, recalculate priority scores for all open tasks
   console.log("🧩 Task saved — updating priority scores...");
   await updateAllScores();
 });
 
 // (remove) after each task remove
 taskSchema.post("remove", async function () {
+  // When a task is deleted, recalculate priority scores to keep cache consistent
   console.log("🧩 Task removed — updating priority scores...");
   await updateAllScores();
 });
 
 taskSchema.pre("save", function (next) {
-  if (!this.isModified("title") && !this.isModified("description") && !this.isNew && this.tags?.length) {
+  if (!this.isModified("taskname") && !this.isModified("description") && !this.isNew && this.tags?.length) {
     return next();
   }
 
   const autoTags = detectTags({
-    title: this.title,
+    title: this.taskname,
     description: this.description,
     tags: this.tags,
   });
@@ -50,5 +52,7 @@ taskSchema.pre("save", function (next) {
   this.tags = autoTags;
   next();
 });
+
+// pre-save hook: auto-detect tags from title/description and save them before persisting
 
 export default mongoose.model("Task", taskSchema);

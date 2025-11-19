@@ -140,7 +140,7 @@ export function planTasks(tasks, { busyBlocksByDate = {}, workingHours = DEFAULT
 
       plan.push({
         taskId: task._id,
-        title: task.title,
+        title: task.taskname || task.title,
         date: slot.dateKey,
         start: slot.start,
         end: slot.end,
@@ -171,7 +171,7 @@ export function planTasks(tasks, { busyBlocksByDate = {}, workingHours = DEFAULT
     if (remaining > 0) {
       unscheduled.push({
         taskId: task._id,
-        title: task.title,
+        title: task.taskname || task.title,
         remainingMinutes: remaining,
       });
     }

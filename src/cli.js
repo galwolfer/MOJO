@@ -269,7 +269,7 @@ async function addTask() {
     return Number.isFinite(parsed) ? parsed : fallback;
   };
 
-  const title = (await ask("Task title: ")).trim();
+  const taskname = (await ask("Task title: ")).trim();
   const description = (await ask("Short description (optional): ")).trim();
   const importance = toNumber((await ask("Importance 1–5 (default 3): ")).trim(), 3);
   const effort = toNumber((await ask("Effort 1–5 (default 3): ")).trim(), 3);
@@ -297,7 +297,7 @@ async function addTask() {
 
   const created = await Task.create({
     userId: currentUser._id,
-    title,
+    taskname,
     description,
     importance,
     effort,
@@ -313,7 +313,7 @@ async function addTask() {
     userId: currentUser._id,
     payload: {
       taskId: created._id.toString(),
-      title: created.title,
+      taskname: created.taskname,
       tags: created.tags || [],
       importance: created.importance,
       effort: created.effort,
@@ -357,7 +357,8 @@ async function listTasks() {
   console.log(theme.accent(`\n${currentUser.username}'s tasks:`));
   tasks.forEach((task, index) => {
     const tags = Array.isArray(task.tags) && task.tags.length ? task.tags.join(", ") : "misc";
-    const line = `${index + 1}. ${paint(task.title, ansi.bold)}  ${theme.muted(
+    const displayName = task.taskname || task.title || "(no title)";
+    const line = `${index + 1}. ${paint(displayName, ansi.bold)}  ${theme.muted(
       `(importance ${task.importance}, effort ${task.effort}, score ${task.priorityScore ?? 0}, tags: ${tags})`
     )}`;
     console.log(line);
@@ -398,7 +399,7 @@ async function suggestNewTask() {
 
   const tasks = await Task.find(
     { userId: currentUser._id, status: { $in: ["todo", "in_progress"] } },
-    { title: 1, tags: 1 }
+    { taskname: 1, tags: 1 }
   ).lean();
 
   const suggestion = await suggestTaskFromProfile(profile, tasks);
@@ -571,7 +572,7 @@ async function viewScheduleOption() {
     start: { $gte: todayStart },
   })
     .sort({ start: 1 })
-    .populate("taskId", "title")
+      .populate("taskId", "taskname")
     .lean();
 
   if (!upcoming.length) {
@@ -593,7 +594,7 @@ async function viewScheduleOption() {
       const start = item.start.toTimeString().slice(0, 5);
       const end = item.end.toTimeString().slice(0, 5);
       const status = item.status;
-      const title = item.taskId?.title || "(deleted task)";
+        const title = item.taskId?.taskname || "(deleted task)";
       console.log(theme.muted(`${start}–${end} (${status}) → ${title}`));
     });
   }
@@ -609,7 +610,7 @@ async function updateScheduleEntryOption() {
   })
     .sort({ start: 1 })
     .limit(20)
-    .populate("taskId", "title")
+    .populate("taskId", "taskname")
     .lean();
 
   if (!upcoming.length) {
@@ -622,7 +623,7 @@ async function updateScheduleEntryOption() {
     const start = session.start.toTimeString().slice(0, 5);
     const end = session.end.toTimeString().slice(0, 5);
     const dateLabel = formatLocalDate(session.start);
-    const title = session.taskId?.title || "(deleted task)";
+    const title = session.taskId?.taskname || "(deleted task)";
     console.log(
       theme.muted(
         `${index + 1}) ${dateLabel} ${start}-${end} (${session.status}) → ${title}`

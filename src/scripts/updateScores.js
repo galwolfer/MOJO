@@ -5,13 +5,14 @@ import { scoreActivities } from "../services/priority.js";
 import Task from "../models/Task.js";
 import { User } from "../models/User.js";
 
+// mapStatus: map task.status to activity status used by the scorer
 const mapStatus = (status) =>
   status === "todo" || status === "in_progress" ? "open" : "closed";
 
 const toActivity = (task) => ({
   id: task._id.toString(),
   userId: task.userId?.toString(),
-  title: task.title,
+  title: task.taskname || task.title,
   type: task.type || "general",
   duration_min: task.duration_min || 30,
   importance: Number.isFinite(task.importance) ? task.importance : 3,
@@ -22,6 +23,7 @@ const toActivity = (task) => ({
   required_context: { timeOfDay: task.timeOfDay || "any" },
   tags: Array.isArray(task.tags) ? task.tags : [],
 });
+// toActivity: translate DB Task -> scorer activity shape (fields used by scoreActivities)
 
 export async function updateAllScores() {
   let shouldDisconnect = false;
@@ -31,10 +33,11 @@ export async function updateAllScores() {
       shouldDisconnect = true;
     }
 
+    // load open tasks with only the fields needed for scoring
     const openTasks = await Task.find(
       { status: { $in: ["todo", "in_progress"] } },
       {
-        title: 1,
+        taskname: 1,
         importance: 1,
         effort: 1,
         dueDate: 1,
@@ -52,6 +55,7 @@ export async function updateAllScores() {
       return;
     }
 
+    // group tasks by user so we can score per-user with their profile
     const tasksByUser = openTasks.reduce((acc, task) => {
       const userId = task.userId?.toString();
       if (!userId) return acc;
@@ -70,6 +74,7 @@ export async function updateAllScores() {
 
     const operations = [];
 
+    // score each user's tasks using their profile and accumulate bulk updates
     for (const [userId, userTasks] of Object.entries(tasksByUser)) {
       const profile = profileMap.get(userId) || {};
       const scored = scoreActivities(userTasks.map(toActivity), profile);
@@ -91,6 +96,7 @@ export async function updateAllScores() {
       return;
     }
 
+    // write all updated `priorityScore` values back to the DB in bulk
     await Task.bulkWrite(operations, { ordered: false });
     console.log("✅ Priority scores updated for all open tasks");
   } catch (err) {
