@@ -4,14 +4,14 @@ import { connectDatabase } from "./config/database.js";
 import { User } from "./models/User.js";
 import Task from "./models/Task.js";
 import { coacherAlgorithm } from "./services/index.js";
-import { suggestTaskFromProfile } from "./services/suggestions.js";
+import { suggestTaskFromProfile } from "./algorithms/priority/suggestions.js";
 import { logEvent } from "./services/telemetry.js";
-import { categoryForTag } from "./services/tagging.js";
-import { planTasks, persistPlan } from "./services/planner.js";
+import { categoryForTag } from "./algorithms/priority/tagging.js";
+import { planTasks, persistPlan } from "./algorithms/binPacking/planner.js";
 import { TaskSchedule } from "./models/TaskSchedule.js";
 import { BusyBlock } from "./models/BusyBlock.js";
-import { startOfDay, addDays } from "./services/calendarUtils.js";
-import { buildRoutineBusyBlocks, getRoutineSettings, describeRoutineWindows } from "./services/routineBlocks.js";
+import { startOfDay, addDays } from "./algorithms/binPacking/calendarUtils.js";
+import { buildRoutineBusyBlocks, getRoutineSettings, describeRoutineWindows } from "./algorithms/binPacking/routineBlocks.js";
 
 // Simple ANSI styling helpers to keep the CLI lively without extra deps
 const ansi = {

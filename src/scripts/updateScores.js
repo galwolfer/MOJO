@@ -1,7 +1,7 @@
 // src/scripts/updateScores.js
 import mongoose from "mongoose";
 import { env } from "../config/env.js";
-import { scoreActivities } from "../services/priority.js";
+import { scoreActivities } from "../algorithms/priority/priority.js";
 import Task from "../models/Task.js";
 import { User } from "../models/User.js";
 

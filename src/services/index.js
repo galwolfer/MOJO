@@ -29,7 +29,7 @@ export const galService = {
 // src/services/index.js
 import mongoose from "mongoose";
 import Task from "../models/Task.js";
-import { scoreActivities } from "./priority.js";
+import { scoreActivities } from "../algorithms/priority/priority.js";
 
 // Open = "todo" | "in-progress", Closed = "done"
 const mapStatus = (s) =>

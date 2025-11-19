@@ -1,4 +1,4 @@
-// src/services/suggestions.js
+// src/algorithms/priority/suggestions.js
 // Suggest new tasks by blending model scores with heuristic fallbacks.
 
 import crypto from "crypto";

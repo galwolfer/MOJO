@@ -1,4 +1,4 @@
-// src/services/modelScorer.js
+// src/algorithms/priority/modelScorer.js
 // Utility helpers to load logistic regression weights and score categories.
 
 import fs from "fs/promises";
@@ -12,7 +12,8 @@ const DEFAULT_MODEL_DIR = "data";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, "../..");
+// projectRoot: go up three levels from algorithms/priority -> project root
+const projectRoot = path.resolve(__dirname, "../../..");
 
 let cachedModel = null;
 let cachedPath = null;

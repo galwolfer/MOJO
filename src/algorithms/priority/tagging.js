@@ -1,4 +1,4 @@
-// src/services/tagging.js
+// src/algorithms/priority/tagging.js
 // Lightweight tag detection and weighting so tasks can be categorized
 // automatically and their priority adjusted accordingly.
 

@@ -3,7 +3,7 @@
 
 import { getFreeIntervalsForDay, subtractInterval, buildWorkingWindow } from "./calendar.js";
 import { addDays, startOfDay, addMinutes } from "./calendarUtils.js";
-import { TaskSchedule } from "../models/TaskSchedule.js";
+import { TaskSchedule } from "../../models/TaskSchedule.js";
 
 const DEFAULT_WORKING_HOURS = {
   startHour: 9,
