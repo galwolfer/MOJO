@@ -12,7 +12,7 @@ import { User } from "../models/index.js";
 export class AgentController {
   constructor(apiKey) {
     this.apiKey = apiKey;
-    this.maxIterations = 5; // Maximum iterations to prevent infinite loops
+    this.maxIterations = 3; // Maximum iterations to prevent infinite loops
 
     // Initialize LangChain LLM
     this.llm = new ChatGoogleGenerativeAI({
@@ -163,7 +163,7 @@ export class AgentController {
                   console.error(`[AgentController] Tool execution error:`, error);
                   currentMessages.push({
                     role: "tool",
-                    content: JSON.stringify({ error: error.message }),
+                    content: `ok=false\nerr="${error.message}"`,
                     tool_call_id: toolCall.id,
                   });
                 }

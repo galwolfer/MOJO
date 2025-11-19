@@ -17,11 +17,9 @@ export function createLangChainTools(userId) {
       schema: z.object({}),
       func: async () => {
         const now = new Date();
-        return JSON.stringify({
-          date: now.toLocaleDateString("en-US"),
-          time: now.toLocaleTimeString("en-US"),
-          timestamp: now.toISOString(),
-        });
+        return `date="${now.toLocaleDateString("en-US")}"
+time="${now.toLocaleTimeString("en-US")}"
+ts="${now.toISOString()}"`;
       },
     }),
 
@@ -52,14 +50,13 @@ export function createLangChainTools(userId) {
             category,
           });
 
-          return JSON.stringify({
-            success: true,
-            message: `Saved: ${fact}`,
-            category,
-            importance,
-          });
+          return `ok=true
+msg="Saved: ${fact}"
+cat="${category}"
+imp=${importance}`;
         } catch (error) {
-          return JSON.stringify({ success: false, error: error.message });
+          return `ok=false
+err="${error.message}"`;
         }
       },
     }),
@@ -79,13 +76,12 @@ export function createLangChainTools(userId) {
             source: "llm_tool",
           });
 
-          return JSON.stringify({
-            success: true,
-            message: `Saved note: ${note}`,
-            importance,
-          });
+          return `ok=true
+msg="Saved note: ${note}"
+imp=${importance}`;
         } catch (error) {
-          return JSON.stringify({ success: false, error: error.message });
+          return `ok=false
+err="${error.message}"`;
         }
       },
     }),
@@ -116,25 +112,25 @@ export function createLangChainTools(userId) {
           }
 
           if (memories.length === 0) {
-            return JSON.stringify({
-              success: true,
-              message: "No relevant memories found",
-              memories: [],
-            });
+            return `ok=true
+msg="No memories"
+count=0`;
           }
 
-          return JSON.stringify({
-            success: true,
-            count: memories.length,
-            memories: memories.map((m) => ({
-              text: m.text,
-              type: m.type,
-              importance: m.importance,
-              timestamp: m.timestamp,
-            })),
-          });
+          const items = memories
+            .map(
+              (m, i) =>
+                `[[mem]]
+text="${m.text}"
+type="${m.type}"
+imp=${m.importance}`
+            )
+            .join("\n");
+          return `ok=true
+count=${memories.length}\n${items}`;
         } catch (error) {
-          return JSON.stringify({ success: false, error: error.message });
+          return `ok=false
+err="${error.message}"`;
         }
       },
     }),
@@ -175,25 +171,19 @@ export function createLangChainTools(userId) {
 
           console.log(`[LOG] Task created: ${task._id} ${recurrence ? "(recurring)" : ""}`);
 
-          const response = {
-            success: true,
-            message: `Task "${name}" created`,
-            task: {
-              id: task._id.toString(),
-              name: task.name,
-              tag: task.tag,
-              deadline: task.deadline,
-            },
-          };
+          let result = `ok=true\nmsg="Task created"\nid="${task._id}"
+name="${task.name}"`;
+          if (task.tag) result += `\ntag="${task.tag}"`;
+          result += `\ndue="${task.deadline}"`;
 
           if (task.recurrence?.type) {
-            response.task.recurrence = { type: task.recurrence.type, interval: task.recurrence.interval };
-            response.message += ` (${task.recurrence.type})`;
+            result += `\nrecur="${task.recurrence.type}"
+int=${task.recurrence.interval}`;
           }
 
-          return JSON.stringify(response);
+          return result;
         } catch (error) {
-          return JSON.stringify({ success: false, error: error.message });
+          return `ok=false\nerr="${error.message}"`;
         }
       },
     }),
@@ -218,19 +208,21 @@ export function createLangChainTools(userId) {
 
           const tasks = await taskService.getTasks(userId, filters);
 
-          return JSON.stringify({
-            success: true,
-            count: tasks.length,
-            tasks: tasks.map((t) => ({
-              id: t._id.toString(),
-              name: t.name,
-              tag: t.tag,
-              deadline: t.deadline,
-              completed: t.completed,
-            })),
-          });
+          if (tasks.length === 0) {
+            return `ok=true\ncount=0`;
+          }
+
+          const items = tasks
+            .map(
+              (t) =>
+                `[[task]]\nid="${t._id}"\nname="${t.name}"${t.tag ? `\ntag="${t.tag}"` : ""}\ndue="${
+                  t.deadline
+                }"\ndone=${t.completed}`
+            )
+            .join("\n");
+          return `ok=true\ncount=${tasks.length}\n${items}`;
         } catch (error) {
-          return JSON.stringify({ success: false, error: error.message });
+          return `ok=false\nerr="${error.message}"`;
         }
       },
     }),
@@ -257,22 +249,14 @@ export function createLangChainTools(userId) {
           const task = await taskService.updateTask(taskId, userId, updates);
 
           if (!task) {
-            return JSON.stringify({ success: false, error: "Task not found" });
+            return `ok=false\nerr="Not found"`;
           }
 
-          return JSON.stringify({
-            success: true,
-            message: "Updated",
-            task: {
-              id: task._id.toString(),
-              name: task.name,
-              tag: task.tag,
-              deadline: task.deadline,
-              completed: task.completed,
-            },
-          });
+          return `ok=true\nmsg="Updated"\nid="${task._id}"\nname="${task.name}"${
+            task.tag ? `\ntag="${task.tag}"` : ""
+          }\ndue="${task.deadline}"\ndone=${task.completed}`;
         } catch (error) {
-          return JSON.stringify({ success: false, error: error.message });
+          return `ok=false\nerr="${error.message}"`;
         }
       },
     }),
@@ -288,11 +272,11 @@ export function createLangChainTools(userId) {
         try {
           const success = await taskService.deleteTask(taskId, userId);
           if (!success) {
-            return JSON.stringify({ success: false, error: "Not found" });
+            return `ok=false\nerr="Not found"`;
           }
-          return JSON.stringify({ success: true, message: "Deleted" });
+          return `ok=true\nmsg="Deleted"`;
         } catch (error) {
-          return JSON.stringify({ success: false, error: error.message });
+          return `ok=false\nerr="${error.message}"`;
         }
       },
     }),
@@ -307,17 +291,15 @@ export function createLangChainTools(userId) {
       func: async ({ days = 7 }) => {
         try {
           const tasks = await taskService.getUpcomingTasks(userId, days);
-          return JSON.stringify({
-            success: true,
-            count: tasks.length,
-            tasks: tasks.map((t) => ({
-              id: t._id.toString(),
-              name: t.name,
-              deadline: t.deadline,
-            })),
-          });
+
+          if (tasks.length === 0) {
+            return `ok=true\ncount=0`;
+          }
+
+          const items = tasks.map((t) => `[[task]]\nid="${t._id}"\nname="${t.name}"\ndue="${t.deadline}"`).join("\n");
+          return `ok=true\ncount=${tasks.length}\n${items}`;
         } catch (error) {
-          return JSON.stringify({ success: false, error: error.message });
+          return `ok=false\nerr="${error.message}"`;
         }
       },
     }),
@@ -330,18 +312,20 @@ export function createLangChainTools(userId) {
       func: async () => {
         try {
           const tasks = await taskService.getOverdueTasks(userId);
-          return JSON.stringify({
-            success: true,
-            count: tasks.length,
-            tasks: tasks.map((t) => ({
-              id: t._id.toString(),
-              name: t.name,
-              deadline: t.deadline,
-              daysOverdue: Math.floor((new Date() - new Date(t.deadline)) / 86400000),
-            })),
-          });
+
+          if (tasks.length === 0) {
+            return `ok=true\ncount=0`;
+          }
+
+          const items = tasks
+            .map((t) => {
+              const days = Math.floor((new Date() - new Date(t.deadline)) / 86400000);
+              return `[[task]]\nid="${t._id}"\nname="${t.name}"\ndue="${t.deadline}"\nover=${days}`;
+            })
+            .join("\n");
+          return `ok=true\ncount=${tasks.length}\n${items}`;
         } catch (error) {
-          return JSON.stringify({ success: false, error: error.message });
+          return `ok=false\nerr="${error.message}"`;
         }
       },
     }),
