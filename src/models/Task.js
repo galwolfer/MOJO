@@ -2,6 +2,7 @@
 import mongoose from "mongoose";
 import { updateAllScores } from "../scripts/updateScores.js";
 import { detectTags } from "../algorithms/priority/tagging.js";
+import { generateSubCategory } from "../services/subcategoryGenerator.js";
 
 const taskSchema = new mongoose.Schema(
   {
@@ -20,6 +21,12 @@ const taskSchema = new mongoose.Schema(
     // Cached score so we can sort quickly (optional)
     // add field: user's behaviour default value ineffective
     priorityScore: { type: Number, default: 0 },
+    subCategory: {
+      label: { type: String, default: "", trim: true },
+      source: { type: String, default: "heuristic", trim: true },
+      confidence: { type: Number, min: 0, max: 1, default: 0 },
+      updatedAt: { type: Date },
+    },
   },
   { timestamps: true }
 );
@@ -38,19 +45,32 @@ taskSchema.post("remove", async function () {
   await updateAllScores();
 });
 
-taskSchema.pre("save", function (next) {
-  if (!this.isModified("taskname") && !this.isModified("description") && !this.isNew && this.tags?.length) {
-    return next();
+taskSchema.pre("save", async function () {
+  const shouldRefreshTags =
+    !this.tags?.length || this.isNew || this.isModified("taskname") || this.isModified("description");
+
+  if (shouldRefreshTags) {
+    const autoTags = detectTags({
+      title: this.taskname,
+      description: this.description,
+      tags: this.tags,
+    });
+    this.tags = autoTags;
   }
 
-  const autoTags = detectTags({
-    title: this.taskname,
-    description: this.description,
-    tags: this.tags,
-  });
+  const hasManualSubCategory = this.subCategory?.label && this.subCategory?.source === "user";
+  const shouldRefreshSubCategory = (shouldRefreshTags || !this.subCategory?.label) && !hasManualSubCategory;
 
-  this.tags = autoTags;
-  next();
+  if (shouldRefreshSubCategory) {
+    this.subCategory = await generateSubCategory({
+      userId: this.userId,
+      title: this.taskname,
+      description: this.description,
+      tags: this.tags,
+      current: this.subCategory,
+      TaskModel: this.constructor,
+    });
+  }
 });
 
 // pre-save hook: auto-detect tags from title/description and save them before persisting
