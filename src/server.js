@@ -5,6 +5,7 @@ import app from "./app.js";
 import { env } from "./config/env.js";
 import { connectDatabase } from "./config/database.js";
 import { logger } from "./utils/logger.js";
+import { startPriorityScheduler } from "./services/priorityScheduler.js";
 
 const server = createServer(app);
 const port = Number(env.PORT ?? 3000);
@@ -13,6 +14,7 @@ connectDatabase()
   .then(() => {
     server.listen(port, () => {
       logger.info(`HTTP server listening on http://localhost:${port}`);
+      startPriorityScheduler();
     });
   })
   .catch((error) => {
