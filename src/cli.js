@@ -6,6 +6,7 @@ import Task from "./models/Task.js";
 import { coacherAlgorithm } from "./services/index.js";
 import { suggestTaskFromProfile } from "./algorithms/priority/suggestions.js";
 import { logEvent } from "./services/telemetry.js";
+import { recordSubCategoryGeneration } from "./services/subcategoryTelemetry.js";
 import { categoryForTag } from "./algorithms/priority/tagging.js";
 import { planTasks, persistPlan } from "./algorithms/binPacking/planner.js";
 import { TaskSchedule } from "./models/TaskSchedule.js";
@@ -277,11 +278,13 @@ async function addTask() {
   const estimatedDuration = Math.max(15, toNumber(durationInput || 60, 60));
   const splitInput = (await ask("Can we split it across sessions? (Y/n, default Y): ")).trim().toLowerCase();
   const canSplit = splitInput === "" || splitInput === "y" || splitInput === "yes";
-  const minChunkInput = (await ask("Minimum chunk size in minutes (default 30): ")).trim();
-  const minChunk = Math.min(
-    estimatedDuration,
-    Math.max(15, toNumber(minChunkInput || 30, 30))
-  );
+  let minChunk = estimatedDuration;
+  if (canSplit) {
+    const chunkCountRaw = (await ask("Into how many chunks would you like to split it? (default 2): ")).trim();
+    const chunkCount = Math.max(1, Math.round(Number(chunkCountRaw) || 2));
+    const baseChunk = Math.ceil(estimatedDuration / chunkCount);
+    minChunk = Math.min(estimatedDuration, Math.max(15, baseChunk));
+  }
   let dueDate;
   while (true) {
     const due = (await ask("Due date (YYYY-MM-DD, optional): ")).trim();
@@ -307,6 +310,15 @@ async function addTask() {
     dueDate,
   });
   console.log(theme.success("✅ Task added! We'll keep its score in sync."));
+  if (created.subCategory?.label) {
+    const confidence = created.subCategory?.confidence;
+    const confidenceLabel = Number.isFinite(confidence) ? `${Math.round(confidence * 100)}%` : "n/a";
+    console.log(
+      theme.muted(
+        `Auto sub-category: ${created.subCategory.label} (${created.subCategory.source}, confidence ${confidenceLabel})`
+      )
+    );
+  }
 
   await logEvent({
     type: "task_created",
@@ -315,12 +327,21 @@ async function addTask() {
       taskId: created._id.toString(),
       taskname: created.taskname,
       tags: created.tags || [],
+      subCategory: created.subCategory || null,
       importance: created.importance,
       effort: created.effort,
       estimatedDuration: created.estimatedDuration,
       canSplit: created.canSplit,
       minChunk: created.minChunk,
     },
+  });
+
+  await recordSubCategoryGeneration({
+    userId: currentUser._id,
+    taskId: created._id.toString(),
+    tags: created.tags || [],
+    subCategory: created.subCategory || null,
+    context: "cli_add",
   });
 
   if (lastSuggestion) {
@@ -357,10 +378,18 @@ async function listTasks() {
   console.log(theme.accent(`\n${currentUser.username}'s tasks:`));
   tasks.forEach((task, index) => {
     const tags = Array.isArray(task.tags) && task.tags.length ? task.tags.join(", ") : "misc";
+    const subCategory = task.subCategory?.label ? task.subCategory.label : null;
     const displayName = task.taskname || task.title || "(no title)";
-    const line = `${index + 1}. ${paint(displayName, ansi.bold)}  ${theme.muted(
-      `(importance ${task.importance}, effort ${task.effort}, score ${task.priorityScore ?? 0}, tags: ${tags})`
-    )}`;
+    const detailParts = [
+      `importance ${task.importance}`,
+      `effort ${task.effort}`,
+      `score ${task.priorityScore ?? 0}`,
+      `tags: ${tags}`,
+    ];
+    if (subCategory) {
+      detailParts.push(`sub: ${subCategory}`);
+    }
+    const line = `${index + 1}. ${paint(displayName, ansi.bold)}  ${theme.muted(`(${detailParts.join(", ")})`)}`;
     console.log(line);
   });
 }
