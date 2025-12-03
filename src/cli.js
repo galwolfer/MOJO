@@ -1,47 +1,21 @@
+// src/cli.js
+// CLI interface for Mojo Coacher. Delegates business logic to services.
+
 import readline from "readline";
-import bcrypt from "bcrypt";
 import { connectDatabase } from "./config/database.js";
-import { User } from "./models/User.js";
-import Task from "./models/Task.js";
+import { ansi, paint, theme } from "./utils/cliTheme.js";
+
+// Services
+import { registerUser, loginUser } from "./services/authService.js";
+import { getUserById, updateRoutineSettings } from "./services/userService.js";
+import { createTask, getTasksForUser, checkSuggestionFollowed, updateScheduleEntryStatus } from "./services/taskService.js";
+import { generatePlan, savePlan, getUpcomingSessions } from "./services/planningService.js";
+import { createBusyBlock, getUpcomingBusyBlocks } from "./services/busyBlockService.js";
 import { coacherAlgorithm } from "./services/index.js";
 import { suggestTaskFromProfile } from "./algorithms/priority/suggestions.js";
 import { logEvent } from "./services/telemetry.js";
-import { recordSubCategoryGeneration } from "./services/subcategoryTelemetry.js";
-import { categoryForTag } from "./algorithms/priority/tagging.js";
-import { planTasks, persistPlan } from "./algorithms/binPacking/planner.js";
-import { TaskSchedule } from "./models/TaskSchedule.js";
-import { BusyBlock } from "./models/BusyBlock.js";
+import { getRoutineSettings, describeRoutineWindows } from "./algorithms/binPacking/routineBlocks.js";
 import { startOfDay, addDays } from "./algorithms/binPacking/calendarUtils.js";
-import { buildRoutineBusyBlocks, getRoutineSettings, describeRoutineWindows } from "./algorithms/binPacking/routineBlocks.js";
-
-// Simple ANSI styling helpers to keep the CLI lively without extra deps
-const ansi = {
-  reset: "\x1b[0m",
-  bold: "\x1b[1m",
-  dim: "\x1b[2m",
-  cyan: "\x1b[36m",
-  magenta: "\x1b[35m",
-  yellow: "\x1b[33m",
-  green: "\x1b[32m",
-  blue: "\x1b[34m",
-  red: "\x1b[31m",
-  gray: "\x1b[90m",
-};
-
-const paint = (text, ...styles) => `${styles.join("")}${text}${ansi.reset}`;
-
-const theme = {
-  title: (text) => paint(text, ansi.bold, ansi.cyan),
-  subtitle: (text) => paint(text, ansi.dim, ansi.gray),
-  success: (text) => paint(text, ansi.bold, ansi.green),
-  warning: (text) => paint(text, ansi.bold, ansi.yellow),
-  error: (text) => paint(text, ansi.bold, ansi.red),
-  info: (text) => paint(text, ansi.blue),
-  prompt: (text) => paint(text, ansi.bold, ansi.magenta),
-  option: (text) => paint(text, ansi.bold, ansi.yellow),
-  accent: (text) => paint(text, ansi.bold, ansi.blue),
-  muted: (text) => paint(text, ansi.dim, ansi.gray),
-};
 
 const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const pad = (value) => String(value).padStart(2, "0");
@@ -104,7 +78,7 @@ const ask = (question, { hidden = false } = {}) =>
 
 let currentUser = null;
 let lastSuggestion = null;
-const SUGGESTION_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
+const SUGGESTION_WINDOW_MS = 30 * 60 * 1000;
 
 const menuOptions = [
   { key: "1", label: "Register" },
@@ -120,36 +94,14 @@ const menuOptions = [
   { key: "0", label: "Exit" },
 ];
 
-// Questionnaire mapping each life area to the prompt we show the user
 const preferenceQuestions = [
-  {
-    key: "work",
-    prompt: "How central is work or your main project right now? (1=low, 5=critical): ",
-  },
-  {
-    key: "study",
-    prompt: "How much focus do studies or learning need? (1=low, 5=critical): ",
-  },
-  {
-    key: "health",
-    prompt: "How often do you invest in health or fitness? (1=rarely, 5=daily): ",
-  },
-  {
-    key: "social",
-    prompt: "How important are social or family commitments? (1=low, 5=high): ",
-  },
-  {
-    key: "finance",
-    prompt: "How urgent are finance/admin tasks? (1=chill, 5=urgent): ",
-  },
-  {
-    key: "household",
-    prompt: "How much attention do household chores need? (1=low, 5=high): ",
-  },
-  {
-    key: "creative",
-    prompt: "How motivated are you to pursue creative projects? (1=low, 5=high): ",
-  },
+  { key: "work", prompt: "How central is work or your main project right now? (1=low, 5=critical): " },
+  { key: "study", prompt: "How much focus do studies or learning need? (1=low, 5=critical): " },
+  { key: "health", prompt: "How often do you invest in health or fitness? (1=rarely, 5=daily): " },
+  { key: "social", prompt: "How important are social or family commitments? (1=low, 5=high): " },
+  { key: "finance", prompt: "How urgent are finance/admin tasks? (1=chill, 5=urgent): " },
+  { key: "household", prompt: "How much attention do household chores need? (1=low, 5=high): " },
+  { key: "creative", prompt: "How motivated are you to pursue creative projects? (1=low, 5=high): " },
 ];
 
 (async function main() {
@@ -198,47 +150,32 @@ async function register() {
     return;
   }
 
-  const email = emailInput.toLowerCase();
-  const duplicate = await User.findOne({ $or: [{ username }, { email }] }).lean();
+  const priorities = await collectPriorities();
+  const result = await registerUser({ username, email: emailInput, password, priorities });
 
-  if (duplicate) {
-    const clashes = [];
-    if (duplicate.username === username) clashes.push("username");
-    if (duplicate.email === email) clashes.push("email");
-    console.log(theme.error(`🚫 That ${clashes.join(" & ")} is already taken. Try a different one.`));
+  if (!result.success) {
+    console.log(theme.error(`🚫 ${result.error}`));
     return;
   }
 
-  const priorities = await collectPriorities();
-  const passwordHash = await bcrypt.hash(password, 10);
-  const user = await User.create({
-    username,
-    email,
-    passwordHash,
-    profile: { priorities },
-  });
-  await logEvent({
-    type: "onboarding_questionnaire_completed",
-    userId: user._id,
-    payload: { priorities },
-  });
   console.log(theme.success("🎉 Registered successfully! You can log in now."));
 }
 
 async function login() {
   const username = (await ask("username: ")).trim();
   const password = (await ask("password: ", { hidden: true })).trim();
-  const user = await User.findOne({ username });
-  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+
+  const result = await loginUser({ username, password });
+  if (!result.success) {
     console.log(theme.error("⛔ Invalid credentials, please try again."));
     return;
   }
-  currentUser = user;
-  console.log(theme.success(`🙌 Logged in as ${user.username}`));
+
+  currentUser = result.user;
+  console.log(theme.success(`🙌 Logged in as ${currentUser.username}`));
 }
 
 async function collectPriorities() {
-  // Ask the user to rate each life area on a 1-5 scale
   console.log(theme.subtitle("\nLet's personalize your experience (answer 1-5)."));
   const result = {};
   for (const { key, prompt } of preferenceQuestions) {
@@ -246,17 +183,17 @@ async function collectPriorities() {
     while (true) {
       const raw = (await ask(prompt)).trim();
       if (!raw) {
-        value = 3; // default midpoint if they skip the answer
+        value = 3;
         break;
       }
       const parsed = Number(raw);
       if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 5) {
-        value = Math.round(parsed); // clamp to integer for storage
+        value = Math.round(parsed);
         break;
       }
       console.log(theme.warning("Please enter a number between 1 and 5."));
     }
-    result[key] = value; // store by category key (e.g. work, health)
+    result[key] = value;
   }
   console.log("");
   return result;
@@ -277,6 +214,7 @@ async function addTask() {
   const durationInput = (await ask("Estimated duration in minutes (default 60): ")).trim();
   const estimatedDuration = Math.max(15, toNumber(durationInput || 60, 60));
   const splitInput = (await ask("Can we split it across sessions? (Y/n, default Y): ")).trim().toLowerCase();
+
   let taskType = "perfect";
   let chunkCount = null;
   let chunkMinutes = estimatedDuration;
@@ -290,7 +228,7 @@ async function addTask() {
     const chunkCountRaw = (await ask(`Into how many chunks would you like to split it?${sliderHint}: `)).trim();
 
     if (chunkCountRaw.includes("-")) {
-      const [minRaw, maxRaw] = chunkCountRaw.split("-").map((fragment) => fragment.trim());
+      const [minRaw, maxRaw] = chunkCountRaw.split("-").map((f) => f.trim());
       const parsedMin = Number(minRaw);
       const parsedMax = Number(maxRaw);
       minMinutes = sanitizeMinutes(parsedMin, 15);
@@ -298,7 +236,7 @@ async function addTask() {
       taskType = "leaky";
       chunkMinutes = minMinutes;
       minChunk = minMinutes;
-      canSplit = false; // leaky tasks are handled as single flexible chunk
+      canSplit = false;
     } else {
       const parsedChunks = Math.max(1, Math.round(Number(chunkCountRaw) || 2));
       chunkCount = parsedChunks;
@@ -308,9 +246,10 @@ async function addTask() {
       minChunk = Math.min(estimatedDuration, chunkMinutes);
     }
   }
+
   const dueDate = await promptTaskDueDate();
 
-  const created = await Task.create({
+  const created = await createTask({
     userId: currentUser._id,
     taskname,
     description,
@@ -326,6 +265,7 @@ async function addTask() {
     maxMinutes,
     dueDate,
   });
+
   console.log(theme.success("✅ Task added! We'll keep its score in sync."));
   if (created.subCategory?.label) {
     const confidence = created.subCategory?.confidence;
@@ -337,56 +277,21 @@ async function addTask() {
     );
   }
 
-  await logEvent({
-    type: "task_created",
-    userId: currentUser._id,
-    payload: {
-      taskId: created._id.toString(),
-      taskname: created.taskname,
-      tags: created.tags || [],
-      subCategory: created.subCategory || null,
-      importance: created.importance,
-      effort: created.effort,
-      estimatedDuration: created.estimatedDuration,
-      canSplit: created.canSplit,
-      minChunk: created.minChunk,
-    },
-  });
-
-  await recordSubCategoryGeneration({
-    userId: currentUser._id,
-    taskId: created._id.toString(),
-    tags: created.tags || [],
-    subCategory: created.subCategory || null,
-    context: "cli_add",
-  });
-
   if (lastSuggestion) {
-    const withinWindow = Date.now() - lastSuggestion.at <= SUGGESTION_WINDOW_MS;
-    if (withinWindow) {
-      const taskCategories = new Set((created.tags || []).map((tag) => categoryForTag(tag)));
-      if (taskCategories.has(lastSuggestion.category)) {
-        await logEvent({
-          type: "suggestion_followed",
-          userId: currentUser._id,
-          payload: {
-            trackingId: lastSuggestion.trackingId,
-            taskId: created._id.toString(),
-            category: lastSuggestion.category,
-          },
-        });
-        lastSuggestion = null;
-      }
-    } else {
-      lastSuggestion = null;
-    }
+    const followed = await checkSuggestionFollowed({
+      userId: currentUser._id,
+      task: created,
+      lastSuggestion,
+      windowMs: SUGGESTION_WINDOW_MS,
+    });
+    if (followed) lastSuggestion = null;
   }
 }
 
 async function listTasks() {
   if (!ensureLoggedIn()) return;
 
-  const tasks = await Task.find({ userId: currentUser._id }).lean();
+  const tasks = await getTasksForUser(currentUser._id);
   if (!tasks.length) {
     console.log(theme.info("📭 No tasks yet — add your first one!"));
     return;
@@ -395,7 +300,7 @@ async function listTasks() {
   console.log(theme.accent(`\n${currentUser.username}'s tasks:`));
   tasks.forEach((task, index) => {
     const tags = Array.isArray(task.tags) && task.tags.length ? task.tags.join(", ") : "misc";
-    const subCategory = task.subCategory?.label ? task.subCategory.label : null;
+    const subCategory = task.subCategory?.label || null;
     const displayName = task.taskname || task.title || "(no title)";
     const detailParts = [
       `importance ${task.importance}`,
@@ -403,9 +308,7 @@ async function listTasks() {
       `score ${task.priorityScore ?? 0}`,
       `tags: ${tags}`,
     ];
-    if (subCategory) {
-      detailParts.push(`sub: ${subCategory}`);
-    }
+    if (subCategory) detailParts.push(`sub: ${subCategory}`);
     const line = `${index + 1}. ${paint(displayName, ansi.bold)}  ${theme.muted(`(${detailParts.join(", ")})`)}`;
     console.log(line);
   });
@@ -414,8 +317,10 @@ async function listTasks() {
 async function recommendTask() {
   if (!ensureLoggedIn()) return;
 
-  const { top, ranked = [], reasons = [] } =
-    await coacherAlgorithm.computeFromDb(currentUser._id, currentUser.profile || {});
+  const { top, ranked = [], reasons = [] } = await coacherAlgorithm.computeFromDb(
+    currentUser._id,
+    currentUser.profile || {}
+  );
 
   if (!top) {
     console.log(theme.info("🤷 Nothing to recommend right now."));
@@ -428,130 +333,44 @@ async function recommendTask() {
   console.log(`${theme.title(top.title)} - score ${paint(top.score.toFixed(2), ansi.bold, ansi.yellow)}`);
   if (top.reason) console.log(theme.muted(`Reason: ${top.reason}`));
   if (top.tags?.length) console.log(theme.muted(`Tags: ${top.tags.join(", ")}`));
-  if (top.window) {
-    console.log(theme.muted(`Suggested slot: ${top.window.start} -> ${top.window.end}`));
-  }
+  if (top.window) console.log(theme.muted(`Suggested slot: ${top.window.start} -> ${top.window.end}`));
 }
 
 async function suggestNewTask() {
   if (!ensureLoggedIn()) return;
 
-  // Reload user profile to pick up the latest preferences
-  const freshUser = await User.findById(currentUser._id).lean();
-  if (freshUser) {
-    currentUser = freshUser;
-  }
+  const freshUser = await getUserById(currentUser._id);
+  if (freshUser) currentUser = freshUser;
   const profile = currentUser.profile || {};
 
-  const tasks = await Task.find(
-    { userId: currentUser._id, status: { $in: ["todo", "in_progress"] } },
-    { taskname: 1, tags: 1 }
-  ).lean();
-
+  const tasks = await getTasksForUser(currentUser._id, { status: { $in: ["todo", "in_progress"] } });
   const suggestion = await suggestTaskFromProfile(profile, tasks);
 
   console.log(theme.accent("\n🆕 Suggested new task idea"));
   console.log(`${theme.title(suggestion.title)} (${suggestion.category})`);
   console.log(theme.muted(`Why: ${suggestion.reason}`));
   if (suggestion.algorithm === "logreg" && typeof suggestion.modelScore === "number") {
-    console.log(
-      theme.muted(
-        `Model confidence: ${(suggestion.modelScore * 100).toFixed(1)}%`
-      )
-    );
+    console.log(theme.muted(`Model confidence: ${(suggestion.modelScore * 100).toFixed(1)}%`));
   }
-  if (suggestion.description) {
-    console.log(theme.muted(`Idea: ${suggestion.description}`));
-  }
+  if (suggestion.description) console.log(theme.muted(`Idea: ${suggestion.description}`));
   console.log(theme.muted("Add it via option 3 to include it in your queue."));
 
   lastSuggestion = { ...suggestion, at: Date.now() };
-  await logEvent({
-    type: "suggestion_shown",
-    userId: currentUser._id,
-    payload: suggestion,
-  });
+  await logEvent({ type: "suggestion_shown", userId: currentUser._id, payload: suggestion });
 }
 
 async function planTasksOption() {
   if (!ensureLoggedIn()) return;
 
-  const tasks = await Task.find({
+  const { plan, unscheduled, message } = await generatePlan({
     userId: currentUser._id,
-    status: { $in: ["todo", "in_progress"] },
-  }).lean();
-
-  if (!tasks.length) {
-    console.log(theme.info("📭 No open tasks to plan."));
-    return;
-  }
-
-  const now = new Date();
-  const planningHorizonDays = 14;
-  const todayStart = startOfDay(now);
-  const horizonEnd = addDays(todayStart, planningHorizonDays);
-
-  const autoRoutineBlocks = buildRoutineBusyBlocks({
-    startDate: todayStart,
-    endDate: horizonEnd,
     profile: currentUser.profile || {},
   });
 
-  const busyBlocksByDate = Object.entries(autoRoutineBlocks).reduce((acc, [key, intervals]) => {
-    acc[key] = intervals.map((interval) => ({
-      start: new Date(interval.start),
-      end: new Date(interval.end),
-    }));
-    return acc;
-  }, {});
-
-  const existingSessions = await TaskSchedule.find({
-    userId: currentUser._id,
-    end: { $gte: now },
-    status: "planned",
-  }).lean();
-
-  const remainingByTaskId = new Map(
-    tasks.map((task) => [task._id.toString(), task.estimatedDuration || 0])
-  );
-
-  for (const session of existingSessions) {
-    const key = session.start.toISOString().slice(0, 10);
-    if (!busyBlocksByDate[key]) busyBlocksByDate[key] = [];
-    busyBlocksByDate[key].push({ start: new Date(session.start), end: new Date(session.end) });
-
-    const taskId = session.taskId?.toString();
-    if (taskId && remainingByTaskId.has(taskId)) {
-      const remaining = Math.max(0, remainingByTaskId.get(taskId) - session.minutes);
-      remainingByTaskId.set(taskId, remaining);
-    }
-  }
-
-  const busyBlocks = await BusyBlock.find({
-    userId: currentUser._id,
-    start: { $lt: horizonEnd },
-    end: { $gt: todayStart },
-  }).lean();
-
-  for (const block of busyBlocks) {
-    const key = block.start.toISOString().slice(0, 10);
-    if (!busyBlocksByDate[key]) busyBlocksByDate[key] = [];
-    busyBlocksByDate[key].push({ start: new Date(block.start), end: new Date(block.end) });
-  }
-
-  const tasksForPlanning = tasks
-    .map((task) => {
-      const remaining = remainingByTaskId.get(task._id.toString());
-      return { ...task, estimatedDuration: remaining };
-    })
-    .filter((task) => (task.estimatedDuration || 0) > 0);
-
-  if (!tasksForPlanning.length) {
-    console.log(theme.info("🎉 All tasks already scheduled."));
+  if (message) {
+    console.log(theme.info(message));
     return;
   }
-
-  const { plan, unscheduled } = planTasks(tasksForPlanning, { busyBlocksByDate, planningHorizonDays });
 
   if (!plan.length) {
     console.log(theme.warning("⚠️ Unable to schedule any tasks within the planning window."));
@@ -562,20 +381,15 @@ async function planTasksOption() {
       return acc;
     }, {});
 
-    const dates = Object.keys(grouped).sort();
     console.log(theme.accent("\n🗓️  Draft schedule"));
-    for (const date of dates) {
+    for (const date of Object.keys(grouped).sort()) {
       console.log(theme.title(`\n${date}`));
       grouped[date]
         .sort((a, b) => a.start - b.start)
         .forEach((slot) => {
           const start = slot.start.toTimeString().slice(0, 5);
           const end = slot.end.toTimeString().slice(0, 5);
-          console.log(
-            theme.muted(
-              `${start}–${end} (${slot.minutes} min) → ${slot.title}`
-            )
-          );
+          console.log(theme.muted(`${start}–${end} (${slot.minutes} min) → ${slot.title}`));
         });
     }
   }
@@ -583,44 +397,22 @@ async function planTasksOption() {
   if (unscheduled.length) {
     console.log(theme.warning("\n⚠️ Unscheduled tasks:"));
     unscheduled.forEach((item) => {
-      console.log(
-        theme.muted(
-          `• ${item.title} (needs ${item.remainingMinutes} more minutes)`
-        )
-      );
+      console.log(theme.muted(`• ${item.title} (needs ${item.remainingMinutes} more minutes)`));
     });
   }
 
   try {
-    await persistPlan(currentUser._id, plan);
+    await savePlan({ userId: currentUser._id, plan, unscheduled });
     console.log(theme.success("\n💾 Plan saved."));
   } catch (err) {
     console.error("Failed to save plan:", err);
   }
-
-  await logEvent({
-    type: "tasks_planned",
-    userId: currentUser._id,
-    payload: {
-      plannedCount: plan.length,
-      unscheduledCount: unscheduled.length,
-    },
-  });
 }
 
 async function viewScheduleOption() {
   if (!ensureLoggedIn()) return;
 
-  const now = new Date();
-  const todayStart = startOfDay(now);
-  const upcoming = await TaskSchedule.find({
-    userId: currentUser._id,
-    start: { $gte: todayStart },
-  })
-    .sort({ start: 1 })
-      .populate("taskId", "taskname")
-    .lean();
-
+  const upcoming = await getUpcomingSessions(currentUser._id);
   if (!upcoming.length) {
     console.log(theme.info("📭 No upcoming sessions found."));
     return;
@@ -640,7 +432,7 @@ async function viewScheduleOption() {
       const start = item.start.toTimeString().slice(0, 5);
       const end = item.end.toTimeString().slice(0, 5);
       const status = item.status;
-        const title = item.taskId?.taskname || "(deleted task)";
+      const title = item.taskId?.taskname || "(deleted task)";
       console.log(theme.muted(`${start}–${end} (${status}) → ${title}`));
     });
   }
@@ -649,16 +441,7 @@ async function viewScheduleOption() {
 async function updateScheduleEntryOption() {
   if (!ensureLoggedIn()) return;
 
-  const todayStart = startOfDay(new Date());
-  const upcoming = await TaskSchedule.find({
-    userId: currentUser._id,
-    start: { $gte: todayStart },
-  })
-    .sort({ start: 1 })
-    .limit(20)
-    .populate("taskId", "taskname")
-    .lean();
-
+  const upcoming = await getUpcomingSessions(currentUser._id, { limit: 20 });
   if (!upcoming.length) {
     console.log(theme.info("📭 No sessions available to update."));
     return;
@@ -670,11 +453,7 @@ async function updateScheduleEntryOption() {
     const end = session.end.toTimeString().slice(0, 5);
     const dateLabel = formatLocalDate(session.start);
     const title = session.taskId?.taskname || "(deleted task)";
-    console.log(
-      theme.muted(
-        `${index + 1}) ${dateLabel} ${start}-${end} (${session.status}) → ${title}`
-      )
-    );
+    console.log(theme.muted(`${index + 1}) ${dateLabel} ${start}-${end} (${session.status}) → ${title}`));
   });
 
   const choiceRaw = (await ask("Session number: ")).trim();
@@ -685,49 +464,20 @@ async function updateScheduleEntryOption() {
   }
 
   const session = upcoming[choiceIndex];
-
   const statusRaw = (await ask("New status (planned/completed/skipped): ")).trim().toLowerCase();
   if (!["planned", "completed", "skipped"].includes(statusRaw)) {
     console.log(theme.warning("⚠️ Invalid status."));
     return;
   }
 
-  await TaskSchedule.updateOne({ _id: session._id }, { $set: { status: statusRaw } });
-  console.log(theme.success("✅ Session updated."));
-
-  // Sync parent task status based on session progress
-  if (session.taskId?._id) {
-    await syncTaskStatusFromSessions(session.taskId._id);
-  }
-
-  await logEvent({
-    type: "schedule_updated",
+  const { taskStatus } = await updateScheduleEntryStatus({
     userId: currentUser._id,
-    payload: {
-      sessionId: session._id.toString(),
-      status: statusRaw,
-    },
+    sessionId: session._id,
+    newStatus: statusRaw,
   });
-}
 
-async function syncTaskStatusFromSessions(taskId) {
-  const sessions = await TaskSchedule.find({ taskId }).lean();
-  if (!sessions.length) return;
-
-  const allCompleted = sessions.every((s) => s.status === "completed");
-  const someCompleted = sessions.some((s) => s.status === "completed");
-
-  let newStatus;
-  if (allCompleted) {
-    newStatus = "done";
-  } else if (someCompleted) {
-    newStatus = "in_progress";
-  } else {
-    newStatus = "todo";
-  }
-
-  await Task.updateOne({ _id: taskId }, { $set: { status: newStatus } });
-  console.log(theme.muted(`Task status synced to "${newStatus}".`));
+  console.log(theme.success("✅ Session updated."));
+  console.log(theme.muted(`Task status synced to "${taskStatus}".`));
 }
 
 const calendarMenuOptions = [
@@ -747,7 +497,7 @@ async function calendarConstraintsMenu() {
     });
     const choice = (await ask("Choose an option ➤ ")).trim();
     if (choice === "0" || choice === "") break;
-    const selected = calendarMenuOptions.find((option) => option.key === choice);
+    const selected = calendarMenuOptions.find((o) => o.key === choice);
     if (!selected || !selected.action) {
       console.log(theme.warning("⚠️ Not a valid calendar option."));
       continue;
@@ -787,27 +537,14 @@ async function addBusyBlockOption() {
     break;
   }
 
-  await BusyBlock.create({
-    userId: currentUser._id,
-    title,
-    start,
-    end,
-  });
-
+  await createBusyBlock({ userId: currentUser._id, title, start, end });
   console.log(theme.success("✅ Busy block added."));
 }
 
 async function viewBusyBlocksOption() {
   if (!ensureLoggedIn()) return;
 
-  const now = startOfDay(new Date());
-  const blocks = await BusyBlock.find({
-    userId: currentUser._id,
-    end: { $gte: now },
-  })
-    .sort({ start: 1 })
-    .lean();
-
+  const blocks = await getUpcomingBusyBlocks(currentUser._id);
   if (!blocks.length) {
     console.log(theme.info("📭 No busy blocks found."));
     return;
@@ -834,10 +571,7 @@ async function routineBlocksSettingsOption() {
   console.log(theme.muted("Default windows:"));
   descriptions.forEach((line) => console.log(theme.muted(` • ${line}`)));
 
-  const answer = (await ask("Enable automatic routine busy blocks? (y/n, blank to cancel): "))
-    .trim()
-    .toLowerCase();
-
+  const answer = (await ask("Enable automatic routine busy blocks? (y/n, blank to cancel): ")).trim().toLowerCase();
   if (!answer) {
     console.log(theme.muted("No changes made."));
     return;
@@ -849,17 +583,9 @@ async function routineBlocksSettingsOption() {
   }
 
   const enabled = answer === "y" || answer === "yes";
-  const payload = {
-    enabled,
-    blocks: routineSettings.blocks,
-  };
+  const payload = { enabled, blocks: routineSettings.blocks };
 
-  await User.updateOne(
-    { _id: currentUser._id },
-    { $set: { "profile.settings.routineBlocks": payload } }
-  );
-
-  const refreshed = await User.findById(currentUser._id).lean();
+  const refreshed = await updateRoutineSettings(currentUser._id, payload);
   if (refreshed) currentUser = refreshed;
 
   const updatedText = enabled ? theme.success("enabled") : theme.warning("disabled");
@@ -873,9 +599,7 @@ async function routineBlocksSettingsOption() {
 
 async function promptTaskDueDate() {
   const wantsDeadline = (await ask("Set a deadline date? (y/n, default n): ")).trim().toLowerCase();
-  if (!["y", "yes"].includes(wantsDeadline)) {
-    return null;
-  }
+  if (!["y", "yes"].includes(wantsDeadline)) return null;
   return chooseDeadlineWithSlider();
 }
 
@@ -884,7 +608,7 @@ async function chooseDeadlineWithSlider() {
   const maxAdvanceDays = 365;
   let offset = 0;
 
-  console.log(theme.subtitle("\nDeadline slider active. Use +n/-n or press Enter to accept today’s date."));
+  console.log(theme.subtitle("\nDeadline slider active. Use +n/-n or press Enter to accept today's date."));
 
   while (true) {
     const selectedDate = addDays(today, offset);
@@ -893,13 +617,9 @@ async function chooseDeadlineWithSlider() {
     console.log(theme.muted("Commands: +n/-n, c=clear, Enter=confirm"));
 
     const commandRaw = (await ask("Command: ")).trim().toLowerCase();
-    if (!commandRaw) {
-      return selectedDate;
-    }
+    if (!commandRaw) return selectedDate;
 
-    if (commandRaw === "c" || commandRaw === "clear") {
-      return null;
-    }
+    if (commandRaw === "c" || commandRaw === "clear") return null;
 
     const jumpMatch = commandRaw.match(/^([+-])(\d+)$/);
     if (jumpMatch) {
@@ -932,12 +652,8 @@ function clampOffset(value, maxDays) {
 
 function sanitizeMinutes(value, fallback) {
   const MINIMUM_MINUTES = 15;
-  if (Number.isFinite(value) && value > 0) {
-    return Math.max(MINIMUM_MINUTES, Math.round(value));
-  }
-  if (Number.isFinite(fallback) && fallback > 0) {
-    return Math.max(MINIMUM_MINUTES, Math.round(fallback));
-  }
+  if (Number.isFinite(value) && value > 0) return Math.max(MINIMUM_MINUTES, Math.round(value));
+  if (Number.isFinite(fallback) && fallback > 0) return Math.max(MINIMUM_MINUTES, Math.round(fallback));
   return MINIMUM_MINUTES;
 }
 
