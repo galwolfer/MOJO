@@ -1,12 +1,13 @@
 // src/services/planningService.js
-// Orchestrates task planning by gathering constraints and calling the bin-packing planner.
+// Orchestrates task planning by gathering constraints and calling the CSP scheduler.
 
 import Task from "../models/Task.js";
 import { TaskSchedule } from "../models/TaskSchedule.js";
 import { BusyBlock } from "../models/BusyBlock.js";
 import { startOfDay, addDays } from "../algorithms/binPacking/calendarUtils.js";
 import { buildRoutineBusyBlocks } from "../algorithms/binPacking/routineBlocks.js";
-import { planTasks, persistPlan } from "../algorithms/binPacking/planner.js";
+import { persistPlan } from "../algorithms/binPacking/planner.js";
+import { planTasksCSP } from "../algorithms/csp/scheduler.js";
 import { logEvent } from "./telemetry.js";
 
 /**
@@ -44,18 +45,20 @@ export async function generatePlan({ userId, profile = {}, planningHorizonDays =
     return acc;
   }, {});
 
-  // Gather existing planned sessions
-  const existingSessions = await TaskSchedule.find({
+  // Note: We do NOT include existing planned sessions as busy blocks
+  // because persistPlan will clear them before saving the new plan.
+  // Only completed/in-progress sessions should be treated as busy.
+  const completedSessions = await TaskSchedule.find({
     userId,
     end: { $gte: now },
-    status: "planned",
+    status: { $in: ["done", "in_progress"] },
   }).lean();
 
   const remainingByTaskId = new Map(
     tasks.map((task) => [task._id.toString(), task.estimatedDuration || 0])
   );
 
-  for (const session of existingSessions) {
+  for (const session of completedSessions) {
     const key = session.start.toISOString().slice(0, 10);
     if (!busyBlocksByDate[key]) busyBlocksByDate[key] = [];
     busyBlocksByDate[key].push({ start: new Date(session.start), end: new Date(session.end) });
@@ -92,7 +95,18 @@ export async function generatePlan({ userId, profile = {}, planningHorizonDays =
     return { plan: [], unscheduled: [], message: "All tasks already scheduled." };
   }
 
-  const { plan, unscheduled } = planTasks(tasksForPlanning, { busyBlocksByDate, planningHorizonDays });
+  // Use CSP scheduler with backtracking and constraint propagation
+  const { plan, unscheduled } = planTasksCSP(tasksForPlanning, { 
+    busyBlocksByDate, 
+    planningHorizonDays,
+    workingHours: profile.workingHours || {
+      startHour: 9,
+      startMinute: 0,
+      endHour: 18,
+      endMinute: 0,
+    },
+    dailyCapMinutes: profile.dailyCapMinutes || 240,
+  });
 
   return { plan, unscheduled };
 }
