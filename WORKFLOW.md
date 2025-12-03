@@ -104,21 +104,18 @@ flowchart TD
 ```
 Mojo/
 ├── src/
-│   ├── models/          # Database schemas
-│   │   ├── User.js      # User accounts
-│   │   ├── Task.js      # Tasks with priority scores
-│   │   └── TaskSchedule.js  # Calendar slots
-│   │
-│   ├── services/        # Core logic
-│   │   ├── priority.js      # Task ranking algorithm
-│   │   ├── planner.js       # Calendar scheduling
-│   │   └── suggestions.js   # Task recommendations
-│   │
-│   ├── cli.js           # Interactive command-line interface
-│   └── server.js        # Express API server
+│   ├── algorithms/
+│   │   ├── priority/     # priority scoring, tagging, suggestions & model helpers
+│   │   └── binPacking/   # calendar planner + routine/availability utilities
+│   ├── models/           # Database schemas (User, Task, TaskSchedule, BusyBlock)
+│   ├── services/         # Supporting helpers (telemetry, subcategory, CLI glue)
+│   ├── cli.js            # Interactive command-line interface
+│   └── server.js         # Express API server
 │
-└── data/                # MongoDB data
+└── data/                # MongoDB/imported data & model weights
 ```
+
+The two algorithm families live under `src/algorithms`, so the priority ranking logic and the bin-packing scheduler can be explained independently while the remaining services provide shared helpers for the CLI/server.
 
 ---
 

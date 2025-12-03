@@ -15,6 +15,8 @@ const DEFAULT_WORKING_HOURS = {
 const DEFAULT_BREAK_MINUTES = 15;
 const MIN_SPLIT_CHUNK = 15;
 
+const clampMinutes = (value, min, max) => Math.max(min, Math.min(max, value));
+
 const minutesBetween = (start, end) => Math.max(0, Math.round((end - start) / 60000));
 
 const enumerateDates = (start, end) => {
@@ -88,6 +90,20 @@ const pickBestFitSlot = ({ candidateDates, chunkMinutes, freeCache, busyBlocksBy
   };
 };
 
+const determineChunkSize = (task, remaining) => {
+  const type = task.taskType || (task.canSplit ? "in_parts" : "perfect");
+  if (type === "leaky" && Number.isFinite(task.minMinutes)) {
+    return Math.min(remaining, Math.max(MIN_SPLIT_CHUNK, task.minMinutes));
+  }
+  if (type === "perfect" || !task.canSplit) {
+    return remaining;
+  }
+  if (type === "in_parts" && Number.isFinite(task.chunkMinutes)) {
+    return Math.min(remaining, Math.max(MIN_SPLIT_CHUNK, Math.round(task.chunkMinutes)));
+  }
+  return task.canSplit ? Math.min(remaining, Math.max(task.minChunk || MIN_SPLIT_CHUNK, MIN_SPLIT_CHUNK)) : remaining;
+};
+
 const toDateKey = (date) => {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
@@ -114,6 +130,13 @@ export function planTasks(tasks, { busyBlocksByDate = {}, workingHours = DEFAULT
   for (const task of sorted) {
     let remaining = task.estimatedDuration || 0;
     if (!remaining) continue;
+    const effectiveType = task.taskType || (task.canSplit ? "in_parts" : "perfect");
+
+    if (effectiveType === "leaky") {
+      const targetMin = Math.max(task.minMinutes || MIN_SPLIT_CHUNK, MIN_SPLIT_CHUNK);
+      const targetMax = task.maxMinutes && task.maxMinutes >= targetMin ? task.maxMinutes : remaining;
+      remaining = clampMinutes(remaining, targetMin, targetMax);
+    }
 
     const dueDate = task.dueDate ? startOfDay(new Date(task.dueDate)) : horizonEnd;
     const rangeEnd = dueDate < horizonEnd ? dueDate : horizonEnd;
@@ -123,9 +146,8 @@ export function planTasks(tasks, { busyBlocksByDate = {}, workingHours = DEFAULT
     let workingWindowCache = {};
 
     while (remaining > 0) {
-      const chunkSize = task.canSplit
-        ? Math.min(remaining, Math.max(task.minChunk || 30, MIN_SPLIT_CHUNK))
-        : remaining;
+      const chunkSize = determineChunkSize(task, remaining);
+      if (!chunkSize) break;
 
       const slot = pickBestFitSlot({
         candidateDates,

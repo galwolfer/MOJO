@@ -17,6 +17,16 @@ const taskSchema = new mongoose.Schema(
     estimatedDuration: { type: Number, min: 15, default: 60 }, // minutes
     canSplit: { type: Boolean, default: true },
     minChunk: { type: Number, min: 15, default: 30 },          // minimum chunk length in minutes when splitting
+    taskType: {
+      type: String,
+      enum: ["perfect", "in_parts", "leaky"],
+      default: "perfect",
+      trim: true,
+    },
+    chunkCount: { type: Number, min: 1 },
+    chunkMinutes: { type: Number, min: 1 },
+    minMinutes: { type: Number, min: 1 },
+    maxMinutes: { type: Number, min: 1 },
     earliestStart: { type: Date },
     // Cached score so we can sort quickly (optional)
     // add field: user's behaviour default value ineffective

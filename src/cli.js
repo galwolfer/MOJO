@@ -277,26 +277,38 @@ async function addTask() {
   const durationInput = (await ask("Estimated duration in minutes (default 60): ")).trim();
   const estimatedDuration = Math.max(15, toNumber(durationInput || 60, 60));
   const splitInput = (await ask("Can we split it across sessions? (Y/n, default Y): ")).trim().toLowerCase();
-  const canSplit = splitInput === "" || splitInput === "y" || splitInput === "yes";
+  let taskType = "perfect";
+  let chunkCount = null;
+  let chunkMinutes = estimatedDuration;
+  let minMinutes = null;
+  let maxMinutes = null;
   let minChunk = estimatedDuration;
+  let canSplit = splitInput === "" || splitInput === "y" || splitInput === "yes";
+
   if (canSplit) {
-    const chunkCountRaw = (await ask("Into how many chunks would you like to split it? (default 2): ")).trim();
-    const chunkCount = Math.max(1, Math.round(Number(chunkCountRaw) || 2));
-    const baseChunk = Math.ceil(estimatedDuration / chunkCount);
-    minChunk = Math.min(estimatedDuration, Math.max(15, baseChunk));
-  }
-  let dueDate;
-  while (true) {
-    const due = (await ask("Due date (YYYY-MM-DD, optional): ")).trim();
-    if (!due) break;
-    const parsed = parseDateOnly(due);
-    if (!parsed) {
-      console.log(theme.warning("⚠️ Please enter a due date like 2025-11-14."));
-      continue;
+    const sliderHint = " (default 2, or enter min-max for flexible time)";
+    const chunkCountRaw = (await ask(`Into how many chunks would you like to split it?${sliderHint}: `)).trim();
+
+    if (chunkCountRaw.includes("-")) {
+      const [minRaw, maxRaw] = chunkCountRaw.split("-").map((fragment) => fragment.trim());
+      const parsedMin = Number(minRaw);
+      const parsedMax = Number(maxRaw);
+      minMinutes = sanitizeMinutes(parsedMin, 15);
+      maxMinutes = Math.max(minMinutes, sanitizeMinutes(parsedMax, estimatedDuration));
+      taskType = "leaky";
+      chunkMinutes = minMinutes;
+      minChunk = minMinutes;
+      canSplit = false; // leaky tasks are handled as single flexible chunk
+    } else {
+      const parsedChunks = Math.max(1, Math.round(Number(chunkCountRaw) || 2));
+      chunkCount = parsedChunks;
+      taskType = "in_parts";
+      const baseChunk = Math.ceil(estimatedDuration / parsedChunks);
+      chunkMinutes = Math.max(15, baseChunk);
+      minChunk = Math.min(estimatedDuration, chunkMinutes);
     }
-    dueDate = parsed;
-    break;
   }
+  const dueDate = await promptTaskDueDate();
 
   const created = await Task.create({
     userId: currentUser._id,
@@ -307,6 +319,11 @@ async function addTask() {
     estimatedDuration,
     canSplit,
     minChunk,
+    taskType,
+    chunkCount,
+    chunkMinutes,
+    minMinutes,
+    maxMinutes,
     dueDate,
   });
   console.log(theme.success("✅ Task added! We'll keep its score in sync."));
@@ -678,6 +695,11 @@ async function updateScheduleEntryOption() {
   await TaskSchedule.updateOne({ _id: session._id }, { $set: { status: statusRaw } });
   console.log(theme.success("✅ Session updated."));
 
+  // Sync parent task status based on session progress
+  if (session.taskId?._id) {
+    await syncTaskStatusFromSessions(session.taskId._id);
+  }
+
   await logEvent({
     type: "schedule_updated",
     userId: currentUser._id,
@@ -686,6 +708,26 @@ async function updateScheduleEntryOption() {
       status: statusRaw,
     },
   });
+}
+
+async function syncTaskStatusFromSessions(taskId) {
+  const sessions = await TaskSchedule.find({ taskId }).lean();
+  if (!sessions.length) return;
+
+  const allCompleted = sessions.every((s) => s.status === "completed");
+  const someCompleted = sessions.some((s) => s.status === "completed");
+
+  let newStatus;
+  if (allCompleted) {
+    newStatus = "done";
+  } else if (someCompleted) {
+    newStatus = "in_progress";
+  } else {
+    newStatus = "todo";
+  }
+
+  await Task.updateOne({ _id: taskId }, { $set: { status: newStatus } });
+  console.log(theme.muted(`Task status synced to "${newStatus}".`));
 }
 
 const calendarMenuOptions = [
@@ -827,6 +869,76 @@ async function routineBlocksSettingsOption() {
     console.log(theme.muted("We'll protect the following times automatically:"));
     describeRoutineWindows(payload.blocks).forEach((line) => console.log(theme.muted(` • ${line}`)));
   }
+}
+
+async function promptTaskDueDate() {
+  const wantsDeadline = (await ask("Set a deadline date? (y/n, default n): ")).trim().toLowerCase();
+  if (!["y", "yes"].includes(wantsDeadline)) {
+    return null;
+  }
+  return chooseDeadlineWithSlider();
+}
+
+async function chooseDeadlineWithSlider() {
+  const today = startOfDay(new Date());
+  const maxAdvanceDays = 365;
+  let offset = 0;
+
+  console.log(theme.subtitle("\nDeadline slider active. Use +n/-n or press Enter to accept today’s date."));
+
+  while (true) {
+    const selectedDate = addDays(today, offset);
+    console.log(theme.muted(`Pattern: ${buildDeadlinePattern(offset, maxAdvanceDays)}`));
+    console.log(theme.info(`Selected: ${formatLocalDate(selectedDate)} (+${offset} days)`));
+    console.log(theme.muted("Commands: +n/-n, c=clear, Enter=confirm"));
+
+    const commandRaw = (await ask("Command: ")).trim().toLowerCase();
+    if (!commandRaw) {
+      return selectedDate;
+    }
+
+    if (commandRaw === "c" || commandRaw === "clear") {
+      return null;
+    }
+
+    const jumpMatch = commandRaw.match(/^([+-])(\d+)$/);
+    if (jumpMatch) {
+      const direction = jumpMatch[1];
+      const step = Number(jumpMatch[2]);
+      if (Number.isFinite(step)) {
+        offset = clampOffset(offset + (direction === "+" ? step : -step), maxAdvanceDays);
+        continue;
+      }
+    }
+
+    console.log(theme.warning("⚠️ Use +n/-n to shift the date, c to cancel, or Enter to accept."));
+  }
+}
+
+function buildDeadlinePattern(currentOffset, maxAdvanceDays) {
+  const length = 11;
+  const half = Math.floor(length / 2);
+  const start = Math.max(0, Math.min(currentOffset - half, Math.max(0, maxAdvanceDays - length)));
+  const pattern = [];
+  for (let index = start; index < start + length; index++) {
+    pattern.push(index === currentOffset ? "█" : "─");
+  }
+  return pattern.join("");
+}
+
+function clampOffset(value, maxDays) {
+  return Math.max(0, Math.min(maxDays, value));
+}
+
+function sanitizeMinutes(value, fallback) {
+  const MINIMUM_MINUTES = 15;
+  if (Number.isFinite(value) && value > 0) {
+    return Math.max(MINIMUM_MINUTES, Math.round(value));
+  }
+  if (Number.isFinite(fallback) && fallback > 0) {
+    return Math.max(MINIMUM_MINUTES, Math.round(fallback));
+  }
+  return MINIMUM_MINUTES;
 }
 
 function ensureLoggedIn() {
