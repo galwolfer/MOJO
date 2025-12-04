@@ -598,6 +598,18 @@ May the force be with you! 🌟
 - The LLM can call `save_user_fact` or `save_conversation_note` to store memories; the tools persist memory and update user embeddings asynchronously.
 - The controller will also inject a short memory context into the prompt to help the model respond without always calling memory tools.
 
+### Memory Save Implementation Note
+
+- **Pragmatic save behavior:** To make memory writes resilient to unrelated schema validation errors (for example, an invalid `profile.tone` value such as `"very angry"`), the current runtime memory persistence appends the memory object to `User.memories` and saves the user document using Mongoose with whole-document validation disabled: `user.save({ validateBeforeSave: false })`.
+- **Rationale:** This prevents a single invalid field on the `User` document from blocking otherwise valid memory writes. The memory objects themselves are still constructed and validated at the memory-level before being pushed into `user.memories`.
+- **Tradeoffs & risks:** Disabling whole-document validation allows invalid profile or other fields to remain in the database, which may cause subtle bugs elsewhere. This was chosen as a minimal, pragmatic fix to restore the "remember" functionality.
+- **Recommended follow-ups:**
+   - Sanitize and normalize profile inputs where they are set (map unknown `tone` values to an allowed enum or a safe default).
+   - Consider a one-time migration script to clean existing invalid profiles.
+   - For long-term robustness, move vector storage to a dedicated collection or vector DB so memory writes don't require saving the entire user document.
+
+If you'd like, I can add a migration helper and unit tests that assert memory-save and retrieval while keeping full-document validation enabled.
+
 
 ---
 If you want, I can now:
