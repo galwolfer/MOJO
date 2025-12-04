@@ -1,7 +1,7 @@
 // src/services/routineBlocks.js
 // Build synthetic busy blocks from simple daily routines (sleep, meals, etc.).
 
-import { addDays, startOfDay } from "./calendarUtils.js";
+import { addDays, startOfDay } from "../utils/dateUtils.js";
 
 const clamp = (value, min, max, fallback) => {
   const num = Number(value);

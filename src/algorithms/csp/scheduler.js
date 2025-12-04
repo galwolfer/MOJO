@@ -3,8 +3,8 @@
 
 import { satisfiesHardConstraints, computeSoftScore } from "./constraints.js";
 import { selectVariableMRV, orderValuesLCV, forwardCheck } from "./heuristics.js";
-import { buildWorkingWindow } from "../binPacking/calendar.js";
-import { addDays, startOfDay, addMinutes } from "../binPacking/calendarUtils.js";
+import { buildWorkingWindow } from "../../utils/timeWindows.js";
+import { addDays, startOfDay, addMinutes } from "../../utils/dateUtils.js";
 
 const DEFAULT_WORKING_HOURS = {
   startHour: 9,
@@ -150,21 +150,25 @@ function generateVariables(tasks, horizonEnd) {
 
     let chunks = [];
 
-    if (taskType === "perfect" || !task.canSplit) {
+    if (taskType === "leaky") {
+      // Leaky tasks: flexible chunk sizes between minMinutes and maxMinutes
+      // Use minMinutes as the target chunk size, default to 60 min
+      const minChunk = task.minMinutes || 60;
+      const maxChunk = task.maxMinutes || minChunk;
+      let remaining = totalMinutes;
+      while (remaining > 0) {
+        // Random chunk size between min and max, capped by remaining
+        const targetSize = minChunk + Math.floor(Math.random() * (maxChunk - minChunk + 1));
+        const size = Math.min(targetSize, remaining);
+        chunks.push(size);
+        remaining -= size;
+      }
+    } else if (taskType === "perfect" || !task.canSplit) {
       // Single chunk for entire task
       chunks.push(totalMinutes);
     } else if (taskType === "in_parts" && task.chunkCount) {
       // Split into specified number of chunks
       const chunkSize = Math.ceil(totalMinutes / task.chunkCount);
-      let remaining = totalMinutes;
-      while (remaining > 0) {
-        const size = Math.min(chunkSize, remaining);
-        chunks.push(size);
-        remaining -= size;
-      }
-    } else if (taskType === "leaky") {
-      // Flexible: use minMinutes as chunk size
-      const chunkSize = task.minMinutes || 30;
       let remaining = totalMinutes;
       while (remaining > 0) {
         const size = Math.min(chunkSize, remaining);

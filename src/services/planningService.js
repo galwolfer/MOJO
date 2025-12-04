@@ -4,9 +4,9 @@
 import Task from "../models/Task.js";
 import { TaskSchedule } from "../models/TaskSchedule.js";
 import { BusyBlock } from "../models/BusyBlock.js";
-import { startOfDay, addDays } from "../algorithms/binPacking/calendarUtils.js";
-import { buildRoutineBusyBlocks } from "../algorithms/binPacking/routineBlocks.js";
-import { persistPlan } from "../algorithms/binPacking/planner.js";
+import { startOfDay, addDays } from "../utils/dateUtils.js";
+import { buildRoutineBusyBlocks } from "./routineBlocks.js";
+import { persistPlan } from "./schedulePersistence.js";
 import { planTasksCSP } from "../algorithms/csp/scheduler.js";
 import { logEvent } from "./telemetry.js";
 

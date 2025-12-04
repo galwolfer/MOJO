@@ -14,8 +14,8 @@ import { createBusyBlock, getUpcomingBusyBlocks } from "./services/busyBlockServ
 import { coacherAlgorithm } from "./services/index.js";
 import { suggestTaskFromProfile } from "./algorithms/priority/suggestions.js";
 import { logEvent } from "./services/telemetry.js";
-import { getRoutineSettings, describeRoutineWindows } from "./algorithms/binPacking/routineBlocks.js";
-import { startOfDay, addDays } from "./algorithms/binPacking/calendarUtils.js";
+import { getRoutineSettings, describeRoutineWindows } from "./services/routineBlocks.js";
+import { startOfDay, addDays } from "./utils/dateUtils.js";
 
 const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const pad = (value) => String(value).padStart(2, "0");

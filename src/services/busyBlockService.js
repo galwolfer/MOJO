@@ -2,7 +2,7 @@
 // CRUD operations for user busy blocks.
 
 import { BusyBlock } from "../models/BusyBlock.js";
-import { startOfDay } from "../algorithms/binPacking/calendarUtils.js";
+import { startOfDay } from "../utils/dateUtils.js";
 
 /**
  * Create a busy block for a user.
