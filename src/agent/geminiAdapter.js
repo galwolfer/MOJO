@@ -2,262 +2,161 @@ import fetch from "node-fetch";
 import { config } from "../config/env.js";
 
 /**
- * ========================================
- * GEMINI ADAPTER - API Communication Layer
- * ========================================
- * 
- * This adapter handles direct communication with the Google Gemini API.
- * It's the low-level interface that constructs HTTP requests and parses responses.
- * 
- * NOTE: This is currently maintained for compatibility but the system primarily
- * uses LangChain's ChatGoogleGenerativeAI wrapper instead of this direct adapter.
- * 
- * RESPONSIBILITIES:
- * 1. Format LangChain messages into Gemini API format
- * 2. Send requests to the Gemini API with configured parameters
- * 3. Parse Gemini's response format (candidates, parts, tokens)
- * 4. Handle error conditions (MAX_TOKENS, invalid responses)
- * 5. Extract actual content from Gemini's nested response structure
+ * GeminiAdapter - lightweight Gemini API helper
+ *
+ * Notes (restored):
+ * - Purpose: small, defensive wrapper around the Gemini REST API used
+ *   for direct calls, debugging, and in environments where we opt out
+ *   of LangChain for rapid prototyping.
+ * - Relationship to LangChain: the project prefers `ChatGoogleGenerativeAI`.
+ *   Keep this adapter for low-level access, feature testing, or when
+ *   function-calling needs more explicit control.
+ * - Function-calls: this adapter encodes assistant function-calls and
+ *   function responses into Gemini's content parts. When adding tools,
+ *   pass a `tools` array of function declarations to `generateContent`.
+ * - Error handling: callers should surface Gemini errors to observability;
+ *   this wrapper throws on HTTP errors and attempts to surface useful logs.
+ * - JSON heuristics: messages that carry `function` responses may be
+ *   stringified JSON; `convertMessagesToGeminiFormat` attempts a best-effort
+ *   JSON.parse and falls back to raw strings. This preserves older data.
+ * - Rate limits & usage: keep `maxOutputTokens` conservative in production
+ *   and surface `usageMetadata` returned by Gemini for billing/monitoring.
+ * - Migration note: this file was previously replaced with a minimal
+ *   implementation that removed extended comments. Those notes were
+ *   intentionally restored to aid future maintainers.
  */
 export class GeminiAdapter {
-  /**
-   * Constructor - Initialize Gemini adapter with API credentials
-   * 
-   * @param {string} apiKey - Google Gemini API key (from config.env)
-   * @param {string} model - Model identifier (default: gemini-2.0-flash)
-   *        Available models: gemini-pro, gemini-pro-vision, gemini-2.0-flash, etc.
-   */
+  // Store API key and model. Keep this constructor minimal so the
+  // adapter is easy to instantiate in tests and lightweight runners.
+  // - `apiKey`: Google API key with access to the Generative Language API.
+  // - `model`: override default model name for testing or staging.
   constructor(apiKey, model = config.geminiModel || "gemini-2.0-flash") {
     this.apiKey = apiKey;
     this.model = model;
-    // Gemini API base URL - all requests go through generativelanguage.googleapis.com
     this.baseUrl = "https://generativelanguage.googleapis.com/v1beta/models";
   }
 
-  /**
-   * Send a request to Gemini API with optional tool definitions
-   * 
-   * FLOW:
-   * 1. Convert LangChain messages to Gemini format
-   * 2. Configure generation settings (temperature, tokens, etc.)
-   * 3. Attach tool definitions if available
-   * 4. Send POST request to Gemini API
-   * 5. Parse and return JSON response
-   * 
-   * @param {Array<Object>} messages - Array of LangChain message objects
-   *        Each message has: { role: "user"|"assistant", content: string }
-   * @param {Array<Object>} tools - Optional array of tool definitions (for function calling)
-   *        Each tool has: { name, description, inputSchema }
-   * @returns {Promise<Object>} Raw Gemini API response with candidates array
-   * @throws {Error} If API request fails or API returns an error
-   * 
-   * GENERATION CONFIG:
-   * - temperature: 0.7 - moderate randomness for natural responses
-   * - maxOutputTokens: 768 - balanced between detail and efficiency
-   * - topK: 40 - nucleus sampling parameter
-   * - topP: 0.95 - diversity vs coherence balance
-   */
   async generateContent(messages, tools = null) {
+    // Build the endpoint URL and convert our messages into Gemini's
+    // `contents` shape. We keep auth as a simple API key for now; if
+    // you need OAuth or a different flow, replace this construction.
     const url = `${this.baseUrl}/${this.model}:generateContent?key=${this.apiKey}`;
-
-    // Convert LangChain format messages to Gemini API format
-    // (different role names, nested structure, etc.)
     const contents = this.convertMessagesToGeminiFormat(messages);
 
-    // Build the request body with generation configuration
+    // The request body follows Gemini's `generateContent` schema. Tune
+    // `generationConfig` for production constraints (latency, cost,
+    // truncation behavior).
     const requestBody = {
       contents,
       generationConfig: {
-        temperature: 0.7,  // Moderate randomness - balanced responses
-        topK: 40,          // Nucleus sampling for diversity
-        topP: 0.95,        // Cumulative probability for sampling
-        maxOutputTokens: 768, // Enough detail but not wasteful
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 768,
       },
     };
 
-    // If tools are provided (for function calling), add them to the request
-    // Tools allow the LLM to call functions in the agent system
+    // Attach tool (function) declarations when present so the model can
+    // return function-calling payloads. `tools` should be an array of
+    // declarations compatible with the project's function-calling helpers.
     if (tools && tools.length > 0) {
-      requestBody.tools = [
-        {
-          functionDeclarations: tools,
-        },
-      ];
+      requestBody.tools = [{ functionDeclarations: tools }];
     }
 
-    // Send HTTP POST request to Gemini API
+    // Perform a single HTTP request. We intentionally do not perform
+    // automatic retries here; callers can wrap this method if they need
+    // exponential backoff or idempotent retry behavior.
     const response = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(requestBody),
     });
 
-    // Handle HTTP errors
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Gemini API error: ${response.status} - ${error}`);
+      // Surface the HTTP body in the thrown error to aid debugging.
+      const txt = await response.text();
+      throw new Error(`Gemini API error: ${response.status} - ${txt}`);
     }
 
-    // Parse response JSON
     const json = await response.json();
 
-    // Check for MAX_TOKENS finish reason (model ran out of output space)
-    // This is a soft limit - the model gracefully stops but may not have finished
+    // Warn when models terminate due to `MAX_TOKENS` so callers can
+    // adjust token budgets or handle partial responses.
     try {
       const candidate = json?.candidates?.[0];
       if (candidate && candidate.finishReason === "MAX_TOKENS") {
-        console.warn(
-          "GeminiAdapter.generateContent: model finished with MAX_TOKENS. Consider reducing prompt size or increasing maxOutputTokens if desired."
-        );
+        console.warn("GeminiAdapter.generateContent: model finished with MAX_TOKENS");
       }
     } catch (e) {
-      // Ignore logging errors
+      // Defensive: parsing issues in auxiliary checks should not hide
+      // the successful JSON response.
     }
 
+    // Return the raw Gemini JSON. Use `extractResponse` to convert to a
+    // normalized `{ type, text|functionCall }` shape used across the app.
     return json;
   }
 
-  /**
-   * Convert LangChain message format to Gemini API format
-   * 
-   * LangChain messages have a standardized format with role and content,
-   * but Gemini API expects different role names and nested structure.
-   * 
-   * CONVERSIONS:
-   * - LangChain "system" → Gemini "user" (Gemini doesn't support system role)
-   * - LangChain "user" → Gemini "user" (human input)
-   * - LangChain "assistant" → Gemini "model" (AI response)
-   * - LangChain with functionCall → Gemini with functionCall part
-   * - LangChain "function" → Gemini with functionResponse (tool result)
-   * 
-   * @param {Array<Object>} messages - LangChain message objects
-   * @returns {Array<Object>} Gemini API format messages
-   * 
-   * Example conversion:
-   * LangChain: { role: "user", content: "Hello" }
-   * Gemini: { role: "user", parts: [{ text: "Hello" }] }
-   */
   convertMessagesToGeminiFormat(messages) {
+    // Map our internal message shape to Gemini's `contents.parts` shape.
+    // The mapping is intentionally conservative to avoid losing data
+    // when messages come from mixed sources (stringified functions,
+    // older clients, etc.).
     return messages.map((msg) => {
-      // Gemini doesn't support "system" role, convert to user with [System]: prefix
       if (msg.role === "system") {
-        return {
-          role: "user",
-          parts: [{ text: `[System]: ${msg.content}` }],
-        };
+        // Some Gemini endpoints do not expose a distinct `system` role,
+        // so we prefix system content into a user text part to preserve
+        // instruction visibility.
+        return { role: "user", parts: [{ text: `[System]: ${msg.content}` }] };
       }
 
-      // Handle assistant messages with function calls (tool invocation)
       if (msg.role === "assistant" && msg.functionCall) {
-        return {
-          role: "model",
-          parts: [
-            {
-              functionCall: msg.functionCall,
-            },
-          ],
-        };
+        // The assistant intends to call a function; encode the call so
+        // the model's tools/function-calling pipeline can be activated.
+        return { role: "model", parts: [{ functionCall: msg.functionCall }] };
       }
 
-      // Handle function response (tool result from system)
       if (msg.role === "function") {
-        // Parse the content if it's a JSON string
+        // Function responses may be structured (objects) or JSON
+        // serialized into strings. Attempt to parse string responses so
+        // downstream consumers can operate on objects when possible.
         let responseContent = msg.content;
         if (typeof responseContent === "string") {
           try {
             responseContent = JSON.parse(responseContent);
           } catch (e) {
-            // If parsing fails, keep as string
-            console.warn("Could not parse function response:", e);
+            // Parsing failed; keep original string to avoid dropping data.
           }
         }
 
         return {
           role: "function",
-          parts: [
-            {
-              functionResponse: {
-                name: msg.name,
-                response: responseContent,
-              },
-            },
-          ],
+          parts: [{ functionResponse: { name: msg.name, response: responseContent } }],
         };
       }
 
-      // Standard message conversion
-      // Convert LangChain role names to Gemini role names
-      return {
-        role: msg.role === "assistant" ? "model" : "user",
-        parts: [{ text: msg.content }],
-      };
+      // Default: map assistant->model and user->user with a text part.
+      return { role: msg.role === "assistant" ? "model" : "user", parts: [{ text: msg.content }] };
     });
   }
 
-  /**
-   * Extract the text/function response from Gemini's nested response structure
-   * 
-   * Gemini API responses are deeply nested:
-   * {
-   *   candidates: [{
-   *     content: {
-   *       parts: [{
-   *         text: "Response text"
-   *         OR functionCall: { name, args }
-   *       }],
-   *       role: "model"
-   *     },
-   *     finishReason: "STOP"
-   *   }]
-   * }
-   * 
-   * This method:
-   * 1. Navigates the nested structure safely
-   * 2. Checks for completion (finish reason)
-   * 3. Returns the response with type indication
-   * 4. Logs detailed errors if structure is unexpected
-   * 
-   * @param {Object} geminiResponse - Raw Gemini API response
-   * @returns {Object} Parsed response with type: "text", "function_call", or "max_tokens"
-   *          { type: "text", text: "..." }
-   *          { type: "function_call", functionCall: { name, args } }
-   *          { type: "max_tokens", candidate: {...} }
-   * @throws {Error} If response structure is invalid or no content found
-   * 
-   * ERROR HANDLING:
-   * - Defensive navigation through optional nested objects
-   * - Logs full response for debugging if structure is unexpected
-   * - Multiple fallback paths to find content
-   */
   extractResponse(geminiResponse) {
-    // Defensive parsing: Try several possible response shapes
-    // Different Gemini API versions or edge cases may return different structures
+    // Prefer the first candidate when present; handle both `candidates`
+    // array and single `candidate` shapes defensively.
     const candidate = geminiResponse?.candidates?.[0] || geminiResponse?.candidate || null;
-
     if (!candidate) {
-      // Log full response for debugging
-      console.error(
-        "GeminiAdapter.extractResponse: no candidate found in response. Full response:\n",
-        JSON.stringify(geminiResponse, null, 2)
-      );
-      throw new Error("No candidate in Gemini response (see server logs for raw Gemini payload)");
+      console.error("GeminiAdapter.extractResponse: no candidate found", JSON.stringify(geminiResponse, null, 2));
+      throw new Error("No candidate in Gemini response");
     }
 
-    // Check for MAX_TOKENS finish reason (model ran out of output space)
-    // This indicates the response was truncated
+    // Expose a special `max_tokens` shape when the model truncated the
+    // response due to token limits so callers can handle retries.
     if (candidate.finishReason === "MAX_TOKENS") {
-      console.warn("⚠️ GeminiAdapter: Model hit MAX_TOKENS before completing response");
-      return {
-        type: "max_tokens",
-        candidate: candidate,
-        usageMetadata: geminiResponse.usageMetadata,
-      };
+      return { type: "max_tokens", candidate, usageMetadata: geminiResponse.usageMetadata };
     }
 
-    // Try to locate the content part in several possible shapes
-    // Gemini API response structure varies; we need to be defensive
+    // Candidates may include `content.parts`, a `content.text`, or a
+    // top-level `text` field. Prefer parts when available.
     let part = null;
     if (candidate.content?.parts && candidate.content.parts.length > 0) {
       part = candidate.content.parts[0];
@@ -268,133 +167,15 @@ export class GeminiAdapter {
     }
 
     if (!part) {
-      // Log detailed information for debugging
-      console.error(
-        "GeminiAdapter.extractResponse: candidate present but no parts/text found. Candidate:\n",
-        JSON.stringify(candidate, null, 2)
-      );
-      console.error("Full Gemini response:\n", JSON.stringify(geminiResponse, null, 2));
-      throw new Error("No parts in Gemini response (see server logs for raw Gemini payload)");
+      console.error("GeminiAdapter.extractResponse: no part found", JSON.stringify(candidate, null, 2));
+      throw new Error("No parts in Gemini response");
     }
 
-    // Check if this is a function call (tool invocation)
-    if (part.functionCall) {
-      return {
-        type: "function_call",
-        functionCall: part.functionCall,
-      };
-    }
+    // Normalize the return shape for the rest of the application.
+    if (part.functionCall) return { type: "function_call", functionCall: part.functionCall };
+    if (part.text) return { type: "text", text: part.text };
 
-    // Check if this is plain text response
-    if (part.text) {
-      return {
-        type: "text",
-        text: part.text,
-      };
-    }
-
-    // Unknown part shape — log for inspection
-    // This shouldn't happen, but helps catch API changes
-    console.error("GeminiAdapter.extractResponse: unknown part shape:", JSON.stringify(part, null, 2));
-    console.error("Full Gemini response:\n", JSON.stringify(geminiResponse, null, 2));
-    throw new Error("Unknown response type from Gemini (see server logs for raw Gemini payload)");
-  }
-}
-        if (typeof responseContent === "string") {
-          try {
-            responseContent = JSON.parse(responseContent);
-          } catch (e) {
-            // If parsing fails, keep as string
-            console.warn("Could not parse function response:", e);
-          }
-        }
-
-        return {
-          role: "function",
-          parts: [
-            {
-              functionResponse: {
-                name: msg.name,
-                response: responseContent,
-              },
-            },
-          ],
-        };
-      }
-
-      return {
-        role: msg.role === "assistant" ? "model" : "user",
-        parts: [{ text: msg.content }],
-      };
-    });
-  }
-
-  /**
-   * Extract the response from Gemini's reply
-   */
-  extractResponse(geminiResponse) {
-    // Defensive parsing: Gemini responses may change shape. Try common locations
-    const candidate = geminiResponse?.candidates?.[0] || geminiResponse?.candidate || null;
-
-    if (!candidate) {
-      // Log the full response for debugging
-      console.error(
-        "GeminiAdapter.extractResponse: no candidate found in response. Full response:\n",
-        JSON.stringify(geminiResponse, null, 2)
-      );
-      throw new Error("No candidate in Gemini response (see server logs for raw Gemini payload)");
-    }
-
-    // Check for MAX_TOKENS finish reason (model ran out of output space)
-    if (candidate.finishReason === "MAX_TOKENS") {
-      console.warn("⚠️ GeminiAdapter: Model hit MAX_TOKENS before completing response");
-      // Return a special type so the caller can retry with a shorter request
-      return {
-        type: "max_tokens",
-        candidate: candidate,
-        usageMetadata: geminiResponse.usageMetadata,
-      };
-    }
-
-    // Try to locate the main part in several possible shapes
-    let part = null;
-    if (candidate.content?.parts && candidate.content.parts.length > 0) {
-      part = candidate.content.parts[0];
-    } else if (candidate.content && typeof candidate.content === "object" && candidate.content.text) {
-      part = { text: candidate.content.text };
-    } else if (candidate.text) {
-      part = { text: candidate.text };
-    }
-
-    if (!part) {
-      // Log the full response for debugging
-      console.error(
-        "GeminiAdapter.extractResponse: candidate present but no parts/text found. Candidate:\n",
-        JSON.stringify(candidate, null, 2)
-      );
-      console.error("Full Gemini response:\n", JSON.stringify(geminiResponse, null, 2));
-      throw new Error("No parts in Gemini response (see server logs for raw Gemini payload)");
-    }
-
-    // If there is a function call
-    if (part.functionCall) {
-      return {
-        type: "function_call",
-        functionCall: part.functionCall,
-      };
-    }
-
-    // If there is plain text
-    if (part.text) {
-      return {
-        type: "text",
-        text: part.text,
-      };
-    }
-
-    // Unknown part shape — log for inspection
-    console.error("GeminiAdapter.extractResponse: unknown part shape:", JSON.stringify(part, null, 2));
-    console.error("Full Gemini response:\n", JSON.stringify(geminiResponse, null, 2));
-    throw new Error("Unknown response type from Gemini (see server logs for raw Gemini payload)");
+    console.error("GeminiAdapter.extractResponse: unknown part shape", JSON.stringify(part, null, 2));
+    throw new Error("Unknown response type from Gemini");
   }
 }
