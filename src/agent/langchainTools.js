@@ -7,31 +7,31 @@ import { memoryStore } from "../services/memoryService.js";
  * ========================================
  * LANGCHAIN TOOLS - LLM Action Functions
  * ========================================
- * 
+ *
  * This module defines all the tools available to the LLM agent.
  * Tools are functions that the LLM can call to take actions in the system.
- * 
+ *
  * TOOL CATEGORIES:
  * 1. MEMORY TOOLS - Save and search user facts and conversation notes
  * 2. TASK TOOLS - Create, update, delete, and retrieve tasks
  * 3. TIME TOOLS - Get current date/time information
- * 
+ *
  * Each tool is a DynamicStructuredTool with:
  * - name: Unique identifier for the tool
  * - description: What the tool does (used by LLM to decide when to use it)
  * - schema: Zod schema defining input parameters and their types
  * - func: The actual function that executes when the tool is called
- * 
+ *
  * Tools communicate with the LLM using TOML-like format for structured responses:
  * ok=true/false, msg="...", count=N, etc.
  */
 
 /**
  * Factory function to create all available LangChain tools
- * 
+ *
  * @param {string} userId - The user's MongoDB _id (tools are bound to specific user)
  * @returns {Array<DynamicStructuredTool>} Array of all available tools
- * 
+ *
  * Tools created:
  * - get_current_time: Returns current date, time, and timestamp
  * - save_user_fact: Store personal facts about the user (profile, preferences, skills)
@@ -71,10 +71,10 @@ ts="${now.toISOString()}"`;
      * ==================
      * Save important facts about the user that should be remembered long-term.
      * Examples: name, location, education, work, preferences, skills
-     * 
+     *
      * These facts are PRIMARY MEMORY - the user's profile and preferences.
      * They're stored with vector embeddings for semantic search.
-     * 
+     *
      * Strategy: Keep facts concise (2-5 words) for efficiency
      * Impact: Facts are retrieved automatically in future conversations
      */
@@ -123,10 +123,10 @@ err="${error.message}"`;
      * ==================
      * Save important information learned during the conversation.
      * Examples: user decisions, plans, requests, topics discussed, preferences stated
-     * 
+     *
      * These are CONVERSATION MEMORY - contextual info for the current/future conversations.
      * Different from user facts - these are temporal and may change.
-     * 
+     *
      * Strategy: Notes are 5-20 words, capture key decision points or agreements
      * Impact: Notes help agent understand what was discussed if conversation is resumed
      */
@@ -159,16 +159,16 @@ err="${error.message}"`;
      * MEMORY TOOL: search_memories
      * ==================
      * Search through saved memories using semantic search.
-     * 
+     *
      * This tool allows the LLM to recall information that isn't in recent context.
      * The search uses vector embeddings for semantic matching - meaning it finds
      * memories that are SIMILAR IN MEANING, not just exact matches.
-     * 
+     *
      * Categories:
      * - primary: User facts (profile, education, work, preferences)
      * - conversation: Past discussions, decisions, plans
      * - all: Search both primary and conversation memories
-     * 
+     *
      * Returns top 5 matching memories with their type and importance score
      */
     new DynamicStructuredTool({
@@ -227,14 +227,14 @@ err="${error.message}"`;
      * TASK TOOL: add_task
      * ==================
      * Create a new task in the user's task list.
-     * 
+     *
      * Parameters:
      * - name: Task description (e.g., "Buy groceries", "Finish project report")
      * - tag: Optional category (e.g., "work", "personal", "shopping")
      * - deadline: ISO 8601 date string (e.g., "2024-12-25")
      *   The LLM should interpret relative dates: "tomorrow" → ISO date
      * - recurrence: Optional recurring pattern (daily, weekly, monthly, yearly)
-     * 
+     *
      * The LLM handles date calculation automatically - it should never ask user
      * Example: "next Monday" or "in 3 days" should be converted to ISO date
      */
@@ -298,13 +298,13 @@ int=${task.recurrence.interval}`;
      * TASK TOOL: get_tasks
      * ==================
      * Retrieve tasks matching specified filters.
-     * 
+     *
      * Filters:
      * - tag: Filter by category (e.g., "work", "personal")
      * - completed: Filter by completion status (true/false)
      * - dueBefore: Get tasks due before a specific date
      * - dueAfter: Get tasks due after a specific date
-     * 
+     *
      * All filters are optional - omit to match all tasks
      */
     new DynamicStructuredTool({
@@ -353,13 +353,13 @@ int=${task.recurrence.interval}`;
      * TASK TOOL: update_task
      * ==================
      * Modify an existing task.
-     * 
+     *
      * Can update any combination of:
      * - name: Change task description
      * - tag: Change category
      * - deadline: Change due date
      * - completed: Mark as done/undone
-     * 
+     *
      * Only the fields provided are updated
      */
     new DynamicStructuredTool({
@@ -429,7 +429,7 @@ int=${task.recurrence.interval}`;
      * ==================
      * Get all tasks due within a specified number of days.
      * Useful for showing the user what's coming up soon.
-     * 
+     *
      * @param days - Number of days to look ahead (default: 7)
      * Returns tasks sorted by due date (earliest first)
      */

@@ -4,27 +4,27 @@ import { User } from "../models/index.js";
  * ========================================
  * VECTOR STORE - Semantic Memory Search
  * ========================================
- * 
+ *
  * This module implements a vector-based storage system for memories,
  * enabling semantic search - finding memories by MEANING rather than exact keyword match.
- * 
+ *
  * HOW IT WORKS:
  * 1. TEXT → VECTOR: Convert memory text to a numerical vector (embedding)
  * 2. SIMILARITY SEARCH: Compare incoming queries against stored memories
  * 3. COSINE SIMILARITY: Measure how similar vectors are (0 = opposite, 1 = identical)
  * 4. RANKING: Return top N memories sorted by similarity score
- * 
+ *
  * EXAMPLE:
  * User saves: "I work at Google as a software engineer"
  * Later user asks: "Where do you work?"
  * System generates embeddings and finds the saved memory because they're semantically similar
- * 
+ *
  * MEMORY TYPES:
  * - PRIMARY MEMORY: User facts (profile, education, work, preferences, skills)
  *   Importance: 7-10 (high - these are stable facts about the user)
  * - CONVERSATION MEMORY: Past discussions, decisions, plans
  *   Importance: 1-6 (lower - these are contextual to specific conversations)
- * 
+ *
  * STORAGE:
  * Memories are stored directly in the User document:
  * User.memories = [
@@ -42,11 +42,11 @@ import { User } from "../models/index.js";
 
 /**
  * Normalize text for embedding by removing stop words
- * 
+ *
  * OPTIMIZATION STRATEGY:
  * Stop words ("the", "a", "is", etc.) don't add semantic value but waste vector space.
  * Removing them focuses the embedding on meaningful keywords.
- * 
+ *
  * PROCESS:
  * 1. Convert to lowercase
  * 2. Remove punctuation
@@ -54,11 +54,11 @@ import { User } from "../models/index.js";
  * 4. Remove stop words (English + Hebrew)
  * 5. Filter words shorter than 2 characters
  * 6. Join remaining words
- * 
+ *
  * EXAMPLE:
  * Input: "I work at Google as a software engineer"
  * Output: "work Google software engineer"
- * 
+ *
  * @param {string} text - Original text to normalize
  * @returns {string} Normalized text with only meaningful keywords
  */
@@ -188,34 +188,34 @@ function normalizeTextForEmbedding(text) {
  * ==================
  * EMBEDDING GENERATION - Convert text to numeric vectors
  * ==================
- * 
+ *
  * This function converts text into a fixed-size numeric vector (embedding).
  * The embedding captures the semantic meaning of the text.
- * 
+ *
  * CURRENT IMPLEMENTATION: Deterministic local embedding
  * - Fast: No API calls needed
  * - Deterministic: Same text always produces same vector
  * - Development-friendly: Works without external dependencies
- * 
+ *
  * TODO FOR PRODUCTION:
  * - Replace with Google Gemini Embeddings API for higher quality
  * - Use embeddings-004 model for better semantic understanding
- * 
+ *
  * HOW IT WORKS:
  * 1. Normalize text (remove stop words, keep keywords only)
  * 2. Hash each character into vector positions
  * 3. Apply sine function for variance
  * 4. Normalize the vector to unit length
- * 
+ *
  * The result is a 128-dimensional vector where:
  * - Similar texts have similar vectors
  * - Dot product of normalized vectors = similarity score
- * 
+ *
  * VECTOR SIZE: 128 dimensions
  * - Balance between precision and performance
  * - Large enough for meaningful distinctions
  * - Small enough for fast similarity calculations
- * 
+ *
  * @param {string} text - Text to convert to embedding vector
  * @param {number} dim - Vector dimension (default: 128)
  * @returns {number[]} Normalized vector of length dim, with values between -1 and 1
@@ -233,7 +233,7 @@ function generateDeterministicVector(text, dim = 128) {
   // Each character contributes to multiple positions for better distribution
   for (let i = 0; i < keywords.length; i++) {
     const code = keywords.charCodeAt(i);
-    const idx = i % dim;  // Wrap around to fit into vector dimensions
+    const idx = i % dim; // Wrap around to fit into vector dimensions
     vec[idx] = (vec[idx] + (code % 97)) / 2 + Math.sin(code) * 0.0001;
   }
 
@@ -246,29 +246,29 @@ function generateDeterministicVector(text, dim = 128) {
  * ==================
  * COSINE SIMILARITY - Measure vector similarity
  * ==================
- * 
+ *
  * Calculates how similar two vectors are using cosine similarity.
- * 
+ *
  * FORMULA:
  * similarity = (a · b) / (||a|| * ||b||)
- * 
+ *
  * RESULT INTERPRETATION:
  * - 1.0 = identical vectors (perfect match)
  * - 0.7+ = highly similar (good match)
  * - 0.5 = moderately similar
  * - 0.0 = orthogonal (no relation)
  * - negative = opposite direction (rare)
- * 
+ *
  * We use cosine similarity because it's:
  * - SCALE-INVARIANT: ||a|| and ||b|| normalize the lengths
  * - DIRECTION-FOCUSED: Only cares about angle, not magnitude
  * - FAST: Just dot product and normalization
- * 
+ *
  * EXAMPLE:
  * "I work at Google" → vec1
  * "Where do you work?" → vec2
  * cosineSimilarity(vec1, vec2) ≈ 0.8 (high match - should retrieve this memory)
- * 
+ *
  * @param {number[]} a - First vector
  * @param {number[]} b - Second vector
  * @returns {number} Similarity score from -1 to 1 (typically 0 to 1)
@@ -276,9 +276,9 @@ function generateDeterministicVector(text, dim = 128) {
 function cosineSimilarity(a, b) {
   if (!a || !b || a.length !== b.length) return 0;
 
-  let dot = 0;    // Dot product: sum of element-wise multiplication
-  let na = 0;     // Squared magnitude of vector a
-  let nb = 0;     // Squared magnitude of vector b
+  let dot = 0; // Dot product: sum of element-wise multiplication
+  let na = 0; // Squared magnitude of vector a
+  let nb = 0; // Squared magnitude of vector b
 
   // Calculate dot product and squared magnitudes in one pass
   for (let i = 0; i < a.length; i++) {
@@ -297,22 +297,22 @@ function cosineSimilarity(a, b) {
  * ==================
  * UPDATE USER EMBEDDING - Aggregate all memory vectors
  * ==================
- * 
+ *
  * Creates a weighted average of all user memories' embeddings.
  * This provides a "snapshot" of the user's profile in vector form.
- * 
+ *
  * WEIGHTING STRATEGY:
  * Higher importance memories have more influence on the user embedding.
  * This means important facts shape the user's overall "profile vector."
- * 
+ *
  * USE CASE:
  * When searching memories, we can compare against the user's overall
  * embedding, not just individual memories - useful for general context.
- * 
+ *
  * @param {string} userId - User ID to update embedding for
  * @param {number} retries - Retry count for database contention (default: 3)
  * @returns {Promise<boolean>} True if successful, false if user not found
- * 
+ *
  * PROCESS:
  * 1. Load user's all memories from database
  * 2. Weight each embedding by its importance score

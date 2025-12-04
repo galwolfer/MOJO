@@ -10,23 +10,23 @@ import { config } from "../config/env.js";
  * ========================================
  * AGENT CONTROLLER - Core Orchestrator
  * ========================================
- * 
+ *
  * The AgentController is the heart of MOJO's intelligent assistant system.
  * It orchestrates the entire flow:
- * 
+ *
  * 1. MEMORY MANAGEMENT - Saves user/assistant messages and retrieves conversation history
  * 2. CONTEXT BUILDING - Loads user profile and retrieves relevant semantic memories
  * 3. PROMPT ENGINEERING - Builds personalized system prompts with user context
  * 4. LLM AGENT LOOP - Manages multi-turn interactions with tool calling
  * 5. TOOL EXECUTION - Handles memory operations, tasks, and time-related queries
- * 
- * FLOW: User Message → Save Message → Load Context → Build Prompt → 
+ *
+ * FLOW: User Message → Save Message → Load Context → Build Prompt →
  *       Agent Loop (LLM + Tools) → Save Response → Return Result
  */
 export class AgentController {
   /**
    * Constructor - Initialize LangChain LLM and agent settings
-   * 
+   *
    * @param {string} apiKey - Google Gemini API key
    */
   constructor(apiKey) {
@@ -50,10 +50,10 @@ export class AgentController {
    * ==========================================================================
    * MAIN METHOD: Process a user message with semantic memory and tool calling
    * ==========================================================================
-   * 
+   *
    * This is the primary entry point for handling user messages. It implements
    * the complete agent loop with memory retrieval and LLM tool calling.
-   * 
+   *
    * ALGORITHM:
    * 1. Save the incoming user message to MongoDB (Session model)
    * 2. Retrieve conversation history from cache/database
@@ -66,7 +66,7 @@ export class AgentController {
    *    - If no tool calls, return the response
    * 8. Save assistant response to database
    * 9. Return result to caller
-   * 
+   *
    * @param {string} sessionId - Unique session identifier
    * @param {string} userMessage - The user's input text
    * @param {string} userId - User's MongoDB _id (from auth token)
@@ -213,7 +213,7 @@ export class AgentController {
             // Execute each tool call sequentially
             for (const toolCall of response.tool_calls) {
               console.log(`[AgentController] Executing tool: ${toolCall.name}`);
-              
+
               // Find the tool in our tools array
               const tool = tools.find((t) => t.name === toolCall.name);
 
@@ -294,7 +294,7 @@ export class AgentController {
 
   /**
    * Reset a session - Clears all messages from a session
-   * 
+   *
    * @param {string} sessionId - Session to reset
    * @param {string} userId - User's ID (for authorization check)
    * @returns {Promise<Object>} { success, message }
@@ -306,7 +306,7 @@ export class AgentController {
 
   /**
    * Retrieve full session history
-   * 
+   *
    * @param {string} sessionId - Session to retrieve
    * @param {string} userId - User's ID (for authorization check)
    * @returns {Promise<Array>} Array of message objects { role, content, timestamp }
