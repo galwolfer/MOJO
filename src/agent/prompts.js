@@ -1,7 +1,33 @@
 /**
- * System Prompts for the Agent
+ * ========================================
+ * SYSTEM PROMPTS - LLM Behavior Configuration
+ * ========================================
+ * 
+ * This module defines the system prompts that guide the LLM's behavior.
+ * System prompts are foundational instructions that the LLM follows
+ * throughout the conversation.
+ * 
+ * PROMPT ENGINEERING STRATEGY:
+ * 1. BASE PROMPT - Core rules, capabilities, response format
+ * 2. USER CONTEXT - Personalization (name, tone, persona)
+ * 3. MEMORY CONTEXT - Relevant past facts and discussions
+ * 
+ * The LLM reads the system prompt before each response and uses it
+ * to understand its role, capabilities, and how to behave.
  */
 
+/**
+ * BASE SYSTEM PROMPT - Core instructions for the LLM
+ * 
+ * Defines:
+ * - Agent identity (MOJO: helpful AI assistant)
+ * - Response language (user's language: Hebrew or English)
+ * - Tool capabilities (memory, tasks, time)
+ * - Response format (TOML-like for tools, natural language for users)
+ * - Date handling rules (automatic calculation of relative dates)
+ * 
+ * Template uses backticks for date injection - replaced with current time
+ */
 export const SYSTEM_PROMPT = `You are MOJO, a helpful AI assistant for task management.
 
 RULES:
@@ -21,12 +47,43 @@ RECUR: "daily"/"כל יום"→{type:"daily",interval:1} | "weekly"/"כל שבו
 `;
 
 /**
- * Build system prompt with user context
+ * Build a personalized system prompt with user-specific context
+ * 
+ * This function takes the base system prompt and injects:
+ * 1. USER IDENTIFICATION - userId and optionally user's name
+ * 2. PERSONALITY SETTINGS - How to respond (tone and persona)
+ * 3. MEMORY CONTEXT - Recent relevant memories injected into the prompt
+ * 
+ * PERSONALIZATION TIERS:
+ * - Tone: Sets communication style (friendly, professional, casual, etc.)
+ * - Persona: Optional roleplay instruction (e.g., "act as a coach")
+ * - Memories: Relevant facts and past discussions automatically retrieved
+ * 
+ * The final prompt tells the LLM:
+ * - Who it's talking to (user identification)
+ * - How to talk to them (tone/persona)
+ * - What to remember about them (memory context)
+ * 
+ * @param {Object} userProfile - User preferences { name, tone, persona }
+ * @param {string} userId - User's MongoDB _id (for tool binding)
+ * @param {string} memoryContext - Formatted memories to inject into prompt
+ * @returns {string} Complete personalized system prompt
+ * 
+ * Example output:
+ * ```
+ * You are MOJO, a helpful AI assistant...
+ * [base rules]
+ * PERSONALITY: Act as a friendly coach. Tone: warm, approachable, conversational.
+ * User: 5f7a8b9c0d1e2f3g4h5i6j (Ofek)
+ * Memory: studies at Bar Ilan; likes coding; 
+ * Past: discussed project timeline yesterday;
+ * ```
  */
 export function buildSystemPromptWithUserContext(userProfile, userId, memoryContext = "") {
   let prompt = SYSTEM_PROMPT;
 
-  // Add user-specific personality and tone
+  // ADD PERSONALITY AND TONE CUSTOMIZATION
+  // This tells the LLM how to interact with this specific user
   if (userProfile?.persona || userProfile?.tone) {
     prompt += `\nPERSONALITY:`;
     
@@ -35,6 +92,7 @@ export function buildSystemPromptWithUserContext(userProfile, userId, memoryCont
     }
     
     if (userProfile.tone) {
+      // Map tone keywords to descriptive language for the LLM
       const toneMap = {
         friendly: "warm, approachable, conversational",
         professional: "polished, business-like, efficient",
@@ -46,14 +104,17 @@ export function buildSystemPromptWithUserContext(userProfile, userId, memoryCont
     }
   }
 
-  // Add user identification
+  // ADD USER IDENTIFICATION
+  // Helps the LLM know who it's talking to
   prompt += `\nUser:${userId}`;
 
   if (userProfile?.name) {
     prompt += `(${userProfile.name})`;
   }
 
-  // Add memory context
+  // ADD MEMORY CONTEXT
+  // Injects relevant facts and past discussions into the system message
+  // This helps the LLM "remember" without token bloat from conversation history
   if (memoryContext?.trim()) {
     prompt += `\n${memoryContext}`;
   }
