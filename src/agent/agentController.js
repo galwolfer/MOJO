@@ -4,6 +4,7 @@ import { memoryStore } from "../services/memoryService.js";
 import { createLangChainTools } from "./langchainTools.js";
 import { buildSystemPromptWithUserContext } from "./prompts.js";
 import { User } from "../models/index.js";
+import { config } from "../config/env.js";
 
 /**
  * Agent Controller - The central controller for the agent
@@ -14,9 +15,9 @@ export class AgentController {
     this.apiKey = apiKey;
     this.maxIterations = 3; // Maximum iterations to prevent infinite loops
 
-    // Initialize LangChain LLM
+    // Initialize LangChain LLM (model configurable via GEMINI_MODEL env var)
     this.llm = new ChatGoogleGenerativeAI({
-      model: "gemini-2.0-flash-exp",
+      model: config.geminiModel || "gemini-2.0-flash",
       apiKey: apiKey,
       temperature: 0.2,
       maxOutputTokens: 768,

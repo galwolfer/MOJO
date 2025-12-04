@@ -1,11 +1,12 @@
 import fetch from "node-fetch";
+import { config } from "../config/env.js";
 
 /**
  * Gemini API Adapter
  * Adapter for working with the Google Gemini API
  */
 export class GeminiAdapter {
-  constructor(apiKey, model = "gemini-2.5-flash") {
+  constructor(apiKey, model = config.geminiModel || "gemini-2.0-flash") {
     this.apiKey = apiKey;
     this.model = model;
     this.baseUrl = "https://generativelanguage.googleapis.com/v1beta/models";
