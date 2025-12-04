@@ -437,7 +437,10 @@ export async function storePrimaryMemory(userId, memoryText, options = {}) {
     user.memoryStats.primaryCount = user.memories.filter((m) => m.category === "primary").length;
     user.memoryStats.lastMemoryUpdate = new Date();
 
-    await user.save();
+    // Save user document with validateBeforeSave: false to bypass profile validation
+    // This allows memories to be saved even if the user's profile has invalid values
+    // (e.g., tone not in enum). Memory validation is still intact.
+    await user.save({ validateBeforeSave: false });
 
     // Get the newly added memory's ID
     const newMemory = user.memories[user.memories.length - 1];
@@ -516,7 +519,10 @@ export async function storeConversationMemory(userId, memoryText, options = {}) 
     user.memoryStats.conversationCount = user.memories.filter((m) => m.category === "conversation").length;
     user.memoryStats.lastMemoryUpdate = new Date();
 
-    await user.save();
+    // Save user document with validateBeforeSave: false to bypass profile validation
+    // This allows memories to be saved even if the user's profile has invalid values
+    // (e.g., tone not in enum). Memory validation is still intact.
+    await user.save({ validateBeforeSave: false });
 
     // Get the newly added memory's ID
     const newMemory = user.memories[user.memories.length - 1];
