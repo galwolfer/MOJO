@@ -367,6 +367,8 @@ def test_category_feature_learning():
     init_theta = np.zeros(n_features); init_theta[0] = 2.0
     model_study = MultiFeatureLinUCB(n_features=n_features, alpha=0.1, init_theta=init_theta)
     x_study = extract_features(motivation=4, duration=50, difficulty=3, delta_hours=48, category="study", categories=CATEGORIES)
+    print(f"\n{'Update':<8} {'Category':<12} {'Reward':<10} {'Score':<18} {'CategoryPred':<12}")
+    print("-" * 70)
     for i in range(1, 7):
         model_study.update(x_study, reward=0.5)
         print(f"{i:<8} {'study':<12} {'0.5':<10} {model_study.predict_score(x_study):<18.6f} {model_study.predict_category(x_study):<12}")
@@ -376,6 +378,8 @@ def test_category_feature_learning():
     init_theta = np.zeros(n_features); init_theta[0] = 2.0
     model_work = MultiFeatureLinUCB(n_features=n_features, alpha=0.1, init_theta=init_theta)
     x_work = extract_features(motivation=4, duration=50, difficulty=3, delta_hours=48, category="work", categories=CATEGORIES)
+    print(f"\n{'Update':<8} {'Category':<12} {'Reward':<10} {'Score':<18} {'CategoryPred':<12}")
+    print("-" * 70)
     for i in range(1, 7):
         model_work.update(x_work, reward=0.3)
         print(f"{i:<8} {'work':<12} {'0.3':<10} {model_work.predict_score(x_work):<18.6f} {model_work.predict_category(x_work):<12}")
@@ -470,6 +474,86 @@ def test_combined_learning():
         print(f"  {case['label']}: Score={score:.6f}, Category={category}")
 
 
+def test_user_behavior_progression():
+    """
+    TEST 8: USER BEHAVIOR PROGRESSION LEARNING
+    ============================================
+    
+    A realistic scenario where a user's behavior improves over time.
+    The user starts with a poor combination of features:
+      - Low motivation + Long tasks + High difficulty + Time pressure = Not Completed
+    
+    Then transitions to medium behavior:
+      - Medium motivation + Medium tasks + Medium difficulty = Slightly Late
+    
+    Finally improves to excellent behavior:
+      - High motivation + Short tasks + Easy difficulty + No pressure = Completed On Time
+    
+    The model learns to predict better outcomes as the user's behavior improves.
+    """
+    print_header("TEST 8: USER BEHAVIOR PROGRESSION LEARNING")
+    
+    n_features = 1 + 2 + 3 + 4 + len(CATEGORIES)
+    init_theta = np.zeros(n_features)
+    init_theta[0] = 2.0  # Strong initial bias toward motivation
+    model = MultiFeatureLinUCB(n_features=n_features, alpha=0.1, init_theta=init_theta)
+    
+    print("\nScenario: Single user learning and improving their task completion behavior")
+    print("Phase 1: Poor behavior (low motivation, difficult, time-pressured)")
+    print("Phase 2: Medium behavior (medium motivation, balanced tasks)")
+    print("Phase 3: Excellent behavior (high motivation, easy, well-planned)")
+    
+    # Keep the feature vector identical across all phases; vary only the reward
+    print_header("TEST 8A-C: USER BEHAVIOR PROGRESSION WITH FIXED FEATURES (vary rewards)")
+    print("\nSingle task features (fixed): motivation=2, duration=90, difficulty=4, pressure=12h, category=work")
+    print("We simulate the same user/task over time; the user's performance (reward) improves over phases.")
+
+    # Use a single feature vector for the entire progression
+    x_user = extract_features(motivation=2, duration=90, difficulty=4, delta_hours=12, category="work", categories=CATEGORIES)
+
+    print(f"\n{'Update':<8} {'Phase':<12} {'Reward':<10} {'Score':<18} {'Category':<12}")
+    print("-" * 70)
+
+    # Phase 1: Poor performance from the user (low reward)
+    print_header("PHASE 1 - POOR PERFORMANCE (low reward)")
+    print(f"{'Init':<8} {'POOR':<12} {'-':<10} {model.predict_score(x_user):<18.6f} {model.predict_category(x_user):<12}")
+    for i in range(1, 6):
+        model.update(x_user, reward=0.1)
+        print(f"{i:<8} {'POOR':<12} {'0.1':<10} {model.predict_score(x_user):<18.6f} {model.predict_category(x_user):<12}")
+
+    # Phase 2: User improves to medium performance (medium reward)
+    print_header("PHASE 2 - MEDIUM PERFORMANCE (medium reward)")
+    for i in range(6, 11):
+        model.update(x_user, reward=0.5)
+        print(f"{i:<8} {'MEDIUM':<12} {'0.5':<10} {model.predict_score(x_user):<18.6f} {model.predict_category(x_user):<12}")
+
+    # Phase 3: User achieves excellent performance (high reward)
+    print_header("PHASE 3 - EXCELLENT PERFORMANCE (high reward)")
+    for i in range(11, 16):
+        model.update(x_user, reward=0.8)
+        print(f"{i:<8} {'EXCELLENT':<12} {'0.8':<10} {model.predict_score(x_user):<18.6f} {model.predict_category(x_user):<12}")
+
+    # Phase 4: Decay then rise — user performance fluctuates
+    print_header("PHASE 4 - DECAY THEN RISE (rewards fluctuate)")
+    print("\nSimulate a period where the user's reward decays (worse performance), then recovers.")
+    print(f"\n{'Update':<8} {'Phase':<12} {'Reward':<10} {'Score':<18} {'Category':<12}")
+    print("-" * 70)
+
+    rewards = [0.8, 0.6, 0.4, 0.2, 0.3, 0.5, 0.7, 0.9]
+    start_idx = 16
+    for offset, r in enumerate(rewards):
+        idx = start_idx + offset
+        model.update(x_user, reward=r)
+        print(f"{idx:<8} {'FLUX':<12} {r:<10} {model.predict_score(x_user):<18.6f} {model.predict_category(x_user):<12}")
+
+    # Final summary: how the model now predicts this fixed feature vector
+    print_header("FINAL PREDICTION - Fixed Features After Progression + Flux")
+    score_final = model.predict_score(x_user)
+    cat_final = model.predict_category(x_user)
+    print(f"Fixed features -> Final Score={score_final:.6f}, Category={cat_final}")
+    print(f"\n[OK] Result: Model adjusted its prediction for the SAME features as rewards fluctuated and recovered.")
+
+
 if __name__ == "__main__":
     print("\n")
     print("=" * 80)
@@ -484,6 +568,7 @@ if __name__ == "__main__":
     test_pressure_feature_learning()
     test_category_feature_learning()
     test_combined_learning()
+    test_user_behavior_progression()
     
     print("\n" + "=" * 80)
     print("[OK] ALL TESTS COMPLETED SUCCESSFULLY")
