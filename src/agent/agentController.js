@@ -105,7 +105,7 @@ export class AgentController {
       const relevantMemories = await memoryStore.retrieveRelevantMemories(
         userId,
         userMessage,
-        5 // Top 5 memories (reduced from 10 to save tokens)
+        5 
       );
 
       // Format memories in compact structure to minimize token usage
