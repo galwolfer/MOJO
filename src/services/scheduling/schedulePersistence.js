@@ -1,7 +1,20 @@
-// src/services/schedulePersistence.js
-// Persistence utilities for task schedules.
+/**
+ * @fileoverview Schedule Persistence Service
+ * @module services/scheduling/schedulePersistence
+ * 
+ * Handles database persistence for generated task schedules.
+ * Manages the lifecycle of scheduled sessions in the database.
+ * 
+ * Key responsibilities:
+ * - Save generated plans to TaskSchedule collection
+ * - Clear outdated future sessions before saving new plans
+ * - Preserve completed sessions for historical records
+ * - Support schedule regeneration without data loss
+ * 
+ * @requires models/TaskSchedule - TaskSchedule database model
+ */
 
-import { TaskSchedule } from "../models/TaskSchedule.js";
+import { TaskSchedule } from "../../models/TaskSchedule.js";
 
 /**
  * Persist a generated plan to the database.

@@ -1,8 +1,23 @@
-// src/services/busyBlockService.js
-// CRUD operations for user busy blocks.
+/**
+ * @fileoverview Busy Block Service
+ * @module services/tasks/busyBlockService
+ * 
+ * Manages user-defined busy blocks (time slots when user is unavailable).
+ * These blocks are used by the scheduling algorithm to avoid conflicts.
+ * 
+ * Key responsibilities:
+ * - Create busy blocks with time validation
+ * - Retrieve busy blocks for a user within a date range
+ * - Delete existing busy blocks
+ * - Support the CSP scheduler by defining unavailable time slots
+ * 
+ * Examples of busy blocks: meetings, appointments, personal commitments
+ * 
+ * @requires models/BusyBlock - BusyBlock database model
+ */
 
-import { BusyBlock } from "../models/BusyBlock.js";
-import { startOfDay } from "../utils/dateUtils.js";
+import { BusyBlock } from "../../models/BusyBlock.js";
+import { startOfDay } from "../../utils/dateUtils.js";
 
 /**
  * Create a busy block for a user.

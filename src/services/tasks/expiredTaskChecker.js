@@ -1,11 +1,29 @@
-// src/services/expiredTaskChecker.js
-// Scheduled service to check for expired tasks and send push notifications
+/**
+ * @fileoverview Expired Task Checker Service
+ * @module services/tasks/expiredTaskChecker
+ * 
+ * Scheduled service that monitors task deadlines and handles expired tasks.
+ * Runs as a cron job to detect overdue tasks and notify users.
+ * 
+ * Key responsibilities:
+ * - Periodically scan for tasks past their due date
+ * - Send push notifications for expired tasks
+ * - Track notified tasks to avoid spam
+ * - Support CLI blocking for users with expired tasks
+ * - Allow users to extend or forfeit expired tasks
+ * 
+ * Default schedule: Every hour (configurable via EXPIRED_CHECK_CRON env var)
+ * 
+ * @requires node-cron - For scheduled job execution
+ * @requires models/Task - Task database model
+ * @requires services/notifications/pushNotification - Push notification service
+ */
 
 import cron from "node-cron";
-import Task from "../models/Task.js";
-import { User } from "../models/User.js";
-import { sendPushNotification } from "./pushNotification.js";
-import { logger } from "../utils/logger.js";
+import Task from "../../models/Task.js";
+import { User } from "../../models/User.js";
+import { sendPushNotification } from "../notifications/pushNotification.js";
+import { logger } from "../../utils/logger.js";
 
 // =============================================================================
 // CONFIGURATION

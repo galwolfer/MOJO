@@ -1,3 +1,28 @@
+/**
+ * @fileoverview Services Index & Coacher Algorithm
+ * @module services/index
+ * 
+ * Central export hub for all Mojo Coacher services and the core scoring algorithm.
+ * Re-exports services from subdirectories and provides the main task prioritization logic.
+ * 
+ * Key responsibilities:
+ * - Export team-specific placeholder services (Ofek, Gal)
+ * - Provide coacherAlgorithm for task scoring and prioritization
+ * - Bridge between database tasks and priority scoring algorithm
+ * - Convert task formats for compatibility with scoring engine
+ * 
+ * Services Directory Structure:
+ * - auth/      : Authentication and user management
+ * - tasks/     : Task CRUD and expired task handling
+ * - scheduling/: CSP planning and schedule persistence
+ * - ml/        : Machine learning predictions
+ * - notifications/: Push notification delivery
+ * - telemetry/ : Event logging and analytics
+ * 
+ * @requires models/Task - Task database model
+ * @requires algorithms/priority/priority - Task scoring algorithm
+ */
+
 // ==================== OFEK — SERVICES (START) ====================
 export const ofekService = {
   // Example: fetch items from a DB (mocked)
@@ -26,7 +51,6 @@ export const galService = {
 // ==================== GAL — SERVICES (END) =======================
 
 // ==================== JONI — SERVICES (START) ====================
-// src/services/index.js
 import mongoose from "mongoose";
 import Task from "../models/Task.js";
 import { scoreActivities } from "../algorithms/priority/priority.js";

@@ -6,17 +6,17 @@ import { connectDatabase } from "./config/database.js";
 import { ansi, paint, theme } from "./utils/cliTheme.js";
 
 // Services
-import { registerUser, loginUser } from "./services/authService.js";
-import { getUserById, updateRoutineSettings } from "./services/userService.js";
-import { createTask, getTasksForUser, checkSuggestionFollowed, updateScheduleEntryStatus } from "./services/taskService.js";
-import { generatePlan, savePlan, getUpcomingSessions } from "./services/planningService.js";
-import { createBusyBlock, getUpcomingBusyBlocks } from "./services/busyBlockService.js";
+import { registerUser, loginUser } from "./services/auth/authService.js";
+import { getUserById, updateRoutineSettings } from "./services/auth/userService.js";
+import { createTask, getTasksForUser, checkSuggestionFollowed, updateScheduleEntryStatus } from "./services/tasks/taskService.js";
+import { generatePlan, savePlan, getUpcomingSessions } from "./services/scheduling/planningService.js";
+import { createBusyBlock, getUpcomingBusyBlocks } from "./services/tasks/busyBlockService.js";
 import { coacherAlgorithm } from "./services/index.js";
 import { suggestTaskFromProfile } from "./algorithms/priority/suggestions.js";
-import { logEvent } from "./services/telemetry.js";
-import { getRoutineSettings, describeRoutineWindows } from "./services/routineBlocks.js";
+import { logEvent } from "./services/telemetry/telemetry.js";
+import { getRoutineSettings, describeRoutineWindows } from "./services/scheduling/routineBlocks.js";
 import { startOfDay, addDays } from "./utils/dateUtils.js";
-import { findExpiredTasksForUser } from "./services/expiredTaskChecker.js";
+import { findExpiredTasksForUser } from "./services/tasks/expiredTaskChecker.js";
 import Task from "./models/Task.js";
 import { TaskSchedule } from "./models/TaskSchedule.js";
 

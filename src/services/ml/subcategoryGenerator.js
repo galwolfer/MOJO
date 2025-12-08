@@ -1,5 +1,19 @@
-// src/services/subcategoryGenerator.js
-// Generate a per-user subcategory label from task text/history.
+/**
+ * @fileoverview Subcategory Generator Service
+ * @module services/ml/subcategoryGenerator
+ * 
+ * Generates personalized subcategory labels for tasks based on text analysis.
+ * Uses NLP techniques to extract meaningful keywords from task names/descriptions.
+ * 
+ * Key responsibilities:
+ * - Extract keywords from task text (removing stop words)
+ * - Generate unique subcategory labels per user
+ * - Analyze task history for pattern detection
+ * - Support task organization and filtering
+ * 
+ * Algorithm: TF-IDF-like keyword extraction with stop word filtering
+ * Output: { label: string, keywords: string[], confidence: number }
+ */
 
 const STOP_WORDS = new Set([
   "a",

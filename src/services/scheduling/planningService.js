@@ -1,14 +1,32 @@
-// src/services/planningService.js
-// Orchestrates task planning by gathering constraints and calling the CSP scheduler.
+/**
+ * @fileoverview Planning Service
+ * @module services/scheduling/planningService
+ * 
+ * Orchestrates intelligent task scheduling using Constraint Satisfaction Problem (CSP).
+ * Gathers user constraints, busy blocks, and task requirements to generate optimal schedules.
+ * 
+ * Key responsibilities:
+ * - Collect open tasks within planning horizon
+ * - Build constraint set (busy blocks, routines, preferences)
+ * - Invoke CSP scheduler algorithm
+ * - Persist generated plans to database
+ * - Log planning events for telemetry
+ * 
+ * Planning considers: due dates, effort, importance, user preferences, busy blocks
+ * 
+ * @requires models/Task - Task database model
+ * @requires models/TaskSchedule - Schedule database model
+ * @requires algorithms/csp/scheduler - CSP scheduling algorithm
+ */
 
-import Task from "../models/Task.js";
-import { TaskSchedule } from "../models/TaskSchedule.js";
-import { BusyBlock } from "../models/BusyBlock.js";
-import { startOfDay, addDays } from "../utils/dateUtils.js";
+import Task from "../../models/Task.js";
+import { TaskSchedule } from "../../models/TaskSchedule.js";
+import { BusyBlock } from "../../models/BusyBlock.js";
+import { startOfDay, addDays } from "../../utils/dateUtils.js";
 import { buildRoutineBusyBlocks } from "./routineBlocks.js";
 import { persistPlan } from "./schedulePersistence.js";
-import { planTasksCSP } from "../algorithms/csp/scheduler.js";
-import { logEvent } from "./telemetry.js";
+import { planTasksCSP } from "../../algorithms/csp/scheduler.js";
+import { logEvent } from "../telemetry/telemetry.js";
 
 /**
  * Generate a schedule for open tasks within a planning horizon.

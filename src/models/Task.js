@@ -2,7 +2,7 @@
 import mongoose from "mongoose";
 import { updateAllScores } from "../scripts/updateScores.js";
 import { detectTags } from "../algorithms/priority/tagging.js";
-import { generateSubCategory } from "../services/subcategoryGenerator.js";
+import { generateSubCategory } from "../services/ml/subcategoryGenerator.js";
 
 const taskSchema = new mongoose.Schema(
   {

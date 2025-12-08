@@ -1,5 +1,20 @@
-// src/services/subcategoryTelemetry.js
-// Thin wrappers around telemetry logging for the subcategory system.
+/**
+ * @fileoverview Subcategory Telemetry Service
+ * @module services/telemetry/subcategoryTelemetry
+ * 
+ * Specialized telemetry wrappers for the subcategory system.
+ * Tracks subcategory generation and user interactions with labels.
+ * 
+ * Key responsibilities:
+ * - Record subcategory generation events
+ * - Track user acceptance/rejection of suggested labels
+ * - Monitor subcategory system performance
+ * - Support analytics for subcategory accuracy improvement
+ * 
+ * Events logged: sub_category_generated, sub_category_accepted, sub_category_rejected
+ * 
+ * @requires services/telemetry/telemetry - Core telemetry service
+ */
 
 import { logEvent } from "./telemetry.js";
 

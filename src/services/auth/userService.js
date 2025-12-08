@@ -1,7 +1,19 @@
-// src/services/userService.js
-// Helpers for user profile and preferences.
+/**
+ * @fileoverview User Profile Service
+ * @module services/auth/userService
+ * 
+ * Helper functions for managing user profiles and preferences.
+ * Provides utilities to fetch and update user data without handling authentication.
+ * 
+ * Key responsibilities:
+ * - Retrieve user profiles by ID
+ * - Update user priority preferences
+ * - Manage user settings and configurations
+ * 
+ * @requires models/User - User database model
+ */
 
-import { User } from "../models/User.js";
+import { User } from "../../models/User.js";
 
 /**
  * Fetch fresh user document by ID.

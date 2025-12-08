@@ -1,7 +1,7 @@
 // src/middlewares/expiredTaskBlocker.js
 // Middleware that blocks users from using the app until they handle expired tasks
 
-import { userHasExpiredTasks, findExpiredTasksForUser } from "../services/expiredTaskChecker.js";
+import { userHasExpiredTasks, findExpiredTasksForUser } from "../services/tasks/expiredTaskChecker.js";
 
 /**
  * List of routes that are NOT blocked (user can always access these)

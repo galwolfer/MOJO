@@ -1,13 +1,29 @@
-// src/services/pushNotification.js
-// Push notification service for mobile notifications
-// 
-// This is a placeholder - implement with your preferred push service:
-// - Firebase Cloud Messaging (FCM) for Android/iOS
-// - Apple Push Notification Service (APNs) for iOS
-// - Expo Push Notifications if using React Native/Expo
-// - OneSignal, Pusher, etc.
+/**
+ * @fileoverview Push Notification Service
+ * @module services/notifications/pushNotification
+ * 
+ * Push notification service for delivering mobile notifications to users.
+ * Provides a unified interface for multiple push notification providers.
+ * 
+ * Key responsibilities:
+ * - Send push notifications to user devices
+ * - Support multiple providers (Firebase, Expo, OneSignal, APNs)
+ * - Handle device token registration
+ * - Manage notification preferences per user
+ * - Queue and retry failed notifications
+ * 
+ * Supported providers (configure via PUSH_SERVICE env var):
+ * - firebase: Firebase Cloud Messaging (FCM) for Android/iOS
+ * - expo: Expo Push Notifications for React Native/Expo apps
+ * - onesignal: OneSignal cross-platform notifications
+ * - apns: Apple Push Notification Service (iOS only)
+ * 
+ * Status: Placeholder implementation - configure with your preferred provider
+ * 
+ * @requires utils/logger - Logging utility
+ */
 
-import { logger } from "../utils/logger.js";
+import { logger } from "../../utils/logger.js";
 
 // =============================================================================
 // CONFIGURATION

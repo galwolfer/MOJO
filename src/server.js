@@ -5,9 +5,9 @@ import app from "./app.js";
 import { env } from "./config/env.js";
 import { connectDatabase } from "./config/database.js";
 import { logger } from "./utils/logger.js";
-import { startPriorityScheduler } from "./services/priorityScheduler.js";
-import { startPredictionScheduler } from "./services/scheduledPrediction.js";
-import { startExpiredTaskChecker } from "./services/expiredTaskChecker.js";
+import { startPriorityScheduler } from "./services/scheduling/priorityScheduler.js";
+import { startPredictionScheduler } from "./services/ml/scheduledPrediction.js";
+import { startExpiredTaskChecker } from "./services/tasks/expiredTaskChecker.js";
 
 const server = createServer(app);
 const port = Number(env.PORT ?? 3000);

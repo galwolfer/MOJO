@@ -1,11 +1,28 @@
-// src/services/taskService.js
-// Business logic for task CRUD, status sync, and related telemetry.
+/**
+ * @fileoverview Task Service
+ * @module services/tasks/taskService
+ * 
+ * Core business logic for task management in Mojo Coacher.
+ * Handles all CRUD operations, status synchronization, and task-related telemetry.
+ * 
+ * Key responsibilities:
+ * - Create, read, update, delete tasks
+ * - Sync task status with scheduled sessions
+ * - Generate and manage task subcategories
+ * - Record task-related telemetry events
+ * - Category tagging and classification
+ * 
+ * Task types supported: perfect, in_parts, leaky
+ * 
+ * @requires models/Task - Task database model
+ * @requires models/TaskSchedule - Schedule database model
+ */
 
-import Task from "../models/Task.js";
-import { TaskSchedule } from "../models/TaskSchedule.js";
-import { logEvent } from "./telemetry.js";
-import { recordSubCategoryGeneration } from "./subcategoryTelemetry.js";
-import { categoryForTag } from "../algorithms/priority/tagging.js";
+import Task from "../../models/Task.js";
+import { TaskSchedule } from "../../models/TaskSchedule.js";
+import { logEvent } from "../telemetry/telemetry.js";
+import { recordSubCategoryGeneration } from "../telemetry/subcategoryTelemetry.js";
+import { categoryForTag } from "../../algorithms/priority/tagging.js";
 
 /**
  * Create a new task for a user.

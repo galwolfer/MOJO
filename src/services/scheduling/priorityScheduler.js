@@ -1,9 +1,25 @@
-// src/services/priorityScheduler.js
-// Periodically refreshes the priority score cache while the server is running.
+/**
+ * @fileoverview Priority Scheduler Service
+ * @module services/scheduling/priorityScheduler
+ * 
+ * Background service that periodically refreshes task priority scores.
+ * Ensures priority cache stays up-to-date while the server is running.
+ * 
+ * Key responsibilities:
+ * - Run priority score updates at configurable intervals
+ * - Manage scheduler lifecycle (start/stop)
+ * - Handle concurrent execution prevention
+ * - Log scheduler activity and errors
+ * 
+ * Default interval: Every hour (configurable via env)
+ * Enable via: PRIORITY_SCHEDULER_ENABLED=true
+ * 
+ * @requires scripts/updateScores - Score calculation logic
+ */
 
-import { env } from "../config/env.js";
-import { logger } from "../utils/logger.js";
-import { updateAllScores } from "../scripts/updateScores.js";
+import { env } from "../../config/env.js";
+import { logger } from "../../utils/logger.js";
+import { updateAllScores } from "../../scripts/updateScores.js";
 
 const DEFAULT_INTERVAL_MS = 60 * 60 * 1000; // every hour
 let intervalHandle = null;

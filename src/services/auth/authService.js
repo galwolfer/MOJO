@@ -1,9 +1,23 @@
-// src/services/authService.js
-// Handles user registration and authentication logic.
+/**
+ * @fileoverview Authentication Service
+ * @module services/auth/authService
+ * 
+ * Handles user registration.ts and authentication logic for Mojo Coacher.
+ * Provides secure password hashing using bcrypt and manages user sessions.
+ * 
+ * Key responsibilities:
+ * - User registration with password hashing
+ * - User login with credential verification
+ * - Session management
+ * - Telemetry logging for auth events
+ * 
+ * @requires bcrypt - For secure password hashing
+ * @requires models/User - User database model
+ */
 
 import bcrypt from "bcrypt";
-import { User } from "../models/User.js";
-import { logEvent } from "./telemetry.js";
+import { User } from "../../models/User.js";
+import { logEvent } from "../telemetry/telemetry.js";
 
 const SALT_ROUNDS = 10;
 

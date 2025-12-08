@@ -2,8 +2,8 @@
 // API routes for task predictions
 
 import { Router } from "express";
-import { predictNextCategory, getPredictionProbabilities } from "../services/mlPredictor.js";
-import { getPredictionForUser, triggerPredictionJob } from "../services/scheduledPrediction.js";
+import { predictNextCategory, getPredictionProbabilities } from "../services/ml/mlPredictor.js";
+import { getPredictionForUser, triggerPredictionJob } from "../services/ml/scheduledPrediction.js";
 import Task from "../models/Task.js";
 import { logger } from "../utils/logger.js";
 

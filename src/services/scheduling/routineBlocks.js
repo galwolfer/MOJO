@@ -1,7 +1,22 @@
-// src/services/routineBlocks.js
-// Build synthetic busy blocks from simple daily routines (sleep, meals, etc.).
+/**
+ * @fileoverview Routine Blocks Generator
+ * @module services/scheduling/routineBlocks
+ * 
+ * Generates synthetic busy blocks from user-defined daily routines.
+ * Converts recurring patterns (sleep, meals, breaks) into time-blocked constraints.
+ * 
+ * Key responsibilities:
+ * - Parse routine definitions (start/end hours, wrap-around handling)
+ * - Generate busy blocks for a specified date range
+ * - Handle routines that span midnight (wrapsToNextDay)
+ * - Validate and normalize time inputs
+ * 
+ * Example routines: sleep (22:00-07:00), lunch (12:00-13:00), dinner (18:00-19:00)
+ * 
+ * @requires utils/dateUtils - Date manipulation utilities
+ */
 
-import { addDays, startOfDay } from "../utils/dateUtils.js";
+import { addDays, startOfDay } from "../../utils/dateUtils.js";
 
 const clamp = (value, min, max, fallback) => {
   const num = Number(value);
