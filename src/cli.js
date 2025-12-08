@@ -8,7 +8,7 @@ import { ansi, paint, theme } from "./utils/cliTheme.js";
 // Services
 import { registerUser, loginUser } from "./services/auth/authService.js";
 import { getUserById, updateRoutineSettings } from "./services/auth/userService.js";
-import { createTask, getTasksForUser, checkSuggestionFollowed, updateScheduleEntryStatus } from "./services/tasks/taskService.js";
+import { createTask, getTasksForUser, checkSuggestionFollowed, updateScheduleEntryStatus, updateTask } from "./services/tasks/taskService.js";
 import { generatePlan, savePlan, getUpcomingSessions } from "./services/scheduling/planningService.js";
 import { createBusyBlock, getUpcomingBusyBlocks } from "./services/tasks/busyBlockService.js";
 import { coacherAlgorithm } from "./services/index.js";
@@ -88,12 +88,13 @@ const menuOptions = [
   { key: "2", label: "Login" },
   { key: "3", label: "Add Task" },
   { key: "4", label: "List Tasks" },
-  { key: "5", label: "Recommend Next Task" },
-  { key: "6", label: "Suggest a New Task" },
-  { key: "7", label: "Plan Tasks" },
-  { key: "8", label: "View Schedule" },
-  { key: "9", label: "Update Schedule Entry" },
-  { key: "10", label: "Calendar Constraints" },
+  { key: "5", label: "Edit Task" },
+  { key: "6", label: "Recommend Next Task" },
+  { key: "7", label: "Suggest a New Task" },
+  { key: "8", label: "Plan Tasks" },
+  { key: "9", label: "View Schedule" },
+  { key: "10", label: "Update Schedule Entry" },
+  { key: "11", label: "Calendar Constraints" },
   { key: "0", label: "Exit" },
 ];
 
@@ -127,12 +128,13 @@ const preferenceQuestions = [
     else if (choice === "2") await login();
     else if (choice === "3") await addTask();
     else if (choice === "4") await listTasks();
-    else if (choice === "5") await recommendTask();
-    else if (choice === "6") await suggestNewTask();
-    else if (choice === "7") await planTasksOption();
-    else if (choice === "8") await viewScheduleOption();
-    else if (choice === "9") await updateScheduleEntryOption();
-    else if (choice === "10") await calendarConstraintsMenu();
+    else if (choice === "5") await editTaskOption();
+    else if (choice === "6") await recommendTask();
+    else if (choice === "7") await suggestNewTask();
+    else if (choice === "8") await planTasksOption();
+    else if (choice === "9") await viewScheduleOption();
+    else if (choice === "10") await updateScheduleEntryOption();
+    else if (choice === "11") await calendarConstraintsMenu();
     else if (choice === "0") break;
     else console.log(theme.warning("🤔 Not sure what you meant. Please pick one of the options above."));
   }
@@ -498,6 +500,165 @@ async function listTasks() {
     const line = `${index + 1}. ${paint(displayName, ansi.bold)}  ${theme.muted(`(${detailParts.join(", ")})`)}`;
     console.log(line);
   });
+}
+
+// =============================================================================
+// EDIT TASK
+// =============================================================================
+
+async function editTaskOption() {
+  if (!ensureLoggedIn()) return;
+
+  const tasks = await getTasksForUser(currentUser._id);
+  if (!tasks.length) {
+    console.log(theme.info("📭 No tasks to edit — add your first one!"));
+    return;
+  }
+
+  // Display tasks for selection
+  console.log(theme.accent(`\nSelect a task to edit:`));
+  tasks.forEach((task, index) => {
+    const displayName = task.taskname || task.title || "(no title)";
+    const status = task.status || "todo";
+    const dueStr = task.dueDate ? ` | Due: ${formatLocalDate(new Date(task.dueDate))}` : "";
+    console.log(`${theme.option(`${index + 1})`)} ${displayName} ${theme.muted(`[${status}]${dueStr}`)}`);
+  });
+  console.log(`${theme.option("0)")} Cancel`);
+
+  const selection = (await ask("\nSelect task number ➤ ")).trim();
+  
+  if (selection === "0" || !selection) {
+    console.log(theme.muted("Edit cancelled."));
+    return;
+  }
+
+  const taskIndex = parseInt(selection, 10) - 1;
+  if (isNaN(taskIndex) || taskIndex < 0 || taskIndex >= tasks.length) {
+    console.log(theme.warning("Invalid selection."));
+    return;
+  }
+
+  const taskToEdit = tasks[taskIndex];
+  await editTaskFields(taskToEdit);
+}
+
+async function editTaskFields(task) {
+  const toNumber = (value, fallback) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+
+  console.log(theme.muted("\n═════════════════════════════════════"));
+  console.log(theme.title(` Editing: ${task.taskname || task.title}`));
+  console.log(theme.muted("═════════════════════════════════════"));
+  console.log(theme.subtitle("Press Enter to keep current value, or type a new value.\n"));
+
+  const updates = {};
+
+  // Task name
+  const currentName = task.taskname || task.title || "";
+  const newName = (await ask(`Task title [${currentName}]: `)).trim();
+  if (newName && newName !== currentName) {
+    updates.taskname = newName;
+  }
+
+  // Description
+  const currentDesc = task.description || "";
+  const descPrompt = currentDesc ? `Description [${currentDesc}]: ` : "Description (optional): ";
+  const newDesc = (await ask(descPrompt)).trim();
+  if (newDesc !== "" && newDesc !== currentDesc) {
+    updates.description = newDesc;
+  }
+
+  // Importance
+  const currentImportance = task.importance ?? 3;
+  const newImportanceRaw = (await ask(`Importance 1-5 [${currentImportance}]: `)).trim();
+  if (newImportanceRaw) {
+    const newImportance = toNumber(newImportanceRaw, currentImportance);
+    if (newImportance >= 1 && newImportance <= 5 && newImportance !== currentImportance) {
+      updates.importance = Math.round(newImportance);
+    }
+  }
+
+  // Effort
+  const currentEffort = task.effort ?? 3;
+  const newEffortRaw = (await ask(`Effort 1-5 [${currentEffort}]: `)).trim();
+  if (newEffortRaw) {
+    const newEffort = toNumber(newEffortRaw, currentEffort);
+    if (newEffort >= 1 && newEffort <= 5 && newEffort !== currentEffort) {
+      updates.effort = Math.round(newEffort);
+    }
+  }
+
+  // Estimated Duration
+  const currentDuration = task.estimatedDuration ?? 60;
+  const newDurationRaw = (await ask(`Estimated duration in minutes [${currentDuration}]: `)).trim();
+  if (newDurationRaw) {
+    const newDuration = toNumber(newDurationRaw, currentDuration);
+    if (newDuration >= 15 && newDuration !== currentDuration) {
+      updates.estimatedDuration = Math.round(newDuration);
+    }
+  }
+
+  // Due Date
+  const currentDueDate = task.dueDate ? formatLocalDate(new Date(task.dueDate)) : "none";
+  console.log(theme.muted(`\nCurrent due date: ${currentDueDate}`));
+  const changeDue = (await ask("Change due date? (y/N): ")).trim().toLowerCase();
+  if (changeDue === "y" || changeDue === "yes") {
+    const newDueDateRaw = (await ask("New due date (YYYY-MM-DD, or 'clear' to remove): ")).trim();
+    if (newDueDateRaw.toLowerCase() === "clear") {
+      updates.dueDate = null;
+    } else if (newDueDateRaw) {
+      const newDueDate = parseDateOnly(newDueDateRaw);
+      if (newDueDate) {
+        updates.dueDate = newDueDate;
+      } else {
+        console.log(theme.warning("Invalid date format, keeping current value."));
+      }
+    }
+  }
+
+  // Status
+  const currentStatus = task.status || "todo";
+  console.log(theme.muted(`\nCurrent status: ${currentStatus}`));
+  console.log(theme.subtitle("Status options: todo, in_progress, done"));
+  const newStatusRaw = (await ask(`New status [${currentStatus}]: `)).trim().toLowerCase();
+  if (newStatusRaw && ["todo", "in_progress", "done"].includes(newStatusRaw) && newStatusRaw !== currentStatus) {
+    updates.status = newStatusRaw;
+  }
+
+  // Check if any updates
+  if (Object.keys(updates).length === 0) {
+    console.log(theme.info("\n📝 No changes made."));
+    return;
+  }
+
+  // Confirm changes
+  console.log(theme.subtitle("\nChanges to apply:"));
+  for (const [field, value] of Object.entries(updates)) {
+    const displayValue = value instanceof Date ? formatLocalDate(value) : 
+                         value === null ? "(cleared)" : value;
+    console.log(theme.muted(`  • ${field}: ${displayValue}`));
+  }
+
+  const confirm = (await ask("\nApply these changes? (Y/n): ")).trim().toLowerCase();
+  if (confirm === "n" || confirm === "no") {
+    console.log(theme.muted("Edit cancelled."));
+    return;
+  }
+
+  // Apply updates
+  const result = await updateTask({
+    userId: currentUser._id,
+    taskId: task._id,
+    updates,
+  });
+
+  if (result.success) {
+    console.log(theme.success("\n✅ Task updated successfully!"));
+  } else {
+    console.log(theme.error(`\n❌ Failed to update task: ${result.error}`));
+  }
 }
 
 async function recommendTask() {

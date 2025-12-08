@@ -182,3 +182,75 @@ export async function updateScheduleEntryStatus({ userId, sessionId, newStatus }
 
   return { sessionStatus: newStatus, taskStatus };
 }
+
+/**
+ * Update an existing task's fields.
+ * Only provided fields will be updated (partial update).
+ * @param {object} params
+ * @param {string} params.userId - The user ID (for authorization)
+ * @param {string} params.taskId - The task ID to update
+ * @param {object} params.updates - Object containing fields to update
+ * @returns {Promise<{ success: boolean, task?: object, error?: string }>}
+ */
+export async function updateTask({ userId, taskId, updates }) {
+  if (!taskId) {
+    return { success: false, error: "Task ID is required." };
+  }
+
+  // Find the task and verify ownership
+  const task = await Task.findOne({ _id: taskId, userId });
+  if (!task) {
+    return { success: false, error: "Task not found or you don't have permission to edit it." };
+  }
+
+  // Allowed fields for update
+  const allowedFields = [
+    "taskname",
+    "description",
+    "importance",
+    "effort",
+    "estimatedDuration",
+    "canSplit",
+    "minChunk",
+    "taskType",
+    "chunkCount",
+    "chunkMinutes",
+    "minMinutes",
+    "maxMinutes",
+    "dueDate",
+    "status",
+    "tags",
+  ];
+
+  // Filter updates to only allowed fields
+  const sanitizedUpdates = {};
+  for (const field of allowedFields) {
+    if (updates[field] !== undefined) {
+      sanitizedUpdates[field] = updates[field];
+    }
+  }
+
+  if (Object.keys(sanitizedUpdates).length === 0) {
+    return { success: false, error: "No valid fields to update." };
+  }
+
+  // Apply the update
+  const updated = await Task.findByIdAndUpdate(
+    taskId,
+    { $set: sanitizedUpdates },
+    { new: true }
+  ).lean();
+
+  // Log the update event
+  await logEvent({
+    type: "task_updated",
+    userId,
+    payload: {
+      taskId: taskId.toString(),
+      updatedFields: Object.keys(sanitizedUpdates),
+      changes: sanitizedUpdates,
+    },
+  });
+
+  return { success: true, task: updated };
+}
