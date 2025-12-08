@@ -28,3 +28,6 @@ dist-ssr
 /dump/
 mongodump-
 *.dump
+
+# Training data and models
+/data/

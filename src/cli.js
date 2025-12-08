@@ -16,6 +16,9 @@ import { suggestTaskFromProfile } from "./algorithms/priority/suggestions.js";
 import { logEvent } from "./services/telemetry.js";
 import { getRoutineSettings, describeRoutineWindows } from "./services/routineBlocks.js";
 import { startOfDay, addDays } from "./utils/dateUtils.js";
+import { findExpiredTasksForUser } from "./services/expiredTaskChecker.js";
+import Task from "./models/Task.js";
+import { TaskSchedule } from "./models/TaskSchedule.js";
 
 const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const pad = (value) => String(value).padStart(2, "0");
@@ -109,6 +112,15 @@ const preferenceQuestions = [
   console.log(theme.success("✅ Connected to MongoDB - welcome to Mojo Coacher CLI!"));
 
   while (true) {
+    // Check for expired tasks before showing menu (if logged in)
+    if (currentUser) {
+      const hasExpired = await checkAndBlockExpiredTasks();
+      if (hasExpired) {
+        // User was logged out due to unhandled expired tasks
+        continue;
+      }
+    }
+    
     printMenu();
     const choice = (await ask("Choose an option ➤ ")).trim();
     if (choice === "1") await register();
@@ -129,6 +141,26 @@ const preferenceQuestions = [
   rl.close();
   process.exit(0);
 })();
+
+/**
+ * Check for expired tasks and block user if any exist
+ * Returns true if user was blocked/logged out
+ */
+async function checkAndBlockExpiredTasks() {
+  if (!currentUser) return false;
+
+  const expiredTasks = await findExpiredTasksForUser(currentUser._id);
+  
+  if (expiredTasks.length === 0) {
+    return false;
+  }
+
+  // There are expired tasks - force user to handle them
+  await handleExpiredTasks();
+  
+  // If user cancelled (currentUser is now null), return true to restart loop
+  return currentUser === null;
+}
 
 function printMenu() {
   console.log(theme.muted("\n═════════════════════════════════════"));
@@ -173,6 +205,160 @@ async function login() {
 
   currentUser = result.user;
   console.log(theme.success(`🙌 Logged in as ${currentUser.username}`));
+  
+  // Check for expired tasks - user must handle them before continuing
+  await handleExpiredTasks();
+}
+
+// =============================================================================
+// EXPIRED TASKS HANDLING
+// =============================================================================
+
+async function handleExpiredTasks() {
+  if (!currentUser) return;
+
+  const expiredTasks = await findExpiredTasksForUser(currentUser._id);
+  
+  if (expiredTasks.length === 0) {
+    return; // No expired tasks, continue normally
+  }
+
+  // Show blocking screen
+  console.log(theme.muted("\n═══════════════════════════════════════════════════════════"));
+  console.log(theme.error("  ⚠️  ATTENTION: You have tasks with EXPIRED deadlines!  ⚠️"));
+  console.log(theme.muted("═══════════════════════════════════════════════════════════"));
+  console.log(theme.warning(`\nYou have ${expiredTasks.length} task(s) past their deadline.`));
+  console.log(theme.warning("You must handle each one before you can continue.\n"));
+
+  // Process each expired task
+  for (let i = 0; i < expiredTasks.length; i++) {
+    const task = expiredTasks[i];
+    const handled = await handleSingleExpiredTask(task, i + 1, expiredTasks.length);
+    
+    if (!handled) {
+      // User chose to exit - they can't continue until tasks are handled
+      console.log(theme.warning("\n⚠️  You must handle all expired tasks to use the app."));
+      console.log(theme.muted("Logging out...\n"));
+      currentUser = null;
+      return;
+    }
+  }
+
+  console.log(theme.success("\n✅ All expired tasks handled! You can now continue.\n"));
+}
+
+async function handleSingleExpiredTask(task, index, total) {
+  const daysOverdue = task.daysOverdue || 0;
+  
+  console.log(theme.muted("───────────────────────────────────────────────────────────"));
+  console.log(theme.title(`  📋 Expired Task ${index}/${total}`));
+  console.log(theme.muted("───────────────────────────────────────────────────────────"));
+  console.log(`  ${theme.subtitle("Task:")} ${task.taskname}`);
+  if (task.description) {
+    console.log(`  ${theme.subtitle("Description:")} ${task.description}`);
+  }
+  console.log(`  ${theme.subtitle("Due Date:")} ${formatLocalDate(new Date(task.dueDate))}`);
+  console.log(`  ${theme.error(`  ⏰ ${daysOverdue} day(s) overdue`)}`);
+  console.log(`  ${theme.subtitle("Importance:")} ${"⭐".repeat(task.importance || 3)}`);
+  console.log("");
+  
+  console.log(theme.subtitle("What would you like to do?"));
+  console.log(`${theme.option("1)")} 📅 Extend deadline (set a new date)`);
+  console.log(`${theme.option("2)")} 🗑️  Delete this task (forfeit)`);
+  console.log(`${theme.option("0)")} ❌ Cancel (logout)`);
+  console.log("");
+
+  while (true) {
+    const choice = (await ask("Choose an option ➤ ")).trim();
+
+    if (choice === "1") {
+      // Extend deadline
+      const extended = await extendTaskDeadline(task);
+      if (extended) return true;
+      // If extension failed, ask again
+      continue;
+    }
+    
+    if (choice === "2") {
+      // Forfeit/delete task
+      const deleted = await forfeitTask(task);
+      if (deleted) return true;
+      continue;
+    }
+    
+    if (choice === "0") {
+      // Cancel - user can't continue
+      return false;
+    }
+
+    console.log(theme.warning("Please choose 1, 2, or 0."));
+  }
+}
+
+async function extendTaskDeadline(task) {
+  console.log(theme.subtitle("\nSet a new deadline (must be in the future):"));
+  console.log(theme.muted("Format: YYYY-MM-DD (e.g., 2025-12-15)\n"));
+
+  const input = (await ask("New deadline ➤ ")).trim();
+  
+  if (!input) {
+    console.log(theme.warning("No date entered. Please try again."));
+    return false;
+  }
+
+  const newDate = parseDateOnly(input);
+  
+  if (!newDate) {
+    console.log(theme.error("❌ Invalid date format. Use YYYY-MM-DD."));
+    return false;
+  }
+
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  
+  if (newDate <= now) {
+    console.log(theme.error("❌ New deadline must be in the future!"));
+    return false;
+  }
+
+  try {
+    await Task.findByIdAndUpdate(task._id, { dueDate: newDate });
+    console.log(theme.success(`\n✅ Deadline extended to ${formatLocalDate(newDate)}!`));
+    return true;
+  } catch (err) {
+    console.log(theme.error(`❌ Failed to update task: ${err.message}`));
+    return false;
+  }
+}
+
+async function forfeitTask(task) {
+  console.log(theme.warning(`\n⚠️  Are you sure you want to DELETE "${task.taskname}"?`));
+  console.log(theme.muted("This action cannot be undone.\n"));
+
+  const confirm = (await ask("Type 'yes' to confirm ➤ ")).trim().toLowerCase();
+  
+  if (confirm !== "yes") {
+    console.log(theme.muted("Deletion cancelled."));
+    return false;
+  }
+
+  try {
+    // Delete the task
+    await Task.findByIdAndDelete(task._id);
+    
+    // Also delete any scheduled sessions
+    try {
+      await TaskSchedule.deleteMany({ taskId: task._id });
+    } catch (schedErr) {
+      // Ignore if no schedules
+    }
+
+    console.log(theme.success(`\n✅ Task "${task.taskname}" has been deleted.`));
+    return true;
+  } catch (err) {
+    console.log(theme.error(`❌ Failed to delete task: ${err.message}`));
+    return false;
+  }
 }
 
 async function collectPriorities() {
