@@ -1,3 +1,5 @@
+import { moderateScale, scale, verticalScale } from "react-native-size-matters";
+
 export const COLORS = {
   // Primary colors
   primary1: "#4361EE",
@@ -42,10 +44,10 @@ export const COLORS = {
 };
 
 export const SPACING = {
-  sm: 5,
-  md: 10,
-  lg: 17,
-  xlg: 28,
+  sm: moderateScale(5),
+  md: moderateScale(10),
+  lg: moderateScale(17),
+  xlg: moderateScale(28),
 };
 
 export const FONTS = {
@@ -53,6 +55,7 @@ export const FONTS = {
   fredokaThin: "Fredoka-Thin",
   fredokaLight: "Fredoka-Light",
   fredokaMedium: "Fredoka-Medium",
+  fredokaRegular: "Fredoka-Regular",
   fredokaDemiBold: "Fredoka-DemiBold",
   fredokaBold: "Fredoka-Bold",
   fredokaHeavy: "Fredoka-Heavy",
@@ -71,36 +74,36 @@ export const SYSTEM_FONTS = {
 
 export const TYPOGRAPHY = {
   title: {
-    fontFamily: FONTS.fredokaMedium,
-    fontSize: 28,
-    fontWeight: "600" as const,
+    fontFamily: FONTS.fredokaBold,
+    fontSize: moderateScale(32),
     textTransform: "uppercase" as const,
     color: COLORS.primary1,
   },
   title2: {
-    fontFamily: FONTS.fredokaMedium,
-    fontSize: 22,
-    fontWeight: "600" as const,
+    fontFamily: FONTS.fredokaBold,
+    fontSize: moderateScale(24),
     textTransform: "uppercase" as const,
     color: COLORS.primary1,
   },
   title3: {
     fontFamily: FONTS.fredokaBold,
-    fontSize: 14,
-    fontWeight: "700" as const,
+    fontSize: moderateScale(18),
     textTransform: "uppercase" as const,
     color: COLORS.black,
   },
   bodyText: {
-    fontFamily: FONTS.fredokaLight,
-    fontSize: 14,
-    fontWeight: "300" as const,
+    fontFamily: FONTS.fredokaRegular,
+    fontSize: moderateScale(18),
+    color: COLORS.black,
+  },
+  boldText: {
+    fontFamily: FONTS.fredokaBold,
+    fontSize: moderateScale(18),
     color: COLORS.black,
   },
   notes: {
-    fontFamily: FONTS.fredokaExtraLight,
-    fontSize: 11,
-    fontWeight: "300" as const,
+    fontFamily: FONTS.fredokaLight,
+    fontSize: moderateScale(14),
     color: COLORS.black,
   },
 };
