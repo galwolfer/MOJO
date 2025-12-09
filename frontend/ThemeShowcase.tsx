@@ -1,6 +1,9 @@
 import React from "react";
 import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { COLORS, SPACING, FONTS, SYSTEM_FONTS, TYPOGRAPHY } from "./theme";
+import { Checkbox } from "./components/Checkbox";
+import { ProgressIcon } from "./components/ProgressIcon";
+import { useState } from "react";
 
 const ColorSwatch = ({ name, hex }: { name: string; hex: string }) => (
   <View style={styles.swatchWrap}>
@@ -11,6 +14,9 @@ const ColorSwatch = ({ name, hex }: { name: string; hex: string }) => (
 );
 
 const ThemeShowcase: React.FC = () => {
+  const [isChecked, setIsChecked] = useState(false);
+  const [progress, setProgress] = useState(0);
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.header}>Theme Showcase</Text>
@@ -50,6 +56,32 @@ const ThemeShowcase: React.FC = () => {
             <Text style={styles.fontMeta}>{JSON.stringify(styleObj).slice(0, 80)}...</Text>
           </View>
         ))}
+      </View>
+
+      <Text style={styles.sectionTitle}>Interactive Components</Text>
+      <View style={{ gap: 20, paddingBottom: 40 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <Text style={{ fontFamily: FONTS.fredokaMedium }}>Checkbox:</Text>
+          <Checkbox checked={isChecked} onChange={setIsChecked} size={40} />
+        </View>
+
+        <View style={{ gap: 10 }}>
+          <Text style={{ fontFamily: FONTS.fredokaMedium }}>Progress Icon (Value: {progress.toFixed(1)}):</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 20 }}>
+            <ProgressIcon value={progress} size={40} />
+            <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
+              {[0, 0.25, 0.5, 0.75, 1].map((val) => (
+                <TouchableOpacity
+                  key={val}
+                  onPress={() => setProgress(val)}
+                  style={{ padding: 8, backgroundColor: "#eee", borderRadius: 4 }}
+                >
+                  <Text style={{ fontSize: 12 }}>{val * 100}%</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
       </View>
 
       <View style={{ height: 36 }} />

@@ -5,7 +5,8 @@ export const COLORS = {
   primary3: "#7209B7",
   primary4: "#F72585",
   primary5: "#ECA32E",
-  primary6: "#F43E3E",
+  primary6: "#38AF4D",
+  primary7: "#F43E3E",
 
   // Bright palette
   brightP1: "#6F86F2",
