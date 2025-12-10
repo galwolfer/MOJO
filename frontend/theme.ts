@@ -1,4 +1,4 @@
-import { moderateScale, scale, verticalScale } from "react-native-size-matters";
+import { moderateScale, s, scale, verticalScale } from "react-native-size-matters";
 
 export const COLORS = {
   // Primary colors
@@ -61,6 +61,13 @@ export const FONTS = {
   fredokaHeavy: "Fredoka-Heavy",
 };
 
+export const FONT_SIZES = {
+  sm: moderateScale(14),
+  md: moderateScale(16),
+  base: moderateScale(18),
+  lg: moderateScale(24),
+};
+
 // System fonts as fallback when custom fonts aren't available (Expo Go)
 export const SYSTEM_FONTS = {
   fredokaExtraLight: "sans-serif-light",
@@ -92,18 +99,21 @@ export const TYPOGRAPHY = {
     fontSize: moderateScale(32),
     textTransform: "uppercase" as const,
     color: COLORS.primary1,
+    letterSpacing: 1.1,
   },
   title2: {
     fontFamily: FONTS.fredokaBold,
     fontSize: moderateScale(24),
     textTransform: "uppercase" as const,
     color: COLORS.primary1,
+    letterSpacing: 1.1,
   },
   title3: {
     fontFamily: FONTS.fredokaBold,
     fontSize: moderateScale(18),
     textTransform: "uppercase" as const,
     color: COLORS.black,
+    letterSpacing: 1.1,
   },
   bodyText: {
     fontFamily: FONTS.fredokaRegular,
@@ -118,6 +128,14 @@ export const TYPOGRAPHY = {
   notes: {
     fontFamily: FONTS.fredokaLight,
     fontSize: moderateScale(14),
+    color: COLORS.black,
+  },
+  input: {
+    fontFamily: FONTS.fredokaRegular,
+    fontSize: FONT_SIZES.base,
+    // 'line-height: normal' maps to letting the system choose a sensible height.
+    lineHeight: Math.round(FONT_SIZES.base * 1.2),
+    // Entered text should be black; placeholder will remain light gray via `placeholderTextColor`.
     color: COLORS.black,
   },
 };

@@ -6,6 +6,7 @@ import { COLORS, SPACING, FONTS, SYSTEM_FONTS, TYPOGRAPHY, SHADOWS } from "./the
 import { Checkbox } from "./components/icons/Checkbox";
 import { ProgressIcon } from "./components/icons/ProgressIcon";
 import Box from "./components/layout/Box";
+import Input from "./components/Input";
 import { useState } from "react";
 
 const ColorSwatch = ({ name, hex }: { name: string; hex: string }) => (
@@ -23,6 +24,9 @@ const ColorSwatch = ({ name, hex }: { name: string; hex: string }) => (
 const ThemeShowcase: React.FC = () => {
   const [isChecked, setIsChecked] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [textInput, setTextInput] = useState("");
+  const [emailInput, setEmailInput] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
 
   return (
     <BoxContainer>
@@ -84,6 +88,26 @@ const ThemeShowcase: React.FC = () => {
                 ))}
               </View>
             </View>
+          </View>
+
+          <View style={{ gap: 10 }}>
+            <AppText variant="bodyText">Input:</AppText>
+            <Input value={textInput} onChangeText={setTextInput} placeholder="Enter text..." />
+            <Input
+              type="email"
+              label="Email"
+              value={emailInput}
+              onChangeText={setEmailInput}
+              placeholder="your@email.com"
+            />
+            <Input
+              type="password"
+              label="Password"
+              value={passwordInput}
+              onChangeText={setPasswordInput}
+              placeholder="Enter password"
+              error={passwordInput && passwordInput.length < 6 ? "Password too short" : undefined}
+            />
           </View>
         </View>
       </Box>

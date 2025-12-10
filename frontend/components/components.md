@@ -22,11 +22,12 @@ Update this file whenever you add, remove, or change a component.
    - Native mobile version of the progress icon using `Animated` + `react-native-svg`.
 
 - `BoxContainer` — `frontend/components/layout/BoxContainer.tsx`
-   - Layout wrapper (ScrollView) that provides the shared `boxContainer` spacing for pages such as the Theme showcase.
+  - Layout wrapper (ScrollView) that provides the shared `boxContainer` spacing for pages such as the Theme showcase.
 
-- Barrel exports: `frontend/components/index.ts` exports the public components (e.g. `AppText`, `Box`, `BoxContainer`, `Checkbox`, `ProgressIcon`). Use these for cleaner imports across the app.
+- `Input` — `frontend/components/Input.tsx`
+  - Flexible input component supporting multiple types (text, email, password, number). Styled using theme values with consistent spacing, colors, and shadows. Supports label and error states.
 
-Maintenance
+- Barrel exports: `frontend/components/index.ts` exports the public components (e.g. `AppText`, `Box`, `BoxContainer`, `Checkbox`, `ProgressIcon`, `Input`). Use these for cleaner imports across the app.Maintenance
 ----------
 
 1. When adding a new component, add a short entry above and include:
