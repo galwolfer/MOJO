@@ -6,7 +6,7 @@ import { COLORS, SPACING, FONTS, SYSTEM_FONTS, TYPOGRAPHY, SHADOWS } from "./the
 import { Checkbox } from "./components/icons/Checkbox";
 import { ProgressIcon } from "./components/icons/ProgressIcon";
 import Box from "./components/layout/Box";
-import Input from "./components/Input";
+import Input from "./components/inputs/Input";
 import { useState } from "react";
 
 const ColorSwatch = ({ name, hex }: { name: string; hex: string }) => (

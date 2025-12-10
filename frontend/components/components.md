@@ -24,7 +24,7 @@ Update this file whenever you add, remove, or change a component.
 - `BoxContainer` — `frontend/components/layout/BoxContainer.tsx`
   - Layout wrapper (ScrollView) that provides the shared `boxContainer` spacing for pages such as the Theme showcase.
 
-- `Input` — `frontend/components/Input.tsx`
+- `Input` — `frontend/components/input/Input.tsx`
   - Flexible input component supporting multiple types (text, email, password, number). Styled using theme values with consistent spacing, colors, and shadows. Supports label and error states.
 
 - Barrel exports: `frontend/components/index.ts` exports the public components (e.g. `AppText`, `Box`, `BoxContainer`, `Checkbox`, `ProgressIcon`, `Input`). Use these for cleaner imports across the app.Maintenance
