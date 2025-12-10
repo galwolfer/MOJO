@@ -9,7 +9,7 @@ export type IconProps = SvgProps & { size?: number };
 const ICON_FILES: Record<string, string> = {
   burger: "burger.svg",
   calendar: "calendar.svg",
-  cancel: "camcel.svg",
+  cancel: "cancel.svg",
   clock: "clock-1.svg",
   default: "default.svg",
   down: "down-icon.svg",
@@ -82,7 +82,11 @@ function createIcon(svgFileName: string, debugName: string): React.FC<IconProps>
     if (Platform.OS === "web") {
       const coloredDataUri = `data:image/svg+xml;base64,${btoa(coloredSvg)}`;
       return (
-        <img src={coloredDataUri} alt={debugName} style={{ width: numericSize, height: numericSize, display: "block" }} />
+        <img
+          src={coloredDataUri}
+          alt={debugName}
+          style={{ width: numericSize, height: numericSize, display: "block" }}
+        />
       );
     }
 
@@ -91,7 +95,7 @@ function createIcon(svgFileName: string, debugName: string): React.FC<IconProps>
 }
 
 export const ICONS: Record<string, React.FC<IconProps>> = Object.fromEntries(
-  Object.entries(ICON_FILES).map(([key, file]) => [key, createIcon(file, key)]),
+  Object.entries(ICON_FILES).map(([key, file]) => [key, createIcon(file, key)])
 ) as Record<string, React.FC<IconProps>>;
 
 export const ICON_NAMES = Object.keys(ICONS);

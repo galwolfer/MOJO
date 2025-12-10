@@ -2,12 +2,13 @@ import React from "react";
 import { View, StyleSheet, TouchableOpacity } from "react-native";
 import BoxContainer from "./components/layout/BoxContainer";
 import AppText from "./components/AppText";
-import { COLORS, SPACING, FONTS, SYSTEM_FONTS, TYPOGRAPHY, SHADOWS } from "./theme";
+import { COLORS, SPACING, FONTS, SYSTEM_FONTS, TYPOGRAPHY, SHADOWS, paletteIndexFromKey } from "./theme";
 import { Checkbox } from "./components/icons/Checkbox";
 import { ProgressIcon } from "./components/icons/ProgressIcon";
 import { ICONS, ICON_NAMES } from "./components/icons/icons";
 import Box from "./components/layout/Box";
-import Input from "./components/inputs/Input";
+import Input from "./components/icons/inputs/Input";
+import Tag from "./components/icons/inputs/tag";
 import { useState } from "react";
 
 const ColorSwatch = ({ name, hex }: { name: string; hex: string }) => (
@@ -138,22 +139,29 @@ const ThemeShowcase: React.FC = () => {
                 setFruitInput(val);
               }}
             />
-            {selectedFruit ? <AppText variant="notes">Selected: {selectedFruit}</AppText> : null}
-            <Input
-              label="Single Option Dropdown"
-              placeholder="Select the only option..."
-              options={["Only Choice"]}
-              onSelect={setSingleOption}
-            />
+
             {singleOption.length > 0 && <AppText variant="notes">Selected: {singleOption.join(", ")}</AppText>}
             <Input
               label="Multi-Select Dropdown"
               placeholder="Select multiple fruits..."
               options={fruits}
               multiSelect
+              value={multiOptions.join(", ")}
               onSelect={setMultiOptions}
             />
-            {multiOptions.length > 0 && <AppText variant="notes">Selected: {multiOptions.join(", ")}</AppText>}
+            {multiOptions.length > 0 && (
+              <View style={{ marginTop: SPACING.sm, flexDirection: "row", gap: SPACING.sm, flexWrap: "wrap" }}>
+                {multiOptions.map((m) => (
+                  <Tag
+                    key={m}
+                    label={m}
+                    colorIndex={paletteIndexFromKey(m)}
+                    editable
+                    onRemove={() => setMultiOptions((prev) => prev.filter((x) => x !== m))}
+                  />
+                ))}
+              </View>
+            )}
           </View>
         </View>
       </Box>

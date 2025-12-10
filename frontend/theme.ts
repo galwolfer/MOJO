@@ -144,3 +144,28 @@ export const TYPOGRAPHY = {
     color: COLORS.black,
   },
 };
+
+// Returns a bright/dark color pair for a given palette index (1-7).
+// If `index` is omitted or invalid, a random index between 1 and 7 is chosen.
+export function getPalettePair(index?: number) {
+  const idx =
+    Number.isInteger(index) && index! >= 1 && index! <= 7 ? (index as number) : Math.floor(Math.random() * 7) + 1;
+  const brightKey = `brightP${idx}` as keyof typeof COLORS as keyof typeof COLORS;
+  const darkKey = `darkP${idx}` as keyof typeof COLORS as keyof typeof COLORS;
+  return { bg: COLORS[brightKey], text: COLORS[darkKey], index: idx };
+}
+
+// Deterministically map a string key to a palette index 1..7.
+export function paletteIndexFromKey(key?: string): number {
+  if (!key) return Math.floor(Math.random() * 7) + 1;
+  // normalize (trim + lowercase) so keys that only differ by case/whitespace map same
+  const normalized = key.trim().toLowerCase();
+  if (normalized.length === 0) return Math.floor(Math.random() * 7) + 1;
+  // djb2-like hash
+  let hash = 5381;
+  for (let i = 0; i < normalized.length; i++) {
+    hash = (hash * 33) ^ normalized.charCodeAt(i);
+  }
+  const idx = Math.abs(hash) % 7;
+  return idx + 1;
+}

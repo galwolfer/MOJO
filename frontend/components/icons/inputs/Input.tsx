@@ -12,11 +12,10 @@ import {
   // Changed to Pressable for better handling of simultaneous gestures
   Pressable,
 } from "react-native";
-import { COLORS, SPACING, SHADOWS, FONTS, TYPOGRAPHY, DIVIDER, paletteIndexFromKey } from "../../theme";
-import AppText from "../AppText";
-import { Checkbox } from "../icons/Checkbox";
-import { Chevron } from "../icons/Chevron";
-import Tag from "../icons/inputs/tag";
+import { COLORS, SPACING, SHADOWS, FONTS, TYPOGRAPHY, DIVIDER } from "../../../theme";
+import AppText from "../../AppText";
+import { Checkbox } from "../Checkbox";
+import { Chevron } from "../Chevron";
 
 type InputType = "text" | "email" | "password" | "number";
 
@@ -193,24 +192,13 @@ function Input<T = any>({
             ref={inputRef}
             style={[styles.input, Platform.OS === "web" ? ({ outlineWidth: 0 } as any) : undefined]}
             placeholder={
-              Platform.OS === "android"
-                ? ""
-                : options
-                ? // keep placeholder visible for multiSelect even after selection
-                  multiSelect
-                  ? selected.length > 0
-                    ? `${selected.length} selected`
-                    : placeholder
-                  : selected.length === 0
-                  ? placeholder
-                  : ""
-                : placeholder
+              Platform.OS === "android" ? "" : options ? (selected.length === 0 ? placeholder : "") : placeholder
             }
             placeholderTextColor={COLORS.lightGray}
             keyboardType={getKeyboardType()}
             secureTextEntry={getSecureTextEntry()}
             editable={!options}
-            value={options ? "" : (rest as any).value}
+            value={options ? selected.join(", ") : (rest as any).value}
             onFocus={(e) => {
               rest.onFocus?.(e);
             }}
@@ -238,25 +226,6 @@ function Input<T = any>({
           )}
         </Animated.View>
       </Pressable>
-
-      {options && multiSelect && selected.length > 0 && (
-        <View style={styles.tagsContainerBelow} pointerEvents="box-none">
-          {selected.map((s, i) => (
-            <Tag
-              key={s}
-              label={s}
-              colorIndex={paletteIndexFromKey(s)}
-              editable
-              onRemove={() => {
-                const newSelected = selected.filter((x) => x !== s);
-                setSelected(newSelected);
-                onSelect?.(newSelected);
-              }}
-              style={{ marginRight: i < selected.length - 1 ? SPACING.sm : 0 }}
-            />
-          ))}
-        </View>
-      )}
 
       {options && (
         <Modal
@@ -315,8 +284,6 @@ function Input<T = any>({
                           ? selected.filter((s) => s !== option)
                           : [...selected, option];
                         setSelected(newSelected);
-                        // update consumer immediately when multi-select changes
-                        onSelect?.(newSelected);
                         // wait for outside click to finalize
                       }
                     }}
@@ -428,20 +395,6 @@ const styles = StyleSheet.create({
     height: DIVIDER.width,
     backgroundColor: DIVIDER.color,
     marginHorizontal: SPACING.md,
-  },
-  tagsContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    paddingHorizontal: SPACING.md,
-  },
-  tagsContainerBelow: {
-    marginTop: SPACING.sm,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.sm,
-    flexWrap: "wrap",
-    paddingHorizontal: SPACING.md,
   },
 });
 
