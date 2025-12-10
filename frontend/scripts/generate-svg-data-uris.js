@@ -10,19 +10,30 @@ let output = "// Auto-generated SVG data URIs for web compatibility\n";
 output += "// Run: node scripts/generate-svg-data-uris.js to regenerate\n\n";
 output += "export const SVG_DATA_URIS: Record<string, string> = {\n";
 
+let modifiedCount = 0;
+
 svgFiles.forEach((file) => {
   const svgPath = path.join(iconsLibDir, file);
   let svgContent = fs.readFileSync(svgPath, "utf8");
+  const originalContent = svgContent;
 
-  // Strip hardcoded colors to allow theming
-  svgContent = svgContent
-    .replace(/stroke="#F2F5FF"/g, 'stroke="currentColor"')
-    .replace(/fill="#F2F5FF"/g, 'fill="currentColor"')
+  // Strip hardcoded colors from source files for native compatibility
+  // Remove stroke and fill attributes with hex colors, keeping other attributes
+  svgContent = svgContent.replace(/\s+stroke="#[A-Fa-f0-9]{6}"/g, "").replace(/\s+fill="#[A-Fa-f0-9]{6}"/g, "");
+
+  // Write cleaned SVG back to source file
+  if (svgContent !== originalContent) {
+    fs.writeFileSync(svgPath, svgContent, "utf8");
+    modifiedCount++;
+  }
+
+  // For web data URIs, replace with currentColor for theming
+  const webSvgContent = originalContent
     .replace(/stroke="#[A-Fa-f0-9]{6}"/g, 'stroke="currentColor"')
     .replace(/fill="#[A-Fa-f0-9]{6}"/g, 'fill="currentColor"');
 
   // Create data URI
-  const encoded = Buffer.from(svgContent).toString("base64");
+  const encoded = Buffer.from(webSvgContent).toString("base64");
   const dataUri = `data:image/svg+xml;base64,${encoded}`;
 
   output += `  '${file}': '${dataUri}',\n`;
@@ -32,3 +43,4 @@ output += "};\n";
 
 fs.writeFileSync(outputFile, output, "utf8");
 console.log(`✓ Generated ${svgFiles.length} SVG data URIs -> ${outputFile}`);
+console.log(`✓ Cleaned ${modifiedCount} source SVG files (removed hardcoded colors)`);

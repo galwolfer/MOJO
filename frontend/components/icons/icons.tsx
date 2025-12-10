@@ -1,9 +1,9 @@
 import React from "react";
-import { Platform, View } from "react-native";
+import { Text, View, Platform } from "react-native";
 import type { SvgProps } from "react-native-svg";
 import { SVG_DATA_URIS } from "./svg-data-uris";
 
-// Import original SVG files as React components (native transformer)
+// Import original SVG files as React components (requires react-native-svg-transformer)
 import BurgerIcon from "./icons-lib/burger.svg";
 import CalendarIcon from "./icons-lib/calendar.svg";
 import CamcelIcon from "./icons-lib/camcel.svg";
@@ -27,94 +27,161 @@ import TrophyIcon from "./icons-lib/trophy.svg";
 import UpIcon from "./icons-lib/up-icon.svg";
 import UserIcon from "./icons-lib/user.svg";
 import WorkoutIcon from "./icons-lib/workout.svg";
+import { COLORS } from "../../theme";
 
-export type IconProps = SvgProps & { size?: number; color?: string };
+export type IconProps = SvgProps;
 
-// Helpers to decode/encode base64 safely in browser/node
-const decodeBase64 = (s: string) => {
-  try {
-    if (typeof Buffer !== "undefined") return Buffer.from(s, "base64").toString("utf8");
-  } catch {}
-  try {
-    // @ts-ignore
-    return atob(s);
-  } catch {
-    return "";
-  }
-};
-const encodeBase64 = (str: string) => {
-  try {
-    if (typeof Buffer !== "undefined") return Buffer.from(str, "utf8").toString("base64");
-  } catch {}
-  try {
-    // @ts-ignore
-    return btoa(str);
-  } catch {
-    return "";
-  }
-};
-
-function normalizeImport(mod: any, debugName?: string, svgFileName?: string): React.FC<IconProps> {
+function normalizeImport(mod: any, debugName?: string, svgFileName?: string): React.FC<SvgProps> {
+  // Possible shapes:
+  // - React component (function/class) — native transformer output
+  // - Module object with `default` or `ReactComponent` (CRA)
+  // - String URL to the asset (web bundlers)
+  // - Asset object with `uri` (expo/asset)
+  // - Empty object {} — web Metro doesn't transform SVGs, need fallback
   const candidate = mod && (mod.ReactComponent ?? mod.default ?? mod);
 
-  // Native transformer -> React component
+  // If it's a React component (function or class)
   if (typeof candidate === "function") {
-    return (props: IconProps) => {
+    return (props: SvgProps) => {
       const anyProps: any = props || {};
+      // Map common convenience props -> svg props
       const mapped: any = { ...anyProps };
-      if (anyProps.color && !anyProps.fill) mapped.fill = anyProps.color;
-      if (anyProps.color && !anyProps.stroke) mapped.stroke = anyProps.color;
-      if (anyProps.size && !anyProps.width) mapped.width = anyProps.size;
-      if (anyProps.size && !anyProps.height) mapped.height = anyProps.size;
-      return React.createElement(candidate, mapped as any);
+      // Map color to both fill AND stroke to override hardcoded values
+      if (anyProps.color) {
+        mapped.fill = anyProps.color;
+        mapped.stroke = anyProps.color;
+      }
+      // size prop -> width/height
+      if (anyProps.size) {
+        mapped.width = anyProps.size;
+        mapped.height = anyProps.size;
+      }
+      return React.createElement(candidate, mapped);
     };
   }
 
-  // Web asset (string URL)
+  // If it's a string (URL) — render as <img> on web
   if (typeof candidate === "string") {
-    return (props: IconProps) => {
-      const anyProps: any = props || {};
+    return (props: SvgProps) => {
+      const anyProps = props as any;
       const size = anyProps.size || anyProps.width || anyProps.height || 24;
-      return (<img src={candidate} alt={debugName || "icon"} style={{ width: size, height: size }} />) as any;
+      return (
+        <img
+          src={candidate}
+          alt={debugName || "icon"}
+          style={{
+            width: size,
+            height: size,
+            display: "block",
+          }}
+        />
+      );
     };
   }
 
-  // Expo asset object with uri
+  // If it's an asset object with uri
   if (candidate && typeof candidate === "object" && typeof candidate.uri === "string") {
-    return (props: IconProps) => {
-      const anyProps: any = props || {};
+    return (props: SvgProps) => {
+      const anyProps = props as any;
       const size = anyProps.size || anyProps.width || anyProps.height || 24;
-      return (<img src={candidate.uri} alt={debugName || "icon"} style={{ width: size, height: size }} />) as any;
+      return <img src={candidate.uri} alt={debugName || "icon"} style={{ width: size, height: size }} />;
     };
   }
 
-  // Fallback for web: use generated SVG data URIs and inject color
-  if (Platform.OS === "web" && svgFileName && SVG_DATA_URIS[svgFileName]) {
+  // FALLBACK: use data URI with platform-specific rendering
+  const isWeb = Platform.OS === "web";
+
+  if (svgFileName && SVG_DATA_URIS[svgFileName]) {
     const dataUri = SVG_DATA_URIS[svgFileName];
-    return (props: IconProps) => {
-      const anyProps: any = props || {};
-      const size = anyProps.size || anyProps.width || anyProps.height || 24;
-      const color = anyProps.color || "#000";
-      const base64Content = dataUri.split(",")[1] || "";
-      const svgContent = decodeBase64(base64Content);
-      const coloredSvg = svgContent.replace(/currentColor/g, color);
-      const coloredDataUri = `data:image/svg+xml;base64,${encodeBase64(coloredSvg)}`;
-      return (<img src={coloredDataUri} alt={debugName || "icon"} style={{ width: size, height: size }} />) as any;
-    };
+
+    if (isWeb) {
+      // Web: use img tag with color injection
+      return (props: SvgProps) => {
+        const anyProps = props as any;
+        const size = anyProps.size || anyProps.width || anyProps.height || 24;
+        const color = anyProps.color || COLORS.black;
+
+        // Decode base64 data URI and inject color
+        const base64Content = dataUri.split(",")[1];
+        const svgContent = atob(base64Content);
+
+        // Replace currentColor with actual color value
+        const coloredSvg = svgContent.replace(/currentColor/g, color);
+        const coloredDataUri = `data:image/svg+xml;base64,${btoa(coloredSvg)}`;
+
+        return (
+          <img
+            src={coloredDataUri}
+            alt={debugName || "icon"}
+            style={{
+              width: size,
+              height: size,
+              display: "block",
+            }}
+          />
+        );
+      };
+    } else {
+      // Native: use SvgXml from react-native-svg
+      const { SvgXml } = require("react-native-svg");
+
+      return (props: SvgProps) => {
+        const anyProps = props as any;
+        const size = anyProps.size || anyProps.width || anyProps.height || 24;
+        const color = anyProps.color || COLORS.black;
+
+        // Decode base64 and inject color
+        const base64Content = dataUri.split(",")[1];
+
+        // Use atob for React Native (it's available globally)
+        let svgContent;
+        try {
+          svgContent = global.atob ? global.atob(base64Content) : atob(base64Content);
+        } catch (error) {
+          console.warn(`Failed to decode base64 for ${debugName}:`, error);
+          return (
+            <View style={{ width: size, height: size }}>
+              <Text>?</Text>
+            </View>
+          );
+        }
+
+        // For native, we need to replace currentColor since SvgXml doesn't support it
+        const coloredSvg = svgContent
+          .replace(/currentColor/g, color)
+          .replace(/stroke-width/g, "strokeWidth")
+          .replace(/stroke-linecap/g, "strokeLinecap")
+          .replace(/stroke-linejoin/g, "strokeLinejoin")
+          .replace(/clip-path/g, "clipPath");
+
+        return <SvgXml xml={coloredSvg} width={size} height={size} />;
+      };
+    }
   }
 
-  // Unknown shape: return safe placeholder (native: View, web: div)
-  return (props: IconProps) => {
-    const anyProps: any = props || {};
+  // Unknown shape — log error and return platform-specific placeholder
+  console.warn(`[Icon ${debugName}] No SVG data found for ${svgFileName}`);
+
+  return (props: SvgProps) => {
+    const anyProps = props as any;
     const size = anyProps.size || 24;
-    if (Platform.OS === "web") {
-      return (<div title={`Icon: ${debugName || "unknown"}`}>?</div>) as any;
-    }
-    return (<View style={{ width: size, height: size }} />) as any;
+    return (
+      <View
+        style={{
+          width: size,
+          height: size,
+          backgroundColor: "#f0f0f0",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Text style={{ fontSize: 10 }}>?</Text>
+      </View>
+    );
   };
 }
 
-export const ICONS: Record<string, React.FC<IconProps>> = {
+export const ICONS: Record<string, React.FC<SvgProps>> = {
   burger: normalizeImport(BurgerIcon, "burger", "burger.svg"),
   calendar: normalizeImport(CalendarIcon, "calendar", "calendar.svg"),
   cancel: normalizeImport(CamcelIcon, "cancel", "camcel.svg"),
