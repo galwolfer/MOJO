@@ -8,8 +8,8 @@
 import React, { useEffect, useRef } from "react";
 import { Animated, TouchableOpacity, Easing } from "react-native";
 import Svg, { Path, Rect } from "react-native-svg";
-import svgPaths from "../imports/svg-kilf0jp2lv";
-import { COLORS } from "../theme";
+import svgPaths from "../../imports/svg-kilf0jp2lv";
+import { COLORS } from "../../theme";
 
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
 const AnimatedPath = Animated.createAnimatedComponent(Path);

@@ -1,7 +1,17 @@
+/**
+ * Box
+ *
+ * A simple surfaced container with a styled title bar and content area.
+ * - `title` (string) renders a top header using the `title3` typography.
+ * - `children` are placed in the content area and will be wrapped by `AppText`
+ *   if they're plain strings so body typography applies by default.
+ *
+ * Use `Box` to group related UI into visually distinct cards.
+ */
 import React from "react";
 import { View, StyleSheet } from "react-native";
-import AppText from "./AppText";
-import { COLORS, SHADOWS, SPACING, TYPOGRAPHY } from "../theme";
+import AppText from "../AppText";
+import { COLORS, SHADOWS, SPACING, TYPOGRAPHY } from "../../theme";
 
 type BoxProps = {
   title: string;

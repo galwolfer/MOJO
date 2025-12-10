@@ -3,9 +3,9 @@ import { View, StyleSheet, TouchableOpacity } from "react-native";
 import BoxContainer from "./components/layout/BoxContainer";
 import AppText from "./components/AppText";
 import { COLORS, SPACING, FONTS, SYSTEM_FONTS, TYPOGRAPHY, SHADOWS } from "./theme";
-import { Checkbox } from "./components/Checkbox";
-import { ProgressIcon } from "./components/ProgressIcon";
-import Box from "./components/Box";
+import { Checkbox } from "./components/icons/Checkbox";
+import { ProgressIcon } from "./components/icons/ProgressIcon";
+import Box from "./components/layout/Box";
 import { useState } from "react";
 
 const ColorSwatch = ({ name, hex }: { name: string; hex: string }) => (

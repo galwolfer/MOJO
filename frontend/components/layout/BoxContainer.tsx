@@ -1,3 +1,10 @@
+/**
+ * BoxContainer
+ *
+ * A small layout wrapper that provides the shared `boxContainer` spacing
+ * and alignment used across the theme showcase. Exported as both a
+ * `boxContainerStyle` object and a `BoxContainer` ScrollView wrapper.
+ */
 import React from "react";
 import { ScrollView, ScrollViewProps, ViewStyle } from "react-native";
 import { SPACING } from "../../theme";
