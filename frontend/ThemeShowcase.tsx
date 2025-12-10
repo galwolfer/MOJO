@@ -28,6 +28,9 @@ const ThemeShowcase: React.FC = () => {
   const [textInput, setTextInput] = useState("");
   const [emailInput, setEmailInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
+  const [fruitInput, setFruitInput] = useState("");
+  const [selectedFruit, setSelectedFruit] = useState<string | null>(null);
+  const fruits = ["Apple", "Banana", "Cherry", "Date", "Elderberry"];
 
   return (
     <BoxContainer>
@@ -109,6 +112,23 @@ const ThemeShowcase: React.FC = () => {
               placeholder="Enter password"
               error={passwordInput && passwordInput.length < 6 ? "Password too short" : undefined}
             />
+            <Input
+              type="dropdown"
+              label="Fruit"
+              placeholder="Select or type..."
+              options={fruits}
+              value={fruitInput}
+              onChangeText={(t) => {
+                setFruitInput(t);
+                setSelectedFruit(null);
+              }}
+              onSelect={(item) => {
+                const val = String(item);
+                setSelectedFruit(val);
+                setFruitInput(val);
+              }}
+            />
+            {selectedFruit ? <AppText variant="notes">Selected: {selectedFruit}</AppText> : null}
           </View>
         </View>
       </Box>

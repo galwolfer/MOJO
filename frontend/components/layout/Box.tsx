@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
     borderRadius: SPACING.lg,
     backgroundColor: COLORS.white2,
-    overflow: "hidden",
+    overflow: "visible",
     boxShadow: SHADOWS.card.web,
   },
   titleWrap: {
@@ -63,6 +63,7 @@ const styles = StyleSheet.create({
   content: {
     padding: SPACING.md,
     alignSelf: "stretch",
+    overflow: "visible",
   },
 });
 

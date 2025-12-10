@@ -1,25 +1,48 @@
 /**
  * Input
  *
- * A flexible input component with multiple type support (currently text).
+ * A flexible input component with multiple type support (text, email, password, number, dropdown).
  * Styled using the app's theme with consistent spacing, colors, and shadows.
  *
  * Usage:
  *   <Input value={text} onChangeText={setText} placeholder="Enter text..." />
  *   <Input type="text" label="Name" />
+ *   <Input
+ *     type="dropdown"
+ *     label="Select Option"
+ *     options={['Option 1', 'Option 2']}
+ *     onSelect={(opt) => console.log(opt)}
+ *   />
  */
-import React, { useRef, useEffect } from "react";
-import { View, TextInput, TextInputProps, StyleSheet, Animated, Platform, Text } from "react-native";
+import React, { useRef, useEffect, useState } from "react";
+import {
+  View,
+  TextInput,
+  TextInputProps,
+  StyleSheet,
+  Animated,
+  Platform,
+  Text,
+  TouchableOpacity,
+  FlatList,
+} from "react-native";
 import { COLORS, SPACING, SHADOWS, FONTS, TYPOGRAPHY } from "../../theme";
 import AppText from "../AppText";
+import { ICONS } from "../icons/icons";
 
-type InputType = "text" | "email" | "password" | "number";
+type InputType = "text" | "email" | "password" | "number" | "dropdown";
 
-type InputProps = Omit<TextInputProps, "style"> & {
+interface InputProps<T = any> extends Omit<TextInputProps, "style"> {
   type?: InputType;
   label?: string;
   error?: string;
-};
+  // Dropdown specific props
+  options?: T[];
+  renderOption?: (item: T) => React.ReactNode;
+  onSelect?: (item: T) => void;
+  filterFunction?: (item: T, query: string) => boolean;
+  displayValue?: (item: T) => string;
+}
 
 const hexToRgba = (hex: string, alpha = 1) => {
   const m = hex.replace("#", "");
@@ -48,9 +71,21 @@ function useWebCaret(idPrefix = "input") {
   return idRef.current;
 }
 
-const Input: React.FC<InputProps> = ({ type = "text", label, error, placeholder, ...rest }) => {
+function Input<T = any>({
+  type = "text",
+  label,
+  error,
+  placeholder,
+  options = [],
+  renderOption,
+  onSelect,
+  filterFunction,
+  displayValue,
+  ...rest
+}: InputProps<T>) {
   const borderColorAnim = useRef(new Animated.Value(0)).current;
   const webNativeID = useWebCaret();
+  const [isOpen, setIsOpen] = useState(false);
 
   // Track the actual value to determine if we should show the custom placeholder
   const providedValue = (rest as any).value ?? (rest as any).defaultValue;
@@ -95,8 +130,32 @@ const Input: React.FC<InputProps> = ({ type = "text", label, error, placeholder,
   const selectionColor = Platform.OS === "android" ? hexToRgba(COLORS.primary1, 0.28) : COLORS.primary1;
   const cursorColor = COLORS.primary1;
 
+  // Dropdown logic
+  const filteredOptions = React.useMemo(() => {
+    if (type !== "dropdown") return [];
+    const text = (typeof providedValue === "string" ? providedValue : "").toLowerCase();
+
+    // If text is empty, show all options
+    if (!text) return options;
+
+    return options.filter((item) => {
+      if (filterFunction) return filterFunction(item, text);
+      const labelStr = displayValue ? displayValue(item) : String(item);
+      return labelStr.toLowerCase().includes(text);
+    });
+  }, [options, providedValue, type, filterFunction, displayValue]);
+
+  const handleSelect = (item: T) => {
+    if (onSelect) onSelect(item);
+    setIsOpen(false);
+  };
+
+  const toggleDropdown = () => {
+    setIsOpen(!isOpen);
+  };
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isOpen ? { zIndex: 9999 } : { zIndex: 1 }]}>
       {label && (
         <AppText variant="boldText" style={styles.label}>
           {label}
@@ -121,11 +180,22 @@ const Input: React.FC<InputProps> = ({ type = "text", label, error, placeholder,
           keyboardType={getKeyboardType()}
           secureTextEntry={getSecureTextEntry()}
           underlineColorAndroid="transparent"
+          onFocus={(e) => {
+            if (type === "dropdown") setIsOpen(true);
+            rest.onFocus?.(e);
+          }}
           {...rest}
           selectionColor={selectionColor}
           cursorColor={cursorColor}
           {...(Platform.OS === "web" && webNativeID ? { nativeID: webNativeID } : {})}
         />
+
+        {type === "dropdown" && (
+          <TouchableOpacity onPress={toggleDropdown} style={styles.iconButton}>
+            {isOpen ? <ICONS.up size={20} color={COLORS.primary1} /> : <ICONS.down size={20} color={COLORS.primary1} />}
+          </TouchableOpacity>
+        )}
+
         {/* Custom placeholder overlay for Android to ensure proper font rendering */}
         {Platform.OS === "android" && isEmpty && placeholder && (
           <Text style={styles.customPlaceholder} pointerEvents="none">
@@ -133,6 +203,28 @@ const Input: React.FC<InputProps> = ({ type = "text", label, error, placeholder,
           </Text>
         )}
       </Animated.View>
+
+      {type === "dropdown" && isOpen && (
+        <View style={styles.dropdownList}>
+          <FlatList
+            data={filteredOptions}
+            keyExtractor={(_, index) => index.toString()}
+            renderItem={({ item }) => (
+              <TouchableOpacity style={styles.optionItem} onPress={() => handleSelect(item)}>
+                {renderOption ? (
+                  renderOption(item)
+                ) : (
+                  <AppText>{displayValue ? displayValue(item) : String(item)}</AppText>
+                )}
+              </TouchableOpacity>
+            )}
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+            style={{ maxHeight: 200 }}
+          />
+        </View>
+      )}
+
       {error && (
         <AppText variant="notes" style={styles.errorText}>
           {error}
@@ -140,21 +232,23 @@ const Input: React.FC<InputProps> = ({ type = "text", label, error, placeholder,
       )}
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     alignSelf: "stretch",
     width: "100%",
     gap: SPACING.sm,
+    position: "relative",
   },
   label: {
     marginBottom: SPACING.sm,
   },
   inputWrapper: {
     display: "flex",
+    flexDirection: "row",
     width: "100%",
-    alignItems: "flex-start",
+    alignItems: "center",
     gap: SPACING.sm + 2,
     alignSelf: "stretch",
     borderRadius: SPACING.lg,
@@ -164,6 +258,7 @@ const styles = StyleSheet.create({
     boxShadow: SHADOWS.card.web,
     minHeight: 44,
     position: "relative" as const,
+    paddingRight: SPACING.sm,
   },
   input: {
     flex: 1,
@@ -184,6 +279,31 @@ const styles = StyleSheet.create({
           textAlignVertical: "center" as const,
         }
       : {}),
+  },
+  iconButton: {
+    padding: SPACING.sm / 2,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  dropdownList: {
+    position: "absolute",
+    top: "100%",
+    left: 0,
+    right: 0,
+    backgroundColor: COLORS.white,
+    borderRadius: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.brightP1,
+    marginTop: SPACING.sm / 2,
+    maxHeight: 200,
+    zIndex: 9999,
+    elevation: 10,
+    boxShadow: SHADOWS.card.web,
+  },
+  optionItem: {
+    padding: SPACING.md,
+    borderBottomWidth: 0.5,
+    borderBottomColor: COLORS.lightGray,
   },
   customPlaceholder: {
     position: "absolute",
