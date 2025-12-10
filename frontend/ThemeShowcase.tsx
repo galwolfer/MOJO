@@ -113,7 +113,7 @@ const ThemeShowcase: React.FC = () => {
               error={passwordInput && passwordInput.length < 6 ? "Password too short" : undefined}
             />
             <Input
-              type="dropdown"
+              type="text"
               label="Fruit"
               placeholder="Select or type..."
               options={fruits}
@@ -122,7 +122,7 @@ const ThemeShowcase: React.FC = () => {
                 setFruitInput(t);
                 setSelectedFruit(null);
               }}
-              onSelect={(item) => {
+              onSelect={(item: string) => {
                 const val = String(item);
                 setSelectedFruit(val);
                 setFruitInput(val);
