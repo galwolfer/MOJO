@@ -5,6 +5,7 @@ import AppText from "./components/AppText";
 import { COLORS, SPACING, FONTS, SYSTEM_FONTS, TYPOGRAPHY, SHADOWS } from "./theme";
 import { Checkbox } from "./components/icons/Checkbox";
 import { ProgressIcon } from "./components/icons/ProgressIcon";
+import { ICONS, ICON_NAMES } from "./components/icons/icons";
 import Box from "./components/layout/Box";
 import Input from "./components/inputs/Input";
 import { useState } from "react";
@@ -111,6 +112,27 @@ const ThemeShowcase: React.FC = () => {
           </View>
         </View>
       </Box>
+
+      <Box title="Icon Library (All Icons)">
+        <View style={{ gap: 12, paddingBottom: 20 }}>
+          <AppText variant="bodyText">All icons from icons-lib with CSS color control (primary1 color):</AppText>
+          <View style={styles.iconsGrid}>
+            {ICON_NAMES.map((iconName) => {
+              const IconComponent = ICONS[iconName];
+              return (
+                <View key={iconName} style={styles.iconItem}>
+                  <View style={styles.iconWrapper}>
+                    <IconComponent size={32} color={COLORS.primary1} />
+                  </View>
+                  <AppText variant="notes" style={styles.iconLabel}>
+                    {iconName}
+                  </AppText>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      </Box>
     </BoxContainer>
   );
 };
@@ -173,6 +195,36 @@ const styles = StyleSheet.create({
   },
   typoSample: {
     marginBottom: 6,
+  },
+
+  iconsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.md,
+    marginTop: SPACING.sm,
+  },
+  iconItem: {
+    alignItems: "center",
+    width: 80,
+    color: COLORS.primary1,
+    marginBottom: SPACING.md,
+  },
+  iconWrapper: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    backgroundColor: COLORS.white,
+    alignItems: "center",
+    justifyContent: "center",
+    ...SHADOWS.card.rn,
+    borderWidth: 1,
+    borderColor: COLORS.grayLight,
+  },
+  iconLabel: {
+    marginTop: 6,
+    fontSize: 11,
+    textAlign: "center",
+    color: COLORS.black,
   },
 });
 

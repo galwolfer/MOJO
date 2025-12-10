@@ -21,34 +21,36 @@ type InputProps = Omit<TextInputProps, "style"> & {
   error?: string;
 };
 
-const Input: React.FC<InputProps> = ({ type = "text", label, error, placeholder, ...rest }) => {
-  const borderColorAnim = useRef(new Animated.Value(0)).current;
-  // For web we inject a small stylesheet to reliably control caret and selection colors
-  const webIdRef = useRef<string | null>(null);
+const hexToRgba = (hex: string, alpha = 1) => {
+  const m = hex.replace("#", "");
+  const r = parseInt(m.substring(0, 2), 16);
+  const g = parseInt(m.substring(2, 4), 16);
+  const b = parseInt(m.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+function useWebCaret(idPrefix = "input") {
+  const idRef = useRef<string | null>(null);
   useEffect(() => {
     if (Platform.OS !== "web") return;
-    const id = `input-${Math.random().toString(36).slice(2, 9)}`;
-    webIdRef.current = id;
+    const id = `${idPrefix}-${Math.random().toString(36).slice(2, 9)}`;
+    idRef.current = id;
     const style = document.createElement("style");
     style.id = `style-${id}`;
-    // semi-transparent primary for selection background
-    const selectionBg = (hex: string, alpha = 0.28) => {
-      // convert #RRGGBB to rgba
-      const m = hex.replace("#", "");
-      const r = parseInt(m.substring(0, 2), 16);
-      const g = parseInt(m.substring(2, 4), 16);
-      const b = parseInt(m.substring(4, 6), 16);
-      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    };
-
-    style.textContent = `#${id} { caret-color: ${COLORS.brightP1} !important; }
-#${id}::selection { background: ${selectionBg(COLORS.brightP1, 0.28)} !important; }`;
+    const selectionColor = hexToRgba(COLORS.primary1, 0.28);
+    style.textContent = `#${id} { caret-color: ${COLORS.primary1} !important; } #${id}::selection { background: ${selectionColor} !important; }`;
     document.head.appendChild(style);
     return () => {
-      const s = document.getElementById(`style-${id}`);
-      if (s) s.remove();
+      const el = document.getElementById(`style-${id}`);
+      if (el) el.remove();
     };
-  }, []);
+  }, [idPrefix]);
+  return idRef.current;
+}
+
+const Input: React.FC<InputProps> = ({ type = "text", label, error, placeholder, ...rest }) => {
+  const borderColorAnim = useRef(new Animated.Value(0)).current;
+  const webNativeID = useWebCaret();
 
   // Track the actual value to determine if we should show the custom placeholder
   const providedValue = (rest as any).value ?? (rest as any).defaultValue;
@@ -89,6 +91,10 @@ const Input: React.FC<InputProps> = ({ type = "text", label, error, placeholder,
     return type === "password";
   };
 
+  // Compute selection / cursor colors once
+  const selectionColor = Platform.OS === "android" ? hexToRgba(COLORS.primary1, 0.28) : COLORS.primary1;
+  const cursorColor = COLORS.primary1;
+
   return (
     <View style={styles.container}>
       {label && (
@@ -102,25 +108,23 @@ const Input: React.FC<InputProps> = ({ type = "text", label, error, placeholder,
             styles.input,
             Platform.OS === "web"
               ? ({
-                  outlineWidth: 5,
+                  outlineWidth: 0,
                   outlineStyle: "none",
                   outlineColor: "transparent",
                   caretColor: COLORS.primary1,
                 } as any)
               : undefined,
           ]}
-          // Use empty placeholder and overlay custom text instead.
+          // Use empty placeholder and overlay custom text on Android to control font for placeholder
           placeholder={Platform.OS === "android" ? "" : placeholder}
           placeholderTextColor={COLORS.lightGray}
           keyboardType={getKeyboardType()}
           secureTextEntry={getSecureTextEntry()}
           underlineColorAndroid="transparent"
           {...rest}
-          // Android: selectionColor is highlight, cursorColor is cursor.
-          // iOS: selectionColor is both.
-          selectionColor={COLORS.brightP1}
-          cursorColor={COLORS.primary1}
-          {...(Platform.OS === "web" && webIdRef.current ? { nativeID: webIdRef.current } : {})}
+          selectionColor={selectionColor}
+          cursorColor={cursorColor}
+          {...(Platform.OS === "web" && webNativeID ? { nativeID: webNativeID } : {})}
         />
         {/* Custom placeholder overlay for Android to ensure proper font rendering */}
         {Platform.OS === "android" && isEmpty && placeholder && (

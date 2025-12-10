@@ -30,6 +30,18 @@ Update this file whenever you add, remove, or change a component.
 - Barrel exports: `frontend/components/index.ts` exports the public components (e.g. `AppText`, `Box`, `BoxContainer`, `Checkbox`, `ProgressIcon`, `Input`). Use these for cleaner imports across the app.Maintenance
 ----------
 
+- `Icons` — `frontend/components/icons/icons.tsx`
+   - Central icon registry. Imports all SVGs from `components/icons/icons-lib` and exports a lookup `ICONS` map and `ICON_NAMES` array.
+   - Usage: import an icon component and render with `size` and `color` props.
+      - Example: `import { ICONS } from './components/icons/icons';` then `const Icon = ICONS.burger; <Icon size={24} color={COLORS.primary1} />` or `const Icon = ICONS['burger']; <Icon size={24} color={COLORS.primary1} />`.
+   - Cross-platform behavior:
+      - Native (iOS/Android): uses `react-native-svg` components via the svg transformer when available, and forwards `size` → width/height and `color` → fill/stroke.
+      - Web: uses generated inline SVG data URIs (see `scripts/generate-svg-data-uris.js`) and injects the requested `color` into the SVG so theming works.
+   - Adding new icons:
+      1. Put the `.svg` file in `components/icons/icons-lib/`.
+      2. Run `node scripts/generate-svg-data-uris.js` to update `svg-data-uris.ts` for web fallback.
+      3. Add the icon to the `ICONS` map in `icons.tsx` (follow existing naming conventions).
+
 1. When adding a new component, add a short entry above and include:
    - Purpose / one-line description
    - Any notable cross-platform differences (web vs native)
