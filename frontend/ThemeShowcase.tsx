@@ -1,5 +1,6 @@
 import React from "react";
-import { ScrollView, View, StyleSheet, TouchableOpacity } from "react-native";
+import { View, StyleSheet, TouchableOpacity } from "react-native";
+import BoxContainer from "./components/layout/BoxContainer";
 import AppText from "./components/AppText";
 import { COLORS, SPACING, FONTS, SYSTEM_FONTS, TYPOGRAPHY, SHADOWS } from "./theme";
 import { Checkbox } from "./components/Checkbox";
@@ -24,7 +25,7 @@ const ThemeShowcase: React.FC = () => {
   const [progress, setProgress] = useState(0);
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <BoxContainer>
       <AppText variant="title">Theme Showcase</AppText>
 
       <Box title="Colors">
@@ -36,11 +37,11 @@ const ThemeShowcase: React.FC = () => {
       </Box>
 
       <Box title="Spacing">
-        <View style={styles.spacingRow}>
+        <View style={styles.spacingCol}>
           {Object.entries(SPACING).map(([k, v]) => (
-            <View key={k} style={styles.spacingCol}>
+            <View key={k}>
               <View style={[styles.spacingBox, { height: v * 3, width: v * 6 }]} />
-              <AppText variant="notes" style={styles.spacingLabel}>{`${k} — ${v}px`}</AppText>
+              <AppText variant="notes">{`${k} — ${v}px`}</AppText>
             </View>
           ))}
         </View>
@@ -86,17 +87,11 @@ const ThemeShowcase: React.FC = () => {
           </View>
         </View>
       </Box>
-    </ScrollView>
+    </BoxContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    padding: SPACING.md,
-    alignItems: "stretch",
-    gap: SPACING.lg,
-  },
-
   colorsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -116,29 +111,26 @@ const styles = StyleSheet.create({
   },
   swatchLabel: {
     marginTop: 6,
-    color: "#333",
+    color: COLORS.black,
   },
   hexLabel: {
-    color: "#666",
+    color: COLORS.grayLight,
   },
   spacingRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
   },
   spacingCol: {
     alignItems: "center",
-    width: "30%",
   },
   spacingBox: {
-    backgroundColor: "#f2f4ff",
+    backgroundColor: COLORS.black,
     borderRadius: 6,
     marginBottom: 6,
     padding: SPACING.sm,
     ...SHADOWS.card.rn,
   },
-  spacingLabel: {
-    color: "#333",
-  },
+
   fontsList: {
     marginTop: 6,
   },
@@ -157,13 +149,6 @@ const styles = StyleSheet.create({
   },
   typoSample: {
     marginBottom: 6,
-  },
-  sectionCard: {
-    backgroundColor: COLORS.colorWhite,
-    borderRadius: 12,
-    padding: SPACING.md,
-    marginBottom: 12,
-    ...SHADOWS.card.rn,
   },
 });
 
