@@ -173,6 +173,9 @@ function Input<T = any>({
     // Only open if the input type is dropdown
     if (type !== "dropdown") return;
 
+    // Clear the text when opening the dropdown
+    if (rest.onChangeText) rest.onChangeText("");
+
     // Measure where the input is on the entire screen (Page X/Y)
     wrapperRef.current?.measureInWindow((x, y, width, height) => {
       // Calculate position just below the input box
@@ -188,8 +191,6 @@ function Input<T = any>({
     if (isOpen) {
       closeDropdown();
     } else {
-      // Clear the text when opening the dropdown via the icon
-      if (rest.onChangeText) rest.onChangeText("");
       openDropdown();
     }
   };
@@ -202,47 +203,54 @@ function Input<T = any>({
         </AppText>
       )}
 
-      <Animated.View
-        ref={wrapperRef}
-        collapsable={false}
-        style={[styles.inputWrapper, { borderColor: animatedBorderColor }]}
+      <Pressable
+        onPress={() => {
+          if (type === "dropdown" && !isOpen) openDropdown();
+        }}
+        style={styles.inputWrapperPressable}
       >
-        <TextInput
-          ref={inputRef}
-          style={[styles.input, Platform.OS === "web" ? ({ outlineWidth: 0 } as any) : undefined]}
-          placeholder={Platform.OS === "android" ? "" : placeholder}
-          placeholderTextColor={COLORS.lightGray}
-          keyboardType={getKeyboardType()}
-          secureTextEntry={getSecureTextEntry()}
-          onFocus={(e) => {
-            // If the input receives focus, open the dropdown, unless it's already open or closing
-            if (type === "dropdown" && !isOpen && !isClosingRef.current) openDropdown();
-            rest.onFocus?.(e);
-          }}
-          // If using the Modal/Pressable solution, we typically don't need onBlur here
-          // as we rely on the overlay tap to close everything.
-          // If you need specific onBlur logic, be careful with timing.
-          {...rest}
-          selectionColor={selectionColor}
-          cursorColor={cursorColor}
-          {...(Platform.OS === "web" && webNativeID ? { nativeID: webNativeID } : {})}
-        />
+        <Animated.View
+          ref={wrapperRef}
+          collapsable={false}
+          style={[styles.inputWrapper, { borderColor: animatedBorderColor }]}
+        >
+          <TextInput
+            ref={inputRef}
+            style={[styles.input, Platform.OS === "web" ? ({ outlineWidth: 0 } as any) : undefined]}
+            placeholder={Platform.OS === "android" ? "" : placeholder}
+            placeholderTextColor={COLORS.lightGray}
+            keyboardType={getKeyboardType()}
+            secureTextEntry={getSecureTextEntry()}
+            onFocus={(e) => {
+              // If the input receives focus, open the dropdown, unless it's already open or closing
+              if (type === "dropdown" && !isOpen && !isClosingRef.current) openDropdown();
+              rest.onFocus?.(e);
+            }}
+            // If using the Modal/Pressable solution, we typically don't need onBlur here
+            // as we rely on the overlay tap to close everything.
+            // If you need specific onBlur logic, be careful with timing.
+            {...rest}
+            selectionColor={selectionColor}
+            cursorColor={cursorColor}
+            {...(Platform.OS === "web" && webNativeID ? { nativeID: webNativeID } : {})}
+          />
 
-        {type === "dropdown" && (
-          // Use Pressable instead of TouchableOpacity for better responsiveness
-          <Pressable onPress={toggleDropdown} style={styles.iconButton}>
-            <Animated.View style={{ transform: [{ rotate }] }}>
-              <ICONS.down width={20} height={20} color={COLORS.primary1} />
-            </Animated.View>
-          </Pressable>
-        )}
+          {type === "dropdown" && (
+            // Use Pressable instead of TouchableOpacity for better responsiveness
+            <Pressable onPress={toggleDropdown} style={styles.iconButton}>
+              <Animated.View style={{ transform: [{ rotate }] }}>
+                <ICONS.down width={20} height={20} color={COLORS.primary1} />
+              </Animated.View>
+            </Pressable>
+          )}
 
-        {Platform.OS === "android" && isEmpty && placeholder && (
-          <Text style={styles.customPlaceholder} pointerEvents="none">
-            {placeholder}
-          </Text>
-        )}
-      </Animated.View>
+          {Platform.OS === "android" && isEmpty && placeholder && (
+            <Text style={styles.customPlaceholder} pointerEvents="none">
+              {placeholder}
+            </Text>
+          )}
+        </Animated.View>
+      </Pressable>
 
       {/* Render Dropdown in a Transparent Modal */}
       {type === "dropdown" && isOpen && (
@@ -334,6 +342,16 @@ const styles = StyleSheet.create({
     boxShadow: SHADOWS.card.web,
     minHeight: 44,
     paddingRight: SPACING.sm,
+  },
+  // Transparent pressable wrapper that covers the input area (no visible styling)
+  inputWrapperPressable: {
+    width: "100%",
+    alignSelf: "stretch",
+    borderRadius: SPACING.lg,
+    backgroundColor: "transparent",
+    paddingRight: SPACING.sm,
+    minHeight: 44,
+    justifyContent: "center",
   },
   input: {
     flex: 1,
