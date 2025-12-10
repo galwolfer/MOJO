@@ -7,11 +7,15 @@ import {
   Animated,
   Platform,
   Text,
+  Modal,
+  Easing,
   // Changed to Pressable for better handling of simultaneous gestures
   Pressable,
 } from "react-native";
-import { COLORS, SPACING, SHADOWS, FONTS, TYPOGRAPHY } from "../../theme";
+import { COLORS, SPACING, SHADOWS, FONTS, TYPOGRAPHY, DIVIDER } from "../../theme";
 import AppText from "../AppText";
+import { Checkbox } from "../icons/Checkbox";
+import { Chevron } from "../icons/Chevron";
 
 type InputType = "text" | "email" | "password" | "number";
 
@@ -19,9 +23,10 @@ interface InputProps<T = any> extends Omit<TextInputProps, "style"> {
   type?: InputType;
   label?: string;
   error?: string;
-  // Optional props kept for compatibility with the earlier dropdown UX (currently unused)
+  // Optional props for dropdown functionality
   options?: string[];
-  onSelect?: (value: string) => void;
+  onSelect?: (values: string[]) => void;
+  multiSelect?: boolean;
 }
 
 const hexToRgba = (hex: string, alpha = 1) => {
@@ -51,18 +56,54 @@ function useWebCaret(idPrefix = "input") {
   return idRef.current;
 }
 
-function Input<T = any>({ type = "text", label, error, placeholder, options, onSelect, ...rest }: InputProps<T>) {
+function Input<T = any>({
+  type = "text",
+  label,
+  error,
+  placeholder,
+  options,
+  onSelect,
+  multiSelect = false,
+  ...rest
+}: InputProps<T>) {
   const borderColorAnim = useRef(new Animated.Value(0)).current;
   const webNativeID = useWebCaret();
 
   const wrapperRef = useRef<View>(null);
   const inputRef = useRef<TextInput>(null);
 
+  const [selected, setSelected] = useState<string[]>([]);
+  const [isOpen, setIsOpen] = useState(false);
+  const [dropdownLayout, setDropdownLayout] = useState({ top: 0, left: 0, width: 0 });
+  const dropdownAnim = useRef(new Animated.Value(0)).current;
+
+  const closeDropdown = () => {
+    Animated.timing(dropdownAnim, {
+      toValue: 0,
+      duration: 220,
+      easing: Easing.bezier(0.2, 0.8, 0.2, 1),
+      useNativeDriver: true,
+    }).start(() => {
+      setIsOpen(false);
+      if (multiSelect) onSelect?.(selected);
+    });
+  };
   const providedValue = (rest as any).value ?? (rest as any).defaultValue;
   const isEmpty =
     providedValue === undefined ||
     providedValue === null ||
     (typeof providedValue === "string" && providedValue.length === 0);
+
+  // Sync selected with provided value for options
+  useEffect(() => {
+    if (options && typeof providedValue === "string") {
+      const vals = providedValue
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s);
+      setSelected(vals);
+    }
+  }, [providedValue, options]);
 
   // ... (animateBorder, animatedBorderColor, rotate, useEffects for rotation and border) ...
   const animateBorder = (hasError: boolean) => {
@@ -114,8 +155,31 @@ function Input<T = any>({ type = "text", label, error, placeholder, options, onS
 
       <Pressable
         onPress={() => {
-          // focus the input when pressing the wrapper
-          inputRef.current?.focus();
+          if (options) {
+            if (isOpen) {
+              // close with animation
+              closeDropdown();
+            } else {
+              // measure and open
+              wrapperRef.current?.measure((x, y, width, height, pageX, pageY) => {
+                // subtract a small spacing so the dropdown visually sits flush with the input
+                // On mobile use half the input height so the dropdown sits closer to the input center
+                const topOffset = Platform.OS === "web" ? pageY + height + SPACING.sm : pageY + height / 2;
+                setDropdownLayout({ top: topOffset, left: pageX, width });
+                setIsOpen(true);
+                // start open animation shortly after setIsOpen so Modal is visible
+                requestAnimationFrame(() => {
+                  Animated.timing(dropdownAnim, {
+                    toValue: 1,
+                    duration: 320,
+                    easing: Easing.bezier(0.68, -0.55, 0.265, 1.55),
+                    useNativeDriver: true,
+                  }).start();
+                });
+              });
+            }
+            inputRef.current?.focus();
+          }
         }}
         style={styles.inputWrapperPressable}
       >
@@ -127,24 +191,33 @@ function Input<T = any>({ type = "text", label, error, placeholder, options, onS
           <TextInput
             ref={inputRef}
             style={[styles.input, Platform.OS === "web" ? ({ outlineWidth: 0 } as any) : undefined]}
-            placeholder={Platform.OS === "android" ? "" : placeholder}
+            placeholder={
+              Platform.OS === "android" ? "" : options ? (selected.length === 0 ? placeholder : "") : placeholder
+            }
             placeholderTextColor={COLORS.lightGray}
             keyboardType={getKeyboardType()}
             secureTextEntry={getSecureTextEntry()}
+            editable={!options}
+            value={options ? selected.join(", ") : (rest as any).value}
             onFocus={(e) => {
               rest.onFocus?.(e);
             }}
             onChangeText={(text) => {
-              rest.onChangeText?.(text);
+              if (!options) {
+                rest.onChangeText?.(text);
+              }
             }}
-            // If using the Modal/Pressable solution, we typically don't need onBlur here
-            // as we rely on the overlay tap to close everything.
-            // If you need specific onBlur logic, be careful with timing.
             {...rest}
             selectionColor={selectionColor}
             cursorColor={cursorColor}
             {...(Platform.OS === "web" && webNativeID ? { nativeID: webNativeID } : {})}
           />
+
+          {options && (
+            <View style={{ marginRight: 8 }}>
+              <Chevron isOpen={isOpen} size={TYPOGRAPHY.input.lineHeight ?? TYPOGRAPHY.input.fontSize} />
+            </View>
+          )}
 
           {Platform.OS === "android" && isEmpty && placeholder && (
             <Text style={styles.customPlaceholder} pointerEvents="none">
@@ -153,6 +226,80 @@ function Input<T = any>({ type = "text", label, error, placeholder, options, onS
           )}
         </Animated.View>
       </Pressable>
+
+      {options && (
+        <Modal
+          visible={isOpen}
+          transparent={true}
+          animationType="none"
+          onRequestClose={() => {
+            // use closeAnimation
+            closeDropdown();
+          }}
+        >
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => {
+              closeDropdown();
+            }}
+          >
+            <Animated.View
+              style={[
+                styles.dropdown,
+                {
+                  top: dropdownLayout.top,
+                  left: dropdownLayout.left,
+                  width: dropdownLayout.width,
+                  opacity: dropdownAnim,
+                  transform: [
+                    {
+                      translateY: dropdownAnim.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }),
+                    },
+                    {
+                      scaleY: dropdownAnim.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1] }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              {options.map((option, index) => (
+                <React.Fragment key={option}>
+                  <Pressable
+                    onPress={() => {
+                      if (!multiSelect) {
+                        const newSelected = [option];
+                        setSelected(newSelected);
+                        // animate close then call onSelect
+                        Animated.timing(dropdownAnim, {
+                          toValue: 0,
+                          duration: 220,
+                          easing: Easing.bezier(0.2, 0.8, 0.2, 1),
+                          useNativeDriver: true,
+                        }).start(() => {
+                          setIsOpen(false);
+                          onSelect?.(newSelected);
+                        });
+                      } else {
+                        const newSelected = selected.includes(option)
+                          ? selected.filter((s) => s !== option)
+                          : [...selected, option];
+                        setSelected(newSelected);
+                        // wait for outside click to finalize
+                      }
+                    }}
+                    style={styles.option}
+                  >
+                    {multiSelect && <Checkbox checked={selected.includes(option)} onChange={() => {}} size={18} />}
+                    <AppText>{option}</AppText>
+                  </Pressable>
+                  {index < options.length - 1 && <View style={styles.optionDivider} />}
+                </React.Fragment>
+              ))}
+            </Animated.View>
+          </Pressable>
+        </Modal>
+      )}
+
       {/* dropdown removed - use external picker component if needed */}
 
       {error && (
@@ -223,6 +370,31 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: COLORS.primary7,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "transparent",
+  },
+  dropdown: {
+    position: "absolute",
+    backgroundColor: COLORS.white,
+    borderRadius: SPACING.lg,
+    borderWidth: 0.15,
+    borderColor: COLORS.brightP1,
+    boxShadow: SHADOWS.card.web,
+    ...(Platform.OS !== "web" ? SHADOWS.card.rn : {}),
+  },
+  option: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    gap: SPACING.sm,
+  },
+  optionDivider: {
+    height: DIVIDER.width,
+    backgroundColor: DIVIDER.color,
+    marginHorizontal: SPACING.md,
   },
 });
 

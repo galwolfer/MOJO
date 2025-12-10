@@ -93,6 +93,11 @@ export const SHADOWS = {
   },
 };
 
+export const DIVIDER = {
+  color: COLORS.white3,
+  width: 1,
+};
+
 export const TYPOGRAPHY = {
   title: {
     fontFamily: FONTS.fredokaBold,

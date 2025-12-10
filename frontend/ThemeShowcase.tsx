@@ -30,6 +30,9 @@ const ThemeShowcase: React.FC = () => {
   const [passwordInput, setPasswordInput] = useState("");
   const [fruitInput, setFruitInput] = useState("");
   const [selectedFruit, setSelectedFruit] = useState<string | null>(null);
+  const [numberInput, setNumberInput] = useState("");
+  const [singleOption, setSingleOption] = useState<string[]>([]);
+  const [multiOptions, setMultiOptions] = useState<string[]>([]);
   const fruits = ["Apple", "Banana", "Cherry", "Date", "Elderberry"];
 
   return (
@@ -113,22 +116,44 @@ const ThemeShowcase: React.FC = () => {
               error={passwordInput && passwordInput.length < 6 ? "Password too short" : undefined}
             />
             <Input
+              type="number"
+              label="Number"
+              value={numberInput}
+              onChangeText={setNumberInput}
+              placeholder="Enter a number"
+            />
+            <Input
               type="text"
-              label="Fruit"
-              placeholder="Select or type..."
+              label="Fruit (Single Select)"
+              placeholder="Select a fruit..."
               options={fruits}
               value={fruitInput}
               onChangeText={(t) => {
                 setFruitInput(t);
                 setSelectedFruit(null);
               }}
-              onSelect={(item: string) => {
-                const val = String(item);
+              onSelect={(values: string[]) => {
+                const val = values[0] || "";
                 setSelectedFruit(val);
                 setFruitInput(val);
               }}
             />
             {selectedFruit ? <AppText variant="notes">Selected: {selectedFruit}</AppText> : null}
+            <Input
+              label="Single Option Dropdown"
+              placeholder="Select the only option..."
+              options={["Only Choice"]}
+              onSelect={setSingleOption}
+            />
+            {singleOption.length > 0 && <AppText variant="notes">Selected: {singleOption.join(", ")}</AppText>}
+            <Input
+              label="Multi-Select Dropdown"
+              placeholder="Select multiple fruits..."
+              options={fruits}
+              multiSelect
+              onSelect={setMultiOptions}
+            />
+            {multiOptions.length > 0 && <AppText variant="notes">Selected: {multiOptions.join(", ")}</AppText>}
           </View>
         </View>
       </Box>
