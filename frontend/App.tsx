@@ -1,9 +1,10 @@
 import { useCallback } from "react";
 import { StatusBar } from "expo-status-bar";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, View, useWindowDimensions, Platform } from "react-native";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
-import ThemeShowcase from './ThemeShowcase';
+import ThemeShowcase from "./ThemeShowcase";
+import { COLORS, SPACING } from "./theme";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -23,25 +24,62 @@ export default function App() {
     }
   }, [fontsLoaded, fontError]);
 
+  // Call layout-related hooks before any early returns so hooks order stays stable
+  const { width, height } = useWindowDimensions();
+  // treat wide viewports as desktop where we center a mobile-sized device
+  const isDesktopLike = Platform.OS === "web" ? width >= 700 : width >= 700;
+
   if (!fontsLoaded && !fontError) {
     return null;
   }
 
-  return ( 
-    <View style={styles.container} onLayout={onLayoutRootView}> 
-      <ThemeShowcase /> 
-      <StatusBar style="auto" /> 
-    </View> 
-  ); 
+  const outerStyle = isDesktopLike ? styles.desktopOuter : styles.container;
+
+  const deviceWidth = 600; // target mobile device width on desktop
+  const deviceHeight = Math.min(height, 900); // keep some margin
+
+  const deviceStyle = isDesktopLike
+    ? [styles.deviceFrame, { width: deviceWidth, height: deviceHeight }]
+    : styles.deviceFull;
+
+  return (
+    <View style={outerStyle} onLayout={onLayoutRootView}>
+      <View style={deviceStyle}>
+        <ThemeShowcase />
+      </View>
+      <StatusBar style="auto" />
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.white3,
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
+    gap: SPACING.md,
+  },
+  desktopOuter: {
+    flex: 1,
+    backgroundColor: COLORS.black,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  deviceFrame: {
+    borderRadius: 20,
+    overflow: "hidden",
+    backgroundColor: COLORS.white3,
+    // shadow (works on native); web will approximate
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 12,
+  },
+  deviceFull: {
+    flex: 1,
+    width: "100%",
   },
   text: {
     fontSize: 16,

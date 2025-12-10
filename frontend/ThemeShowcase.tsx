@@ -1,15 +1,21 @@
 import React from "react";
-import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { COLORS, SPACING, FONTS, SYSTEM_FONTS, TYPOGRAPHY } from "./theme";
+import { ScrollView, View, StyleSheet, TouchableOpacity } from "react-native";
+import AppText from "./components/AppText";
+import { COLORS, SPACING, FONTS, SYSTEM_FONTS, TYPOGRAPHY, SHADOWS } from "./theme";
 import { Checkbox } from "./components/Checkbox";
 import { ProgressIcon } from "./components/ProgressIcon";
+import Box from "./components/Box";
 import { useState } from "react";
 
 const ColorSwatch = ({ name, hex }: { name: string; hex: string }) => (
   <View style={styles.swatchWrap}>
     <View style={[styles.swatch, { backgroundColor: hex }]} />
-    <Text style={styles.swatchLabel}>{name}</Text>
-    <Text style={styles.hexLabel}>{hex}</Text>
+    <AppText variant="notes" style={styles.swatchLabel}>
+      {name}
+    </AppText>
+    <AppText variant="notes" style={styles.hexLabel}>
+      {hex}
+    </AppText>
   </View>
 );
 
@@ -19,116 +25,100 @@ const ThemeShowcase: React.FC = () => {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.header}>Theme Showcase</Text>
+      <AppText variant="title">Theme Showcase</AppText>
 
-      <Text style={styles.sectionTitle}>Colors</Text>
-      <View style={styles.colorsGrid}>
-        {Object.entries(COLORS).map(([name, hex]) => (
-          <ColorSwatch key={name} name={name} hex={hex} />
-        ))}
-      </View>
-
-      <Text style={styles.sectionTitle}>Spacing</Text>
-      <View style={styles.spacingRow}>
-        {Object.entries(SPACING).map(([k, v]) => (
-          <View key={k} style={styles.spacingCol}>
-            <View style={[styles.spacingBox, { height: v * 3, width: v * 6 }]} />
-            <Text style={styles.spacingLabel}>{`${k} — ${v}px`}</Text>
-          </View>
-        ))}
-      </View>
-
-      <Text style={styles.sectionTitle}>Fonts (custom + system fallbacks)</Text>
-      <View style={styles.fontsList}>
-        {Object.entries(FONTS).map(([key, family]) => (
-          <View key={key} style={styles.fontRow}>
-            <Text style={[styles.fontSample, { fontFamily: family }]}>{family}</Text>
-            <Text style={styles.fontMeta}>{key}</Text>
-          </View>
-        ))}
-      </View>
-
-      <Text style={styles.sectionTitle}>Typography Presets</Text>
-      <View style={styles.typoList}>
-        {Object.entries(TYPOGRAPHY).map(([key, styleObj]) => (
-          <View key={key} style={styles.typoRow}>
-            <Text style={[styles.typoSample, { ...(styleObj as any) }]}>{key} — The quick brown fox jumps</Text>
-            <Text style={styles.fontMeta}>{JSON.stringify(styleObj).slice(0, 80)}...</Text>
-          </View>
-        ))}
-      </View>
-
-      <Text style={styles.sectionTitle}>Interactive Components</Text>
-      <View style={{ gap: 20, paddingBottom: 40 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          <Text style={{ fontFamily: FONTS.fredokaMedium }}>Checkbox:</Text>
-          <Checkbox checked={isChecked} onChange={setIsChecked} size={40} />
+      <Box title="Colors">
+        <View style={styles.colorsGrid}>
+          {Object.entries(COLORS).map(([name, hex]) => (
+            <ColorSwatch key={name} name={name} hex={hex} />
+          ))}
         </View>
+      </Box>
 
-        <View style={{ gap: 10 }}>
-          <Text style={{ fontFamily: FONTS.fredokaMedium }}>Progress Icon (Value: {progress.toFixed(1)}):</Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 20 }}>
-            <ProgressIcon value={progress} size={40} />
-            <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
-              {[0, 0.25, 0.5, 0.75, 1].map((val) => (
-                <TouchableOpacity
-                  key={val}
-                  onPress={() => setProgress(val)}
-                  style={{ padding: 8, backgroundColor: "#eee", borderRadius: 4 }}
-                >
-                  <Text style={{ fontSize: 12 }}>{val * 100}%</Text>
-                </TouchableOpacity>
-              ))}
+      <Box title="Spacing">
+        <View style={styles.spacingRow}>
+          {Object.entries(SPACING).map(([k, v]) => (
+            <View key={k} style={styles.spacingCol}>
+              <View style={[styles.spacingBox, { height: v * 3, width: v * 6 }]} />
+              <AppText variant="notes" style={styles.spacingLabel}>{`${k} — ${v}px`}</AppText>
+            </View>
+          ))}
+        </View>
+      </Box>
+
+      <Box title="Typography Presets">
+        <View style={styles.typoList}>
+          {Object.entries(TYPOGRAPHY).map(([key, styleObj]) => (
+            <View key={key} style={styles.typoRow}>
+              <AppText variant={key as any} style={styles.typoSample}>
+                {key} — The quick brown fox jumps
+              </AppText>
+              <AppText variant="notes">{JSON.stringify(styleObj).slice(0, 80)}...</AppText>
+            </View>
+          ))}
+        </View>
+      </Box>
+      <Box title="Interactive Components">
+        <View style={{ gap: 20, paddingBottom: 40 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <AppText variant="bodyText">Checkbox:</AppText>
+            <Checkbox checked={isChecked} onChange={setIsChecked} size={40} />
+          </View>
+
+          <View style={{ gap: 10 }}>
+            <AppText variant="bodyText">Progress Icon (Value: {progress.toFixed(1)}):</AppText>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 20 }}>
+              <ProgressIcon value={progress} size={40} />
+              <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
+                {[0, 0.25, 0.5, 0.75, 1].map((val) => (
+                  <TouchableOpacity
+                    key={val}
+                    onPress={() => setProgress(val)}
+                    style={{ padding: 8, backgroundColor: "#eee", borderRadius: 4 }}
+                  >
+                    <AppText variant="notes" style={{ fontSize: 12 }}>
+                      {val * 100}%
+                    </AppText>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
           </View>
         </View>
-      </View>
-
-      <View style={{ height: 36 }} />
+      </Box>
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    padding: 18,
-    backgroundColor: "#fff",
+    padding: SPACING.md,
     alignItems: "stretch",
+    gap: SPACING.lg,
   },
-  header: {
-    fontSize: 28,
-    fontWeight: "700",
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginTop: 18,
-    marginBottom: 8,
-  },
+
   colorsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: SPACING.md,
   },
   swatchWrap: {
     width: "30%",
-    marginBottom: 12,
+    marginBottom: SPACING.md,
+    padding: SPACING.sm,
   },
   swatch: {
     height: 64,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "#eee",
+    ...SHADOWS.card.rn,
   },
   swatchLabel: {
     marginTop: 6,
-    fontSize: 12,
     color: "#333",
   },
   hexLabel: {
-    fontSize: 11,
     color: "#666",
   },
   spacingRow: {
@@ -143,9 +133,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#f2f4ff",
     borderRadius: 6,
     marginBottom: 6,
+    padding: SPACING.sm,
+    ...SHADOWS.card.rn,
   },
   spacingLabel: {
-    fontSize: 12,
     color: "#333",
   },
   fontsList: {
@@ -157,10 +148,7 @@ const styles = StyleSheet.create({
   fontSample: {
     fontSize: 20,
   },
-  fontMeta: {
-    fontSize: 12,
-    color: "#666",
-  },
+
   typoList: {
     marginTop: 6,
   },
@@ -168,8 +156,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   typoSample: {
-    fontSize: 16,
     marginBottom: 6,
+  },
+  sectionCard: {
+    backgroundColor: COLORS.colorWhite,
+    borderRadius: 12,
+    padding: SPACING.md,
+    marginBottom: 12,
+    ...SHADOWS.card.rn,
   },
 });
 

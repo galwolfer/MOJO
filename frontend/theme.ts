@@ -72,6 +72,20 @@ export const SYSTEM_FONTS = {
   fredokaHeavy: "sans-serif-black",
 };
 
+// Reusable shadow variants (CSS string for web + RN approximation)
+export const SHADOWS = {
+  card: {
+    web: "0 0 15px 0 rgba(0, 0, 0, 0.05) inset, 0 1px 10px 0 rgba(21, 39, 124, 0.14)",
+    rn: {
+      shadowColor: "rgba(21, 39, 124, 0.14)",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.14,
+      shadowRadius: 10,
+      elevation: 4,
+    },
+  },
+};
+
 export const TYPOGRAPHY = {
   title: {
     fontFamily: FONTS.fredokaBold,

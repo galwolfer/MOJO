@@ -66,9 +66,6 @@ export function ProgressIcon({ value, size = 18 }: ProgressIconProps) {
     [centerY + radius, centerY - radius * 0.6, centerY - radius * 0.64, centerY - radius]
   );
 
-  // Rotation: 90deg at 0%, 45deg at 50%, 0deg at 100%
-  const rotation = useTransform(springValue, [0, 1], [90, 0]);
-
   // Stroke width increases during completion animation
   const strokeWidth = useTransform(completionProgress, [0, 1], [1, 2.5]);
 
@@ -105,7 +102,7 @@ export function ProgressIcon({ value, size = 18 }: ProgressIconProps) {
         fill="none"
         preserveAspectRatio="none"
         viewBox="0 0 18 18"
-        style={{ overflow: "visible", rotate: rotation }}
+        style={{ overflow: "visible" }}
       >
         <defs>
           <clipPath id={`rounded-rect-clip-${size}`}>
