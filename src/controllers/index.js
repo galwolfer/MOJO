@@ -24,14 +24,49 @@ export const galUpdateProfile = async (req, res, _next) => {
 };
 // ==================== GAL — CONTROLLERS (END) =======================
 // ==================== JONI — CONTROLLERS (START) ====================
-// Example controller for Joni's feature set.
+// Controllers for Joni's feature set (Coacher Algorithm / Priority Engine)
+
+// import { joniService } from "../services/index.js";
+
+export const joniCoachNext = async (req, res, _next) => {
+  // TODO(Joni): compute next recommended activity using the Coacher Algorithm
+  try {
+    const { userId } = req.body || {};
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required" });
+    }
+
+    const result = await joniService.computePriority(userId);
+    res.json({ owner: "Joni", ...result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const joniCoachFeedback = async (req, res, _next) => {
+  // TODO(Joni): record user feedback for the Coacher Algorithm
+  try {
+    const { userId, activityId, action } = req.body || {};
+    if (!userId || !activityId || !action) {
+      return res.status(400).json({ error: "userId, activityId, and action are required" });
+    }
+
+    await joniService.recordFeedback({ userId, activityId, action });
+    res.json({ owner: "Joni", ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 export const joniStats = async (_req, res, _next) => {
   // TODO(Joni): compute statistics or call services.joni*()
-  res.json({ owner: "Joni", stats: { users: 0, sessions: 0 } });
+  const result = await joniService.stats();
+  res.json({ owner: "Joni", stats: result });
 };
 
 export const joniTriggerJob = async (_req, res, _next) => {
-  // TODO(Joni): trigger a background-like job (synchronously mocked)
-  res.json({ owner: "Joni", job: "queued" });
+  // TODO(Joni): trigger a background-like job (mocked example)
+  const result = await joniService.triggerJob();
+  res.json({ owner: "Joni", job: result });
 };
 // ==================== JONI — CONTROLLERS (END) ======================

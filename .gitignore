@@ -25,3 +25,12 @@ dist-ssr
 .env
 /scripts/.token
 /md
+
+# Backups and DB dumps
+/backups/
+/dump/
+mongodump-
+*.dump
+
+# Training data and models
+/data/
