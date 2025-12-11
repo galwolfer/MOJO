@@ -1,16 +1,16 @@
 /**
  * @fileoverview Services Index & Coacher Algorithm
  * @module services/index
- * 
+ *
  * Central export hub for all Mojo Coacher services and the core scoring algorithm.
  * Re-exports services from subdirectories and provides the main task prioritization logic.
- * 
+ *
  * Key responsibilities:
  * - Export team-specific placeholder services (Ofek, Gal)
  * - Provide coacherAlgorithm for task scoring and prioritization
  * - Bridge between database tasks and priority scoring algorithm
  * - Convert task formats for compatibility with scoring engine
- * 
+ *
  * Services Directory Structure:
  * - auth/      : Authentication and user management
  * - tasks/     : Task CRUD and expired task handling
@@ -18,7 +18,7 @@
  * - ml/        : Machine learning predictions
  * - notifications/: Push notification delivery
  * - telemetry/ : Event logging and analytics
- * 
+ *
  * @requires models/Task - Task database model
  * @requires algorithms/priority/priority - Task scoring algorithm
  */
@@ -51,14 +51,11 @@ export const galService = {
 // ==================== GAL — SERVICES (END) =======================
 
 // ==================== JONI — SERVICES (START) ====================
-import mongoose from "mongoose";
 import Task from "../models/Task.js";
 import { scoreActivities } from "../algorithms/priority/priority.js";
 
 // Open = "todo" | "in-progress", Closed = "done"
-const mapStatus = (s) =>
-  (s === "todo" || s === "in-progress") ? "open" :
-  (s === "done" ? "closed" : "open");
+const mapStatus = (s) => (s === "todo" || s === "in-progress" ? "open" : s === "done" ? "closed" : "open");
 
 export const coacherAlgorithm = {
   // importing tasks by username from the DB
@@ -66,7 +63,18 @@ export const coacherAlgorithm = {
     // Only user's open tasks
     const tasks = await Task.find(
       { userId, status: { $in: ["todo", "in-progress"] } },
-      { taskname: 1, importance: 1, effort: 1, dueDate: 1, status: 1, tags: 1, duration_min: 1, recurrence: 1, timeOfDay: 1, userId: 1 }
+      {
+        taskname: 1,
+        importance: 1,
+        effort: 1,
+        dueDate: 1,
+        status: 1,
+        tags: 1,
+        duration_min: 1,
+        recurrence: 1,
+        timeOfDay: 1,
+        userId: 1,
+      }
     ).lean();
 
     if (!tasks || tasks.length === 0) {
@@ -74,13 +82,13 @@ export const coacherAlgorithm = {
     }
 
     // minimal normalization
-    const normalized = tasks.map(t => ({
+    const normalized = tasks.map((t) => ({
       ...t,
       importance: Number.isFinite(t.importance) ? t.importance : 3,
       effort: Number.isFinite(t.effort) ? t.effort : 2,
       dueDate: t.dueDate ? new Date(t.dueDate) : null,
       status: t.status || "todo",
-      tags: Array.isArray(t.tags) ? t.tags : []
+      tags: Array.isArray(t.tags) ? t.tags : [],
     }));
 
     return this.computeFromTasks(normalized, userProfile);

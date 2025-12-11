@@ -16,7 +16,7 @@ connectDatabase()
     server.listen(port, () => {
       logger.info(`HTTP server listening on http://localhost:${port}`);
       startPriorityScheduler();
-      
+
       // Start expired task checker (runs every hour)
       // Sends push notifications when tasks expire
       startExpiredTaskChecker();
