@@ -7,7 +7,6 @@ import {
   Animated,
   Platform,
   Text,
-  Modal,
   Easing,
   // Changed to Pressable for better handling of simultaneous gestures
   Pressable,
@@ -17,6 +16,9 @@ import AppText from "../AppText";
 import { Checkbox } from "../icons/Checkbox";
 import { Chevron } from "../icons/Chevron";
 import Tag from "../icons/inputs/tag";
+import DropdownModal from "./DropdownModal";
+import TagsBelow from "./TagsBelow";
+import InputField from "./InputField";
 
 type InputType = "text" | "email" | "password" | "number";
 
@@ -189,10 +191,10 @@ function Input<T = any>({
           collapsable={false}
           style={[styles.inputWrapper, { borderColor: animatedBorderColor }]}
         >
-          <TextInput
+          <InputField
             ref={inputRef}
             style={[styles.input, Platform.OS === "web" ? ({ outlineWidth: 0 } as any) : undefined]}
-            placeholder={
+            placeholderText={
               Platform.OS === "android"
                 ? ""
                 : options
@@ -211,10 +213,10 @@ function Input<T = any>({
             secureTextEntry={getSecureTextEntry()}
             editable={!options}
             value={options ? "" : (rest as any).value}
-            onFocus={(e) => {
+            onFocus={(e: any) => {
               rest.onFocus?.(e);
             }}
-            onChangeText={(text) => {
+            onChangeText={(text: string) => {
               if (!options) {
                 rest.onChangeText?.(text);
               }
@@ -240,97 +242,48 @@ function Input<T = any>({
       </Pressable>
 
       {options && multiSelect && selected.length > 0 && (
-        <View style={styles.tagsContainerBelow} pointerEvents="box-none">
-          {selected.map((s, i) => (
-            <Tag
-              key={s}
-              label={s}
-              colorIndex={paletteIndexFromKey(s)}
-              editable
-              onRemove={() => {
-                const newSelected = selected.filter((x) => x !== s);
-                setSelected(newSelected);
-                onSelect?.(newSelected);
-              }}
-              style={{ marginRight: i < selected.length - 1 ? SPACING.sm : 0 }}
-            />
-          ))}
-        </View>
+        <TagsBelow
+          selected={selected}
+          onRemove={(label: string) => {
+            const newSelected = selected.filter((x) => x !== label);
+            setSelected(newSelected);
+            onSelect?.(newSelected);
+          }}
+        />
       )}
 
       {options && (
-        <Modal
+        <DropdownModal
           visible={isOpen}
-          transparent={true}
-          animationType="none"
-          onRequestClose={() => {
-            // use closeAnimation
-            closeDropdown();
+          dropdownLayout={dropdownLayout}
+          dropdownAnim={dropdownAnim}
+          options={options}
+          multiSelect={!!multiSelect}
+          selected={selected}
+          onToggleOption={(option: string) => {
+            if (!multiSelect) {
+              const newSelected = [option];
+              setSelected(newSelected);
+              // animate close then call onSelect
+              Animated.timing(dropdownAnim, {
+                toValue: 0,
+                duration: 220,
+                easing: Easing.bezier(0.2, 0.8, 0.2, 1),
+                useNativeDriver: true,
+              }).start(() => {
+                setIsOpen(false);
+                onSelect?.(newSelected);
+              });
+            } else {
+              const newSelected = selected.includes(option)
+                ? selected.filter((s) => s !== option)
+                : [...selected, option];
+              setSelected(newSelected);
+              onSelect?.(newSelected);
+            }
           }}
-        >
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => {
-              closeDropdown();
-            }}
-          >
-            <Animated.View
-              style={[
-                styles.dropdown,
-                {
-                  top: dropdownLayout.top,
-                  left: dropdownLayout.left,
-                  width: dropdownLayout.width,
-                  opacity: dropdownAnim,
-                  transform: [
-                    {
-                      translateY: dropdownAnim.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }),
-                    },
-                    {
-                      scaleY: dropdownAnim.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1] }),
-                    },
-                  ],
-                },
-              ]}
-            >
-              {options.map((option, index) => (
-                <React.Fragment key={option}>
-                  <Pressable
-                    onPress={() => {
-                      if (!multiSelect) {
-                        const newSelected = [option];
-                        setSelected(newSelected);
-                        // animate close then call onSelect
-                        Animated.timing(dropdownAnim, {
-                          toValue: 0,
-                          duration: 220,
-                          easing: Easing.bezier(0.2, 0.8, 0.2, 1),
-                          useNativeDriver: true,
-                        }).start(() => {
-                          setIsOpen(false);
-                          onSelect?.(newSelected);
-                        });
-                      } else {
-                        const newSelected = selected.includes(option)
-                          ? selected.filter((s) => s !== option)
-                          : [...selected, option];
-                        setSelected(newSelected);
-                        // update consumer immediately when multi-select changes
-                        onSelect?.(newSelected);
-                        // wait for outside click to finalize
-                      }
-                    }}
-                    style={styles.option}
-                  >
-                    {multiSelect && <Checkbox checked={selected.includes(option)} onChange={() => {}} size={18} />}
-                    <AppText>{option}</AppText>
-                  </Pressable>
-                  {index < options.length - 1 && <View style={styles.optionDivider} />}
-                </React.Fragment>
-              ))}
-            </Animated.View>
-          </Pressable>
-        </Modal>
+          onRequestClose={closeDropdown}
+        />
       )}
 
       {/* dropdown removed - use external picker component if needed */}
