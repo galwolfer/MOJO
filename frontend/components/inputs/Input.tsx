@@ -48,7 +48,14 @@ function useWebCaret(idPrefix = "input") {
     const style = document.createElement("style");
     style.id = `style-${id}`;
     const selectionColor = hexToRgba(COLORS.primary1, 0.28);
-    style.textContent = `#${id} { caret-color: ${COLORS.primary1} !important; } #${id}::selection { background: ${selectionColor} !important; }`;
+    // Localized rules for this input plus broader rules so web text inputs
+    // and textareas use the light placeholder font. We keep the ID-specific
+    // rules to control caret and selection for this input only.
+    style.textContent =
+      `#${id} { caret-color: ${COLORS.primary1} !important; } ` +
+      `#${id}::selection { background: ${selectionColor} !important; } ` +
+      `#${id}::placeholder { font-family: '${FONTS.fredokaLight}' !important; font-weight: 300 !important; color: ${COLORS.lightGray} !important; } ` +
+      `input::placeholder, textarea::placeholder { font-family: '${FONTS.fredokaLight}' !important; font-weight: 300 !important; color: ${COLORS.lightGray} !important; }`;
     document.head.appendChild(style);
     return () => {
       const el = document.getElementById(`style-${id}`);
