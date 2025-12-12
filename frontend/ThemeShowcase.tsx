@@ -19,6 +19,7 @@ import { ICONS, ICON_NAMES } from "./components/icons/icons";
 import Box from "./components/layout/Box";
 import Input from "./components/inputs/Input";
 import Tag from "./components/inputs/tag";
+import PriorityList, { PriorityListItem } from "./components/PriorityList";
 import { useState } from "react";
 
 const ColorSwatch = ({ name, hex }: { name: string; hex: string }) => (
@@ -48,6 +49,12 @@ const ThemeShowcase: React.FC<ThemeShowcaseProps> = ({ iconsSize = "md" }) => {
   const [numberInput, setNumberInput] = useState("");
   const [singleOption, setSingleOption] = useState<string[]>([]);
   const [multiOptions, setMultiOptions] = useState<string[]>([]);
+  const [priorityItems, setPriorityItems] = useState<PriorityListItem[]>([
+    { id: "studies", label: "My studies", icon: <ICONS.study size={20} color={COLORS.primary2} /> },
+    { id: "workout", label: "My workout routine", icon: <ICONS.workout size={20} color={COLORS.primary6} /> },
+    { id: "friends", label: "Meeting my friends", icon: <ICONS.friends size={20} color={COLORS.primary3} /> },
+    { id: "partner", label: "Being with my partner", icon: <ICONS.heart size={20} color={COLORS.primary4} /> },
+  ]);
   const fruits = ["Apple", "Banana", "Cherry", "Date", "Elderberry"];
 
   return (
@@ -177,6 +184,15 @@ const ThemeShowcase: React.FC<ThemeShowcaseProps> = ({ iconsSize = "md" }) => {
                 ))}
               </View>
             )}
+            <AppText variant="bodyText" style={{ marginTop: SPACING.md }}>
+              Rank your goals by priority:
+            </AppText>
+            <PriorityList
+              items={priorityItems}
+              onChange={(next) => {
+                setPriorityItems(next);
+              }}
+            />
           </View>
         </View>
       </Box>
