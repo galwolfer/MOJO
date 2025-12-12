@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from "react";
 import {
   View,
+  ViewStyle,
   TextInput,
   TextInputProps,
   StyleSheet,
@@ -12,7 +13,17 @@ import {
   // Changed to Pressable for better handling of simultaneous gestures
   Pressable,
 } from "react-native";
-import { COLORS, SPACING, SHADOWS, FONTS, TYPOGRAPHY, DIVIDER, ICON_SIZES, IconSizeKey } from "../../theme";
+import {
+  COLORS,
+  SPACING,
+  SHADOWS,
+  FONTS,
+  TYPOGRAPHY,
+  DIVIDER,
+  ICON_SIZES,
+  IconSizeKey,
+  COMPONENT_STYLES,
+} from "../../theme";
 import AppText from "../AppText";
 import { Checkbox } from "../icons/Checkbox";
 import { Chevron } from "../icons/Chevron";
@@ -367,36 +378,19 @@ function Input<T = any>({
 const styles = StyleSheet.create({
   container: {
     alignSelf: "stretch",
-    width: "100%",
+    width: "auto",
     gap: SPACING.sm,
   },
   label: {
     marginBottom: SPACING.sm,
   },
+
   inputWrapper: {
-    display: "flex",
-    flexDirection: "row",
-    width: "100%",
-    alignItems: "center",
-    gap: SPACING.sm + 2,
-    alignSelf: "stretch",
-    borderRadius: SPACING.lg,
-    borderWidth: 0.15,
-    borderColor: COLORS.brightP1,
-    backgroundColor: COLORS.white,
-    boxShadow: SHADOWS.card.web,
-    minHeight: 44,
-    paddingRight: SPACING.sm,
+    ...(COMPONENT_STYLES.inputWrapper as ViewStyle),
   },
   // Transparent pressable wrapper that covers the input area (no visible styling)
   inputWrapperPressable: {
-    width: "100%",
-    alignSelf: "stretch",
-    borderRadius: SPACING.lg,
-    backgroundColor: "transparent",
-    paddingRight: SPACING.sm,
-    minHeight: 44,
-    justifyContent: "center",
+    ...(COMPONENT_STYLES.inputWrapperPressable as ViewStyle),
   },
   input: {
     flex: 1,

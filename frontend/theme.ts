@@ -104,7 +104,64 @@ export const SHADOWS = {
 
 export const DIVIDER = {
   color: COLORS.white3,
-  width: 1,
+  width: 0.9,
+};
+
+// Reusable component-level styles. Keep UI surface tokens here so components
+// can import a consistent set of style primitives (web + RN friendly).
+export const COMPONENT_STYLES = {
+  inputWrapper: {
+    display: "flex",
+    flexDirection: "row",
+    width: "100%",
+    alignItems: "center",
+    // small additional gap used by Input
+    gap: SPACING.sm + 2,
+    alignSelf: "stretch",
+    borderRadius: SPACING.lg,
+    borderWidth: 0.15,
+    borderColor: COLORS.brightP1,
+    backgroundColor: COLORS.white,
+    // web shadow token; RN uses SHADOWS.card.rn where needed
+    boxShadow: SHADOWS.card.web,
+    minHeight: 44,
+    paddingRight: SPACING.sm,
+  },
+  inputWrapperPressable: {
+    width: "100%",
+    alignSelf: "stretch",
+    borderRadius: SPACING.lg,
+    backgroundColor: "transparent",
+    minHeight: 44,
+    justifyContent: "center",
+  },
+  // Container style for grouped list-like surfaces (cards containing rows)
+  listContainer: {
+    display: "flex",
+    flexDirection: "column",
+    width: "100%",
+    alignSelf: "stretch",
+    borderRadius: SPACING.lg,
+    // Use a pixel-visible border on web/native (0.15 was too thin to render reliably)
+    borderWidth: 0.15,
+    borderStyle: "solid",
+    borderColor: COLORS.brightP1,
+    backgroundColor: COLORS.white,
+    boxShadow: SHADOWS.card.web,
+    padding: SPACING.sm,
+  },
+  // Individual row/item inside a listContainer. Keep background transparent
+  // so the container's rounded corners remain visible; padding is applied
+  // per-row so items have spacing and can show separators between them.
+  listItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    gap: SPACING.sm,
+    backgroundColor: "transparent",
+  },
 };
 
 export const TYPOGRAPHY = {

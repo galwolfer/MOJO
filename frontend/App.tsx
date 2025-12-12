@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet, View, useWindowDimensions, Platform } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import ThemeShowcase from "./ThemeShowcase";
@@ -43,12 +44,14 @@ export default function App() {
     : styles.deviceFull;
 
   return (
-    <View style={outerStyle} onLayout={onLayoutRootView}>
-      <View style={deviceStyle}>
-        <ThemeShowcase />
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={outerStyle} onLayout={onLayoutRootView}>
+        <View style={deviceStyle}>
+          <ThemeShowcase />
+        </View>
+        <StatusBar style="auto" />
       </View>
-      <StatusBar style="auto" />
-    </View>
+    </GestureHandlerRootView>
   );
 }
 

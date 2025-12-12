@@ -73,4 +73,3 @@
 - **Small PRs:** Keep UI changes small and focused — easier to review and test.
 
 If you'd like, I can also add short usage examples for a few core components (copy-paste examples) or create quick unit/storybook stories for components.
-
