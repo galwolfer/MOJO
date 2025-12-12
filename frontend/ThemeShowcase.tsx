@@ -2,7 +2,17 @@ import React from "react";
 import { View, StyleSheet, TouchableOpacity } from "react-native";
 import BoxContainer from "./components/layout/BoxContainer";
 import AppText from "./components/AppText";
-import { COLORS, SPACING, FONTS, SYSTEM_FONTS, TYPOGRAPHY, SHADOWS, paletteIndexFromKey } from "./theme";
+import {
+  COLORS,
+  SPACING,
+  FONTS,
+  SYSTEM_FONTS,
+  TYPOGRAPHY,
+  SHADOWS,
+  paletteIndexFromKey,
+  ICON_SIZES,
+  IconSizeKey,
+} from "./theme";
 import { Checkbox } from "./components/icons/Checkbox";
 import { ProgressIcon } from "./components/icons/ProgressIcon";
 import { ICONS, ICON_NAMES } from "./components/icons/icons";
@@ -23,7 +33,11 @@ const ColorSwatch = ({ name, hex }: { name: string; hex: string }) => (
   </View>
 );
 
-const ThemeShowcase: React.FC = () => {
+interface ThemeShowcaseProps {
+  iconsSize?: IconSizeKey;
+}
+
+const ThemeShowcase: React.FC<ThemeShowcaseProps> = ({ iconsSize = "md" }) => {
   const [isChecked, setIsChecked] = useState(false);
   const [progress, setProgress] = useState(0);
   const [textInput, setTextInput] = useState("");
@@ -75,13 +89,13 @@ const ThemeShowcase: React.FC = () => {
         <View style={{ gap: 20, paddingBottom: 40 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
             <AppText variant="bodyText">Checkbox:</AppText>
-            <Checkbox checked={isChecked} onChange={setIsChecked} size={40} />
+            <Checkbox checked={isChecked} onChange={setIsChecked} size={ICON_SIZES[iconsSize]} />
           </View>
 
           <View style={{ gap: 10 }}>
             <AppText variant="bodyText">Progress Icon (Value: {progress.toFixed(1)}):</AppText>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 20 }}>
-              <ProgressIcon value={progress} size={40} />
+              <ProgressIcon value={progress} size={ICON_SIZES[iconsSize]} />
               <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
                 {[0, 0.25, 0.5, 0.75, 1].map((val) => (
                   <TouchableOpacity
@@ -147,6 +161,7 @@ const ThemeShowcase: React.FC = () => {
               options={fruits}
               multiSelect
               onSelect={setMultiOptions}
+              iconSize={iconsSize}
             />
             {multiOptions.length > 0 && (
               <View style={{ marginTop: SPACING.sm, flexDirection: "row", gap: SPACING.sm, flexWrap: "wrap" }}>
@@ -174,7 +189,7 @@ const ThemeShowcase: React.FC = () => {
               return (
                 <View key={iconName} style={styles.iconItem}>
                   <View style={styles.iconWrapper}>
-                    <IconComponent size={32} color={COLORS.primary1} />
+                    <IconComponent size={ICON_SIZES[iconsSize]} color={COLORS.primary1} />
                   </View>
                   <AppText variant="notes" style={styles.iconLabel}>
                     {iconName}

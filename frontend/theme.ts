@@ -68,6 +68,15 @@ export const FONT_SIZES = {
   lg: moderateScale(24),
 };
 
+// Icon size tokens used across the app
+export type IconSizeKey = "sm" | "md" | "big";
+
+export const ICON_SIZES: Record<IconSizeKey, number> = {
+  sm: moderateScale(18),
+  md: moderateScale(32),
+  big: moderateScale(48),
+};
+
 // System fonts as fallback when custom fonts aren't available (Expo Go)
 export const SYSTEM_FONTS = {
   fredokaExtraLight: "sans-serif-light",

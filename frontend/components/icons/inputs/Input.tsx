@@ -12,10 +12,10 @@ import {
   // Changed to Pressable for better handling of simultaneous gestures
   Pressable,
 } from "react-native";
-import { COLORS, SPACING, SHADOWS, FONTS, TYPOGRAPHY, DIVIDER } from "../../theme";
-import AppText from "../AppText";
-import { Checkbox } from "../icons/Checkbox";
-import { Chevron } from "../icons/Chevron";
+import { COLORS, SPACING, SHADOWS, FONTS, TYPOGRAPHY, DIVIDER } from "../../../theme";
+import AppText from "../../AppText";
+import { Checkbox } from "../Checkbox";
+import { Chevron } from "../Chevron";
 
 type InputType = "text" | "email" | "password" | "number";
 

@@ -12,7 +12,7 @@ import {
   // Changed to Pressable for better handling of simultaneous gestures
   Pressable,
 } from "react-native";
-import { COLORS, SPACING, SHADOWS, FONTS, TYPOGRAPHY, DIVIDER } from "../../theme";
+import { COLORS, SPACING, SHADOWS, FONTS, TYPOGRAPHY, DIVIDER, ICON_SIZES, IconSizeKey } from "../../theme";
 import AppText from "../AppText";
 import { Checkbox } from "../icons/Checkbox";
 import { Chevron } from "../icons/Chevron";
@@ -27,6 +27,8 @@ interface InputProps<T = any> extends Omit<TextInputProps, "style"> {
   options?: string[];
   onSelect?: (values: string[]) => void;
   multiSelect?: boolean;
+  // optional icon size control (sm | md | big)
+  iconSize?: IconSizeKey;
 }
 
 const hexToRgba = (hex: string, alpha = 1) => {
@@ -64,6 +66,7 @@ function Input<T = any>({
   options,
   onSelect,
   multiSelect = false,
+  iconSize = "md",
   ...rest
 }: InputProps<T>) {
   const borderColorAnim = useRef(new Animated.Value(0)).current;
@@ -124,6 +127,8 @@ function Input<T = any>({
     effectivePlaceholder = placeholder;
   }
 
+  const iconSizeMap: Record<IconSizeKey, number> = { sm: 18, md: 30, big: 40 };
+
   // Sync selected with provided value for options
   useEffect(() => {
     if (options && typeof providedValue === "string") {
@@ -135,7 +140,7 @@ function Input<T = any>({
     }
   }, [providedValue, options]);
 
-  // ... (animateBorder, animatedBorderColor, rotate, useEffects for rotation and border) ...
+  // Removed local iconSizeMap, using ICON_SIZES from theme
   const animateBorder = (hasError: boolean) => {
     Animated.timing(borderColorAnim, {
       toValue: hasError ? 1 : 0,
@@ -317,8 +322,10 @@ function Input<T = any>({
                     }}
                     style={styles.option}
                   >
-                    {multiSelect && <Checkbox checked={selected.includes(option)} onChange={() => {}} size={18} />}
                     <AppText>{option}</AppText>
+                    {multiSelect && (
+                      <Checkbox checked={selected.includes(option)} onChange={() => {}} size={ICON_SIZES[iconSize]} />
+                    )}
                   </Pressable>
                   {index < options.length - 1 && <View style={styles.optionDivider} />}
                 </React.Fragment>
