@@ -73,8 +73,8 @@ export type IconSizeKey = "sm" | "md" | "big";
 
 export const ICON_SIZES: Record<IconSizeKey, number> = {
   sm: moderateScale(18),
-  md: moderateScale(32),
-  big: moderateScale(48),
+  md: moderateScale(24),
+  big: moderateScale(35),
 };
 
 // System fonts as fallback when custom fonts aren't available (Expo Go)

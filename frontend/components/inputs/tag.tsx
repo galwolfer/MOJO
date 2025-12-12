@@ -1,7 +1,8 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ViewStyle } from "react-native";
-import { COLORS, SPACING, TYPOGRAPHY, getPalettePair } from "../../theme";
+import { COLORS, SPACING, TYPOGRAPHY, ICON_SIZES, getPalettePair } from "../../theme";
 import { ICONS } from "../icons/icons";
+import { transform } from "motion";
 
 interface TagProps {
   label: string;
@@ -19,12 +20,12 @@ const Tag = ({ label, editable = false, onRemove, leftIcon, colorIndex, style }:
   return (
     <View style={[styles.root, { backgroundColor: pair.bg }, style]}>
       {leftIcon ? <View style={styles.leftIcon}>{leftIcon}</View> : null}
-      <Text style={[styles.label, { color: pair.text }]} numberOfLines={1} ellipsizeMode="tail">
+      <Text style={[styles.label, { color: pair.text, translateY: 10 }]} numberOfLines={1} ellipsizeMode="tail">
         {label}
       </Text>
       {editable && (
         <TouchableOpacity onPress={onRemove} accessibilityRole="button" style={styles.removeTouch}>
-          <ICONS.cancel width={14} height={14} color={pair.text} />
+          <ICONS.cancel width={ICON_SIZES.sm} height={ICON_SIZES.sm} color={pair.text} />
         </TouchableOpacity>
       )}
     </View>
@@ -36,6 +37,7 @@ const styles = StyleSheet.create({
     display: "flex",
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     height: 40,
     padding: SPACING.md,
     gap: 1,

@@ -160,6 +160,7 @@ const ThemeShowcase: React.FC<ThemeShowcaseProps> = ({ iconsSize = "md" }) => {
               placeholder="Select multiple fruits..."
               options={fruits}
               multiSelect
+              value={multiOptions.join(", ")}
               onSelect={setMultiOptions}
               iconSize={iconsSize}
             />

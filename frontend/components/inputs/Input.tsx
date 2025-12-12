@@ -92,12 +92,17 @@ function Input<T = any>({
     });
   };
   const providedValue = (rest as any).value ?? (rest as any).defaultValue;
+
+  const [inputValue, setInputValue] = useState<string>(typeof providedValue === "string" ? providedValue : "");
+
+  useEffect(() => {
+    if (providedValue !== undefined && providedValue !== null) {
+      setInputValue(String(providedValue));
+    }
+  }, [providedValue]);
+
   const hasSelected = selected.length > 0;
-  const isEmpty =
-    !hasSelected &&
-    (providedValue === undefined ||
-      providedValue === null ||
-      (typeof providedValue === "string" && providedValue.length === 0));
+  const isEmpty = !hasSelected && (!inputValue || inputValue.length === 0);
 
   // Compute display value and effective placeholder for the TextInput.
   // When using multiSelect and there are no selected items, we want the
@@ -109,11 +114,14 @@ function Input<T = any>({
   let displayValue: string | undefined = explicitValue as any;
   let effectivePlaceholder: string | undefined = placeholder as any;
 
+  const nonEmpty = (s: string | undefined) => (typeof s === "string" && s.length > 0 ? s : undefined);
+
   if (options) {
     if (multiSelect) {
       if (selected.length === 0) {
         displayValue = ""; // show placeholder-style text
-        effectivePlaceholder = explicitValue ?? defaultValue ?? placeholder;
+        // prefer explicitly provided non-empty value; fall back to placeholder
+        effectivePlaceholder = nonEmpty(explicitValue) ?? nonEmpty(defaultValue) ?? placeholder;
       } else {
         displayValue = placeholder;
         effectivePlaceholder = placeholder;
@@ -123,7 +131,7 @@ function Input<T = any>({
       effectivePlaceholder = placeholder;
     }
   } else {
-    displayValue = explicitValue as any;
+    displayValue = placeholder as any;
     effectivePlaceholder = placeholder;
   }
 
@@ -236,6 +244,7 @@ function Input<T = any>({
               rest.onFocus?.(e);
             }}
             onChangeText={(text) => {
+              setInputValue(text);
               if (!options) {
                 rest.onChangeText?.(text);
               }
@@ -252,7 +261,7 @@ function Input<T = any>({
             </View>
           )}
 
-          {Platform.OS === "android" && options && multiSelect && selected.length === 0 && effectivePlaceholder && (
+          {Platform.OS === "android" && isEmpty && effectivePlaceholder && (
             <Text style={styles.customPlaceholder} pointerEvents="none">
               {effectivePlaceholder}
             </Text>
@@ -301,16 +310,18 @@ function Input<T = any>({
                     onPress={() => {
                       if (!multiSelect) {
                         const newSelected = [option];
+                        // update selection state immediately so UI updates
                         setSelected(newSelected);
-                        // animate close then call onSelect
+                        // call onSelect immediately to be responsive
+                        onSelect?.(newSelected);
+                        // start closing animation but don't wait for it to complete
                         Animated.timing(dropdownAnim, {
                           toValue: 0,
-                          duration: 220,
+                          duration: 180,
                           easing: Easing.bezier(0.2, 0.8, 0.2, 1),
                           useNativeDriver: true,
                         }).start(() => {
                           setIsOpen(false);
-                          onSelect?.(newSelected);
                         });
                       } else {
                         const newSelected = selected.includes(option)
@@ -322,7 +333,7 @@ function Input<T = any>({
                     }}
                     style={styles.option}
                   >
-                    <AppText>{option}</AppText>
+                    <AppText style={{ flex: 1 }}>{option}</AppText>
                     {multiSelect && (
                       <Checkbox checked={selected.includes(option)} onChange={() => {}} size={ICON_SIZES[iconSize]} />
                     )}
@@ -422,6 +433,7 @@ const styles = StyleSheet.create({
   option: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.md,
     gap: SPACING.sm,
