@@ -7,8 +7,8 @@ import { Checkbox } from "./components/icons/Checkbox";
 import { ProgressIcon } from "./components/icons/ProgressIcon";
 import { ICONS, ICON_NAMES } from "./components/icons/icons";
 import Box from "./components/layout/Box";
-import Input from "./components/icons/inputs/Input";
-import Tag from "./components/icons/inputs/tag";
+import Input from "./components/inputs/Input";
+import Tag from "./components/inputs/tag";
 import { useState } from "react";
 
 const ColorSwatch = ({ name, hex }: { name: string; hex: string }) => (
@@ -146,7 +146,6 @@ const ThemeShowcase: React.FC = () => {
               placeholder="Select multiple fruits..."
               options={fruits}
               multiSelect
-              value={multiOptions.join(", ")}
               onSelect={setMultiOptions}
             />
             {multiOptions.length > 0 && (

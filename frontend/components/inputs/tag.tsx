@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ViewStyle } from "react-native";
-import { COLORS, SPACING, TYPOGRAPHY, getPalettePair } from "../../../theme";
+import { COLORS, SPACING, TYPOGRAPHY, getPalettePair } from "../../theme";
 import { ICONS } from "../icons/icons";
 
 interface TagProps {

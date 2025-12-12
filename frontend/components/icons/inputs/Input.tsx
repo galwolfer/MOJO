@@ -12,10 +12,10 @@ import {
   // Changed to Pressable for better handling of simultaneous gestures
   Pressable,
 } from "react-native";
-import { COLORS, SPACING, SHADOWS, FONTS, TYPOGRAPHY, DIVIDER } from "../../../theme";
-import AppText from "../../AppText";
-import { Checkbox } from "../Checkbox";
-import { Chevron } from "../Chevron";
+import { COLORS, SPACING, SHADOWS, FONTS, TYPOGRAPHY, DIVIDER } from "../../theme";
+import AppText from "../AppText";
+import { Checkbox } from "../icons/Checkbox";
+import { Chevron } from "../icons/Chevron";
 
 type InputType = "text" | "email" | "password" | "number";
 
@@ -89,10 +89,12 @@ function Input<T = any>({
     });
   };
   const providedValue = (rest as any).value ?? (rest as any).defaultValue;
+  const hasSelected = selected.length > 0;
   const isEmpty =
-    providedValue === undefined ||
-    providedValue === null ||
-    (typeof providedValue === "string" && providedValue.length === 0);
+    !hasSelected &&
+    (providedValue === undefined ||
+      providedValue === null ||
+      (typeof providedValue === "string" && providedValue.length === 0));
 
   // Sync selected with provided value for options
   useEffect(() => {
@@ -198,7 +200,7 @@ function Input<T = any>({
             keyboardType={getKeyboardType()}
             secureTextEntry={getSecureTextEntry()}
             editable={!options}
-            value={options ? selected.join(", ") : (rest as any).value}
+            value={options ? (multiSelect ? "" : selected.join("x ")) : (rest as any).value}
             onFocus={(e) => {
               rest.onFocus?.(e);
             }}
@@ -284,7 +286,7 @@ function Input<T = any>({
                           ? selected.filter((s) => s !== option)
                           : [...selected, option];
                         setSelected(newSelected);
-                        // wait for outside click to finalize
+                        onSelect?.(newSelected);
                       }
                     }}
                     style={styles.option}
