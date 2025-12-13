@@ -178,10 +178,25 @@ const TextBouble: React.FC<Props> = ({
   const typedContent = useMemo(() => {
     // Keep the original typography on mobile/web by cloning the provided text element (e.g., AppText)
     if (React.isValidElement(children)) {
-      return React.cloneElement(children as any, undefined, typed);
+      const childProps: any = (children as any).props || {};
+      const mergedStyle = [childProps.style, mode === "user" ? { color: COLORS.colorWhite } : undefined];
+      return React.cloneElement(children as any, { style: mergedStyle }, typed);
     }
-    return <Text style={styles.text}>{typed}</Text>;
-  }, [children, typed]);
+    return <Text style={[styles.text, mode === "user" ? { color: COLORS.colorWhite } : undefined]}>{typed}</Text>;
+  }, [children, typed, mode]);
+
+  const renderContent =
+    resolvedTypewriter && mode === "agent" && fullText != null ? (
+      typedContent
+    ) : React.isValidElement(children) ? (
+      React.cloneElement(children as any, {
+        style: [(children as any).props?.style, mode === "user" ? { color: COLORS.colorWhite } : undefined],
+      })
+    ) : typeof children === "string" ? (
+      <Text style={[styles.text, mode === "user" ? { color: COLORS.colorWhite } : undefined]}>{children}</Text>
+    ) : (
+      children
+    );
 
   return (
     <View style={[styles.wrapper, style]}>
@@ -211,7 +226,7 @@ const TextBouble: React.FC<Props> = ({
       )}
 
       <View style={[styles.containerBase, radii, containerShadow, { backgroundColor: containerBg }]}>
-        {resolvedTypewriter && mode === "agent" && fullText != null ? typedContent : children}
+        {renderContent}
       </View>
     </View>
   );
