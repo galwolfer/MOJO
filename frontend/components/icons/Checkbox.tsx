@@ -10,7 +10,7 @@
  */
 import { motion, useMotionValue, animate, useTransform } from "motion/react";
 import { useEffect } from "react";
-import svgPaths from "../../imports/svg-kilf0jp2lv";
+import svgPaths from "../../assets/imports/svg-kilf0jp2lv";
 import { COLORS } from "../../theme";
 
 interface CheckboxProps {
