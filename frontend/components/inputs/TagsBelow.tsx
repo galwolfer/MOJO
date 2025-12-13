@@ -8,6 +8,11 @@ interface TagsBelowProps {
   onRemove: (label: string) => void;
 }
 
+/**
+ * TagsBelow - A component that displays selected tags below with remove functionality.
+ * @param selected - Array of selected tag labels.
+ * @param onRemove - Callback to remove a tag by label.
+ */
 const TagsBelow: React.FC<TagsBelowProps> = ({ selected, onRemove }) => {
   return (
     <View

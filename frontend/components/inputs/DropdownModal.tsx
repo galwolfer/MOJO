@@ -15,6 +15,17 @@ interface DropdownModalProps {
   onRequestClose: () => void;
 }
 
+/**
+ * DropdownModal - A modal component for displaying dropdown options.
+ * @param visible - Whether the modal is visible.
+ * @param dropdownLayout - Layout information for positioning.
+ * @param dropdownAnim - Animation value for the dropdown.
+ * @param options - Array of option strings.
+ * @param multiSelect - Whether multiple selections are allowed.
+ * @param selected - Array of selected options.
+ * @param onToggleOption - Callback to toggle an option.
+ * @param onRequestClose - Callback to close the modal.
+ */
 const DropdownModal: React.FC<DropdownModalProps> = ({
   visible,
   dropdownLayout,

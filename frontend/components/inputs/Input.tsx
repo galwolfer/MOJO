@@ -42,6 +42,12 @@ interface InputProps<T = any> extends Omit<TextInputProps, "style"> {
   iconSize?: IconSizeKey;
 }
 
+/**
+ * Converts a hex color to rgba format.
+ * @param hex - The hex color string.
+ * @param alpha - The alpha value (0-1).
+ * @returns The rgba color string.
+ */
 const hexToRgba = (hex: string, alpha = 1) => {
   const m = hex.replace("#", "");
   const r = parseInt(m.substring(0, 2), 16);
@@ -50,6 +56,11 @@ const hexToRgba = (hex: string, alpha = 1) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
+/**
+ * Custom hook for web-specific caret and selection styling.
+ * @param idPrefix - Prefix for the unique ID.
+ * @returns The unique ID for the input.
+ */
 function useWebCaret(idPrefix = "input") {
   const idRef = useRef<string | null>(null);
   useEffect(() => {
@@ -76,6 +87,18 @@ function useWebCaret(idPrefix = "input") {
   return idRef.current;
 }
 
+/**
+ * Input - A flexible input component with optional dropdown functionality.
+ * @param type - The input type (text, email, password, number).
+ * @param label - Optional label for the input.
+ * @param error - Optional error message.
+ * @param placeholder - Placeholder text.
+ * @param options - Array of options for dropdown.
+ * @param onSelect - Callback for selection.
+ * @param multiSelect - Whether multiple selections are allowed.
+ * @param iconSize - Size of icons.
+ * @param rest - Other TextInput props.
+ */
 function Input<T = any>({
   type = "text",
   label,

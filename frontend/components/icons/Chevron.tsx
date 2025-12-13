@@ -8,6 +8,12 @@ interface ChevronProps {
   color?: string;
 }
 
+/**
+ * Chevron - An animated chevron icon for web platforms.
+ * @param isOpen - Whether the chevron is in the open state.
+ * @param size - The size of the chevron.
+ * @param color - The color of the chevron.
+ */
 export const Chevron = ({ isOpen, size = 17, color = COLORS.primary1 }: ChevronProps) => {
   // Original path: curve pointing down
   // Reconstructed based on the inverse of pathUp

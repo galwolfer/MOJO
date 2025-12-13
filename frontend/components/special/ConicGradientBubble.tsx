@@ -8,6 +8,10 @@ type Props = {
   style?: ViewStyle;
 };
 
+/**
+ * ConicGradientBubble - An animated gradient bubble component using Skia.
+ * @param style - Optional custom styles.
+ */
 export default function ConicGradientBubble({ style }: Props) {
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
   const center = useSharedValue(vec(0, 0));

@@ -9,6 +9,12 @@ interface ChevronProps {
   color?: string;
 }
 
+/**
+ * Chevron - An animated chevron icon for native platforms.
+ * @param isOpen - Whether the chevron is in the open state.
+ * @param size - The size of the chevron.
+ * @param color - The color of the chevron.
+ */
 export const Chevron = ({ isOpen, size = 17, color = COLORS.primary1 }: ChevronProps) => {
   // Key coordinates derived from the paths
   // Down state (V) - "M1.25 1.25 L5.99 6.67 C7.19 8.04 9.31 8.04 10.51 6.67 L15.25 1.25"

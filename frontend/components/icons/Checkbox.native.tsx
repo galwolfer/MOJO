@@ -20,6 +20,12 @@ interface CheckboxProps {
   size?: number;
 }
 
+/**
+ * Checkbox - Animated checkbox control for native platforms.
+ * @param checked - Whether the checkbox is checked.
+ * @param onChange - Callback when the checkbox state changes.
+ * @param size - The size of the checkbox.
+ */
 export function Checkbox({ checked, onChange, size = 18 }: CheckboxProps) {
   const progress = useRef(new Animated.Value(checked ? 1 : 0)).current;
 

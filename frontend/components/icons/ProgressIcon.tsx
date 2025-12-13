@@ -15,6 +15,11 @@ interface ProgressIconProps {
   size?: number;
 }
 
+/**
+ * ProgressIcon - Animated progress indicator for web platforms.
+ * @param value - Progress value between 0 and 1.
+ * @param size - The size of the icon.
+ */
 export function ProgressIcon({ value, size = 18 }: ProgressIconProps) {
   // Clamp value between 0 and 1
   const clampedValue = Math.max(0, Math.min(1, value));

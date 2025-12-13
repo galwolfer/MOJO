@@ -18,10 +18,22 @@ type BoxProps = {
   children?: React.ReactNode;
 };
 
+/**
+ * Wraps string children with AppText for consistent typography.
+ * @param children - The children to wrap.
+ * @returns The wrapped children.
+ */
+const wrapStringChildren = (children?: React.ReactNode): React.ReactNode => {
+  return React.Children.map(children, (child) => (typeof child === "string" ? <AppText>{child}</AppText> : child));
+};
+
+/**
+ * Box - A styled container component with a title bar and content area.
+ * @param title - The title to display in the header.
+ * @param children - The content to display inside the box.
+ */
 const Box: React.FC<BoxProps> = ({ title, children }) => {
-  const wrappedChildren = React.Children.map(children, (child) =>
-    typeof child === "string" ? <AppText>{child}</AppText> : child
-  );
+  const wrappedChildren = wrapStringChildren(children);
 
   return (
     <View style={styles.box}>

@@ -7,6 +7,12 @@ interface InputFieldProps extends TextInputProps {
   placeholderText?: string | null;
 }
 
+/**
+ * InputField - A custom TextInput component with optional web-specific ID and placeholder.
+ * @param webNativeID - Native ID for web.
+ * @param placeholderText - Placeholder text.
+ * @param rest - Other TextInput props.
+ */
 const InputField = React.forwardRef<TextInput, InputFieldProps>(({ webNativeID, placeholderText, ...rest }, ref) => {
   return (
     <Animated.View style={{ flex: 1 }}>

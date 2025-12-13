@@ -8,6 +8,11 @@ type Props = {
   children?: React.ReactNode;
 };
 
+/**
+ * TextBouble - A styled container component with a blurred gradient background.
+ * @param style - Optional custom styles for the wrapper.
+ * @param children - The content to display inside the bubble.
+ */
 const TextBouble: React.FC<Props> = ({ style, children }) => {
   return (
     <View style={[styles.wrapper, style]}>

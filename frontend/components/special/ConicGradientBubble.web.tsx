@@ -21,6 +21,10 @@ const gradientStops = [
 
 const shadowShrink = SPACING.xlg;
 
+/**
+ * ConicGradientBubble - A web-specific animated gradient bubble component using Reanimated.
+ * @param style - Optional custom styles.
+ */
 export default function ConicGradientBubble({ style }: Props) {
   const progress = useSharedValue(0);
 

@@ -39,6 +39,12 @@ function decodeBase64(base64: string) {
   throw new Error("No base64 decoder available");
 }
 
+/**
+ * Creates an icon component from an SVG file.
+ * @param svgFileName - The name of the SVG file.
+ * @param debugName - The debug name for the icon.
+ * @returns A React component for the icon.
+ */
 function createIcon(svgFileName: string, debugName: string): React.FC<IconProps> {
   const dataUri = SVG_DATA_URIS[svgFileName];
 

@@ -3,31 +3,45 @@
 This file documents the UI components in `frontend/components`.
 Update this file whenever you add, remove, or change a component.
 
-- `AppText.tsx` — `frontend/components/AppText.tsx`
+# Components
+
+This file documents the UI components in `frontend/components`.
+Update this file whenever you add, remove, or change a component.
+
+- `AppText.tsx` — `frontend/components/common/AppText.tsx`
    - Text wrapper that applies the app's `TYPOGRAPHY` presets. Use `variant` to pick a preset (e.g. `title`, `bodyText`, `notes`). Centralizes typography.
 
-- `Box.tsx` — `frontend/components/Box.tsx`
+- `Box.tsx` — `frontend/components/layout/Box.tsx`
    - A surfaced card with a styled title bar and content. Use to group UI into distinct sections. Title uses `title3` typography.
 
-- `Checkbox` (web) — `frontend/components/icons/Checkbox.tsx` or `frontend/components/Checkbox.tsx`
+- `Checkbox` (web) — `frontend/components/icons/Checkbox.tsx`
    - Web checkbox (animated) using `motion/react`. Mirrors native checkbox behavior.
 
-- `Checkbox.native.tsx` (native) — `frontend/components/icons/Checkbox.native.tsx` or `frontend/components/Checkbox.native.tsx`
+- `Checkbox.native.tsx` (native) — `frontend/components/icons/Checkbox.native.tsx`
    - Native checkbox for mobile using `Animated` + `react-native-svg`.
 
-- `ProgressIcon` (web) — `frontend/components/icons/ProgressIcon.tsx` or `frontend/components/ProgressIcon.tsx`
+- `ProgressIcon` (web) — `frontend/components/icons/ProgressIcon.tsx`
    - Web progress/status icon with SVG animation; morphs into a check at 100%.
 
-- `ProgressIcon.native.tsx` (native) — `frontend/components/icons/ProgressIcon.native.tsx` or `frontend/components/ProgressIcon.native.tsx`
+- `ProgressIcon.native.tsx` (native) — `frontend/components/icons/ProgressIcon.native.tsx`
    - Native mobile version of the progress icon using `Animated` + `react-native-svg`.
 
 - `BoxContainer` — `frontend/components/layout/BoxContainer.tsx`
   - Layout wrapper (ScrollView) that provides the shared `boxContainer` spacing for pages such as the Theme showcase.
 
-- `Input` — `frontend/components/input/Input.tsx`
+- `Input` — `frontend/components/inputs/Input.tsx`
   - Flexible input component supporting multiple types (text, email, password, number). Styled using theme values with consistent spacing, colors, and shadows. Supports label and error states. When `options` prop is provided, acts as a dropdown selector. Use `multiSelect` prop to enable multiple selections with checkboxes; otherwise, it's single select without checkboxes. The dropdown is rendered in a Modal to "fly over" other content, and clicking outside closes it.
 
-- Barrel exports: `frontend/components/index.ts` exports the public components (e.g. `AppText`, `Box`, `BoxContainer`, `Checkbox`, `ProgressIcon`, `Input`). Use these for cleaner imports across the app.Maintenance
+- `ConicGradientBubble.tsx` — `frontend/components/special/ConicGradientBubble.tsx`
+   - Animated gradient bubble component using Skia for visual effects.
+
+- `PriorityList.tsx` — `frontend/components/special/PriorityList.tsx`
+   - Draggable priority list component for reordering items.
+
+- `TextBouble.tsx` — `frontend/components/common/TextBouble.tsx`
+   - Text bubble component for displaying text in a styled bubble.
+
+- Barrel exports: `frontend/components/index.ts` exports the public components (e.g. `AppText`, `Box`, `BoxContainer`, `Checkbox`, `ProgressIcon`, `Input`, `ConicGradientBubble`, `PriorityList`, `TextBouble`). Use these for cleaner imports across the app.Maintenance
 ----------
 
 - `Icons` — `frontend/components/icons/icons.tsx`

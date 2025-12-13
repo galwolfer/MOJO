@@ -56,12 +56,23 @@ const styles = StyleSheet.create({
   },
 });
 
+/**
+ * Creates a stable string signature for the order of items.
+ * @param arr - The array of priority list items.
+ * @returns A string representing the order.
+ */
 function orderKey(arr: PriorityListItem[]): string {
   // Notes inside the code are in English
   // Create a stable signature for the current order.
   return arr.map((x) => x.id).join("|");
 }
 
+/**
+ * RenderItem - Renders a single draggable item in the priority list.
+ * @param item - The item to render.
+ * @param drag - Drag handler.
+ * @param isActive - Whether the item is being dragged.
+ */
 const RenderItem = ({ item, drag, isActive }: RenderItemParams<PriorityListItem>) => {
   return (
     <View style={[styles.card, isActive && styles.cardDragging, isActive && styles.cardActive]}>
@@ -83,6 +94,11 @@ const RenderItem = ({ item, drag, isActive }: RenderItemParams<PriorityListItem>
   );
 };
 
+/**
+ * PriorityList - A native draggable list component for reordering items.
+ * @param items - The list of items to display.
+ * @param onChange - Callback when the order changes.
+ */
 const PriorityList: React.FC<PriorityListProps> = ({ items, onChange }) => {
   const [listData, setListData] = useState<PriorityListItem[]>(items);
 

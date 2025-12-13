@@ -30,6 +30,10 @@ interface PriorityListProps {
   onChange: (nextOrder: PriorityListItem[]) => void;
 }
 
+/**
+ * SortableItem - A draggable item in the priority list.
+ * @param item - The item to render.
+ */
 const SortableItem: React.FC<{ item: PriorityListItem }> = ({ item }) => {
   const [hovered, setHovered] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
@@ -87,6 +91,11 @@ const SortableItem: React.FC<{ item: PriorityListItem }> = ({ item }) => {
   );
 };
 
+/**
+ * PriorityList - A draggable list component for reordering items.
+ * @param items - The list of items to display.
+ * @param onChange - Callback when the order changes.
+ */
 const PriorityList: React.FC<PriorityListProps> = ({ items, onChange }) => {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),

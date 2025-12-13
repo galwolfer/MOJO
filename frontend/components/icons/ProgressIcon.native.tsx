@@ -19,6 +19,11 @@ interface ProgressIconProps {
   size?: number;
 }
 
+/**
+ * ProgressIcon - Animated progress indicator for native platforms.
+ * @param value - Progress value between 0 and 1.
+ * @param size - The size of the icon.
+ */
 export function ProgressIcon({ value, size = 18 }: ProgressIconProps) {
   const springValue = useRef(new Animated.Value(0)).current;
   const completionProgress = useRef(new Animated.Value(0)).current;

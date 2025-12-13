@@ -14,6 +14,15 @@ interface TagProps {
   style?: ViewStyle;
 }
 
+/**
+ * Tag - A styled tag component with optional remove functionality.
+ * @param label - The text label for the tag.
+ * @param editable - Whether the tag can be removed.
+ * @param onRemove - Callback when the remove button is pressed.
+ * @param leftIcon - Optional icon to display on the left.
+ * @param colorIndex - Color palette index (1-7).
+ * @param style - Optional custom styles.
+ */
 const Tag = ({ label, editable = false, onRemove, leftIcon, colorIndex, style }: TagProps) => {
   const pair = getPalettePair(typeof colorIndex === "number" ? colorIndex : undefined);
 
