@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import DraggableFlatList, { RenderItemParams } from "react-native-draggable-flatlist";
 import { COLORS, SPACING, TYPOGRAPHY, COMPONENT_STYLES, DIVIDER, SHADOWS, ICON_SIZES } from "../theme";
@@ -15,16 +15,16 @@ interface PriorityListProps {
   onChange: (nextOrder: PriorityListItem[]) => void;
 }
 
+const ROW_HEIGHT = SPACING.lg * 2.5;
+
 const styles = StyleSheet.create({
   card: {
     ...(COMPONENT_STYLES.listItem as any),
-    // align with web/shared: compact padding and a consistent row height
     padding: SPACING.md,
-    height: SPACING.lg * 2.5,
+    height: ROW_HEIGHT,
     borderRadius: SPACING.lg,
   },
   cardDragging: {
-    borderRadius: SPACING.lg,
     backgroundColor: COLORS.white3,
     ...(SHADOWS.card.rn as any),
   },
@@ -56,15 +56,22 @@ const styles = StyleSheet.create({
   },
 });
 
+function orderKey(arr: PriorityListItem[]): string {
+  // Notes inside the code are in English
+  // Create a stable signature for the current order.
+  return arr.map((x) => x.id).join("|");
+}
+
 const RenderItem = ({ item, drag, isActive }: RenderItemParams<PriorityListItem>) => {
   return (
-    <View style={[styles.card, isActive && styles.cardDragging, isActive && styles.cardActive] as any}>
+    <View style={[styles.card, isActive && styles.cardDragging, isActive && styles.cardActive]}>
       <View style={styles.contentRow}>
         {item.icon && <View style={styles.iconWrap}>{item.icon}</View>}
         <Text style={styles.text} numberOfLines={1} ellipsizeMode="tail">
           {item.label}
         </Text>
       </View>
+
       <View style={styles.dragHandle} onTouchStart={drag}>
         <ICONS.move
           width={ICON_SIZES.sm}
@@ -77,54 +84,98 @@ const RenderItem = ({ item, drag, isActive }: RenderItemParams<PriorityListItem>
 };
 
 const PriorityList: React.FC<PriorityListProps> = ({ items, onChange }) => {
-  const [listData, setListData] = useState(items);
+  const [listData, setListData] = useState<PriorityListItem[]>(items);
+
+  const isDraggingRef = useRef(false);
+  const frozenDataRef = useRef<PriorityListItem[]>(items);
+
+  // This stores the last order we emitted to the parent.
+  // If the parent temporarily sends an older order, we ignore it (prevents the blink).
+  const lastEmittedOrderRef = useRef<string | null>(null);
+
+  const itemsOrder = useMemo(() => orderKey(items), [items]);
+  const listOrder = useMemo(() => orderKey(listData), [listData]);
 
   useEffect(() => {
-    setListData(items);
-  }, [items]);
+    if (isDraggingRef.current) return;
 
-  const renderItem = useCallback((params: RenderItemParams<PriorityListItem>) => {
-    return <RenderItem {...params} />;
-  }, []);
+    const lastEmitted = lastEmittedOrderRef.current;
+
+    // If we recently emitted an order and props don't match it yet,
+    // treat it as a stale echo from the parent and ignore.
+    if (lastEmitted && itemsOrder !== lastEmitted) {
+      return;
+    }
+
+    // Now it's safe to accept the props (either:
+    // - parent caught up and matches our emitted order, or
+    // - it's a true external update like reset/server).
+    if (itemsOrder !== listOrder) {
+      setListData(items);
+      frozenDataRef.current = items;
+    }
+  }, [items, itemsOrder, listOrder]);
 
   const keyExtractor = useCallback((item: PriorityListItem) => item.id, []);
 
+  const renderItem = useCallback((params: RenderItemParams<PriorityListItem>) => <RenderItem {...params} />, []);
+
+  const handleDragBegin = useCallback(() => {
+    isDraggingRef.current = true;
+    frozenDataRef.current = listData; // freeze the order while dragging
+  }, [listData]);
+
   const handleDragEnd = useCallback(
     ({ data }: { data: PriorityListItem[] }) => {
+      isDraggingRef.current = false;
+
+      // Record the order we want the parent to reflect.
+      lastEmittedOrderRef.current = orderKey(data);
+
+      // Commit locally immediately (should match internal final order).
       setListData(data);
+      frozenDataRef.current = data;
+
+      // Notify parent.
       onChange(data);
     },
     [onChange]
   );
 
+  const dataForRender = isDraggingRef.current ? frozenDataRef.current : listData;
+
   return (
     <View style={{ position: "relative" }}>
       <DraggableFlatList
-        data={listData}
-        onDragEnd={handleDragEnd}
+        data={dataForRender}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
+        onDragBegin={handleDragBegin}
+        onDragEnd={handleDragEnd}
         scrollEnabled={false}
-        style={{ overflow: "visible", zIndex: 1 } as any}
-        contentContainerStyle={{ ...(COMPONENT_STYLES.listContainer as any), padding: 0 }}
-        // removed ItemSeparatorComponent in favor of an overlayed, fixed separator layer
-        animationConfig={{ duration: 100 }}
         removeClippedSubviews={false}
+        animationConfig={{ duration: 80 }}
+        contentContainerStyle={{ ...(COMPONENT_STYLES.listContainer as any), padding: 0 }}
       />
 
-      {/* Separators rendered in an absolutely positioned overlay so they don't move with dragged nodes */}
-      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { height: SPACING.lg * 2.5 * items.length }] as any}>
-        {items.slice(0, -1).map((_, idx) => (
+      {/* Fixed separators overlay (uses the same dataForRender to avoid desync) */}
+      <View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          { height: ROW_HEIGHT * dataForRender.length, opacity: isDraggingRef.current ? 0 : 1 },
+        ]}
+      >
+        {dataForRender.slice(0, -1).map((_, idx) => (
           <View
             key={`sep-${idx}`}
             style={{
               position: "absolute",
               left: SPACING.sm,
               right: SPACING.sm,
+              top: ROW_HEIGHT * (idx + 1),
               height: DIVIDER.width,
               backgroundColor: DIVIDER.color,
-              top: SPACING.lg * 2.5 * (idx + 1),
-              zIndex: 0,
             }}
           />
         ))}
