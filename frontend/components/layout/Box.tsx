@@ -10,7 +10,7 @@
  */
 import React from "react";
 import { View, StyleSheet } from "react-native";
-import AppText from "../AppText";
+import AppText from "../common/AppText";
 import { COLORS, SHADOWS, SPACING, TYPOGRAPHY } from "../../theme";
 
 type BoxProps = {

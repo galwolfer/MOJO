@@ -1,12 +1,12 @@
 **Overview**
 
 - **Purpose:** Quick reference for developing and running the frontend in this repository.
-- **Location:** This file lives at `frontend/frontend.instuctions.md` and documents common tasks.
+- **Location:** This file lives at `frontend/frontend.instructions.md` and documents common tasks.
 
 **Setup**
 
 - **Switch to frontend folder:** Open a terminal in the `frontend` directory.
-- **Install dependencies (first time):** Run `npm install` or `yarn` in `frontend`.
+- **Install dependencies (first time):** Run `npm install` in `frontend`.
 - **Start the app:** Run `npx expo start` from the `frontend` folder to launch the Metro bundler and Expo dev tools.
 - **Environment check:** Ensure Node.js and Expo CLI are available. On Windows PowerShell use `node -v` and `npx expo --version`.
 

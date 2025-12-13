@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { View, ViewStyle, LayoutChangeEvent, StyleSheet } from "react-native";
 import { Canvas, Rect, SweepGradient, vec } from "@shopify/react-native-skia";
 import { useSharedValue, useDerivedValue, withRepeat, withTiming, Easing } from "react-native-reanimated";
-import { COLORS, SPACING } from "../theme";
+import { COLORS, SPACING } from "../../theme";
 
 type Props = {
   style?: ViewStyle;

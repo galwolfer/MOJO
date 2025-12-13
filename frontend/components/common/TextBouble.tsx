@@ -1,7 +1,7 @@
 import React from "react";
 import { View, StyleSheet, ViewStyle, Platform } from "react-native";
-import { COLORS, SHADOWS, SPACING } from "../theme";
-import ConicGradientBubble from "./ConicGradientBubble";
+import { COLORS, SHADOWS, SPACING } from "../../theme";
+import ConicGradientBubble from "../special/ConicGradientBubble";
 
 type Props = {
   style?: ViewStyle;

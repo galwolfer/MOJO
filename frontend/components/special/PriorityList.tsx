@@ -16,8 +16,8 @@ import {
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { COLORS, SPACING, SHADOWS, TYPOGRAPHY, COMPONENT_STYLES, DIVIDER, ICON_SIZES } from "../theme";
-import { ICONS } from "./icons/icons";
+import { COLORS, SPACING, SHADOWS, TYPOGRAPHY, COMPONENT_STYLES, DIVIDER, ICON_SIZES } from "../../theme";
+import { ICONS } from "../icons/icons";
 
 export type PriorityListItem = {
   id: string;

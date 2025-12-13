@@ -13,7 +13,7 @@ import {
   Pressable,
 } from "react-native";
 import { COLORS, SPACING, SHADOWS, FONTS, TYPOGRAPHY, DIVIDER } from "../../../theme";
-import AppText from "../../AppText";
+import AppText from "../../common/AppText";
 import { Checkbox } from "../Checkbox";
 import { Chevron } from "../Chevron";
 

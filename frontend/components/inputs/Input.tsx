@@ -24,7 +24,7 @@ import {
   IconSizeKey,
   COMPONENT_STYLES,
 } from "../../theme";
-import AppText from "../AppText";
+import AppText from "../common/AppText";
 import { Checkbox } from "../icons/Checkbox";
 import { Chevron } from "../icons/Chevron";
 

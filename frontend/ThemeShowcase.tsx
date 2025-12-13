@@ -1,7 +1,7 @@
 import React from "react";
 import { View, StyleSheet, TouchableOpacity } from "react-native";
 import BoxContainer from "./components/layout/BoxContainer";
-import AppText from "./components/AppText";
+import AppText from "./components/common/AppText";
 import {
   COLORS,
   SPACING,
@@ -19,9 +19,9 @@ import { ICONS, ICON_NAMES } from "./components/icons/icons";
 import Box from "./components/layout/Box";
 import Input from "./components/inputs/Input";
 import Tag from "./components/inputs/tag";
-import PriorityList, { PriorityListItem } from "./components/PriorityList";
+import PriorityList, { PriorityListItem } from "./components/special/PriorityList";
 import { useState } from "react";
-import TextBouble from "./components/TextBouble";
+import TextBouble from "./components/common/TextBouble";
 
 const ColorSwatch = ({ name, hex }: { name: string; hex: string }) => (
   <View style={styles.swatchWrap}>

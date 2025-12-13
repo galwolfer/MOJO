@@ -1,6 +1,6 @@
 import React from "react";
 import { Modal, Pressable, Animated, View } from "react-native";
-import AppText from "../AppText";
+import AppText from "../common/AppText";
 import { Checkbox } from "../icons/Checkbox";
 import { SPACING, DIVIDER, SHADOWS, COLORS } from "../../theme";
 

@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import DraggableFlatList, { RenderItemParams } from "react-native-draggable-flatlist";
-import { COLORS, SPACING, TYPOGRAPHY, COMPONENT_STYLES, DIVIDER, SHADOWS, ICON_SIZES } from "../theme";
-import { ICONS } from "./icons/icons";
+import { COLORS, SPACING, TYPOGRAPHY, COMPONENT_STYLES, DIVIDER, SHADOWS, ICON_SIZES } from "../../theme";
+import { ICONS } from "../icons/icons";
 
 export type PriorityListItem = {
   id: string;

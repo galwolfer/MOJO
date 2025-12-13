@@ -13,7 +13,7 @@
  */
 import React from "react";
 import { Text, TextProps } from "react-native";
-import { TYPOGRAPHY } from "../theme";
+import { TYPOGRAPHY } from "../../theme";
 
 type Variant = keyof typeof TYPOGRAPHY;
 

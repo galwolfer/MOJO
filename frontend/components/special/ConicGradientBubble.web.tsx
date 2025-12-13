@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { StyleSheet, View, ViewStyle } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
-import { COLORS, SPACING } from "../theme";
+import { COLORS, SPACING } from "../../theme";
 
 type Props = {
   style?: ViewStyle;
