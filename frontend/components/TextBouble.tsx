@@ -33,7 +33,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: SPACING.xlg,
     borderBottomRightRadius: SPACING.xlg,
     borderBottomLeftRadius: SPACING.xlg,
-    backgroundColor: "transparent",
+    backgroundColor: COLORS.white2,
 
     // Blue outline shadow (approximation for React Native)
     shadowColor: COLORS.primary1,
