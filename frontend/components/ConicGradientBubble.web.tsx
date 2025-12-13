@@ -66,5 +66,5 @@ const styles = StyleSheet.create({
     marginLeft: "-75vmax",
     marginTop: "-75vmax",
     backgroundImage: `conic-gradient(${gradientStops})`,
-  } as WebGradientStyle,
+  } as unknown as WebGradientStyle,
 });

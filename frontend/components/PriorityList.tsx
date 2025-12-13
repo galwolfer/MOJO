@@ -114,26 +114,6 @@ const PriorityList: React.FC<PriorityListProps> = ({ items, onChange }) => {
           {items.map((item) => (
             <SortableItem key={item.id} item={item} />
           ))}
-
-          {/* Separators rendered in an absolutely positioned overlay so they don't move with dragged nodes */}
-          <div
-            aria-hidden
-            style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, pointerEvents: "none" }}
-          >
-            {items.slice(0, -1).map((_, idx) => (
-              <div
-                key={`sep-${idx}`}
-                style={{
-                  position: "absolute",
-                  left: SPACING.sm,
-                  right: SPACING.sm,
-                  height: DIVIDER.width,
-                  backgroundColor: DIVIDER.color,
-                  top: `${ITEM_HEIGHT * (idx + 1)}px`,
-                }}
-              />
-            ))}
-          </div>
         </div>
       </SortableContext>
     </DndContext>
