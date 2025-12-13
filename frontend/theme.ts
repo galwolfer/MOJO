@@ -100,6 +100,16 @@ export const SHADOWS = {
       elevation: 4,
     },
   },
+  glowingMessage: {
+    web: `0 0 15px 0 rgba(0, 0, 0, 0.05) inset, 0 1px 2px 0 var(${COLORS.primary1})`,
+    rn: {
+      shadowColor: COLORS.primary1,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.5,
+      shadowRadius: 15,
+      elevation: 4,
+    },
+  },
 };
 
 export const DIVIDER = {

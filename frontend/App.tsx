@@ -28,7 +28,7 @@ export default function App() {
   // Call layout-related hooks before any early returns so hooks order stays stable
   const { width, height } = useWindowDimensions();
   // treat wide viewports as desktop where we center a mobile-sized device
-  const isDesktopLike = Platform.OS === "web" ? width >= 700 : width >= 700;
+  const isDesktopLike = Platform.OS === "web" ? width >= 900 : width >= 900;
 
   if (!fontsLoaded && !fontError) {
     return null;
@@ -36,8 +36,8 @@ export default function App() {
 
   const outerStyle = isDesktopLike ? styles.desktopOuter : styles.container;
 
-  const deviceWidth = 600; // target mobile device width on desktop
-  const deviceHeight = Math.min(height, 900); // keep some margin
+  const deviceWidth = 700; // target mobile device width on desktop
+  const deviceHeight = Math.min(height, 1000); // keep some margin
 
   const deviceStyle = isDesktopLike
     ? [styles.deviceFrame, { width: deviceWidth, height: deviceHeight }]

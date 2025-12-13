@@ -61,8 +61,16 @@ const ThemeShowcase: React.FC<ThemeShowcaseProps> = ({ iconsSize = "md" }) => {
   return (
     <BoxContainer>
       <AppText variant="title">Theme Showcase</AppText>
-      <TextBouble>
-        <AppText variant="bodyText">This is a Text Bouble sample content.</AppText>
+      <TextBouble mode="user">
+        <AppText variant="bodyText">
+          User bubble (p1 background), with the normal shadow and top-left corner not xlg.
+        </AppText>
+      </TextBouble>
+
+      <TextBouble mode="agent">
+        <AppText variant="bodyText">
+          User bubble (p1 background), with the normal shadow and top-left corner not xlg.{" "}
+        </AppText>
       </TextBouble>
 
       <Box title="Colors">
