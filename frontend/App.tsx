@@ -5,6 +5,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import ThemeShowcase from "./ThemeShowcase";
+import Header from "./components/common/Header";
 import { COLORS, SPACING } from "./theme";
 
 // Keep the splash screen visible while we fetch resources
@@ -47,6 +48,9 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={outerStyle} onLayout={onLayoutRootView}>
         <View style={deviceStyle}>
+          <Header title="MOJO" logo={null} show={true}>
+            {/* Example children area: you can put calendar, contact info, etc. */}
+          </Header>
           <ThemeShowcase />
         </View>
         <StatusBar style="auto" />
