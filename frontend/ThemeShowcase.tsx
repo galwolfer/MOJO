@@ -21,6 +21,7 @@ import Input from "./components/inputs/Input";
 import Tag from "./components/inputs/tag";
 import PriorityList, { PriorityListItem } from "./components/PriorityList";
 import { useState } from "react";
+import TextBouble from "./components/TextBouble";
 
 const ColorSwatch = ({ name, hex }: { name: string; hex: string }) => (
   <View style={styles.swatchWrap}>
@@ -60,6 +61,9 @@ const ThemeShowcase: React.FC<ThemeShowcaseProps> = ({ iconsSize = "md" }) => {
   return (
     <BoxContainer>
       <AppText variant="title">Theme Showcase</AppText>
+      <TextBouble>
+        <AppText variant="bodyText">This is a Text Bouble sample content.</AppText>
+      </TextBouble>
 
       <Box title="Colors">
         <View style={styles.colorsGrid}>
