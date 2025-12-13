@@ -19,7 +19,7 @@ const gradientStops = [
   `${COLORS.primary1} 360deg`,
 ].join(", ");
 
-const shadowShrink = SPACING.xlg;
+const shadowShrink = SPACING.lg;
 
 /**
  * ConicGradientBubble - A web-specific animated gradient bubble component using Reanimated.

@@ -85,7 +85,7 @@ function createIcon(svgFileName: string, debugName: string): React.FC<IconProps>
 
     const coloredSvg = svgContent.replace(/currentColor/g, tint);
 
-    if (Platform.OS === "web") {
+    if ((Platform as any).OS === "web") {
       const coloredDataUri = `data:image/svg+xml;base64,${btoa(coloredSvg)}`;
       return (
         <img

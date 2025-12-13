@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "#eee",
-    ...SHADOWS.card.rn,
+    ...(SHADOWS.card as object),
   },
   swatchLabel: {
     marginTop: 6,
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     marginBottom: 6,
     padding: SPACING.sm,
-    ...SHADOWS.card.rn,
+    ...(SHADOWS.card as object),
   },
 
   fontsList: {
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     alignItems: "center",
     justifyContent: "center",
-    ...SHADOWS.card.rn,
+    ...(SHADOWS.card as object),
     borderWidth: 1,
     borderColor: COLORS.grayLight,
   },

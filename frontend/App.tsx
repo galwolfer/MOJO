@@ -28,7 +28,7 @@ export default function App() {
   // Call layout-related hooks before any early returns so hooks order stays stable
   const { width, height } = useWindowDimensions();
   // treat wide viewports as desktop where we center a mobile-sized device
-  const isDesktopLike = Platform.OS === "web" ? width >= 900 : width >= 900;
+  const isDesktopLike = (Platform as any).OS === "web" ? width >= 900 : width >= 900;
 
   if (!fontsLoaded && !fontError) {
     return null;

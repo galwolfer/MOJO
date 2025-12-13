@@ -3,7 +3,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Platform, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { COLORS, SHADOWS, SPACING } from "../../theme";
 import ConicGradientBubble from "../special/ConicGradientBubble";
-import { BoxShadow } from "@shopify/react-native-skia";
 
 export type TextBoubleMode = "agent" | "user";
 
@@ -20,7 +19,7 @@ type Props = {
   onTypingDone?: () => void;
 };
 
-const DEFAULT_CPS = 100;
+const DEFAULT_CPS = 50;
 
 // Notes inside the code are in English
 function extractPlainText(node: React.ReactNode): string | null {
@@ -75,18 +74,11 @@ function getContainerBackground(mode: TextBoubleMode) {
 function getContainerShadow(mode: TextBoubleMode) {
   // "user - normal shadow present"
   if (mode === "user") {
-    return {
-      shadowColor: COLORS.primary1,
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.22,
-      shadowRadius: 2,
-      elevation: 3,
-    } as const;
+    // Use the glowing message shadow for user too
+    return SHADOWS.glowingMessage as ViewStyle;
   }
 
-  return {
-    BoxShadow: SHADOWS.glowingMessage,
-  } as const;
+  return SHADOWS.glowingMessage as ViewStyle;
 }
 
 const TextBouble: React.FC<Props> = ({
@@ -143,7 +135,7 @@ const TextBouble: React.FC<Props> = ({
 
         // On mobile, animating opacity via JS driver is more reliable
         // when the gradient component is SVG/complex.
-        const useNativeDriver = Platform.OS === "web" ? false : false;
+        const useNativeDriver = (Platform as any).OS === "web" ? false : false;
 
         Animated.parallel([
           Animated.timing(conicOpacity, {
@@ -204,6 +196,8 @@ const TextBouble: React.FC<Props> = ({
                   ...radii,
                   // Keep the old look: only web uses CSS blur; native keeps the component's original rendering
                   filter: "blur(10px)",
+                  // On web, inherit bubble border so the conic gradient aligns with container edges
+                  ...((Platform as any).OS === "web" ? { borderWidth: 0.15, borderColor: COLORS.brightP1 } : {}),
                 }}
               />
             </Animated.View>
@@ -253,24 +247,14 @@ const styles = StyleSheet.create({
     left: -18,
     right: -18,
     bottom: -18,
-    zIndex: Platform.OS === "web" ? 0 : undefined,
+    zIndex: (Platform as any).OS === "web" ? 0 : undefined,
   },
 
   // "glowingMessage shadow" approximation (uses theme if exists)
   glow: {
     position: "absolute",
-    top: -14,
-    left: -14,
-    right: -14,
-    bottom: -14,
     backgroundColor: "transparent",
-    ...(SHADOWS?.glowingMessage ?? {
-      shadowColor: COLORS.primary1,
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.35,
-      shadowRadius: 14,
-      elevation: 10,
-    }),
+    ...(SHADOWS.glowingMessage as ViewStyle),
   },
 
   text: {

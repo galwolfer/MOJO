@@ -51,7 +51,7 @@ const DropdownModal: React.FC<DropdownModalProps> = ({
             borderWidth: 0.15,
             borderColor: COLORS.brightP1,
             paddingVertical: SPACING.sm,
-            ...SHADOWS.card.rn,
+            ...(SHADOWS.card as any),
             transform: [
               { translateY: dropdownAnim.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }) },
               { scaleY: dropdownAnim.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1] }) },

@@ -9,9 +9,9 @@
  * Use `Box` to group related UI into visually distinct cards.
  */
 import React from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, Platform } from "react-native";
 import AppText from "../common/AppText";
-import { COLORS, SHADOWS, SPACING, TYPOGRAPHY } from "../../theme";
+import { COLORS, SHADOWS, SPACING } from "../../theme";
 
 type BoxProps = {
   title: string;
@@ -56,7 +56,7 @@ const styles = StyleSheet.create({
     borderRadius: SPACING.lg,
     backgroundColor: COLORS.white2,
     overflow: "visible",
-    boxShadow: SHADOWS.card.web,
+    ...(SHADOWS.card as object),
   },
   titleWrap: {
     height: SPACING.xlg + 5,

@@ -21,7 +21,7 @@ const InputField = React.forwardRef<TextInput, InputFieldProps>(({ webNativeID, 
         style={[{ flex: 1, padding: 12, fontFamily: TYPOGRAPHY.input.fontFamily, fontSize: TYPOGRAPHY.input.fontSize }]}
         placeholder={placeholderText ?? undefined}
         placeholderTextColor={COLORS.lightGray}
-        {...(Platform.OS === "web" && webNativeID ? { nativeID: webNativeID } : {})}
+        {...((Platform as any).OS === "web" && webNativeID ? { nativeID: webNativeID } : {})}
         {...rest}
       />
     </Animated.View>

@@ -64,7 +64,7 @@ const hexToRgba = (hex: string, alpha = 1) => {
 function useWebCaret(idPrefix = "input") {
   const idRef = useRef<string | null>(null);
   useEffect(() => {
-    if (Platform.OS !== "web") return;
+    if ((Platform as any).OS !== "web") return;
     const id = `${idPrefix}-${Math.random().toString(36).slice(2, 9)}`;
     idRef.current = id;
     const style = document.createElement("style");
@@ -248,7 +248,7 @@ function Input<T = any>({
               wrapperRef.current?.measure((x, y, width, height, pageX, pageY) => {
                 // subtract a small spacing so the dropdown visually sits flush with the input
                 // On mobile use half the input height so the dropdown sits closer to the input center
-                const topOffset = Platform.OS === "web" ? pageY + height + SPACING.sm : pageY + height / 2;
+                const topOffset = (Platform as any).OS === "web" ? pageY + height + SPACING.sm : pageY + height / 2;
                 setDropdownLayout({ top: topOffset, left: pageX, width });
                 setIsOpen(true);
                 // start open animation shortly after setIsOpen so Modal is visible
@@ -274,7 +274,7 @@ function Input<T = any>({
         >
           <TextInput
             ref={inputRef}
-            style={[styles.input, Platform.OS === "web" ? ({ outlineWidth: 0 } as any) : undefined]}
+            style={[styles.input, (Platform as any).OS === "web" ? ({ outlineWidth: 0 } as any) : undefined]}
             placeholder={Platform.OS === "android" ? "" : effectivePlaceholder}
             placeholderTextColor={COLORS.lightGray}
             keyboardType={getKeyboardType()}
@@ -293,7 +293,7 @@ function Input<T = any>({
             {...rest}
             selectionColor={selectionColor}
             cursorColor={cursorColor}
-            {...(Platform.OS === "web" && webNativeID ? { nativeID: webNativeID } : {})}
+            {...((Platform as any).OS === "web" && webNativeID ? { nativeID: webNativeID } : {})}
           />
 
           {options && (
@@ -451,8 +451,7 @@ const styles = StyleSheet.create({
     borderRadius: SPACING.lg,
     borderWidth: 0.15,
     borderColor: COLORS.brightP1,
-    boxShadow: SHADOWS.card.web,
-    ...(Platform.OS !== "web" ? SHADOWS.card.rn : {}),
+    ...(SHADOWS.card as any),
   },
   option: {
     flexDirection: "row",

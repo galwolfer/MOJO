@@ -26,7 +26,7 @@ const styles = StyleSheet.create({
   },
   cardDragging: {
     backgroundColor: COLORS.white3,
-    ...(SHADOWS.card.rn as any),
+    ...(SHADOWS.card as any),
   },
   cardActive: {
     zIndex: 999,

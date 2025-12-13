@@ -1,4 +1,5 @@
 import { moderateScale, s, scale, verticalScale } from "react-native-size-matters";
+import { Platform } from "react-native";
 
 export const COLORS = {
   // Primary colors
@@ -77,6 +78,22 @@ export const ICON_SIZES: Record<IconSizeKey, number> = {
   big: moderateScale(35),
 };
 
+// Convert a hex color like "#4361EE" to an rgba() string with the given alpha.
+function hexToRgba(hex: string, alpha: number) {
+  const h = hex.replace("#", "");
+  const full =
+    h.length === 3
+      ? h
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      : h;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 // System fonts as fallback when custom fonts aren't available (Expo Go)
 export const SYSTEM_FONTS = {
   fredokaExtraLight: "sans-serif-light",
@@ -88,27 +105,25 @@ export const SYSTEM_FONTS = {
   fredokaHeavy: "sans-serif-black",
 };
 
-// Reusable shadow variants (CSS string for web + RN approximation)
+// Reusable shadow variants (automatically platform-aware)
 export const SHADOWS = {
   card: {
-    web: "0 0 15px 0 rgba(0, 0, 0, 0.05) inset, 0 1px 10px 0 rgba(21, 39, 124, 0.14)",
-    rn: {
-      shadowColor: "rgba(21, 39, 124, 0.14)",
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.14,
-      shadowRadius: 10,
-      elevation: 4,
-    },
+    // explicit CSS token for web + RN shadow props for native
+    boxShadow: "0 1px 10px 0 rgba(21, 39, 124, 0.14)",
+    shadowColor: "rgba(21, 39, 124, 0.14)",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 1,
+    shadowRadius: 1,
+    elevation: 4,
   },
   glowingMessage: {
-    web: `0 0 15px 0 rgba(0, 0, 0, 0.05) inset, 0 1px 2px 0 var(${COLORS.primary1})`,
-    rn: {
-      shadowColor: COLORS.primary1,
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.5,
-      shadowRadius: 15,
-      elevation: 4,
-    },
+    // use COLORS.primary1 at 50% opacity via helper (keeps the source color variable-driven)
+    boxShadow: `0 0 15px 0 rgba(0, 0, 0, 0.05) inset, 0px 1px 2px ${hexToRgba(COLORS.primary1, 0.1)}`,
+    shadowColor: COLORS.primary1,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.5,
+    shadowRadius: 5,
+    elevation: 4,
   },
 };
 
@@ -132,8 +147,13 @@ export const COMPONENT_STYLES = {
     borderWidth: 0.15,
     borderColor: COLORS.brightP1,
     backgroundColor: COLORS.white,
-    // web shadow token; RN uses SHADOWS.card.rn where needed
-    boxShadow: SHADOWS.card.web,
+    // shadow
+    boxShadow: "0 1px 10px 0 rgba(21, 39, 124, 0.14)",
+    shadowColor: "rgba(21, 39, 124, 0.14)",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
+    elevation: 4,
     minHeight: 44,
     paddingRight: SPACING.sm,
   },
@@ -157,7 +177,11 @@ export const COMPONENT_STYLES = {
     borderStyle: "solid",
     borderColor: COLORS.brightP1,
     backgroundColor: COLORS.white,
-    boxShadow: SHADOWS.card.web,
+    shadowColor: "rgba(21, 39, 124, 0.14)",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
+    elevation: 4,
     padding: SPACING.sm,
   },
   // Individual row/item inside a listContainer. Keep background transparent
