@@ -11,7 +11,7 @@ import { apiClient } from "./utils/apiClient.js";
 
 // Services
 import { getUserById, updateRoutineSettings } from "./services/auth/userService.js";
-import { registerUserApi, loginUserApi, updateUserProfileApi } from "./services/auth/authApiService.js";
+import { registerUserApi, loginUserApi, updateUserProfileApi, sendChatMessage, resetChatSession, getChatHistory, checkChatHealth } from "./services/apiService.js";
 import { 
   createTask, 
   getTasksForUser, 
@@ -28,7 +28,7 @@ import { suggestTaskFromProfile } from "./algorithms/priority/suggestions.js";
 import { logEvent } from "./services/telemetry/telemetry.js";
 import { getRoutineSettings, describeRoutineWindows } from "./services/scheduling/routineBlocks.js";
 import { findExpiredTasksForUser } from "./services/tasks/expiredTaskChecker.js";
-import { sendChatMessage, resetChatSession, getChatHistory } from "./services/chat/chatApiService.js";
+
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
