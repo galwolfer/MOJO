@@ -305,7 +305,8 @@ const styles = StyleSheet.create({
   iconsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: SPACING.md,
+    justifyContent: "space-between",
+    gap: SPACING.sm,
     marginTop: SPACING.sm,
   },
   iconItem: {
@@ -318,11 +319,11 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 8,
+    padding: SPACING.lg,
     backgroundColor: COLORS.white,
     alignItems: "center",
     justifyContent: "center",
     ...(SHADOWS.card as object),
-    borderWidth: 1,
   },
   iconLabel: {
     marginTop: 6,

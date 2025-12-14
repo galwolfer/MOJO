@@ -49,16 +49,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: SPACING.xlg,
     borderBottomRightRadius: SPACING.xlg,
 
-    // web boxShadow
-    ...(Platform.OS === "web" ? { boxShadow: SHADOWS.card.boxShadow } : {}),
-    // native shadow
-    shadowColor: SHADOWS.card.shadowColor,
-    shadowOffset: SHADOWS.card.shadowOffset,
-    shadowOpacity: SHADOWS.card.shadowOpacity,
-    shadowRadius: SHADOWS.card.shadowRadius,
-    elevation: SHADOWS.card.elevation,
-    borderColor: COLORS.primary1,
-    borderWidth: 1,
+    ...(SHADOWS.card as object),
   },
   row: {
     width: "100%",

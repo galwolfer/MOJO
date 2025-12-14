@@ -147,15 +147,11 @@ export const COMPONENT_STYLES = {
     borderWidth: 0.15,
     borderColor: COLORS.brightP1,
     backgroundColor: COLORS.white,
-    // shadow
-    boxShadow: "0 1px 10px 0 rgba(21, 39, 124, 0.14)",
-    shadowColor: "rgba(21, 39, 124, 0.14)",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.14,
-    shadowRadius: 10,
-    elevation: 4,
+
     minHeight: 44,
     paddingRight: SPACING.sm,
+
+    ...(SHADOWS.card as object),
   },
   inputWrapperPressable: {
     width: "100%",

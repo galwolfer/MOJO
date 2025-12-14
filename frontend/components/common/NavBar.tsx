@@ -13,15 +13,15 @@ export default function NavBar({ show = true }: NavBarProps) {
   return (
     <View style={styles.wrapper}>
       <TouchableOpacity style={styles.item} activeOpacity={0.7}>
-        <ICONS.user size={ICON_SIZES.md} color={COLORS.primary1} />
+        <ICONS.user size={ICON_SIZES.big} color={COLORS.primary1} />
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.item} activeOpacity={0.7}>
-        <ICONS.ojo size={ICON_SIZES.md} color={COLORS.primary1} />
+        <ICONS.ojo size={ICON_SIZES.big * 1.7} color={COLORS.primary1} />
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.item} activeOpacity={0.7}>
-        <ICONS.list size={ICON_SIZES.md} color={COLORS.primary1} />
+        <ICONS.list size={ICON_SIZES.big} color={COLORS.primary1} />
       </TouchableOpacity>
     </View>
   );
@@ -31,25 +31,20 @@ const styles = StyleSheet.create({
   wrapper: {
     width: "100%",
     flexDirection: "row",
-    justifyContent: "space-around",
+    justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.md,
+    paddingBottom: Platform.OS === "web" ? SPACING.lg : SPACING.lg,
+    paddingHorizontal: SPACING.xlg,
     backgroundColor: COLORS.white,
     borderTopLeftRadius: SPACING.xlg,
     borderTopRightRadius: SPACING.xlg,
-    borderColor: COLORS.primary1,
-    borderWidth: 1,
-    ...(Platform.OS === "web" ? { boxShadow: SHADOWS.card.boxShadow } : {}),
-    shadowColor: SHADOWS.card.shadowColor,
-    shadowOffset: SHADOWS.card.shadowOffset,
-    shadowOpacity: SHADOWS.card.shadowOpacity,
-    shadowRadius: SHADOWS.card.shadowRadius,
-    elevation: SHADOWS.card.elevation,
+    height: SPACING.xlg * 3 + (Platform.OS !== "web" ? SPACING.lg : 0),
+    ...(SHADOWS.card as object),
   },
   item: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    minWidth: 56,
   },
 });

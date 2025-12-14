@@ -39,7 +39,7 @@ export default function App() {
       styles.scrollContent,
       {
         paddingTop: headerHeight + SPACING.md,
-        paddingBottom: SPACING.xlg * 2,
+        paddingBottom: SPACING.xlg * 3 + SPACING.lg + (Platform.OS !== "web" ? SPACING.lg : 0),
       },
     ],
     [headerHeight]
@@ -52,7 +52,7 @@ export default function App() {
   const outerStyle = isDesktopLike ? styles.desktopOuter : styles.container;
 
   const deviceWidth = 700;
-  const deviceHeight = Math.min(height, 1000);
+  const deviceHeight = Math.min(height, 1300);
 
   const deviceStyle = isDesktopLike
     ? [styles.deviceFrame, { width: deviceWidth, height: deviceHeight }]
