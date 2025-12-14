@@ -19,7 +19,7 @@
  * @requires algorithms/csp/scheduler - CSP scheduling algorithm
  */
 
-import Task from "../../models/Task.js";
+import { Task } from "../../models/Task.js";
 import { TaskSchedule } from "../../models/TaskSchedule.js";
 import { BusyBlock } from "../../models/BusyBlock.js";
 import { startOfDay, addDays } from "../../utils/dateUtils.js";

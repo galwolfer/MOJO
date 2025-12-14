@@ -24,7 +24,7 @@ export async function createTask(userId, taskData) {
 
     const taskDoc = {
       userId,
-      name,
+      taskname: name,
       tag: tag || null,
       deadline: deadlineDate,
     };

@@ -5,45 +5,28 @@ import readline from "readline";
 import { connectDatabase } from "./config/database.js";
 import { ansi, paint, theme } from "./utils/cliTheme.js";
 
+// Utilities
+import { startOfDay, addDays, formatLocalDate, formatLocalDateTime, parseDateOnly } from "./utils/dateUtils.js";
+
 // Services
-import { registerUser, loginUser } from "./services/auth/authService.js";
 import { getUserById, updateRoutineSettings } from "./services/auth/userService.js";
-import { createTask, getTasksForUser, checkSuggestionFollowed, updateScheduleEntryStatus, updateTask } from "./services/tasks/taskService.js";
+import { registerUserApi, loginUserApi, updateUserProfileApi } from "./services/auth/authApiService.js";
+import { 
+  createTask, 
+  getTasksForUser, 
+  checkSuggestionFollowed, 
+  updateScheduleEntryStatus, 
+  updateTask,
+  extendTaskDeadline as extendTaskDeadlineService,
+  deleteTask as deleteTaskService
+} from "./services/tasks/taskService.js";
 import { generatePlan, savePlan, getUpcomingSessions } from "./services/scheduling/planningService.js";
 import { createBusyBlock, getUpcomingBusyBlocks } from "./services/tasks/busyBlockService.js";
 import { coacherAlgorithm } from "./services/index.js";
 import { suggestTaskFromProfile } from "./algorithms/priority/suggestions.js";
 import { logEvent } from "./services/telemetry/telemetry.js";
 import { getRoutineSettings, describeRoutineWindows } from "./services/scheduling/routineBlocks.js";
-import { startOfDay, addDays } from "./utils/dateUtils.js";
 import { findExpiredTasksForUser } from "./services/tasks/expiredTaskChecker.js";
-import Task from "./models/Task.js";
-import { TaskSchedule } from "./models/TaskSchedule.js";
-
-const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-const pad = (value) => String(value).padStart(2, "0");
-
-const formatLocalDateTime = (date) => {
-  const year = date.getFullYear();
-  const month = pad(date.getMonth() + 1);
-  const day = pad(date.getDate());
-  const hours = pad(date.getHours());
-  const minutes = pad(date.getMinutes());
-  return `${year}-${month}-${day} ${hours}:${minutes}`;
-};
-
-const formatLocalDate = (date) => {
-  const year = date.getFullYear();
-  const month = pad(date.getMonth() + 1);
-  const day = pad(date.getDate());
-  return `${year}-${month}-${day}`;
-};
-
-const parseDateOnly = (input) => {
-  if (!DATE_ONLY_REGEX.test(input)) return null;
-  const parsed = new Date(`${input}T00:00:00`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-};
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
@@ -83,18 +66,22 @@ let currentUser = null;
 let lastSuggestion = null;
 const SUGGESTION_WINDOW_MS = 30 * 60 * 1000;
 
+// Auth token storage
+let authToken = null;
+
 const menuOptions = [
-  { key: "1", label: "Register" },
-  { key: "2", label: "Login" },
-  { key: "3", label: "Add Task" },
-  { key: "4", label: "List Tasks" },
-  { key: "5", label: "Edit Task" },
-  { key: "6", label: "Recommend Next Task" },
-  { key: "7", label: "Suggest a New Task" },
-  { key: "8", label: "Plan Tasks" },
-  { key: "9", label: "View Schedule" },
-  { key: "10", label: "Update Schedule Entry" },
-  { key: "11", label: "Calendar Constraints" },
+  { key: "1", label: "Register", requiresAuth: false },
+  { key: "2", label: "Login", requiresAuth: false },
+  { key: "3", label: "Logout", requiresAuth: true },
+  { key: "4", label: "Add Task", requiresAuth: true },
+  { key: "5", label: "List Tasks", requiresAuth: true },
+  { key: "6", label: "Edit Task", requiresAuth: true },
+  { key: "7", label: "Recommend Next Task", requiresAuth: true },
+  { key: "8", label: "Suggest a New Task", requiresAuth: true },
+  { key: "9", label: "Plan Tasks", requiresAuth: true },
+  { key: "10", label: "View Schedule", requiresAuth: true },
+  { key: "11", label: "Update Schedule Entry", requiresAuth: true },
+  { key: "12", label: "Calendar Constraints", requiresAuth: true },
   { key: "0", label: "Exit" },
 ];
 
@@ -126,15 +113,16 @@ const preferenceQuestions = [
     const choice = (await ask("Choose an option ➤ ")).trim();
     if (choice === "1") await register();
     else if (choice === "2") await login();
-    else if (choice === "3") await addTask();
-    else if (choice === "4") await listTasks();
-    else if (choice === "5") await editTaskOption();
-    else if (choice === "6") await recommendTask();
-    else if (choice === "7") await suggestNewTask();
-    else if (choice === "8") await planTasksOption();
-    else if (choice === "9") await viewScheduleOption();
-    else if (choice === "10") await updateScheduleEntryOption();
-    else if (choice === "11") await calendarConstraintsMenu();
+    else if (choice === "3") await logout();
+    else if (choice === "4") await addTask();
+    else if (choice === "5") await listTasks();
+    else if (choice === "6") await editTaskOption();
+    else if (choice === "7") await recommendTask();
+    else if (choice === "8") await suggestNewTask();
+    else if (choice === "9") await planTasksOption();
+    else if (choice === "10") await viewScheduleOption();
+    else if (choice === "11") await updateScheduleEntryOption();
+    else if (choice === "12") await calendarConstraintsMenu();
     else if (choice === "0") break;
     else console.log(theme.warning("🤔 Not sure what you meant. Please pick one of the options above."));
   }
@@ -167,14 +155,35 @@ async function checkAndBlockExpiredTasks() {
 function printMenu() {
   console.log(theme.muted("\n═════════════════════════════════════"));
   console.log(theme.title(" Mojo Coacher — Task Companion "));
+  
+  // Show login status
+  if (currentUser) {
+    console.log(theme.success(` 👤 Logged in as: ${currentUser.username} `));
+  } else {
+    console.log(theme.warning(" 🔒 Not logged in "));
+  }
+  
   console.log(theme.subtitle(" What would you like to do? "));
   console.log(theme.muted("═════════════════════════════════════"));
-  menuOptions.forEach(({ key, label }) => {
+  
+  menuOptions.forEach(({ key, label, requiresAuth }) => {
+    // Show appropriate options based on login status
+    if (requiresAuth === true && !currentUser) {
+      // Skip auth-required options when not logged in
+      return;
+    }
+    if (requiresAuth === false && currentUser) {
+      // Skip register/login when already logged in
+      return;
+    }
     console.log(`${theme.option(`${key})`)} ${label}`);
   });
 }
 
 async function register() {
+  console.log(theme.subtitle("\n📝 Register a new account"));
+  // console.log(theme.muted("This will create your account via the backend API.\n"));
+
   const username = (await ask("username: ")).trim();
   const emailInput = (await ask("email: ")).trim();
   const password = (await ask("password: ", { hidden: true })).trim();
@@ -184,32 +193,95 @@ async function register() {
     return;
   }
 
-  const priorities = await collectPriorities();
-  const result = await registerUser({ username, email: emailInput, password, priorities });
+  console.log(theme.muted("\n🔄 Sending registration request to server..."));
+
+  const result = await registerUserApi({ username, email: emailInput, password });
 
   if (!result.success) {
-    console.log(theme.error(`🚫 ${result.error}`));
+    console.log(theme.error(`🚫 Registration failed: ${result.error}`));
     return;
   }
 
-  console.log(theme.success("🎉 Registered successfully! You can log in now."));
+  console.log(theme.success("🎉 Registered successfully!"));
+  console.log(theme.muted(`\nYour JWT token has been saved. You are now logged in as ${result.user.username}.`));
+
+  // Auto-login after registration
+  authToken = result.token;
+  currentUser = result.user;
+
+  // Optionally collect priorities and update profile
+  const wantsPriorities = (await ask("\nWould you like to set your task priorities now? (y/N): ")).trim().toLowerCase();
+  if (wantsPriorities === 'y' || wantsPriorities === 'yes') {
+    const priorities = await collectPriorities();
+    const updateResult = await updateUserProfileApi({ priorities });
+    if (updateResult.success) {
+      console.log(theme.success("✅ Priorities saved!"));
+    } else {
+      console.log(theme.warning(`⚠️ Could not save priorities: ${updateResult.error}`));
+    }
+  }
+
+  // Check for expired tasks
+  await handleExpiredTasks();
 }
 
 async function login() {
+  console.log(theme.subtitle("\n🔐 Login to your account"));
+  console.log(theme.muted("This will authenticate via the backend API.\n"));
+
   const username = (await ask("username: ")).trim();
   const password = (await ask("password: ", { hidden: true })).trim();
 
-  const result = await loginUser({ username, password });
-  if (!result.success) {
-    console.log(theme.error("⛔ Invalid credentials, please try again."));
+  if (!username || !password) {
+    console.log(theme.warning("⚠️ Please provide username and password."));
     return;
   }
 
+  console.log(theme.muted("\n🔄 Authenticating with server..."));
+
+  const result = await loginUserApi({ username, password });
+
+  if (!result.success) {
+    console.log(theme.error(`⛔ Login failed: ${result.error}`));
+    return;
+  }
+
+  // Store auth token and user info
+  authToken = result.token;
   currentUser = result.user;
+
   console.log(theme.success(`🙌 Logged in as ${currentUser.username}`));
-  
+  console.log(theme.muted(`JWT token saved for API requests.`));
+
+  // Show token info (useful for debugging/testing)
+  const showToken = (await ask("\nShow your JWT token? (useful for API testing) (y/N): ")).trim().toLowerCase();
+  if (showToken === 'y' || showToken === 'yes') {
+    console.log(theme.muted("\n📋 Your JWT Token (copy for API testing):"));
+    console.log(theme.accent(authToken));
+  }
+
   // Check for expired tasks - user must handle them before continuing
   await handleExpiredTasks();
+}
+
+async function logout() {
+  if (!currentUser) {
+    console.log(theme.warning("⚠️ You're not logged in."));
+    return;
+  }
+
+  const confirm = (await ask(`\nLogout from ${currentUser.username}? (Y/n): `)).trim().toLowerCase();
+  if (confirm === 'n' || confirm === 'no') {
+    console.log(theme.muted("Logout cancelled."));
+    return;
+  }
+
+  const previousUser = currentUser.username;
+  currentUser = null;
+  authToken = null;
+  lastSuggestion = null;
+  
+  console.log(theme.success(`👋 Logged out from ${previousUser}. See you next time!`));
 }
 
 // =============================================================================
@@ -323,14 +395,15 @@ async function extendTaskDeadline(task) {
     return false;
   }
 
-  try {
-    await Task.findByIdAndUpdate(task._id, { dueDate: newDate });
-    console.log(theme.success(`\n✅ Deadline extended to ${formatLocalDate(newDate)}!`));
-    return true;
-  } catch (err) {
-    console.log(theme.error(`❌ Failed to update task: ${err.message}`));
+  const result = await extendTaskDeadlineService({ taskId: task._id, userId: currentUser._id, newDeadline: newDate });
+  
+  if (!result.success) {
+    console.log(theme.error(`❌ Failed to update task: ${result.error}`));
     return false;
   }
+  
+  console.log(theme.success(`\n✅ Deadline extended to ${formatLocalDate(newDate)}!`));
+  return true;
 }
 
 async function forfeitTask(task) {
@@ -344,23 +417,16 @@ async function forfeitTask(task) {
     return false;
   }
 
-  try {
-    // Delete the task
-    await Task.findByIdAndDelete(task._id);
-    
-    // Also delete any scheduled sessions
-    try {
-      await TaskSchedule.deleteMany({ taskId: task._id });
-    } catch (schedErr) {
-      // Ignore if no schedules
-    }
+  // Delete the task and its schedules via service
+  const result = await deleteTaskService({ taskId: task._id, userId: currentUser._id });
 
-    console.log(theme.success(`\n✅ Task "${task.taskname}" has been deleted.`));
-    return true;
-  } catch (err) {
-    console.log(theme.error(`❌ Failed to delete task: ${err.message}`));
+  if (!result.success) {
+    console.log(theme.error(`❌ Failed to delete task: ${result.error}`));
     return false;
   }
+
+  console.log(theme.success(`\n✅ Task "${task.taskname}" has been deleted.`));
+  return true;
 }
 
 async function collectPriorities() {

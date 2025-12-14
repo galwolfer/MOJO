@@ -18,7 +18,7 @@
  * @requires models/TaskSchedule - Schedule database model
  */
 
-import Task from "../../models/Task.js";
+import { Task } from "../../models/Task.js";
 import { TaskSchedule } from "../../models/TaskSchedule.js";
 import { logEvent } from "../telemetry/telemetry.js";
 import { recordSubCategoryGeneration } from "../telemetry/subcategoryTelemetry.js";
@@ -253,4 +253,101 @@ export async function updateTask({ userId, taskId, updates }) {
   });
 
   return { success: true, task: updated };
+}
+
+/**
+ * Extend the deadline of a task.
+ * @param {object} params
+ * @param {string} params.taskId - Task ID
+ * @param {string} params.userId - User ID (for authorization)
+ * @param {Date} params.newDeadline - New deadline date
+ * @returns {Promise<{success: boolean, task?: object, error?: string}>}
+ */
+export async function extendTaskDeadline({ taskId, userId, newDeadline }) {
+  if (!taskId) {
+    return { success: false, error: "Task ID is required." };
+  }
+
+  if (!newDeadline || !(newDeadline instanceof Date) || isNaN(newDeadline.getTime())) {
+    return { success: false, error: "Valid new deadline is required." };
+  }
+
+  // Validate deadline is in the future
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  if (newDeadline <= now) {
+    return { success: false, error: "New deadline must be in the future." };
+  }
+
+  try {
+    const task = await Task.findOneAndUpdate(
+      { _id: taskId, userId },
+      { $set: { dueDate: newDeadline } },
+      { new: true }
+    ).lean();
+
+    if (!task) {
+      return { success: false, error: "Task not found or you don't have permission." };
+    }
+
+    await logEvent({
+      type: "task_deadline_extended",
+      userId,
+      payload: {
+        taskId: taskId.toString(),
+        newDeadline: newDeadline.toISOString(),
+      },
+    });
+
+    return { success: true, task };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Delete/forfeit a task and its scheduled sessions.
+ * @param {object} params
+ * @param {string} params.taskId - Task ID
+ * @param {string} params.userId - User ID (for authorization)
+ * @returns {Promise<{success: boolean, taskname?: string, error?: string}>}
+ */
+export async function deleteTask({ taskId, userId }) {
+  if (!taskId) {
+    return { success: false, error: "Task ID is required." };
+  }
+
+  try {
+    // Find the task first to get the name
+    const task = await Task.findOne({ _id: taskId, userId });
+
+    if (!task) {
+      return { success: false, error: "Task not found or you don't have permission." };
+    }
+
+    const taskname = task.taskname;
+
+    // Delete the task
+    await Task.findByIdAndDelete(taskId);
+
+    // Also delete any scheduled sessions
+    try {
+      await TaskSchedule.deleteMany({ taskId });
+    } catch {
+      // Ignore if no schedules exist
+    }
+
+    await logEvent({
+      type: "task_deleted",
+      userId,
+      payload: {
+        taskId: taskId.toString(),
+        taskname,
+      },
+    });
+
+    return { success: true, taskname };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 }

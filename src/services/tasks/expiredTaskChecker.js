@@ -18,7 +18,7 @@
  */
 
 import cron from "node-cron";
-import Task from "../../models/Task.js";
+import { Task } from "../../models/Task.js";
 import { logger } from "../../utils/logger.js";
 
 // =============================================================================

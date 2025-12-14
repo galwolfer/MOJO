@@ -2,7 +2,7 @@
 // API routes for handling expired tasks (deadlines passed)
 
 import { Router } from "express";
-import Task from "../models/Task.js";
+import { Task } from "../models/Task.js";
 import { logger } from "../utils/logger.js";
 
 const router = Router();

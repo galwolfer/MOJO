@@ -81,7 +81,7 @@ taskSchema.pre("save", async function () {
       TaskModel: this.constructor,
     });
   }
-})();
+});
 
 // Compound indexes for efficient queries
 taskSchema.index({ userId: 1, deadline: 1 });
