@@ -67,6 +67,80 @@ ts="${now.toISOString()}"`;
 
     /**
      * ==================
+     * PERSONALITY TOOL: set_tone
+     * ==================
+     * Change the communication style/tone of the assistant.
+     * Options: friendly, professional, casual, formal, enthusiastic
+     * 
+     * The tone affects how the assistant responds:
+     * - friendly: warm, approachable, conversational
+     * - professional: polished, business-like, efficient
+     * - casual: relaxed, informal, laid-back
+     * - formal: respectful, proper, structured
+     * - enthusiastic: energetic, positive, encouraging
+     */
+    new DynamicStructuredTool({
+      name: "set_tone",
+      description: "Change assistant's communication tone. Use when user asks to be more friendly/professional/casual/formal/enthusiastic or asks you to change how you talk.",
+      schema: z.object({
+        tone: z.enum(["friendly", "professional", "casual", "formal", "enthusiastic"])
+          .describe("The tone to use: friendly, professional, casual, formal, or enthusiastic"),
+      }),
+      func: async ({ tone }) => {
+        try {
+          const result = await memoryStore.updateUserProfile(userId, { tone });
+          if (!result) {
+            return `ok=false\nerr="Failed to update tone"`;
+          }
+          
+          const toneDescriptions = {
+            friendly: "warm and approachable",
+            professional: "polished and business-like",
+            casual: "relaxed and informal",
+            formal: "respectful and proper",
+            enthusiastic: "energetic and encouraging"
+          };
+          
+          return `ok=true\nmsg="Tone changed to ${tone}"\ndesc="${toneDescriptions[tone]}"`;
+        } catch (error) {
+          return `ok=false\nerr="${error.message}"`;
+        }
+      },
+    }),
+
+    /**
+     * ==================
+     * PERSONALITY TOOL: set_persona
+     * ==================
+     * Change the persona/character of the assistant.
+     * Can be anything: "Donald Trump", "a pirate", "Yoda", "a strict coach", etc.
+     * 
+     * The persona defines WHO the assistant acts as.
+     * Default is "assistant" but can be changed to any character or role.
+     */
+    new DynamicStructuredTool({
+      name: "set_persona",
+      description: "Change assistant's persona/character. Use when user asks you to talk like someone (e.g., 'talk like Donald Trump', 'be a pirate', 'act like Yoda'). Set persona to the character or role requested.",
+      schema: z.object({
+        persona: z.string()
+          .describe("The persona to adopt (e.g., 'Donald Trump', 'a pirate', 'Yoda', 'a motivational coach', 'assistant' for default)"),
+      }),
+      func: async ({ persona }) => {
+        try {
+          const result = await memoryStore.updateUserProfile(userId, { persona });
+          if (!result) {
+            return `ok=false\nerr="Failed to update persona"`;
+          }
+          
+          return `ok=true\nmsg="Persona changed"\npersona="${persona}"`;
+        } catch (error) {
+          return `ok=false\nerr="${error.message}"`;
+        }
+      },
+    }),
+
+    /**
+     * ==================
      * MEMORY TOOL: save_user_fact
      * ==================
      * Save important facts about the user that should be remembered long-term.
@@ -277,9 +351,9 @@ err="${error.message}"`;
 
           // Return structured response
           let result = `ok=true\nmsg="Task created"\nid="${task._id}"
-name="${task.name}"`;
+name="${task.taskname}"`;
           if (task.tag) result += `\ntag="${task.tag}"`;
-          result += `\ndue="${task.deadline}"`;
+          result += `\ndueDate="${task.dueDate}"`;
 
           if (task.recurrence?.type) {
             result += `\nrecur="${task.recurrence.type}"
@@ -336,8 +410,8 @@ int=${task.recurrence.interval}`;
           const items = tasks
             .map(
               (t) =>
-                `[[task]]\nid="${t._id}"\nname="${t.name}"${t.tag ? `\ntag="${t.tag}"` : ""}\ndue="${
-                  t.deadline
+                `[[task]]\nid="${t._id}"\nname="${t.taskname}"${t.tag ? `\ntag="${t.tag}"` : ""}\ndueDate="${
+                  t.dueDate
                 }"\ndone=${t.completed}`
             )
             .join("\n");
@@ -357,28 +431,28 @@ int=${task.recurrence.interval}`;
      * Can update any combination of:
      * - name: Change task description
      * - tag: Change category
-     * - deadline: Change due date
+     * - dueDate: Change due date
      * - completed: Mark as done/undone
      *
      * Only the fields provided are updated
      */
     new DynamicStructuredTool({
       name: "update_task",
-      description: "Update task name/tag/deadline/status",
+      description: "Update task name/tag/dueDate/status",
       schema: z.object({
         taskId: z.string(),
         name: z.string().optional(),
         tag: z.string().optional(),
-        deadline: z.string().optional(),
+        dueDate: z.string().optional(),
         completed: z.boolean().optional(),
       }),
-      func: async ({ taskId, name, tag, deadline, completed }) => {
+      func: async ({ taskId, name, tag, dueDate, completed }) => {
         try {
           // Build update object with only specified fields
           const updates = {};
-          if (name !== undefined) updates.name = name;
+          if (name !== undefined) updates.taskname = name;
           if (tag !== undefined) updates.tag = tag;
-          if (deadline !== undefined) updates.deadline = deadline;
+          if (dueDate !== undefined) updates.dueDate = new Date(dueDate);
           if (completed !== undefined) updates.completed = completed;
 
           // Update in database
@@ -388,9 +462,9 @@ int=${task.recurrence.interval}`;
             return `ok=false\nerr="Not found"`;
           }
 
-          return `ok=true\nmsg="Updated"\nid="${task._id}"\nname="${task.name}"${
+          return `ok=true\nmsg="Updated"\nid="${task._id}"\nname="${task.taskname}"${
             task.tag ? `\ntag="${task.tag}"` : ""
-          }\ndue="${task.deadline}"\ndone=${task.completed}`;
+          }\ndueDate="${task.dueDate}"\ndone=${task.completed}`;
         } catch (error) {
           return `ok=false\nerr="${error.message}"`;
         }
@@ -448,7 +522,7 @@ int=${task.recurrence.interval}`;
           }
 
           // Format as list of upcoming tasks
-          const items = tasks.map((t) => `[[task]]\nid="${t._id}"\nname="${t.name}"\ndue="${t.deadline}"`).join("\n");
+          const items = tasks.map((t) => `[[task]]\nid="${t._id}"\nname="${t.taskname}"\ndueDate="${t.dueDate}"`).join("\n");
           return `ok=true\ncount=${tasks.length}\n${items}`;
         } catch (error) {
           return `ok=false\nerr="${error.message}"`;
@@ -479,8 +553,8 @@ int=${task.recurrence.interval}`;
           // Format results with days overdue
           const items = tasks
             .map((t) => {
-              const days = Math.floor((new Date() - new Date(t.deadline)) / 86400000);
-              return `[[task]]\nid="${t._id}"\nname="${t.name}"\ndue="${t.deadline}"\nover=${days}`;
+              const days = Math.floor((new Date() - new Date(t.dueDate)) / 86400000);
+              return `[[task]]\nid="${t._id}"\nname="${t.taskname}"\ndueDate="${t.dueDate}"\nover=${days}`;
             })
             .join("\n");
           return `ok=true\ncount=${tasks.length}\n${items}`;

@@ -7,6 +7,7 @@ import { ansi, paint, theme } from "./utils/cliTheme.js";
 
 // Utilities
 import { startOfDay, addDays, formatLocalDate, formatLocalDateTime, parseDateOnly } from "./utils/dateUtils.js";
+import { apiClient } from "./utils/apiClient.js";
 
 // Services
 import { getUserById, updateRoutineSettings } from "./services/auth/userService.js";
@@ -27,6 +28,7 @@ import { suggestTaskFromProfile } from "./algorithms/priority/suggestions.js";
 import { logEvent } from "./services/telemetry/telemetry.js";
 import { getRoutineSettings, describeRoutineWindows } from "./services/scheduling/routineBlocks.js";
 import { findExpiredTasksForUser } from "./services/tasks/expiredTaskChecker.js";
+import { sendChatMessage, resetChatSession, getChatHistory } from "./services/chat/chatApiService.js";
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
@@ -69,6 +71,18 @@ const SUGGESTION_WINDOW_MS = 30 * 60 * 1000;
 // Auth token storage
 let authToken = null;
 
+// Chat session storage
+let chatSessionId = null;
+
+/**
+ * Set the authentication token for API requests
+ * @param {string|null} token - JWT token or null to clear
+ */
+function setAuthToken(token) {
+  authToken = token;
+  apiClient.setToken(token);
+}
+
 const menuOptions = [
   { key: "1", label: "Register", requiresAuth: false },
   { key: "2", label: "Login", requiresAuth: false },
@@ -82,6 +96,7 @@ const menuOptions = [
   { key: "10", label: "View Schedule", requiresAuth: true },
   { key: "11", label: "Update Schedule Entry", requiresAuth: true },
   { key: "12", label: "Calendar Constraints", requiresAuth: true },
+  { key: "13", label: "💬 Chat with AI Assistant", requiresAuth: true },
   { key: "0", label: "Exit" },
 ];
 
@@ -123,6 +138,7 @@ const preferenceQuestions = [
     else if (choice === "10") await viewScheduleOption();
     else if (choice === "11") await updateScheduleEntryOption();
     else if (choice === "12") await calendarConstraintsMenu();
+    else if (choice === "13") await chatWithAssistant();
     else if (choice === "0") break;
     else console.log(theme.warning("🤔 Not sure what you meant. Please pick one of the options above."));
   }
@@ -206,7 +222,7 @@ async function register() {
   console.log(theme.muted(`\nYour JWT token has been saved. You are now logged in as ${result.user.username}.`));
 
   // Auto-login after registration
-  authToken = result.token;
+  setAuthToken(result.token);
   currentUser = result.user;
 
   // Optionally collect priorities and update profile
@@ -247,7 +263,7 @@ async function login() {
   }
 
   // Store auth token and user info
-  authToken = result.token;
+  setAuthToken(result.token);
   currentUser = result.user;
 
   console.log(theme.success(`🙌 Logged in as ${currentUser.username}`));
@@ -278,8 +294,9 @@ async function logout() {
 
   const previousUser = currentUser.username;
   currentUser = null;
-  authToken = null;
+  setAuthToken(null);
   lastSuggestion = null;
+  chatSessionId = null;
   
   console.log(theme.success(`👋 Logged out from ${previousUser}. See you next time!`));
 }
@@ -1074,4 +1091,111 @@ function ensureLoggedIn() {
   if (currentUser) return true;
   console.log(theme.warning("🔐 Please log in first."));
   return false;
+}
+
+// =============================================================================
+// AI CHAT
+// =============================================================================
+
+async function chatWithAssistant() {
+  if (!ensureLoggedIn()) return;
+
+  console.log(theme.subtitle("\n🤖 Chat with AI Assistant"));
+  console.log(theme.muted("Have a conversation with your personal AI coach."));
+  console.log(theme.muted("The assistant can help you manage tasks, plan your day, and more."));
+  console.log(theme.muted("─".repeat(50)));
+  console.log(theme.muted("Commands:"));
+  console.log(theme.muted("  'exit' or 'quit' - Return to main menu"));
+  console.log(theme.muted("  'reset' - Start a new conversation"));
+  console.log(theme.muted("  'history' - View conversation history"));
+  console.log(theme.muted("─".repeat(50)));
+
+  // Create or reuse session ID
+  if (!chatSessionId) {
+    chatSessionId = `cli_${currentUser._id}_${Date.now()}`;
+    console.log(theme.success(`\n🆕 New chat session started`));
+  } else {
+    console.log(theme.info(`\n🔄 Continuing previous session`));
+  }
+
+  while (true) {
+    const message = (await ask("\nYou ➤ ")).trim();
+
+    if (!message) continue;
+
+    // Handle special commands
+    const lowerMessage = message.toLowerCase();
+    
+    if (lowerMessage === 'exit' || lowerMessage === 'quit') {
+      console.log(theme.muted("\n👋 Chat ended. Returning to main menu."));
+      console.log(theme.muted("Your conversation will be saved for next time.\n"));
+      break;
+    }
+
+    if (lowerMessage === 'reset') {
+      console.log(theme.muted("🔄 Resetting conversation..."));
+      const resetResult = await resetChatSession({ sessionId: chatSessionId });
+      if (resetResult.success) {
+        chatSessionId = `cli_${currentUser._id}_${Date.now()}`;
+        console.log(theme.success("✅ Conversation reset! Starting fresh."));
+      } else {
+        console.log(theme.error(`❌ Failed to reset: ${resetResult.error}`));
+      }
+      continue;
+    }
+
+    if (lowerMessage === 'history') {
+      await showChatHistory();
+      continue;
+    }
+
+    // Send message to AI assistant
+    console.log(theme.muted("\n🤔 Thinking..."));
+    const result = await sendChatMessage({ message, sessionId: chatSessionId });
+
+    if (!result.success) {
+      console.log(theme.error(`\n❌ Chat error: ${result.error}`));
+      if (result.error.includes('token') || result.error.includes('auth')) {
+        console.log(theme.warning("Try logging out and back in."));
+      }
+      continue;
+    }
+
+    // Display AI response
+    console.log(theme.accent(`\n🤖 Assistant:`));
+    console.log(result.response);
+    console.log(theme.muted(`[${result.messageCount || 0} messages in session]`));
+  }
+}
+
+async function showChatHistory() {
+  if (!chatSessionId) {
+    console.log(theme.info("No active chat session."));
+    return;
+  }
+
+  console.log(theme.muted("\n📜 Loading conversation history..."));
+  const result = await getChatHistory({ sessionId: chatSessionId });
+
+  if (!result.success) {
+    console.log(theme.error(`❌ Failed to load history: ${result.error}`));
+    return;
+  }
+
+  if (!result.history || result.history.length === 0) {
+    console.log(theme.info("No messages in this session yet."));
+    return;
+  }
+
+  console.log(theme.accent(`\n📜 Conversation History (${result.messageCount} messages)`));
+  console.log(theme.muted("─".repeat(50)));
+
+  for (const msg of result.history) {
+    const role = msg.role === 'user' ? '👤 You' : '🤖 Assistant';
+    const roleStyle = msg.role === 'user' ? theme.subtitle : theme.accent;
+    console.log(roleStyle(`\n${role}:`));
+    console.log(msg.content);
+  }
+
+  console.log(theme.muted("\n" + "─".repeat(50)));
 }

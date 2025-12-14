@@ -16,7 +16,11 @@ export async function createTask(userId, taskData) {
   try {
     const { name, tag, deadline, recurrence } = taskData;
 
-    // Validate deadline is in the future
+    // Validate deadline is required and in the future
+    if (!deadline) {
+      throw new Error("Due date is required");
+    }
+    
     const deadlineDate = new Date(deadline);
     if (isNaN(deadlineDate.getTime())) {
       throw new Error("Invalid deadline format");
@@ -26,7 +30,7 @@ export async function createTask(userId, taskData) {
       userId,
       taskname: name,
       tag: tag || null,
-      deadline: deadlineDate,
+      dueDate: deadlineDate, // Map deadline to dueDate (Task model field)
     };
 
     // Add recurrence if provided
