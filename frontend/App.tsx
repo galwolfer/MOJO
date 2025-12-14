@@ -1,4 +1,5 @@
-import { useCallback } from "react";
+// #file:App.tsx
+import React, { useCallback, useMemo, useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet, View, useWindowDimensions, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -6,9 +7,9 @@ import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import ThemeShowcase from "./ThemeShowcase";
 import Header from "./components/common/Header";
+import NavBar from "./components/common/NavBar";
 import { COLORS, SPACING } from "./theme";
 
-// Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
 
 export default function App() {
@@ -26,10 +27,23 @@ export default function App() {
     }
   }, [fontsLoaded, fontError]);
 
-  // Call layout-related hooks before any early returns so hooks order stays stable
   const { width, height } = useWindowDimensions();
-  // treat wide viewports as desktop where we center a mobile-sized device
   const isDesktopLike = (Platform as any).OS === "web" ? width >= 900 : width >= 900;
+
+  // Measure header height so the scroll content always starts *under* it.
+  const [headerHeight, setHeaderHeight] = useState(0);
+  // We add paddingTop = headerHeight so the first scroll item is not hidden behind the header.
+  // Call useMemo before any early returns so hook order remains stable between renders.
+  const showcaseContentStyle = useMemo(
+    () => [
+      styles.scrollContent,
+      {
+        paddingTop: headerHeight + SPACING.md,
+        paddingBottom: SPACING.xlg * 2,
+      },
+    ],
+    [headerHeight]
+  );
 
   if (!fontsLoaded && !fontError) {
     return null;
@@ -37,8 +51,8 @@ export default function App() {
 
   const outerStyle = isDesktopLike ? styles.desktopOuter : styles.container;
 
-  const deviceWidth = 700; // target mobile device width on desktop
-  const deviceHeight = Math.min(height, 1000); // keep some margin
+  const deviceWidth = 700;
+  const deviceHeight = Math.min(height, 1000);
 
   const deviceStyle = isDesktopLike
     ? [styles.deviceFrame, { width: deviceWidth, height: deviceHeight }]
@@ -48,11 +62,30 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={outerStyle} onLayout={onLayoutRootView}>
         <View style={deviceStyle}>
-          <Header title="MOJO" logo={null} show={true}>
-            {/* Example children area: you can put calendar, contact info, etc. */}
-          </Header>
-          <ThemeShowcase />
+          {/* Fixed header overlay */}
+          <View
+            style={styles.headerOverlay}
+            onLayout={(e) => {
+              const h = e?.nativeEvent?.layout?.height ?? 0;
+              if (h && h !== headerHeight) setHeaderHeight(h);
+            }}
+          >
+            <Header title="MOJO" logo={null} show={true}>
+              {/* Header children (optional) */}
+            </Header>
+          </View>
+
+          {/* Fixed bottom nav overlay */}
+          <View style={styles.footerOverlay} pointerEvents="box-none">
+            <NavBar />
+          </View>
+
+          {/* Scroll area: starts below header */}
+          <View style={styles.content}>
+            <ThemeShowcase contentContainerStyle={showcaseContentStyle} />
+          </View>
         </View>
+
         <StatusBar style="auto" />
       </View>
     </GestureHandlerRootView>
@@ -65,7 +98,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white3,
     alignItems: "center",
     justifyContent: "center",
-    gap: SPACING.md,
   },
   desktopOuter: {
     flex: 1,
@@ -77,7 +109,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: "hidden",
     backgroundColor: COLORS.white3,
-    // shadow (works on native); web will approximate
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.12,
@@ -88,20 +119,27 @@ const styles = StyleSheet.create({
     flex: 1,
     width: "100%",
   },
-  text: {
-    fontSize: 16,
+
+  // Header sits on top, content scrolls underneath (but with paddingTop so it is visible)
+  headerOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
   },
-  title: {
-    fontFamily: "Fredoka-Bold",
-    fontSize: 24,
-    color: "#2c3e50",
+
+  footerOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 10,
   },
-  regular: {
-    fontFamily: "Fredoka-Regular",
-    fontSize: 18,
+
+  content: {
+    flex: 1,
   },
-  bold: {
-    fontFamily: "Fredoka-Bold",
-    fontSize: 18,
-  },
+
+  scrollContent: {},
 });

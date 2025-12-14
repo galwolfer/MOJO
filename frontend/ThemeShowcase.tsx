@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
+import { View, StyleSheet, TouchableOpacity, ScrollViewProps } from "react-native";
 import BoxContainer from "./components/layout/BoxContainer";
 import AppText from "./components/common/AppText";
 import {
@@ -35,11 +35,16 @@ const ColorSwatch = ({ name, hex }: { name: string; hex: string }) => (
   </View>
 );
 
-interface ThemeShowcaseProps {
+interface ThemeShowcaseProps extends ScrollViewProps {
   iconsSize?: IconSizeKey;
 }
 
-const ThemeShowcase: React.FC<ThemeShowcaseProps> = ({ iconsSize = "md" }) => {
+const ThemeShowcase: React.FC<ThemeShowcaseProps> = ({
+  iconsSize = "md",
+  contentContainerStyle,
+  style,
+  ...scrollProps
+}) => {
   const [isChecked, setIsChecked] = useState(false);
   const [progress, setProgress] = useState(0);
   const [textInput, setTextInput] = useState("");
@@ -59,7 +64,11 @@ const ThemeShowcase: React.FC<ThemeShowcaseProps> = ({ iconsSize = "md" }) => {
   const fruits = ["Apple", "Banana", "Cherry", "Date", "Elderberry"];
 
   return (
-    <BoxContainer>
+    <BoxContainer
+      style={[styles.scroll, style]}
+      contentContainerStyle={[styles.contentContainer, contentContainerStyle]}
+      {...scrollProps}
+    >
       <AppText variant="title">Theme Showcase</AppText>
       <TextBouble mode="user">
         <AppText variant="bodyText">
@@ -314,13 +323,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     ...(SHADOWS.card as object),
     borderWidth: 1,
-    borderColor: COLORS.grayLight,
   },
   iconLabel: {
     marginTop: 6,
     fontSize: 11,
     textAlign: "center",
-    color: COLORS.black,
+  },
+  scroll: {
+    flex: 1,
+  },
+  contentContainer: {
+    paddingBottom: SPACING.xlg * 2,
   },
 });
 
