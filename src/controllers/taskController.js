@@ -54,10 +54,11 @@ export async function createTask(req, res) {
       }
     }
 
-    const task = await taskService.createTask(userId, {
-      name: name.trim(),
-      tag: tag?.trim(),
-      deadline,
+    const task = await taskService.createTask({
+      userId,
+      taskname: name.trim(),
+      tags: tag ? [tag.trim()] : [],
+      dueDate: deadline ? new Date(deadline) : null,
       recurrence,
     });
 

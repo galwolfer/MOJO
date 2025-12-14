@@ -10,7 +10,7 @@ import { startOfDay, addDays, formatLocalDate, formatLocalDateTime, parseDateOnl
 import { apiClient } from "./utils/apiClient.js";
 
 // Services
-import { getUserById, updateRoutineSettings } from "./services/auth/userService.js";
+import { getUserById, updateRoutineSettings } from "./services/authService.js";
 import { registerUserApi, loginUserApi, updateUserProfileApi, sendChatMessage, resetChatSession, getChatHistory, checkChatHealth } from "./services/apiService.js";
 import { 
   createTask, 
@@ -19,15 +19,15 @@ import {
   updateScheduleEntryStatus, 
   updateTask,
   extendTaskDeadline as extendTaskDeadlineService,
-  deleteTask as deleteTaskService
-} from "./services/tasks/taskService.js";
-import { generatePlan, savePlan, getUpcomingSessions } from "./services/scheduling/planningService.js";
-import { createBusyBlock, getUpcomingBusyBlocks } from "./services/tasks/busyBlockService.js";
+  deleteTask as deleteTaskService,
+  createBusyBlock,
+  getUpcomingBusyBlocks,
+  findExpiredTasksForUser
+} from "./services/taskService.js";
+import { generatePlan, savePlan, getUpcomingSessions, getRoutineSettings, describeRoutineWindows } from "./services/schedulingService.js";
 import { coacherAlgorithm } from "./services/index.js";
 import { suggestTaskFromProfile } from "./algorithms/priority/suggestions.js";
-import { logEvent } from "./services/telemetry/telemetry.js";
-import { getRoutineSettings, describeRoutineWindows } from "./services/scheduling/routineBlocks.js";
-import { findExpiredTasksForUser } from "./services/tasks/expiredTaskChecker.js";
+import { logEvent } from "./services/telemetryService.js";
 
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });

@@ -329,42 +329,50 @@ err="${error.message}"`;
           })
           .optional(),
       }),
-      func: async ({ name, tag, deadline, recurrence }) => {
-        try {
-          const taskData = { name, tag, deadline };
-
-          // Add recurrence pattern if specified
-          if (recurrence?.type) {
-            taskData.recurrence = {
-              type: recurrence.type,
-              interval: recurrence.interval || 1,
-              endDate: recurrence.endDate || null,
-              count: recurrence.count || null,
-              completedDates: [],
+        func: async ({ name, tag, deadline, recurrence }) => {
+          try {
+            // Map tool fields to service signature
+            const payload = {
+              userId,
+              taskname: name,
+              dueDate: deadline ? new Date(deadline) : null,
             };
+
+            if (tag) payload.tags = [tag];
+
+            // Add recurrence pattern if specified
+            if (recurrence?.type) {
+              payload.recurrence = {
+                type: recurrence.type,
+                interval: recurrence.interval || 1,
+                endDate: recurrence.endDate || null,
+                count: recurrence.count || null,
+                completedDates: [],
+              };
+            }
+
+            // Create task in database using the consolidated service signature
+            const task = await taskService.createTask(payload);
+
+            console.log(`[LOG] Task created: ${task._id} ${recurrence ? "(recurring)" : ""}`);
+
+            // Return structured response
+            let result = `ok=true\nmsg="Task created"\nid="${task._id}"\nname="${task.taskname}"`;
+            if (task.tags && task.tags.length) result += `\ntag="${task.tags[0]}"`;
+            result += `\ndueDate="${task.dueDate}"`;
+
+            if (task.recurrence?.type) {
+              result += `\nrecur="${task.recurrence.type}"\nint=${task.recurrence.interval}`;
+            }
+
+            return result;
+          } catch (error) {
+            console.error("[AGENT][add_task] error:", error);
+            return `ok=false\nerr="${error.message}"`;
           }
+        },
 
-          // Create task in database
-          const task = await taskService.createTask(userId, taskData);
-
-          console.log(`[LOG] Task created: ${task._id} ${recurrence ? "(recurring)" : ""}`);
-
-          // Return structured response
-          let result = `ok=true\nmsg="Task created"\nid="${task._id}"
-name="${task.taskname}"`;
-          if (task.tag) result += `\ntag="${task.tag}"`;
-          result += `\ndueDate="${task.dueDate}"`;
-
-          if (task.recurrence?.type) {
-            result += `\nrecur="${task.recurrence.type}"
-int=${task.recurrence.interval}`;
-          }
-
-          return result;
-        } catch (error) {
-          return `ok=false\nerr="${error.message}"`;
-        }
-      },
+        
     }),
 
     /**

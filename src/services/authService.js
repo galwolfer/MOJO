@@ -1,25 +1,30 @@
 /**
- * @fileoverview Authentication Service
- * @module services/auth/authService
+ * @fileoverview Authentication & User Service
+ * @module services/authService
  * 
- * Handles user registration.ts and authentication logic for Mojo Coacher.
- * Provides secure password hashing using bcrypt and manages user sessions.
+ * Consolidated service for user authentication and profile management.
+ * Handles registration, login, and user profile operations.
  * 
  * Key responsibilities:
  * - User registration with password hashing
  * - User login with credential verification
- * - Session management
- * - Telemetry logging for auth events
+ * - Fetch and update user profiles
+ * - Manage user priority preferences
+ * - Update routine settings
  * 
  * @requires bcrypt - For secure password hashing
  * @requires models/User - User database model
  */
 
 import bcrypt from "bcrypt";
-import { User } from "../../models/User.js";
-import { logEvent } from "../telemetry/telemetry.js";
+import { User } from "../models/User.js";
+import { logEvent } from "./telemetryService.js";
 
 const SALT_ROUNDS = 10;
+
+// =============================================================================
+// AUTHENTICATION
+// =============================================================================
 
 /**
  * Register a new user.
@@ -77,4 +82,39 @@ export async function loginUser({ username, password }) {
   }
 
   return { success: true, user };
+}
+
+// =============================================================================
+// USER PROFILE MANAGEMENT
+// =============================================================================
+
+/**
+ * Fetch fresh user document by ID.
+ * @param {string | import("mongoose").Types.ObjectId} userId
+ * @returns {Promise<object | null>}
+ */
+export async function getUserById(userId) {
+  return User.findById(userId).lean();
+}
+
+/**
+ * Update a user's profile priorities.
+ * @param {string | import("mongoose").Types.ObjectId} userId
+ * @param {Record<string, number>} priorities
+ * @returns {Promise<object | null>}
+ */
+export async function updatePriorities(userId, priorities) {
+  await User.updateOne({ _id: userId }, { $set: { "profile.priorities": priorities } });
+  return getUserById(userId);
+}
+
+/**
+ * Update routine-block settings in the user profile.
+ * @param {string | import("mongoose").Types.ObjectId} userId
+ * @param {{ enabled: boolean, blocks: object[] }} settings
+ * @returns {Promise<object | null>}
+ */
+export async function updateRoutineSettings(userId, settings) {
+  await User.updateOne({ _id: userId }, { $set: { "profile.settings.routineBlocks": settings } });
+  return getUserById(userId);
 }
