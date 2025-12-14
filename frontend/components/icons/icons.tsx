@@ -21,6 +21,7 @@ const ICON_FILES: Record<string, string> = {
   list: "list.svg",
   medal: "medal.svg",
   move: "move.svg",
+  ojo: "ojo.svg",
   plus: "plus-1.svg",
   right: "right.svg",
   send: "send-icon.svg",
