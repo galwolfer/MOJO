@@ -29,7 +29,7 @@ const AppButton: React.FC<AppButtonProps> = ({
   onPress,
   icon,
   width,
-  iconPosition = "left",
+  iconPosition = "right",
   mode = "filled",
   color = "primary1",
   style,
@@ -100,7 +100,7 @@ const AppButton: React.FC<AppButtonProps> = ({
       >
         {IconComp && iconPosition === "left" && (
           <View style={styles.iconWrapper}>
-            <IconComp size={20} color={isFilled ? COLORS.colorWhite : resolvedColor} />
+            <IconComp size={SPACING.lg} color={isFilled ? COLORS.colorWhite : resolvedColor} />
           </View>
         )}
 
@@ -112,7 +112,7 @@ const AppButton: React.FC<AppButtonProps> = ({
 
         {IconComp && iconPosition === "right" && (
           <View style={styles.iconWrapper}>
-            <IconComp size={20} color={isFilled ? COLORS.colorWhite : resolvedColor} />
+            <IconComp size={SPACING.lg} color={isFilled ? COLORS.colorWhite : resolvedColor} />
           </View>
         )}
       </Pressable>

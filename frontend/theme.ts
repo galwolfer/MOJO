@@ -57,7 +57,7 @@ export const FONTS = {
   fredokaLight: "Fredoka-Light",
   fredokaMedium: "Fredoka-Medium",
   fredokaRegular: "Fredoka-Regular",
-  fredokaDemiBold: "Fredoka-DemiBold",
+  fredokaSemiBold: "Fredoka-SemiBold",
   fredokaBold: "Fredoka-Bold",
   fredokaHeavy: "Fredoka-Heavy",
 };
@@ -196,7 +196,7 @@ export const COMPONENT_STYLES = {
 
 export const TYPOGRAPHY = {
   title: {
-    fontFamily: FONTS.fredokaBold,
+    fontFamily: FONTS.fredokaSemiBold,
     fontSize: moderateScale(32),
     textTransform: "uppercase" as const,
     color: COLORS.primary1,
@@ -222,7 +222,7 @@ export const TYPOGRAPHY = {
     color: COLORS.black,
   },
   boldText: {
-    fontFamily: FONTS.fredokaBold,
+    fontFamily: FONTS.fredokaSemiBold,
     fontSize: moderateScale(18),
     color: COLORS.black,
   },

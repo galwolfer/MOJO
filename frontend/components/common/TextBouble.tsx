@@ -88,20 +88,22 @@ const NonTextFade: React.FC<{ visible: boolean; style?: any; children?: React.Re
   children,
   style,
 }) => {
-  // Do not render at all when not visible so it doesn't occupy layout space.
-  if (!visible) return null;
-
   const anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Fade in when mounted (visible true)
-    Animated.timing(anim, {
-      toValue: 1,
-      duration: 320,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    }).start();
-  }, [anim]);
+    if (visible) {
+      // Fade in when mounted (visible true)
+      Animated.timing(anim, {
+        toValue: 1,
+        duration: 320,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [anim, visible]);
+
+  // Do not render at all when not visible so it doesn't occupy layout space.
+  if (!visible) return null;
 
   return <Animated.View style={[{ opacity: anim }, style]}>{children}</Animated.View>;
 };
@@ -181,12 +183,10 @@ function cloneChildrenWithTyping(node: React.ReactNode, typedChars: number): Rea
  */
 const AnimatedTypingContent: React.FC<{
   children: React.ReactNode;
-  fullText: string;
   typedChars: number;
-  nonTextOpacity: Animated.Value;
   mode: TextBoubleMode;
-}> = ({ children, typedChars, nonTextOpacity, mode }) => {
-  const content = cloneChildrenWithTyping(children, typedChars, nonTextOpacity);
+}> = ({ children, typedChars, mode }) => {
+  const content = cloneChildrenWithTyping(children, typedChars);
 
   if (React.isValidElement(children)) {
     return React.cloneElement(
@@ -300,15 +300,11 @@ const TextBouble: React.FC<Props> = ({
 
   // Fade-in animation for non-text elements after typing completes
   const nonTextOpacity = useRef(new Animated.Value(0)).current;
-  // Tracks whether we've already run the intro typing animation for this mount
-  const animatedOnceRef = useRef(false);
 
   const handleTypingDone = useMemo(
     () => () => {
       onTypingDone?.();
       setIsTyping(false);
-      // mark completed so we don't run again for the same mount
-      animatedOnceRef.current = true;
 
       // On mobile, animating opacity via JS driver is more reliable
       // when the gradient component is SVG/complex.
@@ -359,15 +355,11 @@ const TextBouble: React.FC<Props> = ({
   );
 
   useEffect(() => {
-    // Run only once on mount to avoid re-triggering on layout changes (resize)
-    // The initial content determines whether we should run the intro typewriter.
+    // Reset whenever content/mode changes
     const nextFull = pickText(children, text);
     const shouldType = (typewriter ?? mode === "agent") && mode === "agent" && !!nextFull;
 
-    // Only start typing if we haven't done it for this mount yet
-    const willType = shouldType && !animatedOnceRef.current;
-
-    // stop any running animations immediately when initializing
+    // stop any running animations immediately when content changes
     try {
       conicAnimRef.current?.stop();
     } catch (_) {}
@@ -375,13 +367,13 @@ const TextBouble: React.FC<Props> = ({
       glowAnimRef.current?.stop();
     } catch (_) {}
 
-    setIsTyping(willType);
-    setShowConic(willType);
+    setIsTyping(shouldType);
+    setShowConic(shouldType);
 
     // If typing: conic visible, glow hidden, non-text hidden. Otherwise: everything visible.
-    conicOpacity.setValue(willType ? 1 : 0);
-    glowOpacity.setValue(mode === "agent" && !willType ? 1 : 0);
-    nonTextOpacity.setValue(willType ? 0 : 1);
+    conicOpacity.setValue(shouldType ? 1 : 0);
+    glowOpacity.setValue(mode === "agent" && !shouldType ? 1 : 0);
+    nonTextOpacity.setValue(shouldType ? 0 : 1);
 
     return () => {
       // stop any running Animated.CompositeAnimation instances
@@ -403,24 +395,30 @@ const TextBouble: React.FC<Props> = ({
         conicOpacity.setValue(0);
       }
       try {
-        const finalGlow = mode === "agent" && !willType ? 1 : 0;
+        const finalGlow =
+          mode === "agent" && !((typewriter ?? mode === "agent") && mode === "agent" && !!pickText(children, text))
+            ? 1
+            : 0;
         glowOpacity.stopAnimation(() => {
           glowOpacity.setValue(finalGlow);
         });
       } catch (_) {
-        const finalGlow = mode === "agent" && !willType ? 1 : 0;
+        const finalGlow =
+          mode === "agent" && !((typewriter ?? mode === "agent") && mode === "agent" && !!pickText(children, text))
+            ? 1
+            : 0;
         glowOpacity.setValue(finalGlow);
       }
       try {
         nonTextOpacity.stopAnimation(() => {
-          nonTextOpacity.setValue(willType ? 0 : 1);
+          nonTextOpacity.setValue(shouldType ? 0 : 1);
         });
       } catch (_) {
-        nonTextOpacity.setValue(willType ? 0 : 1);
+        nonTextOpacity.setValue(shouldType ? 0 : 1);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [children, text, mode, typewriter]);
 
   const radii = useMemo(() => getRadii(mode), [mode]);
   const containerBg = useMemo(() => getContainerBackground(mode), [mode]);
