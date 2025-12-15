@@ -1,7 +1,7 @@
 // src/middlewares/expiredTaskBlocker.js
 // Middleware that blocks users from using the app until they handle expired tasks
 
-import { userHasExpiredTasks, findExpiredTasksForUser } from "../services/tasks/expiredTaskChecker.js";
+import { userHasExpiredTasks, findExpiredTasksForUser } from "../services/taskService.js";
 
 /**
  * List of routes that are NOT blocked (user can always access these)
@@ -18,7 +18,7 @@ const ALLOWED_ROUTES = [
   "/health",
   
   // Expired tasks routes (so user can handle them!)
-  "/api/expired-tasks",
+  "/api/tasks/expired",
   
   // Static files
   "/static",
@@ -85,16 +85,16 @@ export async function expiredTaskBlocker(req, res, next) {
       actions: {
         extend: {
           method: "PATCH",
-          url: "/api/expired-tasks/:taskId/extend",
+          url: "/api/tasks/expired/:taskId/extend",
           body: { newDeadline: "ISO date string" },
         },
         forfeit: {
           method: "DELETE",
-          url: "/api/expired-tasks/:taskId/forfeit",
+          url: "/api/tasks/expired/:taskId/forfeit",
         },
         handleAll: {
           method: "POST",
-          url: "/api/expired-tasks/:taskId/handle",
+          url: "/api/tasks/expired/:taskId/handle",
           body: { action: "extend|forfeit", newDeadline: "for extend only" },
         },
       },
@@ -120,7 +120,7 @@ export async function expiredTaskWarner(req, res, next) {
       if (hasExpired) {
         // Add warning header but don't block
         res.setHeader("X-Expired-Tasks", "true");
-        res.setHeader("X-Expired-Tasks-Action", "/api/expired-tasks");
+        res.setHeader("X-Expired-Tasks-Action", "/api/tasks/expired");
       }
     }
 

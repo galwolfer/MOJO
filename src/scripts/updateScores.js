@@ -2,7 +2,7 @@
 import mongoose from "mongoose";
 import { env } from "../config/env.js";
 import { scoreActivities } from "../algorithms/priority/priority.js";
-import Task from "../models/Task.js";
+import { Task } from "../models/Task.js";
 import { User } from "../models/User.js";
 
 // mapStatus: map task.status to activity status used by the scorer

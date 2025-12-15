@@ -51,7 +51,7 @@ export const galService = {
 // ==================== GAL — SERVICES (END) =======================
 
 // ==================== JONI — SERVICES (START) ====================
-import Task from "../models/Task.js";
+import { Task } from "../models/Task.js";
 import { scoreActivities } from "../algorithms/priority/priority.js";
 
 // Open = "todo" | "in-progress", Closed = "done"

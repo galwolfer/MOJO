@@ -257,7 +257,12 @@ err="${error.message}"`;
       }),
       func: async ({ name, tag, deadline, recurrence }) => {
         try {
-          const taskData = { name, tag, deadline };
+          const taskData = { 
+            userId,
+            taskname: name, 
+            tags: tag ? [tag] : [], 
+            dueDate: new Date(deadline) 
+          };
 
           // Add recurrence pattern if specified
           if (recurrence?.type) {
@@ -271,15 +276,15 @@ err="${error.message}"`;
           }
 
           // Create task in database
-          const task = await taskService.createTask(userId, taskData);
+          const task = await taskService.createTask(taskData);
 
           console.log(`[LOG] Task created: ${task._id} ${recurrence ? "(recurring)" : ""}`);
 
           // Return structured response
           let result = `ok=true\nmsg="Task created"\nid="${task._id}"
-name="${task.name}"`;
-          if (task.tag) result += `\ntag="${task.tag}"`;
-          result += `\ndue="${task.deadline}"`;
+name="${task.taskname}"`;
+          if (task.tags && task.tags.length > 0) result += `\ntag="${task.tags[0]}"`;
+          result += `\ndue="${task.dueDate.toISOString()}"`;
 
           if (task.recurrence?.type) {
             result += `\nrecur="${task.recurrence.type}"
@@ -320,28 +325,32 @@ int=${task.recurrence.interval}`;
         try {
           // Build filter object for database query
           const filters = {};
-          if (tag) filters.tag = tag;
-          if (completed !== undefined) filters.completed = completed;
-          if (dueBefore) filters.dueBefore = dueBefore;
-          if (dueAfter) filters.dueAfter = dueAfter;
+          if (tag) filters.tags = tag;
+          if (completed !== undefined) {
+            filters.status = completed ? "done" : { $ne: "done" };
+          }
+          if (dueBefore) filters.dueDate = { ...filters.dueDate, $lte: new Date(dueBefore) };
+          if (dueAfter) filters.dueDate = { ...filters.dueDate, $gte: new Date(dueAfter) };
 
-          // Query database with filters
-          const tasks = await taskService.getTasks(userId, filters);
+          // Query database with filters (correct service function name)
+          const tasks = await taskService.getTasksForUser(userId, filters);
 
           if (tasks.length === 0) {
-            return `ok=true\ncount=0`;
+            return `ok=true\ncount=0\nmsg="No tasks found"`;
           }
 
-          // Format results as structured list
+          // Format results as a clear bulleted list for the LLM to present nicely
           const items = tasks
-            .map(
-              (t) =>
-                `[[task]]\nid="${t._id}"\nname="${t.name}"${t.tag ? `\ntag="${t.tag}"` : ""}\ndue="${
-                  t.deadline
-                }"\ndone=${t.completed}`
-            )
+            .map((t, i) => {
+              const tagStr = Array.isArray(t.tags) && t.tags.length ? t.tags[0] : "";
+              const done = t.status === "done";
+              const dueStr = t.dueDate 
+                ? new Date(t.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                : "no due date";
+              return `• ${t.taskname}${tagStr ? ` [${tagStr}]` : ""} — due: ${dueStr}${done ? " ✓ done" : ""}`;
+            })
             .join("\n");
-          return `ok=true\ncount=${tasks.length}\n${items}`;
+          return `ok=true\ncount=${tasks.length}\n\n[SYSTEM: Display this list exactly as is, do not reformat]\nYour tasks:\n${items}`;
         } catch (error) {
           return `ok=false\nerr="${error.message}"`;
         }
@@ -366,31 +375,55 @@ int=${task.recurrence.interval}`;
       name: "update_task",
       description: "Update task name/tag/deadline/status",
       schema: z.object({
-        taskId: z.string(),
-        name: z.string().optional(),
+        taskId: z.string().optional(),
+        name: z.string().optional().describe("Task name to identify task when taskId is not provided"),
         tag: z.string().optional(),
         deadline: z.string().optional(),
         completed: z.boolean().optional(),
       }),
       func: async ({ taskId, name, tag, deadline, completed }) => {
         try {
-          // Build update object with only specified fields
-          const updates = {};
-          if (name !== undefined) updates.name = name;
-          if (tag !== undefined) updates.tag = tag;
-          if (deadline !== undefined) updates.deadline = deadline;
-          if (completed !== undefined) updates.completed = completed;
-
-          // Update in database
-          const task = await taskService.updateTask(taskId, userId, updates);
-
-          if (!task) {
-            return `ok=false\nerr="Not found"`;
+          // If taskId not provided, try to resolve by exact task name
+          if (!taskId) {
+            if (!name) return `ok=false\nerr="taskId or name is required"`;
+            const candidates = await taskService.getTasksForUser(userId, { taskname: name });
+            if (!candidates || candidates.length === 0) {
+              return `ok=false\nerr="Task not found by name: ${name}"`;
+            }
+            if (candidates.length > 1) {
+              const list = candidates.map((c) => `- ${c._id}: ${c.taskname}`).join("\\n");
+              return `ok=false\nerr="Multiple tasks found matching name. Please provide taskId. Candidates:\n${list}"`;
+            }
+            taskId = candidates[0]._id;
           }
 
-          return `ok=true\nmsg="Updated"\nid="${task._id}"\nname="${task.name}"${
-            task.tag ? `\ntag="${task.tag}"` : ""
-          }\ndue="${task.deadline}"\ndone=${task.completed}`;
+          // Build update object with only specified fields
+          const updates = {};
+          if (name !== undefined) updates.taskname = name;
+          if (tag !== undefined) updates.tags = [tag];
+
+          if (deadline !== undefined) {
+            const d = new Date(deadline);
+            if (isNaN(d.getTime())) {
+              return `ok=false\nerr="Invalid deadline format"`;
+            }
+            updates.dueDate = d;
+          }
+
+          if (completed !== undefined) updates.status = completed ? "done" : "todo";
+
+          // Update in database
+          const result = await taskService.updateTask({ userId, taskId, updates });
+
+          if (!result.success) {
+            return `ok=false\nerr="${result.error}"`;
+          }
+
+          const task = result.task;
+
+          return `ok=true\nmsg="Updated"\nid="${task._id}"\nname="${task.taskname}"${
+            task.tags && task.tags.length > 0 ? `\ntag="${task.tags[0]}"` : ""
+          }\ndue="${task.dueDate ? new Date(task.dueDate).toISOString() : ""}"\ndone=${task.status === "done"}`;
         } catch (error) {
           return `ok=false\nerr="${error.message}"`;
         }
@@ -412,9 +445,9 @@ int=${task.recurrence.interval}`;
       }),
       func: async ({ taskId }) => {
         try {
-          const success = await taskService.deleteTask(taskId, userId);
-          if (!success) {
-            return `ok=false\nerr="Not found"`;
+          const result = await taskService.deleteTask({ taskId, userId });
+          if (!result.success) {
+            return `ok=false\nerr="${result.error}"`;
           }
           return `ok=true\nmsg="Deleted"`;
         } catch (error) {
@@ -448,8 +481,11 @@ int=${task.recurrence.interval}`;
           }
 
           // Format as list of upcoming tasks
-          const items = tasks.map((t) => `[[task]]\nid="${t._id}"\nname="${t.name}"\ndue="${t.deadline}"`).join("\n");
-          return `ok=true\ncount=${tasks.length}\n${items}`;
+          const items = tasks.map((t) => {
+            const dueStr = t.dueDate ? new Date(t.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "no date";
+            return `• ${t.taskname} (due: ${dueStr})`;
+          }).join("\n");
+          return `ok=true\ncount=${tasks.length}\n\n[SYSTEM: Display this list exactly as is, do not reformat]\nUpcoming tasks:\n${items}`;
         } catch (error) {
           return `ok=false\nerr="${error.message}"`;
         }
@@ -479,11 +515,12 @@ int=${task.recurrence.interval}`;
           // Format results with days overdue
           const items = tasks
             .map((t) => {
-              const days = Math.floor((new Date() - new Date(t.deadline)) / 86400000);
-              return `[[task]]\nid="${t._id}"\nname="${t.name}"\ndue="${t.deadline}"\nover=${days}`;
+              const days = Math.floor((new Date() - new Date(t.dueDate)) / 86400000);
+              const dueStr = t.dueDate ? new Date(t.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "no date";
+              return `• ${t.taskname} (due: ${dueStr}, ${days} days overdue)`;
             })
             .join("\n");
-          return `ok=true\ncount=${tasks.length}\n${items}`;
+          return `ok=true\ncount=${tasks.length}\n\n[SYSTEM: Display this list exactly as is, do not reformat]\nOverdue tasks:\n${items}`;
         } catch (error) {
           return `ok=false\nerr="${error.message}"`;
         }
