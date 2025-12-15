@@ -125,7 +125,12 @@ export const ProgressIcon = memo(function ProgressIcon({ value, size = 18 }: Pro
   const rectHeight = 11.5;
 
   return (
-    <View style={{ width: size, height: size }} collapsable={false} renderToHardwareTextureAndroid={animating} shouldRasterizeIOS={animating}>
+    <View
+      style={{ width: size, height: size }}
+      collapsable={false}
+      renderToHardwareTextureAndroid={animating}
+      shouldRasterizeIOS={animating}
+    >
       <Svg width="100%" height="100%" viewBox="0 0 18 18" style={{ overflow: "visible" }}>
         <Defs>
           <ClipPath id={`rounded-rect-clip-${size}`}>
