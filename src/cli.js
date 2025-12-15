@@ -267,14 +267,6 @@ async function login() {
   currentUser = result.user;
 
   console.log(theme.success(`🙌 Logged in as ${currentUser.username}`));
-  console.log(theme.muted(`JWT token saved for API requests.`));
-
-  // Show token info (useful for debugging/testing)
-  const showToken = (await ask("\nShow your JWT token? (useful for API testing) (y/N): ")).trim().toLowerCase();
-  if (showToken === 'y' || showToken === 'yes') {
-    console.log(theme.muted("\n📋 Your JWT Token (copy for API testing):"));
-    console.log(theme.accent(authToken));
-  }
 
   // Check for expired tasks - user must handle them before continuing
   await handleExpiredTasks();

@@ -67,80 +67,6 @@ ts="${now.toISOString()}"`;
 
     /**
      * ==================
-     * PERSONALITY TOOL: set_tone
-     * ==================
-     * Change the communication style/tone of the assistant.
-     * Options: friendly, professional, casual, formal, enthusiastic
-     * 
-     * The tone affects how the assistant responds:
-     * - friendly: warm, approachable, conversational
-     * - professional: polished, business-like, efficient
-     * - casual: relaxed, informal, laid-back
-     * - formal: respectful, proper, structured
-     * - enthusiastic: energetic, positive, encouraging
-     */
-    new DynamicStructuredTool({
-      name: "set_tone",
-      description: "Change assistant's communication tone. Use when user asks to be more friendly/professional/casual/formal/enthusiastic or asks you to change how you talk.",
-      schema: z.object({
-        tone: z.enum(["friendly", "professional", "casual", "formal", "enthusiastic"])
-          .describe("The tone to use: friendly, professional, casual, formal, or enthusiastic"),
-      }),
-      func: async ({ tone }) => {
-        try {
-          const result = await memoryStore.updateUserProfile(userId, { tone });
-          if (!result) {
-            return `ok=false\nerr="Failed to update tone"`;
-          }
-          
-          const toneDescriptions = {
-            friendly: "warm and approachable",
-            professional: "polished and business-like",
-            casual: "relaxed and informal",
-            formal: "respectful and proper",
-            enthusiastic: "energetic and encouraging"
-          };
-          
-          return `ok=true\nmsg="Tone changed to ${tone}"\ndesc="${toneDescriptions[tone]}"`;
-        } catch (error) {
-          return `ok=false\nerr="${error.message}"`;
-        }
-      },
-    }),
-
-    /**
-     * ==================
-     * PERSONALITY TOOL: set_persona
-     * ==================
-     * Change the persona/character of the assistant.
-     * Can be anything: "Donald Trump", "a pirate", "Yoda", "a strict coach", etc.
-     * 
-     * The persona defines WHO the assistant acts as.
-     * Default is "assistant" but can be changed to any character or role.
-     */
-    new DynamicStructuredTool({
-      name: "set_persona",
-      description: "Change assistant's persona/character. Use when user asks you to talk like someone (e.g., 'talk like Donald Trump', 'be a pirate', 'act like Yoda'). Set persona to the character or role requested.",
-      schema: z.object({
-        persona: z.string()
-          .describe("The persona to adopt (e.g., 'Donald Trump', 'a pirate', 'Yoda', 'a motivational coach', 'assistant' for default)"),
-      }),
-      func: async ({ persona }) => {
-        try {
-          const result = await memoryStore.updateUserProfile(userId, { persona });
-          if (!result) {
-            return `ok=false\nerr="Failed to update persona"`;
-          }
-          
-          return `ok=true\nmsg="Persona changed"\npersona="${persona}"`;
-        } catch (error) {
-          return `ok=false\nerr="${error.message}"`;
-        }
-      },
-    }),
-
-    /**
-     * ==================
      * MEMORY TOOL: save_user_fact
      * ==================
      * Save important facts about the user that should be remembered long-term.
@@ -329,50 +255,47 @@ err="${error.message}"`;
           })
           .optional(),
       }),
-        func: async ({ name, tag, deadline, recurrence }) => {
-          try {
-            // Map tool fields to service signature
-            const payload = {
-              userId,
-              taskname: name,
-              dueDate: deadline ? new Date(deadline) : null,
+      func: async ({ name, tag, deadline, recurrence }) => {
+        try {
+          const taskData = { 
+            userId,
+            taskname: name, 
+            tags: tag ? [tag] : [], 
+            dueDate: new Date(deadline) 
+          };
+
+          // Add recurrence pattern if specified
+          if (recurrence?.type) {
+            taskData.recurrence = {
+              type: recurrence.type,
+              interval: recurrence.interval || 1,
+              endDate: recurrence.endDate || null,
+              count: recurrence.count || null,
+              completedDates: [],
             };
-
-            if (tag) payload.tags = [tag];
-
-            // Add recurrence pattern if specified
-            if (recurrence?.type) {
-              payload.recurrence = {
-                type: recurrence.type,
-                interval: recurrence.interval || 1,
-                endDate: recurrence.endDate || null,
-                count: recurrence.count || null,
-                completedDates: [],
-              };
-            }
-
-            // Create task in database using the consolidated service signature
-            const task = await taskService.createTask(payload);
-
-            console.log(`[LOG] Task created: ${task._id} ${recurrence ? "(recurring)" : ""}`);
-
-            // Return structured response
-            let result = `ok=true\nmsg="Task created"\nid="${task._id}"\nname="${task.taskname}"`;
-            if (task.tags && task.tags.length) result += `\ntag="${task.tags[0]}"`;
-            result += `\ndueDate="${task.dueDate}"`;
-
-            if (task.recurrence?.type) {
-              result += `\nrecur="${task.recurrence.type}"\nint=${task.recurrence.interval}`;
-            }
-
-            return result;
-          } catch (error) {
-            console.error("[AGENT][add_task] error:", error);
-            return `ok=false\nerr="${error.message}"`;
           }
-        },
 
-        
+          // Create task in database
+          const task = await taskService.createTask(taskData);
+
+          console.log(`[LOG] Task created: ${task._id} ${recurrence ? "(recurring)" : ""}`);
+
+          // Return structured response
+          let result = `ok=true\nmsg="Task created"\nid="${task._id}"
+name="${task.taskname}"`;
+          if (task.tags && task.tags.length > 0) result += `\ntag="${task.tags[0]}"`;
+          result += `\ndue="${task.dueDate.toISOString()}"`;
+
+          if (task.recurrence?.type) {
+            result += `\nrecur="${task.recurrence.type}"
+int=${task.recurrence.interval}`;
+          }
+
+          return result;
+        } catch (error) {
+          return `ok=false\nerr="${error.message}"`;
+        }
+      },
     }),
 
     /**
@@ -402,28 +325,32 @@ err="${error.message}"`;
         try {
           // Build filter object for database query
           const filters = {};
-          if (tag) filters.tag = tag;
-          if (completed !== undefined) filters.completed = completed;
-          if (dueBefore) filters.dueBefore = dueBefore;
-          if (dueAfter) filters.dueAfter = dueAfter;
+          if (tag) filters.tags = tag;
+          if (completed !== undefined) {
+            filters.status = completed ? "done" : { $ne: "done" };
+          }
+          if (dueBefore) filters.dueDate = { ...filters.dueDate, $lte: new Date(dueBefore) };
+          if (dueAfter) filters.dueDate = { ...filters.dueDate, $gte: new Date(dueAfter) };
 
-          // Query database with filters
-          const tasks = await taskService.getTasks(userId, filters);
+          // Query database with filters (correct service function name)
+          const tasks = await taskService.getTasksForUser(userId, filters);
 
           if (tasks.length === 0) {
-            return `ok=true\ncount=0`;
+            return `ok=true\ncount=0\nmsg="No tasks found"`;
           }
 
-          // Format results as structured list
+          // Format results as a clear bulleted list for the LLM to present nicely
           const items = tasks
-            .map(
-              (t) =>
-                `[[task]]\nid="${t._id}"\nname="${t.taskname}"${t.tag ? `\ntag="${t.tag}"` : ""}\ndueDate="${
-                  t.dueDate
-                }"\ndone=${t.completed}`
-            )
+            .map((t, i) => {
+              const tagStr = Array.isArray(t.tags) && t.tags.length ? t.tags[0] : "";
+              const done = t.status === "done";
+              const dueStr = t.dueDate 
+                ? new Date(t.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                : "no due date";
+              return `• ${t.taskname}${tagStr ? ` [${tagStr}]` : ""} — due: ${dueStr}${done ? " ✓ done" : ""}`;
+            })
             .join("\n");
-          return `ok=true\ncount=${tasks.length}\n${items}`;
+          return `ok=true\ncount=${tasks.length}\n\n[SYSTEM: Display this list exactly as is, do not reformat]\nYour tasks:\n${items}`;
         } catch (error) {
           return `ok=false\nerr="${error.message}"`;
         }
@@ -439,40 +366,42 @@ err="${error.message}"`;
      * Can update any combination of:
      * - name: Change task description
      * - tag: Change category
-     * - dueDate: Change due date
+     * - deadline: Change due date
      * - completed: Mark as done/undone
      *
      * Only the fields provided are updated
      */
     new DynamicStructuredTool({
       name: "update_task",
-      description: "Update task name/tag/dueDate/status",
+      description: "Update task name/tag/deadline/status",
       schema: z.object({
         taskId: z.string(),
         name: z.string().optional(),
         tag: z.string().optional(),
-        dueDate: z.string().optional(),
+        deadline: z.string().optional(),
         completed: z.boolean().optional(),
       }),
-      func: async ({ taskId, name, tag, dueDate, completed }) => {
+      func: async ({ taskId, name, tag, deadline, completed }) => {
         try {
           // Build update object with only specified fields
           const updates = {};
           if (name !== undefined) updates.taskname = name;
-          if (tag !== undefined) updates.tag = tag;
-          if (dueDate !== undefined) updates.dueDate = new Date(dueDate);
-          if (completed !== undefined) updates.completed = completed;
+          if (tag !== undefined) updates.tags = [tag];
+          if (deadline !== undefined) updates.dueDate = new Date(deadline);
+          if (completed !== undefined) updates.status = completed ? "done" : "todo";
 
           // Update in database
-          const task = await taskService.updateTask(taskId, userId, updates);
+          const result = await taskService.updateTask({ userId, taskId, updates });
 
-          if (!task) {
-            return `ok=false\nerr="Not found"`;
+          if (!result.success) {
+            return `ok=false\nerr="${result.error}"`;
           }
 
+          const task = result.task;
+
           return `ok=true\nmsg="Updated"\nid="${task._id}"\nname="${task.taskname}"${
-            task.tag ? `\ntag="${task.tag}"` : ""
-          }\ndueDate="${task.dueDate}"\ndone=${task.completed}`;
+            task.tags && task.tags.length > 0 ? `\ntag="${task.tags[0]}"` : ""
+          }\ndue="${task.dueDate ? new Date(task.dueDate).toISOString() : ""}"\ndone=${task.status === "done"}`;
         } catch (error) {
           return `ok=false\nerr="${error.message}"`;
         }
@@ -494,9 +423,9 @@ err="${error.message}"`;
       }),
       func: async ({ taskId }) => {
         try {
-          const success = await taskService.deleteTask(taskId, userId);
-          if (!success) {
-            return `ok=false\nerr="Not found"`;
+          const result = await taskService.deleteTask({ taskId, userId });
+          if (!result.success) {
+            return `ok=false\nerr="${result.error}"`;
           }
           return `ok=true\nmsg="Deleted"`;
         } catch (error) {
@@ -530,8 +459,11 @@ err="${error.message}"`;
           }
 
           // Format as list of upcoming tasks
-          const items = tasks.map((t) => `[[task]]\nid="${t._id}"\nname="${t.taskname}"\ndueDate="${t.dueDate}"`).join("\n");
-          return `ok=true\ncount=${tasks.length}\n${items}`;
+          const items = tasks.map((t) => {
+            const dueStr = t.dueDate ? new Date(t.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "no date";
+            return `• ${t.taskname} (due: ${dueStr})`;
+          }).join("\n");
+          return `ok=true\ncount=${tasks.length}\n\n[SYSTEM: Display this list exactly as is, do not reformat]\nUpcoming tasks:\n${items}`;
         } catch (error) {
           return `ok=false\nerr="${error.message}"`;
         }
@@ -562,10 +494,11 @@ err="${error.message}"`;
           const items = tasks
             .map((t) => {
               const days = Math.floor((new Date() - new Date(t.dueDate)) / 86400000);
-              return `[[task]]\nid="${t._id}"\nname="${t.taskname}"\ndueDate="${t.dueDate}"\nover=${days}`;
+              const dueStr = t.dueDate ? new Date(t.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "no date";
+              return `• ${t.taskname} (due: ${dueStr}, ${days} days overdue)`;
             })
             .join("\n");
-          return `ok=true\ncount=${tasks.length}\n${items}`;
+          return `ok=true\ncount=${tasks.length}\n\n[SYSTEM: Display this list exactly as is, do not reformat]\nOverdue tasks:\n${items}`;
         } catch (error) {
           return `ok=false\nerr="${error.message}"`;
         }

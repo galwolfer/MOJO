@@ -133,6 +133,20 @@ export async function getTasksForUser(userId, filter = {}) {
 }
 
 /**
+ * Fetch upcoming tasks for a user.
+ */
+export async function getUpcomingTasks(userId, days = 7) {
+  return Task.findUpcoming(userId, days).lean();
+}
+
+/**
+ * Fetch overdue tasks for a user.
+ */
+export async function getOverdueTasks(userId) {
+  return Task.findOverdue(userId).lean();
+}
+
+/**
  * Sync a task's status based on its scheduled sessions.
  */
 export async function syncTaskStatusFromSessions(taskId) {

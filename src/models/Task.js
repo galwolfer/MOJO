@@ -84,7 +84,7 @@ taskSchema.pre("save", async function () {
 });
 
 // Compound indexes for efficient queries
-taskSchema.index({ userId: 1, deadline: 1 });
+taskSchema.index({ userId: 1, dueDate: 1 });
 taskSchema.index({ userId: 1, tag: 1 });
 taskSchema.index({ userId: 1, completed: 1 });
 
@@ -101,10 +101,10 @@ taskSchema.methods.markIncomplete = function () {
 // Calculate next deadline for recurring task
 taskSchema.methods.calculateNextDeadline = function () {
   if (!this.recurrence || !this.recurrence.type) {
-    return this.deadline;
+    return this.dueDate;
   }
 
-  const current = new Date(this.deadline);
+  const current = new Date(this.dueDate);
   const interval = this.recurrence.interval || 1;
 
   switch (this.recurrence.type) {
@@ -150,7 +150,7 @@ taskSchema.methods.shouldContinueRecurrence = function () {
 // Static methods
 taskSchema.statics.findByUserId = function (userId, filters = {}) {
   const query = { userId, ...filters };
-  return this.find(query).sort({ deadline: 1 });
+  return this.find(query).sort({ dueDate: 1 });
 };
 
 taskSchema.statics.findUpcoming = function (userId, days = 7) {
@@ -159,9 +159,9 @@ taskSchema.statics.findUpcoming = function (userId, days = 7) {
 
   return this.find({
     userId,
-    deadline: { $gte: now, $lte: futureDate },
-    completed: false,
-  }).sort({ deadline: 1 });
+    dueDate: { $gte: now, $lte: futureDate },
+    status: { $ne: "done" },
+  }).sort({ dueDate: 1 });
 };
 
 taskSchema.statics.findOverdue = function (userId) {
@@ -169,9 +169,9 @@ taskSchema.statics.findOverdue = function (userId) {
 
   return this.find({
     userId,
-    deadline: { $lt: now },
-    completed: false,
-  }).sort({ deadline: 1 });
+    dueDate: { $lt: now },
+    status: { $ne: "done" },
+  }).sort({ dueDate: 1 });
 };
 
 export const Task = mongoose.model("Task", taskSchema);

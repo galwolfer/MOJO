@@ -4,7 +4,6 @@ import helmet from "helmet";
 import morgan from "morgan";
 import routes from "./routes/index.js";
 import usersRouter from "./routes/Users.js";
-import expiredTasksRouter from "./routes/expiredTasks.js";
 import { expiredTaskBlocker } from "./middlewares/expiredTaskBlocker.js";
 import { notFound, errorHandler } from "./middlewares/error.js";
 
@@ -18,12 +17,12 @@ app.use(morgan("dev")); // HTTP logging
 
 // Routes that are NOT blocked by expired tasks
 app.use("/api/users", usersRouter);
-app.use("/api/expired-tasks", expiredTasksRouter);
 
 // Block users with expired tasks from accessing other routes
+// Note: /api/tasks/expired/* routes are whitelisted in expiredTaskBlocker middleware
 app.use(expiredTaskBlocker);
 
-// Routes that ARE blocked if user has expired tasks
+// Routes that ARE blocked if user has expired tasks (except /tasks/expired/*)
 app.use("/api", routes);
 
 // Health & root
