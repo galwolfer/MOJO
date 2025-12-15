@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 *.local
+./.env
+md
 
 # Editor directories and files
 .vscode/*
@@ -25,3 +27,26 @@ dist-ssr
 .env
 /scripts/.token
 /md
+
+# Backups and DB dumps
+/backups/
+/dump/
+mongodump-
+*.dump
+
+# Training data and models
+/data/
+*.env
+
+# Authentication tokens (CLI)
+scripts/.token
+
+# Database files
+data/memory.db
+data/memory.db-shm
+data/memory.db-wal
+data/vector_db/
+
+# Test users and data (optional)
+# Uncomment to ignore test data
+# data/test_*

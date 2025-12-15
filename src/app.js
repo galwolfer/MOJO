@@ -1,9 +1,11 @@
-// Notes are in English as requested.
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import routes from "./routes/index.js";
+import usersRouter from "./routes/Users.js";
+import expiredTasksRouter from "./routes/expiredTasks.js";
+import { expiredTaskBlocker } from "./middlewares/expiredTaskBlocker.js";
 import { notFound, errorHandler } from "./middlewares/error.js";
 
 const app = express();
@@ -14,7 +16,14 @@ app.use(cors()); // CORS
 app.use(express.json()); // JSON body parsing
 app.use(morgan("dev")); // HTTP logging
 
-// Routes
+// Routes that are NOT blocked by expired tasks
+app.use("/api/users", usersRouter);
+app.use("/api/expired-tasks", expiredTasksRouter);
+
+// Block users with expired tasks from accessing other routes
+app.use(expiredTaskBlocker);
+
+// Routes that ARE blocked if user has expired tasks
 app.use("/api", routes);
 
 // Health & root

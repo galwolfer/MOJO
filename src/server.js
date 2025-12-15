@@ -1,13 +1,28 @@
+// src/server.js
 // Notes are in English as requested.
 import { createServer } from "http";
 import app from "./app.js";
 import { env } from "./config/env.js";
+import { connectDatabase } from "./config/database.js";
 import { logger } from "./utils/logger.js";
+import { startPriorityScheduler } from "./services/scheduling/priorityScheduler.js";
+import { startExpiredTaskChecker } from "./services/tasks/expiredTaskChecker.js";
 
 const server = createServer(app);
-const port = env.PORT;
+const port = Number(env.PORT ?? 3000);
 
-// Start HTTP server
-server.listen(port, () => {
-  logger.info(`HTTP server listening on http://localhost:${port}`);
-});
+connectDatabase()
+  .then(() => {
+    server.listen(port, () => {
+      logger.info(`HTTP server listening on http://localhost:${port}`);
+      startPriorityScheduler();
+
+      // Start expired task checker (runs every hour)
+      // Sends push notifications when tasks expire
+      startExpiredTaskChecker();
+    });
+  })
+  .catch((error) => {
+    logger.error("Failed to connect to MongoDB:", error);
+    process.exit(1);
+  });

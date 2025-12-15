@@ -4,6 +4,9 @@
 
 import { Router } from "express";
 import healthRouter from "./health.js";
+import chatRouter from "./chat.js";
+import authRouter from "./auth.js";
+import tasksRouter from "./tasks.js";
 import {
   // Ofek controllers
   ofekListItems,
@@ -12,6 +15,8 @@ import {
   galGetProfile,
   galUpdateProfile,
   // Joni controllers
+  joniCoachNext,
+  joniCoachFeedback,
   joniStats,
   joniTriggerJob,
 } from "../controllers/index.js";
@@ -21,13 +26,18 @@ const router = Router();
 // Shared/infra routes
 router.use(healthRouter);
 
+// Authentication routes (public)
+router.use("/auth", authRouter);
+
 // ==================== OFEK — ROUTES (START) ====================
 // Base path for Ofek's feature-set
-router.get("/ofek/items", ofekListItems);
-router.post("/ofek/items", ofekCreateItem);
-// Add more Ofek routes below
-// router.put('/ofek/items/:id', ...);
-// router.delete('/ofek/items/:id', ...);
+
+// Chat/Agent routes
+router.use("/chat", chatRouter);
+
+// Tasks routes
+router.use("/tasks", tasksRouter);
+
 // ==================== OFEK — ROUTES (END) ======================
 
 // ==================== GAL — ROUTES (START) =====================
@@ -39,11 +49,11 @@ router.put("/gal/profile", galUpdateProfile);
 // ==================== GAL — ROUTES (END) =======================
 
 // ==================== JONI — ROUTES (START) ====================
-// Base path for Joni's feature-set
+router.post("/joni/coach/next", joniCoachNext);
+router.post("/joni/coach/feedback", joniCoachFeedback);
+
 router.get("/joni/stats", joniStats);
 router.post("/joni/job", joniTriggerJob);
-// Add more Joni routes below
-// router.delete('/joni/resource/:id', ...);
 // ==================== JONI — ROUTES (END) ======================
 
 export default router;
