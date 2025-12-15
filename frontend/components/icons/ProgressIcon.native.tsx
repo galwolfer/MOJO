@@ -7,8 +7,9 @@
 import React, { useEffect, useRef } from "react";
 import { Animated, View, Easing } from "react-native";
 import Svg, { Path, Rect, Defs, ClipPath, G } from "react-native-svg";
-import svgPaths from "../../assets/imports/svg-kilf0jp2lv";
 import { COLORS } from "../../theme";
+
+const svgPaths = { p24bd7b90: "M7 9.06818L8.33333 11.25L11 7.25" };
 
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
 const AnimatedPath = Animated.createAnimatedComponent(Path);
