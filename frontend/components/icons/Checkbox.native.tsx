@@ -61,8 +61,6 @@ export const Checkbox = memo(function Checkbox({ checked, onChange, size = 18 }:
       style={containerStyle}
       accessibilityRole="checkbox"
       accessibilityState={{ checked }}
-      renderToHardwareTextureAndroid={animating}
-      shouldRasterizeIOS={animating}
     >
       <Svg width="100%" height="100%" viewBox="0 0 18 18" style={{ overflow: "visible" }}>
         {/* Checkbox border - hollow rounded square */}

@@ -4,7 +4,7 @@
  * Native version of `ProgressIcon` that uses `Animated` and
  * `react-native-svg` for performant mobile animations.
  */
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState, memo } from "react";
 import { Animated, View, Easing } from "react-native";
 import Svg, { Path, Rect, Defs, ClipPath, G } from "react-native-svg";
 import { COLORS } from "../../theme";
@@ -25,14 +25,16 @@ interface ProgressIconProps {
  * @param value - Progress value between 0 and 1.
  * @param size - The size of the icon.
  */
-export function ProgressIcon({ value, size = 18 }: ProgressIconProps) {
+export const ProgressIcon = memo(function ProgressIcon({ value, size = 18 }: ProgressIconProps) {
   const springValue = useRef(new Animated.Value(0)).current;
   const completionProgress = useRef(new Animated.Value(0)).current;
+  const [animating, setAnimating] = useState(false);
 
   useEffect(() => {
     const clampedValue = Math.max(0, Math.min(1, value));
 
     if (clampedValue === 1) {
+      setAnimating(true);
       Animated.parallel([
         Animated.spring(springValue, {
           toValue: 1,
@@ -46,15 +48,20 @@ export function ProgressIcon({ value, size = 18 }: ProgressIconProps) {
           easing: Easing.out(Easing.ease),
           useNativeDriver: false,
         }),
-      ]).start();
+      ]).start(() => {
+        setAnimating(false);
+      });
     } else {
       // gentler spring for less bouncy rotation/fill motion on native
+      setAnimating(true);
       Animated.spring(springValue, {
         toValue: clampedValue,
         stiffness: 200,
         damping: 28,
         useNativeDriver: false,
-      }).start();
+      }).start(() => {
+        setAnimating(false);
+      });
       completionProgress.setValue(0);
     }
   }, [value]);
@@ -118,7 +125,7 @@ export function ProgressIcon({ value, size = 18 }: ProgressIconProps) {
   const rectHeight = 11.5;
 
   return (
-    <View style={{ width: size, height: size }}>
+    <View style={{ width: size, height: size }} collapsable={false} renderToHardwareTextureAndroid={animating} shouldRasterizeIOS={animating}>
       <Svg width="100%" height="100%" viewBox="0 0 18 18" style={{ overflow: "visible" }}>
         <Defs>
           <ClipPath id={`rounded-rect-clip-${size}`}>
@@ -167,4 +174,4 @@ export function ProgressIcon({ value, size = 18 }: ProgressIconProps) {
       </Svg>
     </View>
   );
-}
+});
