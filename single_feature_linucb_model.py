@@ -12,11 +12,11 @@ confidence bound (UCB) bonus to encourage exploration. The resulting
 score is mapped into one of five ordinal categories indicating how
 quickly the user is likely to complete a new task:
 
-    1   יבצע מהר (completed very quickly)
-    2  יבצע בזמן (completed on time)
-    3  יבצע קל (slightly late)
-    4  יבצע כבד (significantly late)
-    5  לא יבצע בכלל (did not complete)
+    1   completed very quickly
+    2   completed on time
+    3   slightly late
+    4   significantly late
+    5   did not complete
 
 The class provided here allows users to update the model with a new
 observation (feature value and reward) and to predict the completion
