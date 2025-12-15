@@ -10,8 +10,8 @@
  */
 import { motion, useMotionValue, animate, useTransform } from "motion/react";
 import { useEffect } from "react";
-import svgPaths from "../../assets/imports/svg-kilf0jp2lv";
 import { COLORS } from "../../theme";
+const svgPaths = { p24bd7b90: "M7 9.06818L8.33333 11.25L11 7.25" };
 
 interface CheckboxProps {
   checked: boolean;

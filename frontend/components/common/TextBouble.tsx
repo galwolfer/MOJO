@@ -1,10 +1,78 @@
 // #file:TextBouble.tsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, memo } from "react";
 import { Animated, Easing, Platform, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { COLORS, SHADOWS, SPACING } from "../../theme";
 import ConicGradientBubble from "../special/ConicGradientBubble";
 
 export type TextBoubleMode = "agent" | "user";
+
+/**
+ * Isolated typewriter component that updates independently
+ * without causing parent re-renders. Uses requestAnimationFrame
+ * with direct text node updates for maximum performance.
+ */
+const TypewriterText = memo<{
+  fullText: string;
+  cps: number;
+  onDone: () => void;
+  textStyle?: any;
+  children?: React.ReactNode;
+}>(({ fullText, cps, onDone, textStyle, children }) => {
+  const [displayText, setDisplayText] = useState("");
+  const rafRef = useRef<number | null>(null);
+  const startTsRef = useRef<number | null>(null);
+  const isDoneRef = useRef(false);
+  const lastCharCountRef = useRef(0);
+
+  useEffect(() => {
+    setDisplayText("");
+    isDoneRef.current = false;
+    startTsRef.current = null;
+    lastCharCountRef.current = 0;
+
+    const step = (ts: number) => {
+      if (startTsRef.current == null) startTsRef.current = ts;
+
+      const elapsedSec = (ts - startTsRef.current) / 1000;
+      const targetChars = Math.min(fullText.length, Math.floor(elapsedSec * cps));
+
+      // Only update if character count actually changed
+      if (targetChars !== lastCharCountRef.current) {
+        lastCharCountRef.current = targetChars;
+        setDisplayText(fullText.slice(0, targetChars));
+      }
+
+      if (targetChars >= fullText.length) {
+        if (!isDoneRef.current) {
+          isDoneRef.current = true;
+          onDone();
+        }
+        rafRef.current = null;
+        return;
+      }
+
+      rafRef.current = requestAnimationFrame(step);
+    };
+
+    rafRef.current = requestAnimationFrame(step);
+
+    return () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [fullText, cps, onDone]);
+
+  if (React.isValidElement(children)) {
+    return React.cloneElement(
+      children as any,
+      {
+        style: [textStyle, (children as any).props?.style],
+      },
+      displayText
+    );
+  }
+
+  return <Text style={textStyle}>{displayText}</Text>;
+});
 
 type Props = {
   style?: ViewStyle;
@@ -93,110 +161,127 @@ const TextBouble: React.FC<Props> = ({
   const resolvedTypewriter = typewriter ?? mode === "agent";
   const fullText = useMemo(() => pickText(children, text), [children, text]);
 
-  const [typed, setTyped] = useState(() => (resolvedTypewriter ? "" : fullText ?? ""));
   const [showConic, setShowConic] = useState(() => mode === "agent" && resolvedTypewriter && !!fullText);
-
-  const rafRef = useRef<number | null>(null);
-  const startTsRef = useRef<number | null>(null);
+  const [isTyping, setIsTyping] = useState(() => mode === "agent" && resolvedTypewriter && !!fullText);
 
   // Cross-fade shadow layers (agent only)
   const conicOpacity = useRef(new Animated.Value(0)).current;
   const glowOpacity = useRef(new Animated.Value(0)).current;
+  // Keep refs to running animations so we can stop them cleanly
+  const conicAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+  const glowAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  const handleTypingDone = useMemo(
+    () => () => {
+      onTypingDone?.();
+      setIsTyping(false);
+
+      // On mobile, animating opacity via JS driver is more reliable
+      // when the gradient component is SVG/complex.
+      const useNativeDriver = (Platform as any).OS === "web" ? false : false;
+
+      // ensure any prior animations are stopped
+      try {
+        conicAnimRef.current?.stop();
+      } catch (_) {}
+      try {
+        glowAnimRef.current?.stop();
+      } catch (_) {}
+
+      const conicAnim = Animated.timing(conicOpacity, {
+        toValue: 0,
+        duration: 300,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver,
+      });
+      const glowAnim = Animated.timing(glowOpacity, {
+        toValue: 1,
+        duration: 300,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver,
+      });
+
+      conicAnimRef.current = conicAnim;
+      glowAnimRef.current = glowAnim;
+
+      Animated.parallel([conicAnim, glowAnim]).start(({ finished }) => {
+        // clear refs
+        conicAnimRef.current = null;
+        glowAnimRef.current = null;
+        // Stop rendering the dynamic gradient once the fade completes
+        if (finished) setShowConic(false);
+      });
+    },
+    [onTypingDone, conicOpacity, glowOpacity]
+  );
 
   useEffect(() => {
     // Reset whenever content/mode changes
     const nextFull = pickText(children, text);
     const shouldType = (typewriter ?? mode === "agent") && mode === "agent" && !!nextFull;
 
-    setTyped(shouldType ? "" : nextFull ?? "");
+    setIsTyping(shouldType);
     setShowConic(shouldType);
 
     // If typing: conic visible, glow hidden. Otherwise: glow visible for agent, hidden for user.
     conicOpacity.setValue(shouldType ? 1 : 0);
     glowOpacity.setValue(mode === "agent" && !shouldType ? 1 : 0);
 
-    if (!shouldType || !nextFull) return;
-
-    startTsRef.current = null;
-
-    const step = (ts: number) => {
-      if (startTsRef.current == null) startTsRef.current = ts;
-
-      const elapsedSec = (ts - startTsRef.current) / 1000;
-      const targetChars = Math.min(nextFull.length, Math.floor(elapsedSec * typingSpeedCps));
-
-      setTyped((prev) => {
-        if (prev.length === targetChars) return prev;
-        return nextFull.slice(0, targetChars);
-      });
-
-      if (targetChars >= nextFull.length) {
-        onTypingDone?.();
-
-        // On mobile, animating opacity via JS driver is more reliable
-        // when the gradient component is SVG/complex.
-        const useNativeDriver = (Platform as any).OS === "web" ? false : false;
-
-        Animated.parallel([
-          Animated.timing(conicOpacity, {
-            toValue: 0,
-            duration: 300,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver,
-          }),
-          Animated.timing(glowOpacity, {
-            toValue: 1,
-            duration: 300,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver,
-          }),
-        ]).start(({ finished }) => {
-          // Stop rendering the dynamic gradient once the fade completes
-          if (finished) setShowConic(false);
-        });
-
-        rafRef.current = null;
-        return;
-      }
-
-      rafRef.current = requestAnimationFrame(step);
-    };
-
-    rafRef.current = requestAnimationFrame(step);
-
     return () => {
-      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
+      // stop any running Animated.CompositeAnimation instances
+      try {
+        conicAnimRef.current?.stop();
+      } catch (_) {}
+      conicAnimRef.current = null;
+      try {
+        glowAnimRef.current?.stop();
+      } catch (_) {}
+      glowAnimRef.current = null;
+
+      // ensure the animated values are stopped and snapped to a final value
+      try {
+        conicOpacity.stopAnimation(() => {
+          conicOpacity.setValue(0);
+        });
+      } catch (_) {
+        conicOpacity.setValue(0);
+      }
+      try {
+        const finalGlow =
+          mode === "agent" && !((typewriter ?? mode === "agent") && mode === "agent" && !!pickText(children, text))
+            ? 1
+            : 0;
+        glowOpacity.stopAnimation(() => {
+          glowOpacity.setValue(finalGlow);
+        });
+      } catch (_) {
+        const finalGlow =
+          mode === "agent" && !((typewriter ?? mode === "agent") && mode === "agent" && !!pickText(children, text))
+            ? 1
+            : 0;
+        glowOpacity.setValue(finalGlow);
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [children, text, mode, typewriter, typingSpeedCps]);
+  }, [children, text, mode, typewriter]);
 
   const radii = useMemo(() => getRadii(mode), [mode]);
   const containerBg = useMemo(() => getContainerBackground(mode), [mode]);
   const containerShadow = useMemo(() => getContainerShadow(mode), [mode]);
 
-  const typedContent = useMemo(() => {
-    // Keep the original typography on mobile/web by cloning the provided text element (e.g., AppText)
-    if (React.isValidElement(children)) {
-      const childProps: any = (children as any).props || {};
-      const mergedStyle = [childProps.style, mode === "user" ? { color: COLORS.colorWhite } : undefined];
-      return React.cloneElement(children as any, { style: mergedStyle }, typed);
-    }
-    return <Text style={[styles.text, mode === "user" ? { color: COLORS.colorWhite } : undefined]}>{typed}</Text>;
-  }, [children, typed, mode]);
+  // Render full content (used as invisible placeholder during typing to reserve space)
+  const fullContent = React.isValidElement(children) ? (
+    React.cloneElement(children as any, {
+      style: [(children as any).props?.style, mode === "user" ? { color: COLORS.colorWhite } : undefined],
+    })
+  ) : typeof children === "string" ? (
+    <Text style={[styles.text, mode === "user" ? { color: COLORS.colorWhite } : undefined]}>{children}</Text>
+  ) : (
+    children
+  );
 
-  const renderContent =
-    resolvedTypewriter && mode === "agent" && fullText != null ? (
-      typedContent
-    ) : React.isValidElement(children) ? (
-      React.cloneElement(children as any, {
-        style: [(children as any).props?.style, mode === "user" ? { color: COLORS.colorWhite } : undefined],
-      })
-    ) : typeof children === "string" ? (
-      <Text style={[styles.text, mode === "user" ? { color: COLORS.colorWhite } : undefined]}>{children}</Text>
-    ) : (
-      children
-    );
+  const shouldShowTypewriter = resolvedTypewriter && mode === "agent" && fullText != null;
+  const textStyle = mode === "user" ? { color: COLORS.colorWhite } : undefined;
 
   return (
     <View style={[styles.wrapper, style]}>
@@ -225,8 +310,31 @@ const TextBouble: React.FC<Props> = ({
         </>
       )}
 
-      <View style={[styles.containerBase, radii, containerShadow, { backgroundColor: containerBg }]}>
-        {renderContent}
+      <View
+        style={[styles.containerBase, radii, containerShadow, { backgroundColor: containerBg }]}
+        renderToHardwareTextureAndroid={shouldShowTypewriter && isTyping}
+        shouldRasterizeIOS={shouldShowTypewriter && isTyping}
+      >
+        {shouldShowTypewriter && isTyping ? (
+          <>
+            {/* Invisible full content to reserve space and prevent layout shifts */}
+            <View style={styles.spacer} pointerEvents="none" collapsable={false}>
+              {fullContent}
+            </View>
+            {/* Visible typed content overlaid on top */}
+            <View style={styles.typedOverlay} pointerEvents="box-none" collapsable={false}>
+              <TypewriterText
+                fullText={fullText!}
+                cps={typingSpeedCps}
+                onDone={handleTypingDone}
+                textStyle={textStyle}
+                children={children}
+              />
+            </View>
+          </>
+        ) : (
+          fullContent
+        )}
       </View>
     </View>
   );
@@ -274,6 +382,20 @@ const styles = StyleSheet.create({
 
   text: {
     color: COLORS.black,
+  },
+
+  spacer: {
+    opacity: 0,
+    pointerEvents: "none",
+  },
+
+  typedOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 17,
   },
 });
 

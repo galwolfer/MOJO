@@ -5,7 +5,7 @@
  * Matches the web checkbox's visual language but uses native animation
  * primitives for performance on mobile.
  */
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState, memo } from "react";
 import { Animated, TouchableOpacity, Easing } from "react-native";
 import Svg, { Path, Rect } from "react-native-svg";
 import { COLORS } from "../../theme";
@@ -27,51 +27,42 @@ interface CheckboxProps {
  * @param onChange - Callback when the checkbox state changes.
  * @param size - The size of the checkbox.
  */
-export function Checkbox({ checked, onChange, size = 18 }: CheckboxProps) {
+export const Checkbox = memo(function Checkbox({ checked, onChange, size = 18 }: CheckboxProps) {
   const progress = useRef(new Animated.Value(checked ? 1 : 0)).current;
+  const [animating, setAnimating] = useState(false);
 
   useEffect(() => {
+    setAnimating(true);
     Animated.timing(progress, {
       toValue: checked ? 1 : 0,
       duration: 300,
       useNativeDriver: false, // SVG props often require JS driver
       easing: Easing.out(Easing.ease),
-    }).start();
-  }, [checked]);
+    }).start(() => {
+      setAnimating(false);
+    });
+  }, [checked, progress]);
 
-  const strokeColor = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [COLORS.lightGray, COLORS.primary6],
-  });
+  // Use a static stroke color (no continuous animation) to reduce work
+  const strokeColor = checked ? COLORS.primary6 : COLORS.lightGray;
 
-  const checkDashoffset = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [10, 0],
-  });
+  const checkDashoffset = progress.interpolate({ inputRange: [0, 1], outputRange: [10, 0] });
+  const checkOpacity = progress.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+  const checkScale = progress.interpolate({ inputRange: [0, 0.5, 0.75, 1], outputRange: [0.9, 1.02, 0.99, 1] });
 
-  const checkOpacity = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
+  const handleClick = () => onChange?.(!checked);
 
-  const checkScale = progress.interpolate({
-    inputRange: [0, 0.5, 0.75, 1],
-    outputRange: [0.9, 1.02, 0.99, 1], // subtle pop-in, much less bouncy
-  });
-
-  const handleClick = () => {
-    if (onChange) {
-      onChange(!checked);
-    }
-  };
+  const containerStyle = { width: size, height: size, alignItems: "center", justifyContent: "center" } as const;
 
   return (
     <TouchableOpacity
       onPress={handleClick}
       activeOpacity={1}
-      style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}
+      style={containerStyle}
       accessibilityRole="checkbox"
       accessibilityState={{ checked }}
+      renderToHardwareTextureAndroid={animating}
+      shouldRasterizeIOS={animating}
     >
       <Svg width="100%" height="100%" viewBox="0 0 18 18" style={{ overflow: "visible" }}>
         {/* Checkbox border - hollow rounded square */}
@@ -103,4 +94,4 @@ export function Checkbox({ checked, onChange, size = 18 }: CheckboxProps) {
       </Svg>
     </TouchableOpacity>
   );
-}
+});
