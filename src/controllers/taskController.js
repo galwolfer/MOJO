@@ -168,42 +168,34 @@ export async function updateTask(req, res) {
   try {
     const userId = req.user.userId;
     const { id } = req.params;
-    const updates = req.body;
+    const raw = req.body || {};
 
-    // Validate that at least one field is being updated
-    const allowedFields = ["name", "tag", "deadline", "completed", "recurrence"];
-    const updateFields = Object.keys(updates).filter((key) => allowedFields.includes(key));
+    // Map public API fields to service field names
+    const updates = {};
+    if (raw.name !== undefined) updates.taskname = typeof raw.name === "string" ? raw.name.trim() : raw.name;
+    if (raw.tag !== undefined) updates.tags = raw.tag ? [String(raw.tag).trim()] : [];
+    if (raw.completed !== undefined) updates.status = raw.completed ? "done" : "todo";
 
-    if (updateFields.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: "No valid fields to update",
-      });
-    }
-
-    // Validate recurrence if provided
-    if (updates.recurrence) {
-      if (!updates.recurrence.type || !["daily", "weekly", "monthly", "yearly"].includes(updates.recurrence.type)) {
-        return res.status(400).json({
-          success: false,
-          error: "Invalid recurrence type. Must be: daily, weekly, monthly, or yearly",
-        });
+    // Validate and map deadline if provided
+    if (raw.deadline !== undefined) {
+      const d = new Date(raw.deadline);
+      if (isNaN(d.getTime())) {
+        return res.status(400).json({ success: false, error: "Invalid deadline format. Use ISO 8601 date." });
       }
+      updates.dueDate = d;
     }
 
-    const task = await taskService.updateTask(id, userId, updates);
-
-    if (!task) {
-      return res.status(404).json({
-        success: false,
-        error: "Task not found",
-      });
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ success: false, error: "No valid fields to update" });
     }
 
-    return res.status(200).json({
-      success: true,
-      task,
-    });
+    const result = await taskService.updateTask({ userId, taskId: id, updates });
+
+    if (!result || result.success === false) {
+      return res.status(404).json({ success: false, error: result ? result.error : "Task not found" });
+    }
+
+    return res.status(200).json({ success: true, task: result.task });
   } catch (error) {
     logger.error("Error in updateTask controller:", error);
 

@@ -375,19 +375,41 @@ int=${task.recurrence.interval}`;
       name: "update_task",
       description: "Update task name/tag/deadline/status",
       schema: z.object({
-        taskId: z.string(),
-        name: z.string().optional(),
+        taskId: z.string().optional(),
+        name: z.string().optional().describe("Task name to identify task when taskId is not provided"),
         tag: z.string().optional(),
         deadline: z.string().optional(),
         completed: z.boolean().optional(),
       }),
       func: async ({ taskId, name, tag, deadline, completed }) => {
         try {
+          // If taskId not provided, try to resolve by exact task name
+          if (!taskId) {
+            if (!name) return `ok=false\nerr="taskId or name is required"`;
+            const candidates = await taskService.getTasksForUser(userId, { taskname: name });
+            if (!candidates || candidates.length === 0) {
+              return `ok=false\nerr="Task not found by name: ${name}"`;
+            }
+            if (candidates.length > 1) {
+              const list = candidates.map((c) => `- ${c._id}: ${c.taskname}`).join("\\n");
+              return `ok=false\nerr="Multiple tasks found matching name. Please provide taskId. Candidates:\n${list}"`;
+            }
+            taskId = candidates[0]._id;
+          }
+
           // Build update object with only specified fields
           const updates = {};
           if (name !== undefined) updates.taskname = name;
           if (tag !== undefined) updates.tags = [tag];
-          if (deadline !== undefined) updates.dueDate = new Date(deadline);
+
+          if (deadline !== undefined) {
+            const d = new Date(deadline);
+            if (isNaN(d.getTime())) {
+              return `ok=false\nerr="Invalid deadline format"`;
+            }
+            updates.dueDate = d;
+          }
+
           if (completed !== undefined) updates.status = completed ? "done" : "todo";
 
           // Update in database
