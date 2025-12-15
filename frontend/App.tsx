@@ -5,10 +5,11 @@ import { StyleSheet, View, useWindowDimensions, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
-import ThemeShowcase from "./ThemeShowcase";
+import AuthScreen from "./screens/Auth";
 import Header from "./components/common/Header";
 import NavBar from "./components/common/NavBar";
 import { COLORS, SPACING } from "./theme";
+import ThemeShowcase from "./ThemeShowcase";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -70,19 +71,19 @@ export default function App() {
               if (h && h !== headerHeight) setHeaderHeight(h);
             }}
           >
-            <Header title="MOJO" logo={null} show={true}>
-              {/* Header children (optional) */}
-            </Header>
+            {/* <Header title="MOJO" logo={null} show={true}>
+            </Header> */}
           </View>
 
           {/* Fixed bottom nav overlay */}
           <View style={styles.footerOverlay} pointerEvents="box-none">
-            <NavBar />
+            {/* <NavBar /> */}
           </View>
 
           {/* Scroll area: starts below header */}
           <View style={styles.content}>
-            <ThemeShowcase contentContainerStyle={showcaseContentStyle} />
+            <AuthScreen />
+            {/* <ThemeShowcase /> */}
           </View>
         </View>
 

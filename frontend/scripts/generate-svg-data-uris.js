@@ -4,9 +4,12 @@ const path = require("path");
 // Try a few common locations for the icon source folder so the script works
 // in different repo layouts (components/icons/icons-lib or assets/icons-lib).
 const possibleDirs = [
+  // Common icon source locations (prefers icons-lib folders)
   path.join(__dirname, "../components/icons/icons-lib"),
   path.join(__dirname, "../assets/icons-lib"),
-  path.join(__dirname, "../components/icons-lib"),
+  path.join(__dirname, "../components"),
+  path.join(__dirname, "../assets"),
+  path.join(__dirname, "../icons"),
 ];
 // Prefer the first directory that actually contains .svg files; fall back to existence.
 let iconsLibDir = null;

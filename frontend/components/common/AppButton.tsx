@@ -8,6 +8,7 @@ export type AppButtonProps = {
   title?: string;
   onPress?: () => void;
   icon?: string; // key from ICONS map
+  width?: number | string;
   iconPosition?: "left" | "right";
   mode?: "filled" | "light";
   color?: keyof typeof COLORS | string;
@@ -27,6 +28,7 @@ const AppButton: React.FC<AppButtonProps> = ({
   title,
   onPress,
   icon,
+  width,
   iconPosition = "left",
   mode = "filled",
   color = "primary1",
@@ -44,6 +46,8 @@ const AppButton: React.FC<AppButtonProps> = ({
     isFilled
       ? { backgroundColor: resolvedColor, borderWidth: 2.5, borderColor: resolvedColor }
       : { backgroundColor: "transparent", borderWidth: 2.5, borderColor: resolvedColor },
+    // allow width prop to override static style
+    width === "100%" ? { width: "100%", alignSelf: "stretch" as any } : width != null ? { width } : {},
     SHADOWS.card as object,
     style,
   ];
@@ -92,7 +96,7 @@ const AppButton: React.FC<AppButtonProps> = ({
         onPressOut={handlePressOut}
         disabled={disabled}
         testID={testID}
-        style={styles.content}
+        style={[styles.content, width === "100%" ? { width: "100%" } : undefined]}
       >
         {IconComp && iconPosition === "left" && (
           <View style={styles.iconWrapper}>
