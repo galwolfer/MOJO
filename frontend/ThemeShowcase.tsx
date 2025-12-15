@@ -22,6 +22,7 @@ import Tag from "./components/inputs/tag";
 import PriorityList, { PriorityListItem } from "./components/special/PriorityList";
 import { useState } from "react";
 import TextBouble from "./components/common/TextBouble";
+import { AppButton } from "./components";
 
 const ColorSwatch = ({ name, hex }: { name: string; hex: string }) => (
   <View style={styles.swatchWrap}>
@@ -214,6 +215,27 @@ const ThemeShowcase: React.FC<ThemeShowcaseProps> = ({
                 setPriorityItems(next);
               }}
             />
+            <AppText variant="bodyText" style={{ marginTop: SPACING.md }}>
+              Buttons:
+            </AppText>
+            <View style={{ flexDirection: "row", gap: 12, marginTop: SPACING.sm }}>
+              <AppButton
+                title="Back"
+                icon="left"
+                iconPosition="left"
+                mode="light"
+                color="primary1"
+                onPress={() => setProgress(0)}
+              />
+              <AppButton
+                title="Next"
+                icon="right"
+                iconPosition="right"
+                mode="filled"
+                color="primary6"
+                onPress={() => setProgress(1)}
+              />
+            </View>
           </View>
         </View>
       </Box>

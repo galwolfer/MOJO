@@ -32,6 +32,9 @@ Update this file whenever you add, remove, or change a component.
 - `Input` — `frontend/components/inputs/Input.tsx`
   - Flexible input component supporting multiple types (text, email, password, number). Styled using theme values with consistent spacing, colors, and shadows. Supports label and error states. When `options` prop is provided, acts as a dropdown selector. Use `multiSelect` prop to enable multiple selections with checkboxes; otherwise, it's single select without checkboxes. The dropdown is rendered in a Modal to "fly over" other content, and clicking outside closes it.
 
+- `AppButton` — `frontend/components/common/AppButton.tsx`
+   - Reusable button component that supports an icon (choose any key from `frontend/components/icons/icons.tsx`) placed on the left or right via the `iconPosition` prop. Two visual modes are available: `filled` (solid background) and `light` (transparent background with border). Color can be selected from `COLORS` in `frontend/theme.ts` by passing the color key (e.g. `primary1`) or a CSS color string. Uses `SHADOWS.card` for consistent surface shadowing across platforms.
+
 - `ConicGradientBubble.tsx` — `frontend/components/special/ConicGradientBubble.tsx`
    - Animated gradient bubble component using Skia for visual effects.
 
