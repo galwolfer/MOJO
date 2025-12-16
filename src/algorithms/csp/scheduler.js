@@ -14,7 +14,7 @@ const DEFAULT_WORKING_HOURS = {
 };
 
 const DEFAULT_DAILY_CAP_MINUTES = 240; // 4 hours
-const SLOT_GRANULARITY_MINUTES = 15; // generate slots every 15 min
+const SLOT_GRANULARITY_MINUTES = 10; // generate slots every 10 min for leaky task compatibility
 const MAX_BACKTRACK_ITERATIONS = 10000; // prevent infinite loops
 
 /**
@@ -142,7 +142,13 @@ function generateVariables(tasks, horizonEnd) {
     const taskType = task.taskType || (task.canSplit ? "in_parts" : "perfect");
     
     // Handle deadline: if past or missing, use horizonEnd
+    // Extend deadline to end of day (23:59:59) to handle timezone issues
+    // This ensures a task "due Dec 17" can be scheduled anytime on Dec 17
     let deadline = task.dueDate ? new Date(task.dueDate) : horizonEnd;
+    if (task.dueDate) {
+      // Set to end of the deadline day (23:59:59)
+      deadline.setHours(23, 59, 59, 999);
+    }
     if (deadline < now) {
       // Deadline has passed - treat as urgent, schedule ASAP within horizon
       deadline = horizonEnd;
@@ -152,16 +158,55 @@ function generateVariables(tasks, horizonEnd) {
 
     if (taskType === "leaky") {
       // Leaky tasks: flexible chunk sizes between minMinutes and maxMinutes
-      // Use minMinutes as the target chunk size, default to 60 min
+      // Enforce 10-minute increments and keep each chunk within [min,max]
+      const STEP = 10;
       const minChunk = task.minMinutes || 60;
       const maxChunk = task.maxMinutes || minChunk;
-      let remaining = totalMinutes;
-      while (remaining > 0) {
-        // Random chunk size between min and max, capped by remaining
-        const targetSize = minChunk + Math.floor(Math.random() * (maxChunk - minChunk + 1));
-        const size = Math.min(targetSize, remaining);
-        chunks.push(size);
-        remaining -= size;
+
+      // Round boundaries to STEP
+      const roundedMin = Math.ceil(minChunk / STEP) * STEP;
+      const roundedMax = Math.floor(maxChunk / STEP) * STEP;
+
+      // Round total to STEP down to avoid impossible residues
+      const roundedTotal = Math.floor(totalMinutes / STEP) * STEP;
+
+      if (roundedMin > roundedMax) {
+        // Fallback to single chunk if bounds invalid
+        chunks.push(roundedTotal);
+      } else {
+        // Start with as many min-sized chunks as possible
+        let remaining = roundedTotal;
+        while (remaining >= roundedMin) {
+          chunks.push(roundedMin);
+          remaining -= roundedMin;
+        }
+
+        // Distribute remaining by increasing existing chunks up to max, STEP at a time
+        let idx = 0;
+        while (remaining > 0) {
+          // If all chunks are at max and we still have remaining, create a new chunk
+          const allAtMax = chunks.every((c) => c >= roundedMax);
+          if (allAtMax) {
+            const addSize = Math.min(roundedMin, remaining);
+            // Ensure addSize respects STEP
+            const adjSize = Math.floor(addSize / STEP) * STEP;
+            if (adjSize <= 0) break;
+            chunks.push(adjSize);
+            remaining -= adjSize;
+            continue;
+          }
+
+          // Increase chunks one by one
+          if (chunks[idx] < roundedMax) {
+            const inc = Math.min(STEP, remaining, roundedMax - chunks[idx]);
+            chunks[idx] += inc;
+            remaining -= inc;
+          }
+          idx = (idx + 1) % Math.max(1, chunks.length);
+        }
+
+        // Remove any zero or negative-sized artifacts
+        chunks = chunks.filter((c) => c > 0);
       }
     } else if (taskType === "perfect" || !task.canSplit) {
       // Single chunk for entire task
@@ -319,6 +364,7 @@ function backtrackSearch({ variables, variableDomains, busyBlocksByDate, working
         end: slot.end,
         minutes: variable.chunkMinutes,
         dateKey: slot.dateKey,
+        taskId: variable.taskId,
       };
 
       // Check hard constraints

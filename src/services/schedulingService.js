@@ -161,14 +161,28 @@ export function describeRoutineWindows(blocks = DEFAULT_ROUTINE_BLOCKS) {
 
 /**
  * Persist a generated plan to the database.
- * Clears existing future planned sessions before saving new ones.
+ * Clears existing future planned/skipped sessions before saving new ones.
+ * Also cleans up orphan schedules (where task no longer exists).
  */
 export async function persistPlan(userId, plan) {
   const now = new Date();
+
+  // Clean up orphan schedules (taskId references deleted tasks)
+  const existingTaskIds = await Task.find({ userId }).distinct("_id");
+  const existingTaskIdSet = new Set(existingTaskIds.map((id) => id.toString()));
+  const allSchedules = await TaskSchedule.find({ userId, start: { $gte: now } }).lean();
+  const orphanIds = allSchedules
+    .filter((s) => !existingTaskIdSet.has(s.taskId?.toString()))
+    .map((s) => s._id);
+  if (orphanIds.length > 0) {
+    await TaskSchedule.deleteMany({ _id: { $in: orphanIds } });
+  }
+
+  // Clear future planned/skipped sessions (not completed ones)
   await TaskSchedule.deleteMany({
     userId,
     start: { $gte: now },
-    status: { $ne: "done" },
+    status: { $ne: "completed" },
   });
 
   if (!plan.length) return;
@@ -223,7 +237,7 @@ export async function generatePlan({ userId, profile = {}, planningHorizonDays =
   const completedSessions = await TaskSchedule.find({
     userId,
     end: { $gte: now },
-    status: { $in: ["done", "in_progress"] },
+    status: "completed",
   }).lean();
 
   const remainingByTaskId = new Map(

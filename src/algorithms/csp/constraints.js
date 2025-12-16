@@ -99,7 +99,19 @@ export function satisfiesHardConstraints({
 
   // Check overlap with already-assigned sessions
   for (const assignment of existingAssignments) {
-    if (!noOverlap(candidateSlot, assignment)) {
+    // Enforce minimum gap between ANY consecutive sessions (10 minutes)
+    const MIN_SESSION_GAP_MINUTES = 10;
+    const gapMs = MIN_SESSION_GAP_MINUTES * 60 * 1000;
+
+    const overlaps = !noOverlap(candidateSlot, assignment);
+    if (overlaps) {
+      return false;
+    }
+
+    // Ensure at least 10-minute gap between any two sessions (break time)
+    const endsTooClose = Math.abs(candidateSlot.start.getTime() - assignment.end.getTime()) < gapMs;
+    const startsTooClose = Math.abs(assignment.start.getTime() - candidateSlot.end.getTime()) < gapMs;
+    if (endsTooClose || startsTooClose) {
       return false;
     }
   }

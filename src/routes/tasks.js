@@ -19,7 +19,7 @@ const router = Router();
  QUICK REFERENCE
  ───────────────────────────────────────────────────────────────────────────
 
- 📋 CRUD Operations
+ CRUD Operations
     POST   /              Create a new task
     GET    /              Get all tasks (with filters)
     GET    /:id           Get single task
@@ -27,11 +27,11 @@ const router = Router();
     DELETE /:id           Delete a task
     POST   /:id/toggle    Toggle completion
 
- 🔍 Filtered Queries
+  FILTERED QUERIES
     GET    /upcoming/:days?   Tasks due within N days
     GET    /overdue           Overdue tasks
 
- ⚠️  Expired Task Management
+  EXPIRED TASK MANAGEMENT
     GET    /expired             List all expired tasks
     GET    /expired/check       Quick check (boolean)
     PATCH  /expired/:id/extend  Extend deadline
@@ -46,7 +46,7 @@ router.use(requireAuth);
 
 
 /* ─────────────────────────────────────────────────────────────────────────
-   🔍 FILTERED QUERIES
+   FILTERED QUERIES
    These routes must come before /:id routes to avoid conflicts
    ───────────────────────────────────────────────────────────────────────── */
 
@@ -58,7 +58,7 @@ router.get("/overdue", taskController.getOverdueTasks);
 
 
 /* ─────────────────────────────────────────────────────────────────────────
-   ⚠️  EXPIRED TASK MANAGEMENT
+   EXPIRED TASK MANAGEMENT
    Routes for handling tasks that have passed their deadline
    ───────────────────────────────────────────────────────────────────────── */
 
