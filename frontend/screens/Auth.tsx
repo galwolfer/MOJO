@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Platform, Alert } from "react-native";
+import { View, StyleSheet, Platform } from "react-native";
 import AppText from "../components/common/AppText";
 import AppButton from "../components/common/AppButton";
 import Input from "../components/inputs/Input";
@@ -43,18 +43,16 @@ export default function AuthScreen() {
       }
 
       const data = await apiLogin({ username: loginUsername, password: loginPassword });
-      Alert.alert("Success", "Logged in");
       setScreen("done");
     } catch (err: any) {
       const msg = String(err?.message || err || "Login failed");
       setLoginError(msg);
-      Alert.alert("Error", msg);
     }
   }
 
   async function handleSignup() {
     if (signupPassword !== signupConfirm) {
-      Alert.alert("Error", "Passwords do not match");
+      setSignupError("Passwords do not match");
       return;
     }
 
@@ -81,12 +79,10 @@ export default function AuthScreen() {
         password: signupPassword,
         displayName,
       });
-      Alert.alert("Success", "Account created");
       setScreen("done");
     } catch (err: any) {
       const msg = String(err?.message || err || "Signup failed");
       setSignupError(msg);
-      Alert.alert("Error", msg);
     }
   }
 
