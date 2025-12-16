@@ -231,6 +231,12 @@ export const TYPOGRAPHY = {
     fontSize: moderateScale(14),
     color: COLORS.black,
   },
+  // Error text: same sizing as notes but red color for inline form errors
+  errorText: {
+    fontFamily: FONTS.fredokaLight,
+    fontSize: moderateScale(14),
+    color: COLORS.primary7,
+  },
   input: {
     fontFamily: FONTS.fredokaRegular,
     fontSize: FONT_SIZES.base,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { View, StyleSheet, Platform, Alert } from "react-native";
 import AppText from "../components/common/AppText";
 import AppButton from "../components/common/AppButton";
@@ -8,72 +8,47 @@ import { ICONS } from "../components/icons/icons";
 import { COLORS, SPACING, TYPOGRAPHY } from "../theme";
 import { Box } from "../components";
 
-const API_BASE = "http://localhost:3000/api/auth";
+import { login as apiLogin, register as apiRegister, setApiBase } from "../services/apiClient";
+
+// Optionally override the base URL (useful for dev / device testing)
+// setApiBase("http://10.0.2.2:3000/api");
 
 export default function AuthScreen() {
-  const isWeb = (Platform as any).OS === "web";
+  const [screen, setScreen] = useState<"welcome" | "name" | "login" | "signup" | "done">("welcome");
 
-  const readStorage = (key: string, fallback = "") => {
-    if (!isWeb) return fallback;
-    try {
-      const v = localStorage.getItem(key);
-      return v ?? fallback;
-    } catch (e) {
-      return fallback;
-    }
-  };
-
-  const writeStorage = (key: string, value: string) => {
-    if (!isWeb) return;
-    try {
-      localStorage.setItem(key, value);
-    } catch (e) {
-      // ignore
-    }
-  };
-
-  const [screen, setScreen] = useState<"welcome" | "name" | "login" | "signup" | "done">(() =>
-    (readStorage("auth.screen", "welcome") as any)
-  );
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [signupError, setSignupError] = useState<string | null>(null);
 
   // Login state
-  const [loginUsername, setLoginUsername] = useState(() => readStorage("auth.loginUsername", ""));
-  const [loginPassword, setLoginPassword] = useState(() => readStorage("auth.loginPassword", ""));
+  const [loginUsername, setLoginUsername] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
 
   // Signup state
-  const [signupUsername, setSignupUsername] = useState(() => readStorage("auth.signupUsername", ""));
-  const [signupEmail, setSignupEmail] = useState(() => readStorage("auth.signupEmail", ""));
-  const [signupPassword, setSignupPassword] = useState(() => readStorage("auth.signupPassword", ""));
-  const [signupConfirm, setSignupConfirm] = useState(() => readStorage("auth.signupConfirm", ""));
+  const [signupUsername, setSignupUsername] = useState("");
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
+  const [signupConfirm, setSignupConfirm] = useState("");
   // Pre-signup display name (asked before the signup form)
-  const [displayName, setDisplayName] = useState(() => readStorage("auth.displayName", ""));
-
-  // Persist relevant pieces so accidental remounts (window resize / re-layout)
-  // don't lose the current step or typed form data.
-  useEffect(() => writeStorage("auth.screen", screen), [screen]);
-  useEffect(() => writeStorage("auth.loginUsername", loginUsername), [loginUsername]);
-  useEffect(() => writeStorage("auth.loginPassword", loginPassword), [loginPassword]);
-  useEffect(() => writeStorage("auth.signupUsername", signupUsername), [signupUsername]);
-  useEffect(() => writeStorage("auth.signupEmail", signupEmail), [signupEmail]);
-  useEffect(() => writeStorage("auth.signupPassword", signupPassword), [signupPassword]);
-  useEffect(() => writeStorage("auth.signupConfirm", signupConfirm), [signupConfirm]);
-  useEffect(() => writeStorage("auth.displayName", displayName), [displayName]);
+  const [displayName, setDisplayName] = useState("");
 
   const Mojo = ICONS.mojo as React.FC<any> | undefined;
 
   async function handleLogin() {
     try {
-      const res = await fetch(`${API_BASE}/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: loginUsername, password: loginPassword }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Login failed");
+      setLoginError(null);
+      // Basic client validation
+      if (!loginUsername || !loginPassword) {
+        setLoginError("Please enter username and password");
+        return;
+      }
+
+      const data = await apiLogin({ username: loginUsername, password: loginPassword });
       Alert.alert("Success", "Logged in");
       setScreen("done");
     } catch (err: any) {
-      Alert.alert("Error", String(err.message || err));
+      const msg = String(err?.message || err || "Login failed");
+      setLoginError(msg);
+      Alert.alert("Error", msg);
     }
   }
 
@@ -84,17 +59,34 @@ export default function AuthScreen() {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: signupUsername, email: signupEmail, password: signupPassword }),
+      setSignupError(null);
+
+      // Client-side validation
+      if (!signupUsername) {
+        setSignupError("Please choose a username");
+        return;
+      }
+      if (!signupEmail) {
+        setSignupError("Please enter your email");
+        return;
+      }
+      if (!signupPassword || signupPassword.length < 6) {
+        setSignupError("Password must be at least 6 characters");
+        return;
+      }
+
+      const data = await apiRegister({
+        username: signupUsername,
+        email: signupEmail,
+        password: signupPassword,
+        displayName,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Signup failed");
       Alert.alert("Success", "Account created");
       setScreen("done");
     } catch (err: any) {
-      Alert.alert("Error", String(err.message || err));
+      const msg = String(err?.message || err || "Signup failed");
+      setSignupError(msg);
+      Alert.alert("Error", msg);
     }
   }
 
@@ -105,7 +97,7 @@ export default function AuthScreen() {
       </View>
       {screen === "welcome" && (
         <View style={styles.centered}>
-          <TextBouble mode="agent">
+          <TextBouble mode="agent" playOnceKey="auth:welcome">
             <AppText variant="bodyText">
               {"Hi, I’m "}
               <AppText variant="boldText" style={{ color: COLORS.primary1 }}>
@@ -122,7 +114,7 @@ export default function AuthScreen() {
       )}
 
       {screen === "name" && (
-        <TextBouble mode="agent">
+        <TextBouble mode="agent" playOnceKey="auth:name">
           <AppText variant="bodyText">{"Let’s begin 😊 \nFirst, what should I call you?"}</AppText>
           <Box widget={true}>
             <Input label="Your name" placeholder="Your name" value={displayName} onChangeText={setDisplayName} />
@@ -134,7 +126,7 @@ export default function AuthScreen() {
               color="primary6"
               title="Next"
               onPress={() => {
-                setSignupUsername(displayName || signupUsername);
+                // Keep display name separate from username — do not copy it into username.
                 setScreen("signup");
               }}
               style={{ marginLeft: SPACING.md }}
@@ -144,10 +136,15 @@ export default function AuthScreen() {
       )}
 
       {screen === "login" && (
-        <TextBouble mode="agent">
+        <TextBouble mode="agent" playOnceKey="auth:login">
           <AppText variant="bodyText" style={{ marginBottom: SPACING.md }}>
             {"Welcome back 👋\nLet’s pick up where you left off."}
           </AppText>
+          {loginError ? (
+            <AppText variant="errorText" style={{ marginBottom: SPACING.md }}>
+              {loginError}
+            </AppText>
+          ) : null}
           <Box widget={true} style={styles.form}>
             <Input label="Username" placeholder="Your username" value={loginUsername} onChangeText={setLoginUsername} />
             <Input
@@ -167,36 +164,53 @@ export default function AuthScreen() {
       )}
 
       {screen === "signup" && (
-        <TextBouble mode="agent">
+        <TextBouble mode="agent" playOnceKey="auth:signup">
           <AppText variant="bodyText" style={{ marginBottom: SPACING.md }}>
             {`Great to meet you${displayName ? ", " + displayName : ""}! \nLet's create your account.`}
           </AppText>
           <Box widget={true} style={styles.form}>
+            {signupError ? (
+              <AppText variant="errorText" style={{ marginBottom: SPACING.md }}>
+                {signupError}
+              </AppText>
+            ) : null}
             <Input
               label="Username"
               placeholder="Choose a username"
               value={signupUsername}
-              onChangeText={setSignupUsername}
+              onChangeText={(v) => {
+                setSignupUsername(v);
+                setSignupError(null);
+              }}
             />
             <Input
               label="Email"
               placeholder="Your email"
               value={signupEmail}
-              onChangeText={setSignupEmail}
+              onChangeText={(v) => {
+                setSignupEmail(v);
+                setSignupError(null);
+              }}
               type="email"
             />
             <Input
               label="Password"
               placeholder="Password"
               value={signupPassword}
-              onChangeText={setSignupPassword}
+              onChangeText={(v) => {
+                setSignupPassword(v);
+                setSignupError(null);
+              }}
               type="password"
             />
             <Input
               label="Confirm"
               placeholder="Confirm password"
               value={signupConfirm}
-              onChangeText={setSignupConfirm}
+              onChangeText={(v) => {
+                setSignupConfirm(v);
+                setSignupError(null);
+              }}
               type="password"
             />
           </Box>

@@ -6,6 +6,10 @@ import ConicGradientBubble from "../special/ConicGradientBubble";
 
 export type TextBoubleMode = "agent" | "user";
 
+// Persistent map of played animations by key. When a `playOnceKey` is provided
+// to `TextBouble`, the animation will only play once ever for that key
+// (survives mount/unmount cycles during the app session).
+const playedMap = new Map<string, boolean>();
 /**
  * Isolated typewriter component that updates independently
  * without causing parent re-renders. Uses requestAnimationFrame
@@ -207,6 +211,10 @@ type Props = {
 
   mode?: TextBoubleMode;
 
+  // If provided, the typewriter animation will only play once per-session
+  // for this key. Useful to avoid replay when navigating back-and-forth.
+  playOnceKey?: string;
+
   // Agent typing
   text?: string; // If provided, used for typewriter (preferred over children)
   typewriter?: boolean; // Default: true for agent, false for user
@@ -284,6 +292,7 @@ const TextBouble: React.FC<Props> = ({
   typewriter,
   typingSpeedCps = DEFAULT_CPS,
   onTypingDone,
+  playOnceKey,
 }) => {
   const resolvedTypewriter = typewriter ?? mode === "agent";
   const fullText = useMemo(() => pickText(children, text), [children, text]);
@@ -300,6 +309,12 @@ const TextBouble: React.FC<Props> = ({
 
   // Fade-in animation for non-text elements after typing completes
   const nonTextOpacity = useRef(new Animated.Value(0)).current;
+
+  // Track last seen meaningful inputs to avoid restarting animations on unrelated re-renders
+  // Only run the typewriter the first time this TextBouble is shown.
+  // Subsequent re-renders (e.g. showing inline error messages) should not restart it.
+  const initializedRef = useRef(false);
+  const playedRef = useRef<boolean>(Boolean(playOnceKey && playedMap.get(playOnceKey)));
 
   const handleTypingDone = useMemo(
     () => () => {
@@ -349,31 +364,54 @@ const TextBouble: React.FC<Props> = ({
         glowAnimRef.current = null;
         // Stop rendering the dynamic gradient once the fade completes
         if (finished) setShowConic(false);
+        // Mark that we've completed the typing animation so it won't replay
+        try {
+          playedRef.current = true;
+          if (playOnceKey) playedMap.set(playOnceKey, true);
+        } catch (_) {}
       });
     },
     [onTypingDone, conicOpacity, glowOpacity, nonTextOpacity]
   );
 
   useEffect(() => {
-    // Reset whenever content/mode changes
-    const nextFull = pickText(children, text);
-    const shouldType = (typewriter ?? mode === "agent") && mode === "agent" && !!nextFull;
+    // Initialize only once per mount/show. If the typewriter has already played
+    // for this instance, do not restart it on subsequent re-renders (e.g., showing errors).
+    const shouldType = (typewriter ?? mode === "agent") && mode === "agent" && !!fullText;
 
-    // stop any running animations immediately when content changes
-    try {
-      conicAnimRef.current?.stop();
-    } catch (_) {}
-    try {
-      glowAnimRef.current?.stop();
-    } catch (_) {}
+    if (!initializedRef.current) {
+      initializedRef.current = true;
 
-    setIsTyping(shouldType);
-    setShowConic(shouldType);
-
-    // If typing: conic visible, glow hidden, non-text hidden. Otherwise: everything visible.
-    conicOpacity.setValue(shouldType ? 1 : 0);
-    glowOpacity.setValue(mode === "agent" && !shouldType ? 1 : 0);
-    nonTextOpacity.setValue(shouldType ? 0 : 1);
+      // If we should type at first show, start typing. Otherwise show full content.
+      if (shouldType && !playedRef.current) {
+        setIsTyping(true);
+        setShowConic(true);
+        conicOpacity.setValue(1);
+        glowOpacity.setValue(0);
+        nonTextOpacity.setValue(0);
+      } else {
+        setIsTyping(false);
+        setShowConic(false);
+        conicOpacity.setValue(0);
+        glowOpacity.setValue(mode === "agent" && !shouldType ? 1 : 0);
+        nonTextOpacity.setValue(1);
+        // If we are not typing, mark as played so we don't attempt later
+        playedRef.current = true;
+        if (playOnceKey) playedMap.set(playOnceKey, true);
+      }
+    } else {
+      // Already initialized: don't restart animations on re-renders. But if typing
+      // was never played and now shouldType becomes true, allow it once.
+      if (!playedRef.current && shouldType && !isTyping) {
+        setIsTyping(true);
+        setShowConic(true);
+        conicOpacity.setValue(1);
+        glowOpacity.setValue(0);
+        nonTextOpacity.setValue(0);
+      } else {
+        // Keep current visual state (do not restart)
+      }
+    }
 
     return () => {
       // stop any running Animated.CompositeAnimation instances
@@ -395,18 +433,12 @@ const TextBouble: React.FC<Props> = ({
         conicOpacity.setValue(0);
       }
       try {
-        const finalGlow =
-          mode === "agent" && !((typewriter ?? mode === "agent") && mode === "agent" && !!pickText(children, text))
-            ? 1
-            : 0;
+        const finalGlow = mode === "agent" && !shouldType ? 1 : 0;
         glowOpacity.stopAnimation(() => {
           glowOpacity.setValue(finalGlow);
         });
       } catch (_) {
-        const finalGlow =
-          mode === "agent" && !((typewriter ?? mode === "agent") && mode === "agent" && !!pickText(children, text))
-            ? 1
-            : 0;
+        const finalGlow = mode === "agent" && !shouldType ? 1 : 0;
         glowOpacity.setValue(finalGlow);
       }
       try {
@@ -418,7 +450,7 @@ const TextBouble: React.FC<Props> = ({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [children, text, mode, typewriter]);
+  }, [fullText, mode, typewriter]);
 
   const radii = useMemo(() => getRadii(mode), [mode]);
   const containerBg = useMemo(() => getContainerBackground(mode), [mode]);
