@@ -149,7 +149,7 @@ export const COMPONENT_STYLES = {
     borderColor: COLORS.brightP1,
     backgroundColor: COLORS.white,
 
-    minHeight: 44,
+    minHeight: FONT_SIZES.base * 2.5,
     paddingRight: SPACING.sm,
 
     ...(SHADOWS.card as object),

@@ -29,7 +29,7 @@ import AppText from "../common/AppText";
 import { Checkbox } from "../icons/Checkbox";
 import { Chevron } from "../icons/Chevron";
 
-type InputType = "text" | "email" | "password" | "number";
+type InputType = "text" | "email" | "password" | "number" | "longtext";
 
 interface InputProps<T = any> extends Omit<TextInputProps, "style"> {
   type?: InputType;
@@ -185,7 +185,8 @@ function Input<T = any>({
       effectivePlaceholder = placeholder;
     }
   } else {
-    displayValue = placeholder as any;
+    // For plain inputs (no options) prefer explicit/default value, then the controlled input value.
+    displayValue = nonEmpty(explicitValue) ?? nonEmpty(defaultValue) ?? inputValue ?? "";
     effectivePlaceholder = placeholder;
   }
 
@@ -287,12 +288,18 @@ function Input<T = any>({
         >
           <TextInput
             ref={inputRef}
-            style={[styles.input, (Platform as any).OS === "web" ? ({ outlineWidth: 0 } as any) : undefined]}
+            style={[
+              styles.input,
+              type === "longtext" ? styles.textarea : undefined,
+              (Platform as any).OS === "web" ? ({ outlineWidth: 0 } as any) : undefined,
+            ]}
             placeholder={Platform.OS === "android" ? "" : effectivePlaceholder}
             placeholderTextColor={COLORS.lightGray}
             keyboardType={getKeyboardType()}
             secureTextEntry={getSecureTextEntry()}
             editable={!options}
+            multiline={type === "longtext"}
+            numberOfLines={type === "longtext" ? 5 : undefined}
             value={displayValue}
             onFocus={(e) => {
               rest.onFocus?.(e);
@@ -423,20 +430,22 @@ const styles = StyleSheet.create({
   },
 
   inputWrapper: {
-    minHeight: FONT_SIZES.base * 2,
-
     ...(COMPONENT_STYLES.inputWrapper as ViewStyle),
+    // allow children (TextInput) to stretch vertically so multiline can expand
+    alignItems: "stretch",
   },
   // Transparent pressable wrapper that covers the input area (no visible styling)
   inputWrapperPressable: {
     ...(COMPONENT_STYLES.inputWrapperPressable as ViewStyle),
+    // ensure the pressable doesn't vertically center content which can hide lines
+    justifyContent: "flex-start",
   },
   input: {
     flex: 1,
     width: "100%",
     padding: SPACING.md,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: "flex-start",
+    alignItems: "flex-start",
     fontFamily: TYPOGRAPHY.input.fontFamily,
     fontSize: TYPOGRAPHY.input.fontSize,
     color: TYPOGRAPHY.input.color,
@@ -483,6 +492,12 @@ const styles = StyleSheet.create({
     height: DIVIDER.width,
     backgroundColor: DIVIDER.color,
     marginHorizontal: SPACING.md,
+  },
+  textarea: {
+    minHeight: FONT_SIZES.base * 5,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.md,
+    textAlignVertical: "top",
   },
 });
 

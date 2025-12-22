@@ -3,7 +3,7 @@ import { View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 
 import AppText from "../components/common/AppText";
 import TextBouble from "../components/common/TextBouble";
 import Input from "../components/inputs/Input";
-import { COLORS, FONT_SIZES, SPACING } from "../theme";
+import { COLORS, FONT_SIZES, SHADOWS, SPACING } from "../theme";
 import { useNavigation } from "../context/NavigationContext";
 import { useAuth } from "../context/AuthContext";
 import { ICONS } from "../components/icons/icons";
@@ -132,7 +132,7 @@ export default function ChatScreen() {
     setNavBarConfig({
       show: true,
       widget: (
-        <View style={[styles.inputContainer, keyboardVisible ? styles.inputContainerKeyboard : undefined]}>
+        <View style={[styles.inputContainer]}>
           <View style={{ flex: 1 }}>
             <Input
               placeholder="Type a message..."
@@ -141,6 +141,7 @@ export default function ChatScreen() {
               onSubmitEditing={handleSend}
               returnKeyType="send"
               editable={!isLoading}
+              multiline
             />
           </View>
           <TouchableOpacity
@@ -254,17 +255,18 @@ const styles = StyleSheet.create({
   inputContainer: {
     width: "100%",
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-end",
     paddingVertical: SPACING.sm,
     gap: SPACING.sm,
   },
   sendButton: {
-    width: FONT_SIZES.base * 2,
-    height: FONT_SIZES.base * 2,
+    width: FONT_SIZES.base * 2.5 + 1.5,
+    height: FONT_SIZES.base * 2.5 + 1.5,
     borderRadius: FONT_SIZES.base,
     backgroundColor: COLORS.primary1,
     justifyContent: "center",
     alignItems: "center",
+    ...SHADOWS.card,
   },
   sendButtonDisabled: {
     backgroundColor: COLORS.lightGray,
