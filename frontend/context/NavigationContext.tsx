@@ -8,7 +8,7 @@ export type HeaderConfig = {
   show?: boolean;
   rightElement?: ReactNode;
   leftElement?: ReactNode; // e.g. Return icon
-  centerElement?: ReactNode; // Custom title area
+  element?: ReactNode; // Custom title area
 };
 
 export type NavBarConfig = {

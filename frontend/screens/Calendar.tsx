@@ -8,11 +8,18 @@ import { ICONS } from "../components/icons/icons";
 export default function CalendarScreen() {
   const { setHeaderConfig } = useNavigation();
 
+  const Calendar = (
+    <View>
+      <AppText variant="bodyText">Calendar Placeholder</AppText>
+    </View>
+  );
+
   useEffect(() => {
     setHeaderConfig({
       title: "Calendar",
       show: true,
       icon: ICONS.calendar,
+      element: Calendar,
     });
   }, []);
 

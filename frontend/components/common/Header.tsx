@@ -11,9 +11,10 @@ type HeaderProps = {
   leftElement?: React.ReactNode;
   centerElement?: React.ReactNode;
   style?: any;
+  element?: React.ReactNode;
 };
 
-export default function Header({ title, Icon, show = true, rightElement, leftElement, style }: HeaderProps) {
+export default function Header({ title, Icon, show = true, rightElement, leftElement, element, style }: HeaderProps) {
   if (!show) return null;
 
   return (
@@ -29,6 +30,7 @@ export default function Header({ title, Icon, show = true, rightElement, leftEle
         {/* Right Section */}
         {rightElement && <View style={styles.rightSection}>{rightElement}</View>}
       </View>
+      {element && <View>{element}</View>}
     </View>
   );
 }

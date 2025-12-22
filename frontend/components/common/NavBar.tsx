@@ -19,7 +19,7 @@ export default function NavBar({ show = true }: NavBarProps) {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={styles.navBar}>
       {/* Widget Area (e.g. Chat Input) */}
       {navBarConfig.widget && <View style={styles.widgetContainer}>{navBarConfig.widget}</View>}
 
@@ -46,9 +46,13 @@ export default function NavBar({ show = true }: NavBarProps) {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  navBar: {
     width: "100%",
-    backgroundColor: "transparent",
+    paddingTop: SPACING.md,
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: SPACING.xlg,
+    borderTopRightRadius: SPACING.xlg,
+    ...(SHADOWS.card as object),
   },
   widgetContainer: {
     width: "100%",
@@ -56,18 +60,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
   },
   wrapper: {
+    height: SPACING.xlg * 3 + (Platform.OS !== "web" ? SPACING.lg : 0),
+    paddingBottom: Platform.OS === "web" ? 0 : SPACING.lg,
     width: "100%",
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingTop: SPACING.md,
-    paddingBottom: Platform.OS === "web" ? SPACING.lg : SPACING.lg,
-    paddingHorizontal: SPACING.xlg,
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: SPACING.xlg,
-    borderTopRightRadius: SPACING.xlg,
-    height: SPACING.xlg * 3 + (Platform.OS !== "web" ? SPACING.lg : 0),
-    ...(SHADOWS.card as object),
+    paddingHorizontal: SPACING.lg,
   },
   item: {
     flex: 1,

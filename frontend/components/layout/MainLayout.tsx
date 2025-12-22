@@ -46,7 +46,7 @@ export default function MainLayout() {
             Icon={headerConfig.icon}
             leftElement={headerConfig.leftElement}
             rightElement={headerConfig.rightElement}
-            centerElement={headerConfig.centerElement}
+            element={headerConfig.element}
           />
         </View>
 
