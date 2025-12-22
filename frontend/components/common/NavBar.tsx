@@ -6,27 +6,33 @@ import { useNavigation, TabName } from "../../context/NavigationContext";
 
 type NavBarProps = {
   show?: boolean;
+  hideIcons?: boolean;
 };
 
-export default function NavBar({ show = true }: NavBarProps) {
+export default function NavBar({ show = true, hideIcons = false }: NavBarProps) {
   const { activeTab, setActiveTab, navBarConfig } = useNavigation();
 
   // Allow context to override the prop, but prop=false forces hide
   if (!show || navBarConfig.show === false) return null;
+  const shouldShowIcons = !hideIcons;
 
   const getIconColor = (tab: TabName) => {
     return activeTab === tab ? COLORS.primary1 : COLORS.lightGray;
   };
 
   return (
-    <View style={styles.navBar}>
+    <View style={[styles.navBar, hideIcons ? styles.navBarCompact : undefined]}>
       {/* Widget Area (e.g. Chat Input) */}
-      {navBarConfig.widget && <View style={styles.widgetContainer}>{navBarConfig.widget}</View>}
+      {navBarConfig.widget && (
+        <View style={[styles.widgetContainer, hideIcons ? styles.widgetContainerKeyboard : undefined]}>
+          {navBarConfig.widget}
+        </View>
+      )}
 
       {/* Main Nav Content */}
-      {navBarConfig.customComponent ? (
+      {shouldShowIcons && navBarConfig.customComponent ? (
         navBarConfig.customComponent
-      ) : (
+      ) : shouldShowIcons ? (
         <View style={styles.wrapper}>
           <TouchableOpacity style={styles.item} activeOpacity={0.7} onPress={() => setActiveTab("user")}>
             <ICONS.user size={ICON_SIZES.big} color={getIconColor("user")} />
@@ -40,7 +46,7 @@ export default function NavBar({ show = true }: NavBarProps) {
             <ICONS.calendar size={ICON_SIZES.big} color={getIconColor("calendar")} />
           </TouchableOpacity>
         </View>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -48,16 +54,23 @@ export default function NavBar({ show = true }: NavBarProps) {
 const styles = StyleSheet.create({
   navBar: {
     width: "100%",
+    alignSelf: "stretch",
     paddingTop: SPACING.md,
     backgroundColor: COLORS.white,
     borderTopLeftRadius: SPACING.xlg,
     borderTopRightRadius: SPACING.xlg,
     ...(SHADOWS.card as object),
   },
+  navBarCompact: {
+    paddingTop: SPACING.sm,
+  },
   widgetContainer: {
     width: "100%",
     paddingBottom: SPACING.sm,
     paddingHorizontal: SPACING.md,
+  },
+  widgetContainerKeyboard: {
+    paddingBottom: SPACING.xlg,
   },
   wrapper: {
     height: SPACING.xlg * 3 + (Platform.OS !== "web" ? SPACING.lg : 0),

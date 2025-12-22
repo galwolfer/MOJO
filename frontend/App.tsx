@@ -112,7 +112,5 @@ const styles = StyleSheet.create({
     flex: 1,
     width: "100%",
   },
-  // ... other styles removed as they are now in MainLayout or unused
 });
 
-// Duplicate styles removed — single `styles` definition kept above.

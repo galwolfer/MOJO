@@ -1,13 +1,14 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Platform } from "react-native";
+import { View, StyleSheet, ScrollView } from "react-native";
 import AppText from "../components/common/AppText";
 import AppButton from "../components/common/AppButton";
 import Input from "../components/inputs/Input";
 import TextBouble from "../components/common/TextBouble";
 import { ICONS } from "../components/icons/icons";
-import { COLORS, SPACING, TYPOGRAPHY } from "../theme";
+import { COLORS, SPACING } from "../theme";
 import { Box } from "../components";
 import { useAuth } from "../context/AuthContext";
+import { useKeyboard } from "../hooks";
 
 import { login as apiLogin, register as apiRegister, setApiBase } from "../services/apiClient";
 
@@ -37,6 +38,13 @@ export default function AuthScreen() {
   const [pendingAuth, setPendingAuth] = useState<{ token: string; user: any } | null>(null);
 
   const Mojo = ICONS.mojo as React.FC<any> | undefined;
+  const { visible: keyboardVisible, height: keyboardHeight } = useKeyboard();
+  const keyboardPadding = keyboardVisible ? keyboardHeight : 0;
+  const contentContainerStyle = [
+    styles.contentContainer,
+    keyboardVisible ? styles.contentContainerKeyboard : undefined,
+    { paddingBottom: SPACING.xlg + keyboardPadding },
+  ];
 
   async function handleLogin() {
     try {
@@ -111,7 +119,12 @@ export default function AuthScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={contentContainerStyle}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
       <View style={{ alignItems: "center", marginBottom: -5 * SPACING.sm }}>
         {Mojo ? <Mojo width={SPACING.xlg * 5} color={COLORS.primary1} /> : null}
       </View>
@@ -255,16 +268,23 @@ export default function AuthScreen() {
           <AppButton title="Go to start" onPress={handleFinish} style={{ marginTop: SPACING.md }} />
         </View>
       )}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  scroll: {
     flex: 1,
-    padding: SPACING.xlg,
     backgroundColor: COLORS.white3,
+  },
+  contentContainer: {
+    flexGrow: 1,
+    padding: SPACING.xlg,
     justifyContent: "center",
+    alignItems: "center",
+  },
+  contentContainerKeyboard: {
+    justifyContent: "flex-start",
   },
   centered: {
     alignItems: "center",

@@ -133,6 +133,18 @@ function Input<T = any>({
       if (multiSelect) onSelect?.(selected);
     });
   };
+
+  const scrollInputIntoView = () => {
+    if ((Platform as any).OS !== "web") return;
+    if (typeof document === "undefined") return;
+    setTimeout(() => {
+      const element =
+        (webNativeID && document.getElementById(webNativeID)) || (document.activeElement as HTMLElement | null);
+      if (element && "scrollIntoView" in element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      }
+    }, 50);
+  };
   const providedValue = (rest as any).value ?? (rest as any).defaultValue;
 
   const [inputValue, setInputValue] = useState<string>(typeof providedValue === "string" ? providedValue : "");
@@ -284,6 +296,7 @@ function Input<T = any>({
             value={displayValue}
             onFocus={(e) => {
               rest.onFocus?.(e);
+              scrollInputIntoView();
             }}
             onChangeText={(text) => {
               setInputValue(text);
@@ -410,6 +423,8 @@ const styles = StyleSheet.create({
   },
 
   inputWrapper: {
+    minHeight: FONT_SIZES.base * 2,
+
     ...(COMPONENT_STYLES.inputWrapper as ViewStyle),
   },
   // Transparent pressable wrapper that covers the input area (no visible styling)
@@ -420,7 +435,8 @@ const styles = StyleSheet.create({
     flex: 1,
     width: "100%",
     padding: SPACING.md,
-    height: FONT_SIZES.base * 2,
+    justifyContent: "center",
+    alignItems: "center",
     fontFamily: TYPOGRAPHY.input.fontFamily,
     fontSize: TYPOGRAPHY.input.fontSize,
     color: TYPOGRAPHY.input.color,

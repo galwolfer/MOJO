@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { View, StyleSheet, Platform, useWindowDimensions } from "react-native";
 import { useNavigation } from "../../context/NavigationContext";
 import Header from "../common/Header";
@@ -6,12 +6,16 @@ import NavBar from "../common/NavBar";
 import ChatScreen from "../../screens/Chat";
 import CalendarScreen from "../../screens/Calendar";
 import UserProfileScreen from "../../screens/UserProfile";
-import { COLORS, SPACING } from "../../theme";
+import { COLORS } from "../../theme";
+import { useKeyboard } from "../../hooks";
 
 export default function MainLayout() {
-  const { activeTab, headerConfig } = useNavigation();
+  const { activeTab, headerConfig, navBarConfig } = useNavigation();
   const { width, height } = useWindowDimensions();
   const isDesktopLike = Platform.OS === "web" ? width >= 900 : width >= 900;
+  const { visible: keyboardVisible, height: keyboardHeight } = useKeyboard();
+  const keyboardOffset = keyboardVisible ? keyboardHeight : 0;
+  const hasNavWidget = Boolean(navBarConfig.widget);
 
   const renderScreen = () => {
     switch (activeTab) {
@@ -51,11 +55,20 @@ export default function MainLayout() {
         </View>
 
         {/* Main Content */}
-        <View style={styles.content}>{renderScreen()}</View>
+        <View
+          style={[styles.content, keyboardVisible && !hasNavWidget ? { paddingBottom: keyboardOffset } : undefined]}
+        >
+          {renderScreen()}
+        </View>
 
         {/* NavBar */}
-        <View style={styles.navBarContainer}>
-          <NavBar />
+        <View
+          style={[
+            styles.navBarContainer,
+            keyboardOffset > 0 ? { transform: [{ translateY: -keyboardOffset }] } : undefined,
+          ]}
+        >
+          <NavBar hideIcons={keyboardVisible && hasNavWidget} />
         </View>
       </View>
     </View>
@@ -103,5 +116,6 @@ const styles = StyleSheet.create({
   },
   navBarContainer: {
     zIndex: 10,
+    width: "100%",
   },
 });

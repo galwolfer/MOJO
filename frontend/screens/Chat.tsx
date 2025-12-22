@@ -8,6 +8,7 @@ import { useNavigation } from "../context/NavigationContext";
 import { useAuth } from "../context/AuthContext";
 import { ICONS } from "../components/icons/icons";
 import { sendChatMessage, setChatAuthToken, SendMessageResponse } from "../services/chatService";
+import { useKeyboard } from "../hooks";
 
 type LocalMessage = {
   id: string;
@@ -25,6 +26,8 @@ export default function ChatScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string>(() => `session_${Date.now()}`);
   const flatListRef = useRef<FlatList>(null);
+  const { visible: keyboardVisible, height: keyboardHeight } = useKeyboard();
+  const listPaddingBottom = SPACING.md + (keyboardVisible ? keyboardHeight : 0);
 
   // Set auth token for chat service
   useEffect(() => {
@@ -129,7 +132,7 @@ export default function ChatScreen() {
     setNavBarConfig({
       show: true,
       widget: (
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputContainer, keyboardVisible ? styles.inputContainerKeyboard : undefined]}>
           <View style={{ flex: 1 }}>
             <Input
               placeholder="Type a message..."
@@ -169,8 +172,8 @@ export default function ChatScreen() {
             playOnceKey={item.id}
             style={styles.messageBubble}
           >
-            <AppText variant="bodyText" style={isUser ? styles.userText : styles.agentText}>
-              {item.content}
+            <AppText variant="bodyText">
+              {item.content.endsWith("\n") ? item.content.slice(0, -1) : item.content}
             </AppText>
           </TextBouble>
         </View>
@@ -189,7 +192,7 @@ export default function ChatScreen() {
         data={messages}
         renderItem={renderMessage}
         keyExtractor={keyExtractor}
-        contentContainerStyle={styles.messagesList}
+        contentContainerStyle={[styles.messagesList, { paddingBottom: listPaddingBottom }]}
         showsVerticalScrollIndicator={false}
         onContentSizeChange={scrollToBottom}
         ListEmptyComponent={
@@ -231,12 +234,7 @@ const styles = StyleSheet.create({
   messageBubble: {
     maxWidth: "100%",
   },
-  userText: {
-    color: COLORS.colorWhite,
-  },
-  agentText: {
-    color: COLORS.black,
-  },
+
   emptyContainer: {
     flex: 1,
     justifyContent: "center",
