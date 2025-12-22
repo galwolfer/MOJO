@@ -7,6 +7,7 @@ import TextBouble from "../components/common/TextBouble";
 import { ICONS } from "../components/icons/icons";
 import { COLORS, SPACING, TYPOGRAPHY } from "../theme";
 import { Box } from "../components";
+import { useAuth } from "../context/AuthContext";
 
 import { login as apiLogin, register as apiRegister, setApiBase } from "../services/apiClient";
 
@@ -14,6 +15,7 @@ import { login as apiLogin, register as apiRegister, setApiBase } from "../servi
 // setApiBase("http://10.0.2.2:3000/api");
 
 export default function AuthScreen() {
+  const { signIn } = useAuth();
   const [screen, setScreen] = useState<"welcome" | "name" | "login" | "signup" | "done">("welcome");
 
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -31,6 +33,9 @@ export default function AuthScreen() {
   // Pre-signup display name (asked before the signup form)
   const [displayName, setDisplayName] = useState("");
 
+  // Pending auth state to hold data until user clicks "Go to start"
+  const [pendingAuth, setPendingAuth] = useState<{ token: string; user: any } | null>(null);
+
   const Mojo = ICONS.mojo as React.FC<any> | undefined;
 
   async function handleLogin() {
@@ -43,7 +48,12 @@ export default function AuthScreen() {
       }
 
       const data = await apiLogin({ username: loginUsername, password: loginPassword });
-      setScreen("done");
+      if (data.token && data.user) {
+        setPendingAuth({ token: data.token, user: data.user });
+        setScreen("done");
+      } else {
+        throw new Error("Invalid response from server");
+      }
     } catch (err: any) {
       const msg = String(err?.message || err || "Login failed");
       setLoginError(msg);
@@ -79,12 +89,26 @@ export default function AuthScreen() {
         password: signupPassword,
         displayName,
       });
-      setScreen("done");
+
+      if (data.token && data.user) {
+        setPendingAuth({ token: data.token, user: data.user });
+        setScreen("done");
+      } else {
+        throw new Error("Invalid response from server");
+      }
     } catch (err: any) {
       const msg = String(err?.message || err || "Signup failed");
       setSignupError(msg);
     }
   }
+
+  const handleFinish = () => {
+    if (pendingAuth) {
+      signIn(pendingAuth.token, pendingAuth.user);
+    } else {
+      setScreen("welcome");
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -228,7 +252,7 @@ export default function AuthScreen() {
           <AppText variant="title2">
             {`You're all set${displayName || signupUsername ? ", " + (displayName || signupUsername) : ""}`}
           </AppText>
-          <AppButton title="Go to start" onPress={() => setScreen("welcome")} style={{ marginTop: SPACING.md }} />
+          <AppButton title="Go to start" onPress={handleFinish} style={{ marginTop: SPACING.md }} />
         </View>
       )}
     </View>

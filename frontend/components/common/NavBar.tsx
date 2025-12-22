@@ -1,18 +1,34 @@
 import React from "react";
-import { View, StyleSheet, TouchableOpacity, Platform } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Platform, Alert } from "react-native";
 import { ICONS } from "../icons/icons";
 import { COLORS, SPACING, SHADOWS, ICON_SIZES } from "../../theme";
+import { useAuth } from "../../context/AuthContext";
 
 type NavBarProps = {
   show?: boolean;
 };
 
 export default function NavBar({ show = true }: NavBarProps) {
+  const { signOut } = useAuth();
+
   if (!show) return null;
+
+  const handleLogout = () => {
+    if (Platform.OS === "web") {
+      if (confirm("Are you sure you want to logout?")) {
+        signOut();
+      }
+    } else {
+      Alert.alert("Logout", "Are you sure you want to logout?", [
+        { text: "Cancel", style: "cancel" },
+        { text: "Logout", style: "destructive", onPress: signOut },
+      ]);
+    }
+  };
 
   return (
     <View style={styles.wrapper}>
-      <TouchableOpacity style={styles.item} activeOpacity={0.7}>
+      <TouchableOpacity style={styles.item} activeOpacity={0.7} onPress={handleLogout}>
         <ICONS.user size={ICON_SIZES.big} color={COLORS.primary1} />
       </TouchableOpacity>
 

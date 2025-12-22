@@ -5,7 +5,7 @@ export type RegisterRequest = { username: string; email: string; password: strin
 import { Platform } from "react-native";
 
 // Default machine IP — prefer setting HOST_IP in env for your machine.
-const DEFAULT_MACHINE_IP = "192.168.68.109";
+const DEFAULT_MACHINE_IP = "192.168.68.106";
 
 // Default API base for web/local development
 let API_BASE = "http://localhost:3000/api";
@@ -53,14 +53,28 @@ try {
 
 // (silent in production) resolved API_BASE is kept internal
 
+let authToken: string | null = null;
+
 export function setApiBase(url: string) {
   API_BASE = url.replace(/\/$/, "");
+}
+
+export function setAuthToken(token: string | null) {
+  authToken = token;
 }
 
 async function handleResponse(res: Response) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error || data?.message || res.statusText || "Request failed");
   return data;
+}
+
+function getHeaders() {
+  const headers: any = { "Content-Type": "application/json" };
+  if (authToken) {
+    headers["Authorization"] = `Bearer ${authToken}`;
+  }
+  return headers;
 }
 
 export async function login(payload: LoginRequest) {
@@ -70,7 +84,7 @@ export async function login(payload: LoginRequest) {
   } catch (_) {}
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getHeaders(),
     body: JSON.stringify(payload),
   });
   return handleResponse(res);
@@ -83,10 +97,10 @@ export async function register(payload: RegisterRequest) {
   } catch (_) {}
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getHeaders(),
     body: JSON.stringify(payload),
   });
   return handleResponse(res);
 }
 
-export default { setApiBase, login, register };
+export default { setApiBase, setAuthToken, login, register };

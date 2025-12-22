@@ -10,10 +10,12 @@ import Header from "./components/common/Header";
 import NavBar from "./components/common/NavBar";
 import { COLORS, SPACING } from "./theme";
 import ThemeShowcase from "./ThemeShowcase";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 
 SplashScreen.preventAutoHideAsync();
 
-export default function App() {
+function AppContent() {
+  const { user, isLoading } = useAuth();
   const [fontsLoaded, fontError] = useFonts({
     "Fredoka-Bold": require("./assets/fonts/Fredoka-Bold.ttf"),
     "Fredoka-Light": require("./assets/fonts/Fredoka-Light.ttf"),
@@ -23,30 +25,18 @@ export default function App() {
   });
 
   const onLayoutRootView = useCallback(async () => {
-    if (fontsLoaded || fontError) {
+    if ((fontsLoaded || fontError) && !isLoading) {
       await SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, fontError]);
+  }, [fontsLoaded, fontError, isLoading]);
 
   const { width, height } = useWindowDimensions();
   const isDesktopLike = (Platform as any).OS === "web" ? width >= 900 : width >= 900;
 
   // Measure header height so the scroll content always starts *under* it.
   const [headerHeight, setHeaderHeight] = useState(0);
-  // We add paddingTop = headerHeight so the first scroll item is not hidden behind the header.
-  // Call useMemo before any early returns so hook order remains stable between renders.
-  const showcaseContentStyle = useMemo(
-    () => [
-      styles.scrollContent,
-      {
-        paddingTop: headerHeight + SPACING.md,
-        paddingBottom: SPACING.xlg * 3 + SPACING.lg + (Platform.OS !== "web" ? SPACING.lg : 0),
-      },
-    ],
-    [headerHeight]
-  );
 
-  if (!fontsLoaded && !fontError) {
+  if ((!fontsLoaded && !fontError) || isLoading) {
     return null;
   }
 
@@ -71,25 +61,37 @@ export default function App() {
               if (h && h !== headerHeight) setHeaderHeight(h);
             }}
           >
-            {/* <Header title="MOJO" logo={null} show={true}>
-            </Header> */}
+            {user && <Header title="MOJO" logo={null} show={true} />}
           </View>
 
           {/* Fixed bottom nav overlay */}
           <View style={styles.footerOverlay} pointerEvents="box-none">
-            {/* <NavBar /> */}
+            {user && <NavBar />}
           </View>
 
           {/* Scroll area: starts below header */}
           <View style={styles.content}>
-            <AuthScreen />
-            {/* <ThemeShowcase /> */}
+            {!user ? (
+              <AuthScreen />
+            ) : (
+              <View style={{ flex: 1, paddingTop: headerHeight }}>
+                <ThemeShowcase />
+              </View>
+            )}
           </View>
         </View>
 
         <StatusBar style="auto" />
       </View>
     </GestureHandlerRootView>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 
