@@ -64,9 +64,10 @@ export const FONTS = {
 
 export const FONT_SIZES = {
   sm: moderateScale(14),
-  md: moderateScale(16),
-  base: moderateScale(18),
+  base: moderateScale(16),
+  md: moderateScale(20),
   lg: moderateScale(24),
+  xlg: moderateScale(28),
 };
 
 // Icon size tokens used across the app
@@ -197,44 +198,44 @@ export const COMPONENT_STYLES = {
 export const TYPOGRAPHY = {
   title: {
     fontFamily: FONTS.fredokaSemiBold,
-    fontSize: moderateScale(32),
+    fontSize: FONT_SIZES.xlg,
     textTransform: "uppercase" as const,
     color: COLORS.primary1,
     letterSpacing: 1.1,
   },
   title2: {
     fontFamily: FONTS.fredokaBold,
-    fontSize: moderateScale(24),
+    fontSize: FONT_SIZES.lg,
     textTransform: "uppercase" as const,
     color: COLORS.primary1,
     letterSpacing: 1.1,
   },
   title3: {
     fontFamily: FONTS.fredokaBold,
-    fontSize: moderateScale(18),
+    fontSize: FONT_SIZES.md,
     textTransform: "uppercase" as const,
     color: COLORS.black,
     letterSpacing: 1.1,
   },
   bodyText: {
     fontFamily: FONTS.fredokaRegular,
-    fontSize: moderateScale(18),
+    fontSize: FONT_SIZES.base,
     color: COLORS.black,
   },
   boldText: {
     fontFamily: FONTS.fredokaSemiBold,
-    fontSize: moderateScale(18),
+    fontSize: FONT_SIZES.base,
     color: COLORS.black,
   },
   notes: {
     fontFamily: FONTS.fredokaLight,
-    fontSize: moderateScale(14),
+    fontSize: FONT_SIZES.sm,
     color: COLORS.black,
   },
   // Error text: same sizing as notes but red color for inline form errors
   errorText: {
     fontFamily: FONTS.fredokaLight,
-    fontSize: moderateScale(14),
+    fontSize: FONT_SIZES.sm,
     color: COLORS.primary7,
   },
   input: {

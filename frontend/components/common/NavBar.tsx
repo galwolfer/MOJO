@@ -2,48 +2,59 @@ import React from "react";
 import { View, StyleSheet, TouchableOpacity, Platform, Alert } from "react-native";
 import { ICONS } from "../icons/icons";
 import { COLORS, SPACING, SHADOWS, ICON_SIZES } from "../../theme";
-import { useAuth } from "../../context/AuthContext";
+import { useNavigation, TabName } from "../../context/NavigationContext";
 
 type NavBarProps = {
   show?: boolean;
 };
 
 export default function NavBar({ show = true }: NavBarProps) {
-  const { signOut } = useAuth();
+  const { activeTab, setActiveTab, navBarConfig } = useNavigation();
 
-  if (!show) return null;
+  // Allow context to override the prop, but prop=false forces hide
+  if (!show || navBarConfig.show === false) return null;
 
-  const handleLogout = () => {
-    if (Platform.OS === "web") {
-      if (confirm("Are you sure you want to logout?")) {
-        signOut();
-      }
-    } else {
-      Alert.alert("Logout", "Are you sure you want to logout?", [
-        { text: "Cancel", style: "cancel" },
-        { text: "Logout", style: "destructive", onPress: signOut },
-      ]);
-    }
+  const getIconColor = (tab: TabName) => {
+    return activeTab === tab ? COLORS.primary1 : COLORS.lightGray;
   };
 
   return (
-    <View style={styles.wrapper}>
-      <TouchableOpacity style={styles.item} activeOpacity={0.7} onPress={handleLogout}>
-        <ICONS.user size={ICON_SIZES.big} color={COLORS.primary1} />
-      </TouchableOpacity>
+    <View style={styles.container}>
+      {/* Widget Area (e.g. Chat Input) */}
+      {navBarConfig.widget && <View style={styles.widgetContainer}>{navBarConfig.widget}</View>}
 
-      <TouchableOpacity style={styles.item} activeOpacity={0.7}>
-        <ICONS.ojo size={ICON_SIZES.big * 1.7} color={COLORS.primary1} />
-      </TouchableOpacity>
+      {/* Main Nav Content */}
+      {navBarConfig.customComponent ? (
+        navBarConfig.customComponent
+      ) : (
+        <View style={styles.wrapper}>
+          <TouchableOpacity style={styles.item} activeOpacity={0.7} onPress={() => setActiveTab("user")}>
+            <ICONS.user size={ICON_SIZES.big} color={getIconColor("user")} />
+          </TouchableOpacity>
 
-      <TouchableOpacity style={styles.item} activeOpacity={0.7}>
-        <ICONS.list size={ICON_SIZES.big} color={COLORS.primary1} />
-      </TouchableOpacity>
+          <TouchableOpacity style={styles.item} activeOpacity={0.7} onPress={() => setActiveTab("chat")}>
+            <ICONS.ojo size={ICON_SIZES.big * 1.7} color={getIconColor("chat")} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.item} activeOpacity={0.7} onPress={() => setActiveTab("calendar")}>
+            <ICONS.calendar size={ICON_SIZES.big} color={getIconColor("calendar")} />
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    width: "100%",
+    backgroundColor: "transparent",
+  },
+  widgetContainer: {
+    width: "100%",
+    paddingBottom: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+  },
   wrapper: {
     width: "100%",
     flexDirection: "row",

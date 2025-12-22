@@ -1,16 +1,15 @@
 // #file:App.tsx
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet, View, useWindowDimensions, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import AuthScreen from "./screens/Auth";
-import Header from "./components/common/Header";
-import NavBar from "./components/common/NavBar";
-import { COLORS, SPACING } from "./theme";
-import ThemeShowcase from "./ThemeShowcase";
+import { COLORS } from "./theme";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { NavigationProvider } from "./context/NavigationContext";
+import MainLayout from "./components/layout/MainLayout";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -33,18 +32,21 @@ function AppContent() {
   const { width, height } = useWindowDimensions();
   const isDesktopLike = (Platform as any).OS === "web" ? width >= 900 : width >= 900;
 
-  // Measure header height so the scroll content always starts *under* it.
-  const [headerHeight, setHeaderHeight] = useState(0);
-
   if ((!fontsLoaded && !fontError) || isLoading) {
     return null;
   }
 
-  const outerStyle = isDesktopLike ? styles.desktopOuter : styles.container;
+  // If user is logged in, MainLayout handles the frame/layout itself to support the complex nav/header structure.
+  // If not, we wrap AuthScreen in the frame here.
+  // Actually, to keep it consistent, let's have MainLayout handle the frame for authenticated user,
+  // and we handle the frame for AuthScreen here.
+  // OR better: MainLayout is just the content, and we keep the frame here?
+  // The issue is MainLayout needs to stack Header/Content/Nav.
+  // If we keep the frame here, we just render MainLayout inside it.
 
+  const outerStyle = isDesktopLike ? styles.desktopOuter : styles.container;
   const deviceWidth = 700;
   const deviceHeight = Math.min(height, 1300);
-
   const deviceStyle = isDesktopLike
     ? [styles.deviceFrame, { width: deviceWidth, height: deviceHeight }]
     : styles.deviceFull;
@@ -52,34 +54,19 @@ function AppContent() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={outerStyle} onLayout={onLayoutRootView}>
-        <View style={deviceStyle}>
-          {/* Fixed header overlay */}
-          <View
-            style={styles.headerOverlay}
-            onLayout={(e) => {
-              const h = e?.nativeEvent?.layout?.height ?? 0;
-              if (h && h !== headerHeight) setHeaderHeight(h);
-            }}
-          >
-            {user && <Header title="MOJO" logo={null} show={true} />}
-          </View>
+        {/* If user is logged in, we delegate full control to MainLayout which includes the frame logic internally if needed, 
+            OR we wrap it here. 
+            MainLayout currently implements the frame logic itself. So we should just render it directly if user is logged in.
+            However, AuthScreen needs the frame too.
+        */}
 
-          {/* Fixed bottom nav overlay */}
-          <View style={styles.footerOverlay} pointerEvents="box-none">
-            {user && <NavBar />}
+        {user ? (
+          <MainLayout />
+        ) : (
+          <View style={deviceStyle}>
+            <AuthScreen />
           </View>
-
-          {/* Scroll area: starts below header */}
-          <View style={styles.content}>
-            {!user ? (
-              <AuthScreen />
-            ) : (
-              <View style={{ flex: 1, paddingTop: headerHeight }}>
-                <ThemeShowcase />
-              </View>
-            )}
-          </View>
-        </View>
+        )}
 
         <StatusBar style="auto" />
       </View>
@@ -90,7 +77,9 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <NavigationProvider>
+        <AppContent />
+      </NavigationProvider>
     </AuthProvider>
   );
 }
@@ -117,32 +106,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 18,
     elevation: 12,
+    flex: 1, // Ensure it takes full height
   },
   deviceFull: {
     flex: 1,
     width: "100%",
   },
-
-  // Header sits on top, content scrolls underneath (but with paddingTop so it is visible)
-  headerOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-  },
-
-  footerOverlay: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 10,
-  },
-
-  content: {
-    flex: 1,
-  },
-
-  scrollContent: {},
+  // ... other styles removed as they are now in MainLayout or unused
 });
+
+// Duplicate styles removed — single `styles` definition kept above.

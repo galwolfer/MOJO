@@ -5,27 +5,30 @@ import { ICONS } from "../icons/icons";
 
 type HeaderProps = {
   title?: string;
-  logo?: any; // image source or React element
   Icon?: any; // icon component
   show?: boolean;
-  children?: React.ReactNode;
+  rightElement?: React.ReactNode;
+  leftElement?: React.ReactNode;
+  centerElement?: React.ReactNode;
   style?: any;
 };
 
-export default function Header({ title, Icon = ICONS.calendar, show = true, children, style }: HeaderProps) {
-  const { width } = useWindowDimensions();
+export default function Header({ title, Icon, show = true, rightElement, leftElement, style }: HeaderProps) {
   if (!show) return null;
-
-  // default icon from the icons lib when `logo` prop isn't provided
 
   return (
     <View style={[styles.wrapper, style]}>
-      <View style={styles.row}>
-        <Icon size={ICON_SIZES.big} color={COLORS.primary1} />
-        {title ? <Text style={[TYPOGRAPHY.title, styles.titleText]}>{title}</Text> : null}
-      </View>
+      <View style={styles.container}>
+        {/* Left Section */}
+        <View style={styles.leftSection}>
+          {leftElement}
+          {Icon && !leftElement && <Icon size={ICON_SIZES.big} color={COLORS.primary1} />}
+          {title && <Text style={[TYPOGRAPHY.title, styles.titleText]}>{title}</Text>}
+        </View>
 
-      {children ? <View style={styles.children}>{children}</View> : null}
+        {/* Right Section */}
+        {rightElement && <View style={styles.rightSection}>{rightElement}</View>}
+      </View>
     </View>
   );
 }
@@ -33,36 +36,42 @@ export default function Header({ title, Icon = ICONS.calendar, show = true, chil
 const styles = StyleSheet.create({
   wrapper: {
     width: "100%",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "center",
-    alignItems: "flex-start",
-    // avoid `gap` (not widely supported) and use explicit paddings
-    paddingHorizontal: SPACING.md,
-
-    // small top inset so header doesn't butt up against status bar on mobile
+    paddingHorizontal: SPACING.lg,
     paddingTop: Platform.OS === "android" ? SPACING.xlg + SPACING.md : SPACING.lg,
     paddingBottom: SPACING.lg,
-
     backgroundColor: COLORS.white,
-
     borderBottomLeftRadius: SPACING.xlg,
     borderBottomRightRadius: SPACING.xlg,
-
     ...(SHADOWS.card as object),
   },
-  row: {
-    width: "100%",
+  container: {
     flexDirection: "row",
     alignItems: "center",
-    // use margins on children for spacing instead of `gap`
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  leftSection: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    alignItems: "center",
+    flex: 1,
+    gap: SPACING.md,
+  },
+  centerSection: {
+    flex: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rightSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    flex: 1,
   },
   titleText: {
-    color: COLORS.primary1,
-    marginLeft: SPACING.md,
-  },
-  children: {
     width: "100%",
-    marginTop: SPACING.lg,
+    marginLeft: SPACING.sm,
+    color: COLORS.primary1,
   },
 });
