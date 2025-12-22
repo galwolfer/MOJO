@@ -23,6 +23,7 @@ import {
   ICON_SIZES,
   IconSizeKey,
   COMPONENT_STYLES,
+  FONT_SIZES,
 } from "../../theme";
 import AppText from "../common/AppText";
 import { Checkbox } from "../icons/Checkbox";
@@ -419,6 +420,7 @@ const styles = StyleSheet.create({
     flex: 1,
     width: "100%",
     padding: SPACING.md,
+    height: FONT_SIZES.base * 2,
     fontFamily: TYPOGRAPHY.input.fontFamily,
     fontSize: TYPOGRAPHY.input.fontSize,
     color: TYPOGRAPHY.input.color,

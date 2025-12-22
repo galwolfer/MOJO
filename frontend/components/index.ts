@@ -8,3 +8,5 @@ export { default as BoxContainer } from "./layout/BoxContainer";
 export { default as Input } from "./inputs/Input";
 export { default as PriorityList } from "./special/PriorityList";
 export { default as AppButton } from "./common/AppButton";
+export { default as TextBouble } from "./common/TextBouble";
+export type { TextBoubleMode } from "./common/TextBouble";
