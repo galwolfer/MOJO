@@ -23,6 +23,10 @@ export type ChatMessage = {
   role: "user" | "assistant" | "system" | "function";
   content: string;
   timestamp?: string;
+  isError?: boolean;
+  clientId?: string;
+  relatedClientId?: string;
+  status?: "pending" | "failed" | "sent";
 };
 
 export type SendMessageResponse = {
@@ -72,8 +76,11 @@ export type ResetSessionResponse = {
  * Send a message to the chat agent
  * POST /api/chat/message
  */
-export async function sendChatMessage(payload: SendMessageRequest): Promise<SendMessageResponse> {
-  return post<SendMessageResponse>("/chat/message", payload);
+export async function sendChatMessage(
+  payload: SendMessageRequest,
+  options?: { timeoutMs?: number }
+): Promise<SendMessageResponse> {
+  return post<SendMessageResponse>("/chat/message", payload, options);
 }
 
 /**

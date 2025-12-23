@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
-import { listChatSessions, getChatUserSessions, ChatSessionSummary } from "../services/chatService";
+import { listChatSessions, getChatUserSessions, ChatSessionSummary, ChatMessage } from "../services/chatService";
 import { loadCachedSessions, saveCachedSessions } from "../services/chatSessionCache";
 
 export function useChatSessions() {
@@ -85,6 +85,38 @@ export function useChatSessions() {
   }, [sessions, user?.id]);
 
   const mergeSessions = useCallback((existing: ChatSessionSummary[], incoming: ChatSessionSummary[]) => {
+    const isLocalMessage = (message: ChatMessage) =>
+      message.status === "pending" || message.status === "failed" || message.isError === true;
+
+    const messageKey = (message: ChatMessage) =>
+      message.clientId ||
+      `${message.role}|${message.content}|${message.timestamp || ""}|${message.isError ? "error" : "ok"}`;
+
+    const mergeMessages = (prevMessages?: ChatMessage[], nextMessages?: ChatMessage[]) => {
+      if (!nextMessages) return prevMessages;
+      if (!prevMessages || prevMessages.length === 0) return nextMessages;
+
+      const merged = [...nextMessages];
+      const seen = new Set(merged.map(messageKey));
+
+      for (const msg of prevMessages) {
+        if (!isLocalMessage(msg)) continue;
+        const key = messageKey(msg);
+        if (!seen.has(key)) {
+          merged.push(msg);
+          seen.add(key);
+        }
+      }
+
+      merged.sort((a, b) => {
+        const aTime = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+        const bTime = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+        return aTime - bTime;
+      });
+
+      return merged;
+    };
+
     const map = new Map<string, ChatSessionSummary>();
 
     for (const s of existing) {
@@ -96,13 +128,14 @@ export function useChatSessions() {
       const prev = map.get(next.sessionId);
 
       // Preserve messages if the incoming session doesn't include them.
+      const mergedMessages = mergeMessages(prev?.messages, Array.isArray(next.messages) ? next.messages : prev?.messages);
       const merged: ChatSessionSummary = {
         ...(prev || {}),
         ...next,
         createdAt: next.createdAt ?? prev?.createdAt,
         lastActiveAt: next.lastActiveAt ?? prev?.lastActiveAt,
         messageCount: next.messageCount ?? prev?.messageCount,
-        messages: Array.isArray(next.messages) ? next.messages : prev?.messages,
+        messages: mergedMessages,
       };
 
       map.set(next.sessionId, merged);

@@ -17,6 +17,13 @@ export type NavBarConfig = {
   customComponent?: ReactNode; // Completely replace navbar content
 };
 
+export type ChatScrollState = {
+  offset: number;
+  isAtBottom: boolean;
+  hasScroll: boolean;
+  distanceFromBottom: number;
+};
+
 type NavigationContextType = {
   activeTab: TabName;
   setActiveTab: (tab: TabName) => void;
@@ -24,6 +31,8 @@ type NavigationContextType = {
   setHeaderConfig: (config: HeaderConfig) => void;
   navBarConfig: NavBarConfig;
   setNavBarConfig: (config: NavBarConfig) => void;
+  chatScrollState: ChatScrollState;
+  setChatScrollState: (state: ChatScrollState) => void;
 };
 
 const NavigationContext = createContext<NavigationContextType>({} as NavigationContextType);
@@ -37,6 +46,12 @@ export const NavigationProvider = ({ children }: { children: ReactNode }) => {
   const [navBarConfig, setNavBarConfig] = useState<NavBarConfig>({
     show: true,
   });
+  const [chatScrollState, setChatScrollState] = useState<ChatScrollState>({
+    offset: 0,
+    isAtBottom: true,
+    hasScroll: false,
+    distanceFromBottom: 0,
+  });
 
   return (
     <NavigationContext.Provider
@@ -47,6 +62,8 @@ export const NavigationProvider = ({ children }: { children: ReactNode }) => {
         setHeaderConfig,
         navBarConfig,
         setNavBarConfig,
+        chatScrollState,
+        setChatScrollState,
       }}
     >
       {children}

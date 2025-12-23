@@ -3,6 +3,11 @@
 
 import { getApiBase } from "./config";
 
+type RequestOptions = {
+  timeoutMs?: number;
+  signal?: AbortSignal;
+};
+
 // Auth token storage
 let authToken: string | null = null;
 
@@ -41,66 +46,143 @@ async function handleResponse<T>(res: Response): Promise<T> {
   return data as T;
 }
 
+function buildAbortSignal(options?: RequestOptions) {
+  const timeoutMs = options?.timeoutMs;
+  const externalSignal = options?.signal;
+
+  if (typeof AbortController === "undefined") {
+    return { signal: externalSignal, cleanup: undefined as (() => void) | undefined };
+  }
+
+  if (!timeoutMs) {
+    return { signal: externalSignal, cleanup: undefined as (() => void) | undefined };
+  }
+
+  const controller = new AbortController();
+  const onAbort = () => controller.abort();
+
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      controller.abort();
+    } else {
+      externalSignal.addEventListener("abort", onAbort);
+    }
+  }
+
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const cleanup = () => {
+    clearTimeout(timeoutId);
+    if (externalSignal) {
+      externalSignal.removeEventListener("abort", onAbort);
+    }
+  };
+
+  return { signal: controller.signal, cleanup };
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit, options?: RequestOptions) {
+  const timeoutMs = options?.timeoutMs;
+  if (timeoutMs && typeof AbortController === "undefined") {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const timeoutPromise = new Promise<Response>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error("Request timed out")), timeoutMs);
+    });
+    try {
+      const res = await Promise.race([fetch(url, init), timeoutPromise]);
+      return res as Response;
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  }
+
+  const { signal, cleanup } = buildAbortSignal(options);
+  try {
+    return await fetch(url, { ...init, signal });
+  } finally {
+    cleanup?.();
+  }
+}
+
 /**
  * Make a GET request
  */
-export async function get<T>(endpoint: string): Promise<T> {
+export async function get<T>(endpoint: string, options?: RequestOptions): Promise<T> {
   const url = `${getApiBase()}${endpoint}`;
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(
+    url,
+    {
     method: "GET",
     headers: getHeaders(),
-  });
+    },
+    options
+  );
   return handleResponse<T>(res);
 }
 
 /**
  * Make a POST request
  */
-export async function post<T>(endpoint: string, body?: any): Promise<T> {
+export async function post<T>(endpoint: string, body?: any, options?: RequestOptions): Promise<T> {
   const url = `${getApiBase()}${endpoint}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: getHeaders(),
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const res = await fetchWithTimeout(
+    url,
+    {
+      method: "POST",
+      headers: getHeaders(),
+      body: body ? JSON.stringify(body) : undefined,
+    },
+    options
+  );
   return handleResponse<T>(res);
 }
 
 /**
  * Make a PUT request
  */
-export async function put<T>(endpoint: string, body?: any): Promise<T> {
+export async function put<T>(endpoint: string, body?: any, options?: RequestOptions): Promise<T> {
   const url = `${getApiBase()}${endpoint}`;
-  const res = await fetch(url, {
-    method: "PUT",
-    headers: getHeaders(),
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const res = await fetchWithTimeout(
+    url,
+    {
+      method: "PUT",
+      headers: getHeaders(),
+      body: body ? JSON.stringify(body) : undefined,
+    },
+    options
+  );
   return handleResponse<T>(res);
 }
 
 /**
  * Make a DELETE request
  */
-export async function del<T>(endpoint: string): Promise<T> {
+export async function del<T>(endpoint: string, options?: RequestOptions): Promise<T> {
   const url = `${getApiBase()}${endpoint}`;
-  const res = await fetch(url, {
-    method: "DELETE",
-    headers: getHeaders(),
-  });
+  const res = await fetchWithTimeout(
+    url,
+    {
+      method: "DELETE",
+      headers: getHeaders(),
+    },
+    options
+  );
   return handleResponse<T>(res);
 }
 
 /**
  * Make a PATCH request
  */
-export async function patch<T>(endpoint: string, body?: any): Promise<T> {
+export async function patch<T>(endpoint: string, body?: any, options?: RequestOptions): Promise<T> {
   const url = `${getApiBase()}${endpoint}`;
-  const res = await fetch(url, {
-    method: "PATCH",
-    headers: getHeaders(),
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const res = await fetchWithTimeout(
+    url,
+    {
+      method: "PATCH",
+      headers: getHeaders(),
+      body: body ? JSON.stringify(body) : undefined,
+    },
+    options
+  );
   return handleResponse<T>(res);
 }
 

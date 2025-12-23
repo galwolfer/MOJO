@@ -16,19 +16,36 @@ export type TimelineItem =
       role: "user" | "assistant";
       content: string;
       timestamp: Date;
+      isError?: boolean;
+      clientId?: string;
+      status?: "pending" | "failed" | "sent";
     };
 
 interface TimelineItemProps {
   item: TimelineItem;
   isLastItem: boolean;
+  onRetry?: (sessionId: string, clientId: string) => void;
 }
 
-function TimelineItemComponent({ item, isLastItem }: TimelineItemProps) {
+function TimelineItemComponent({ item, isLastItem, onRetry }: TimelineItemProps) {
   if (item.kind === "divider") {
     return <SessionDivider label={item.label} />;
   }
 
-  return <ChatMessageBubble role={item.role} content={item.content} isLastMessage={isLastItem} playOnceKey={item.id} />;
+  const retryHandler =
+    item.status === "failed" && item.clientId && onRetry ? () => onRetry(item.sessionId, item.clientId) : undefined;
+
+  return (
+    <ChatMessageBubble
+      role={item.role}
+      content={item.content}
+      isLastMessage={isLastItem}
+      playOnceKey={item.id}
+      isError={item.isError}
+      status={item.status}
+      onRetry={retryHandler}
+    />
+  );
 }
 
 function areEqual(prev: TimelineItemProps, next: TimelineItemProps) {
@@ -41,7 +58,15 @@ function areEqual(prev: TimelineItemProps, next: TimelineItemProps) {
   }
   // message
   if (p.kind === "message" && n.kind === "message") {
-    return p.id === n.id && p.content === n.content && p.role === n.role && +p.timestamp === +n.timestamp;
+    return (
+      p.id === n.id &&
+      p.content === n.content &&
+      p.role === n.role &&
+      p.isError === n.isError &&
+      p.clientId === n.clientId &&
+      p.status === n.status &&
+      +p.timestamp === +n.timestamp
+    );
   }
   return false;
 }

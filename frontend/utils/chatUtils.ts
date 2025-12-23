@@ -14,6 +14,9 @@ export type TimelineItem =
       role: "user" | "assistant";
       content: string;
       timestamp: Date;
+      isError?: boolean;
+      clientId?: string;
+      status?: "pending" | "failed" | "sent";
     };
 
 export function buildTimelineItems(sessions: ChatSessionSummary[]): TimelineItem[] {
@@ -37,13 +40,17 @@ export function buildTimelineItems(sessions: ChatSessionSummary[]): TimelineItem
       const m = msgs[i];
       if (m.role !== "user" && m.role !== "assistant") continue;
       const ts = m.timestamp ? new Date(m.timestamp) : stamp;
+      const identity = m.clientId || `${i}_${ts.getTime()}`;
       items.push({
         kind: "message",
-        id: `msg_${s.sessionId}_${i}_${ts.getTime()}`,
+        id: `msg_${s.sessionId}_${identity}`,
         sessionId: s.sessionId,
         role: m.role,
         content: m.content,
         timestamp: ts,
+        isError: m.isError,
+        clientId: m.clientId,
+        status: m.status,
       });
     }
   }

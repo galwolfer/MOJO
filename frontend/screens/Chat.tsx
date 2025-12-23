@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useCallback } from "react";
+import React, { useEffect, useMemo, useRef, useCallback, useState } from "react";
 import {
   View,
   StyleSheet,
@@ -9,11 +9,13 @@ import {
   NativeScrollEvent,
   Platform,
   InteractionManager,
+  Animated,
+  Easing,
 } from "react-native";
 import AppText from "../components/common/AppText";
 import Input from "../components/inputs/Input";
 import { COLORS, FONT_SIZES, SHADOWS, SPACING } from "../theme";
-import { useNavigation } from "../context/NavigationContext";
+import { useNavigation, type ChatScrollState } from "../context/NavigationContext";
 import { useAuth } from "../context/AuthContext";
 import { ICONS } from "../components/icons/icons";
 import { setChatAuthToken } from "../services/chatService";
@@ -21,21 +23,34 @@ import { useKeyboard } from "../hooks";
 import { useChatSessions, useChatMessages } from "../hooks";
 import { TimelineItem, buildTimelineItems } from "../utils/chatUtils";
 import TimelineItemComponent from "../components/chat/TimelineItem";
+import type { ChatSessionSummary } from "../services/chatService";
+
+const SCROLL_DOWN_THRESHOLD = 120;
+const KEYBOARD_SCROLL_THRESHOLD = 80;
 
 export default function ChatScreen() {
-  const { setHeaderConfig, setNavBarConfig } = useNavigation();
+  const { setHeaderConfig, setNavBarConfig, chatScrollState, setChatScrollState } = useNavigation();
   const { token } = useAuth();
   const flatListRef = useRef<FlatList>(null);
+  const sessionsRef = useRef<ChatSessionSummary[]>([]);
+  const scrollStateRef = useRef<ChatScrollState>(chatScrollState);
+  const scrollDownOpacity = useRef(new Animated.Value(0)).current;
+  const scrollDownVisibleRef = useRef(false);
+  const lastDistanceFromBottomRef = useRef(0);
+  const [showScrollDown, setShowScrollDown] = useState(false);
   const { visible: keyboardVisible, height: keyboardHeight } = useKeyboard();
   // Keep a small padding inside the list; overall keyboard offset is handled at layout level to avoid double-padding
   const listPaddingBottom = SPACING.md;
   // Prevent scheduling multiple concurrent scroll timers when keyboard toggles repeatedly
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isAtBottomRef = useRef(true);
+  const hasInitialScrollRef = useRef(false);
 
   const { sessions, isLoadingSessions, isLoadingMoreSessions, hasMoreSessions, loadMoreSessions, updateSession } =
     useChatSessions();
 
-  const { message, setMessage, isLoading, sessionId, setSessionId, handleSend } = useChatMessages(updateSession);
+  const { message, setMessage, isLoading, sessionId, setSessionId, handleSend, handleRetry } =
+    useChatMessages(updateSession);
 
   // Set auth token for chat service
   useEffect(() => {
@@ -57,17 +72,81 @@ export default function ChatScreen() {
   useEffect(() => {
     return () => {
       setNavBarConfig({ show: true, widget: null });
+      setChatScrollState(scrollStateRef.current);
     };
-  }, [setNavBarConfig]);
+  }, [setNavBarConfig, setChatScrollState]);
 
-  const scrollToBottom = useCallback(() => {
+  useEffect(() => {
+    sessionsRef.current = sessions;
+  }, [sessions]);
+
+  useEffect(() => {
+    scrollStateRef.current = chatScrollState;
+    lastDistanceFromBottomRef.current = chatScrollState.distanceFromBottom ?? 0;
+  }, [chatScrollState]);
+
+  const setScrollDownVisible = useCallback(
+    (nextVisible: boolean) => {
+      if (scrollDownVisibleRef.current === nextVisible) return;
+      scrollDownVisibleRef.current = nextVisible;
+      setShowScrollDown(nextVisible);
+      Animated.timing(scrollDownOpacity, {
+        toValue: nextVisible ? 1 : 0,
+        duration: 180,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    },
+    [scrollDownOpacity]
+  );
+
+  const scrollDownTranslate = useMemo(
+    () => scrollDownOpacity.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }),
+    [scrollDownOpacity]
+  );
+
+  const getTodaySessionId = useCallback((list: ChatSessionSummary[]) => {
+    if (!list.length) return undefined;
+    const today = new Date();
+    const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+    const todaySession = [...list]
+      .map((s) => ({
+        sessionId: s.sessionId,
+        stamp: new Date(s.lastActiveAt || s.createdAt || 0),
+      }))
+      .filter((s) => !Number.isNaN(s.stamp.getTime()) && sameDay(s.stamp, today))
+      .sort((a, b) => b.stamp.getTime() - a.stamp.getTime())[0];
+
+    return todaySession?.sessionId;
+  }, []);
+
+  useEffect(() => {
+    const todaySessionId = getTodaySessionId(sessions);
+    if (todaySessionId && todaySessionId !== sessionId) {
+      setSessionId(todaySessionId);
+    }
+  }, [sessions, sessionId, setSessionId, getTodaySessionId]);
+
+  const scrollToBottom = useCallback(
+    (animated = true) => {
     // Clear any pending schedule to avoid buildup
     if (scrollTimeoutRef.current) {
       clearTimeout(scrollTimeoutRef.current as any);
       scrollTimeoutRef.current = null;
     }
     // Schedule a scroll after layout settles. Use InteractionManager on native to be safer.
-    const run = () => flatListRef.current?.scrollToEnd({ animated: true });
+    const run = () => {
+      flatListRef.current?.scrollToEnd({ animated });
+      isAtBottomRef.current = true;
+      lastDistanceFromBottomRef.current = 0;
+      scrollStateRef.current = {
+        ...scrollStateRef.current,
+        isAtBottom: true,
+        hasScroll: scrollStateRef.current.hasScroll,
+        distanceFromBottom: 0,
+      };
+      setScrollDownVisible(false);
+    };
     if (Platform.OS !== "web" && InteractionManager?.runAfterInteractions) {
       InteractionManager.runAfterInteractions(() => {
         scrollTimeoutRef.current = setTimeout(() => {
@@ -81,13 +160,30 @@ export default function ChatScreen() {
         scrollTimeoutRef.current = null;
       }, 100);
     }
-  }, []);
+    },
+    [setScrollDownVisible]
+  );
+
+  const restoreScrollPosition = useCallback(() => {
+    const saved = scrollStateRef.current;
+    if (!saved.hasScroll || saved.isAtBottom) {
+      scrollToBottom(false);
+      return;
+    }
+    const offset = Math.max(0, saved.offset);
+    flatListRef.current?.scrollToOffset({ offset, animated: false });
+    isAtBottomRef.current = false;
+    lastDistanceFromBottomRef.current = saved.distanceFromBottom ?? SCROLL_DOWN_THRESHOLD + 1;
+    setScrollDownVisible(true);
+  }, [scrollToBottom, setScrollDownVisible]);
 
   // When keyboard appears or its height changes, ensure the list scrolls to bottom
   useEffect(() => {
     if (keyboardVisible) {
-      // Ensure list scrolls to bottom after keyboard opens and layout updates
-      scrollToBottom();
+      // Only auto-scroll if the user is already at the bottom
+      if (isAtBottomRef.current || lastDistanceFromBottomRef.current <= KEYBOARD_SCROLL_THRESHOLD) {
+        scrollToBottom();
+      }
     } else {
       // If keyboard closed, clear any pending scroll
       if (scrollTimeoutRef.current) {
@@ -105,19 +201,43 @@ export default function ChatScreen() {
 
   const onScrollLoadMore = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const y = e.nativeEvent.contentOffset.y;
+      const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+      const y = contentOffset.y;
+      const distanceFromBottom = Math.max(0, contentSize.height - (y + layoutMeasurement.height));
+      const atBottom = y + layoutMeasurement.height >= contentSize.height - 20;
+      isAtBottomRef.current = atBottom;
+      lastDistanceFromBottomRef.current = distanceFromBottom;
+      scrollStateRef.current = {
+        offset: y,
+        isAtBottom: atBottom,
+        hasScroll: true,
+        distanceFromBottom,
+      };
+      setScrollDownVisible(distanceFromBottom > SCROLL_DOWN_THRESHOLD);
       // Trigger load more when scrolling near the top
       if (y <= 50 && hasMoreSessions && !isLoadingMoreSessions) {
         loadMoreSessions();
       }
     },
-    [loadMoreSessions, hasMoreSessions, isLoadingMoreSessions]
+    [loadMoreSessions, hasMoreSessions, isLoadingMoreSessions, setScrollDownVisible]
   );
 
   const onSend = useCallback(() => {
-    handleSend(sessionId, sessions);
+    const todaySessionId = getTodaySessionId(sessionsRef.current);
+    const activeSessionId = todaySessionId || sessionId;
+    if (todaySessionId && todaySessionId !== sessionId) {
+      setSessionId(todaySessionId);
+    }
+    handleSend(activeSessionId, () => sessionsRef.current);
     scrollToBottom();
-  }, [handleSend, sessionId, sessions, scrollToBottom]);
+  }, [handleSend, sessionId, scrollToBottom, getTodaySessionId, setSessionId]);
+
+  const onRetry = useCallback(
+    (sessionIdToRetry: string, clientId: string) => {
+      handleRetry(sessionIdToRetry, clientId, () => sessionsRef.current);
+    },
+    [handleRetry]
+  );
 
   // Put the chat input back into the shared NavBar (original behavior)
   const navWidget = useMemo(
@@ -159,12 +279,45 @@ export default function ChatScreen() {
 
   const renderTimelineItem = useCallback(
     ({ item, index }: { item: TimelineItem; index: number }) => (
-      <TimelineItemComponent item={item} isLastItem={index === timelineItems.length - 1} />
+      <TimelineItemComponent
+        item={item}
+        isLastItem={index === timelineItems.length - 1}
+        onRetry={onRetry}
+      />
     ),
-    [timelineItems.length]
+    [timelineItems.length, onRetry]
   );
 
   const keyExtractor = useCallback((item: TimelineItem) => item.id, []);
+  const persistScrollState = useCallback(() => {
+    setChatScrollState(scrollStateRef.current);
+  }, [setChatScrollState]);
+
+  const onContentSizeChange = useCallback(() => {
+    if (!hasInitialScrollRef.current) {
+      if (timelineItems.length === 0 && isLoadingSessions) {
+        return;
+      }
+      const saved = scrollStateRef.current;
+      if (saved.hasScroll && !saved.isAtBottom) {
+        restoreScrollPosition();
+      } else {
+        scrollToBottom(false);
+      }
+      hasInitialScrollRef.current = true;
+      return;
+    }
+
+    if (isAtBottomRef.current) {
+      scrollToBottom();
+    }
+  }, [restoreScrollPosition, scrollToBottom, timelineItems.length, isLoadingSessions]);
+
+  useEffect(() => {
+    if (timelineItems.length === 0) {
+      setScrollDownVisible(false);
+    }
+  }, [timelineItems.length, setScrollDownVisible]);
 
   return (
     <View style={styles.container}>
@@ -176,8 +329,10 @@ export default function ChatScreen() {
         keyExtractor={keyExtractor}
         contentContainerStyle={[styles.messagesList, { paddingBottom: listPaddingBottom }]}
         showsVerticalScrollIndicator={false}
-        onContentSizeChange={scrollToBottom}
+        onContentSizeChange={onContentSizeChange}
         onScroll={onScrollLoadMore}
+        onScrollEndDrag={persistScrollState}
+        onMomentumScrollEnd={persistScrollState}
         scrollEventThrottle={16}
         // Performance tweaks for large lists and frequent layout updates (keyboard)
         removeClippedSubviews={Platform.OS !== "web"}
@@ -208,6 +363,19 @@ export default function ChatScreen() {
           </View>
         }
       />
+      {timelineItems.length > 0 ? (
+        <Animated.View
+          pointerEvents={showScrollDown ? "auto" : "none"}
+          style={[
+            styles.scrollToBottomWrapper,
+            { opacity: scrollDownOpacity, transform: [{ translateY: scrollDownTranslate }] },
+          ]}
+        >
+          <TouchableOpacity style={styles.scrollToBottomButton} onPress={() => scrollToBottom()}>
+            <ICONS.down size={FONT_SIZES.base} color={COLORS.lightGray} />
+          </TouchableOpacity>
+        </Animated.View>
+      ) : null}
     </View>
   );
 }
@@ -287,5 +455,19 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: COLORS.lightGray,
+  },
+  scrollToBottomWrapper: {
+    position: "absolute",
+    right: SPACING.lg,
+    bottom: SPACING.lg,
+  },
+  scrollToBottomButton: {
+    width: FONT_SIZES.base * 2.2,
+    height: FONT_SIZES.base * 2.2,
+    borderRadius: FONT_SIZES.base,
+    backgroundColor: COLORS.white2,
+    justifyContent: "center",
+    alignItems: "center",
+    ...SHADOWS.card,
   },
 });
