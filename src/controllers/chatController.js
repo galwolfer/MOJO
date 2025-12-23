@@ -69,6 +69,8 @@ export async function getHistory(req, res, next) {
     const { sessionId } = req.params;
     const userId = req.user.userId; // From auth middleware
 
+    const { limit, offset } = req.query;
+
     if (!sessionId) {
       return res.status(400).json({
         success: false,
@@ -76,13 +78,43 @@ export async function getHistory(req, res, next) {
       });
     }
 
+    // If pagination query params are provided, return a page from the end of the session.
+    // This keeps responses small for large sessions.
+    if (typeof limit !== "undefined" || typeof offset !== "undefined") {
+      const page = await agent.getSessionHistoryPage(sessionId, userId, limit, offset);
+      return res.json({
+        success: true,
+        ...page,
+      });
+    }
+
+    // Backward-compatible full history (not recommended for large sessions)
     const history = await agent.getSessionHistory(sessionId, userId);
 
-    res.json({
+    return res.json({
       success: true,
       sessionId,
       messageCount: history.length,
       history,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * List chat sessions for the current user
+ * GET /api/chat/sessions?limit=10&cursor=ISO_DATE&includeMessages=10
+ */
+export async function getSessions(req, res, next) {
+  try {
+    const userId = req.user.userId;
+    const { limit, cursor, includeMessages } = req.query;
+
+    const page = await agent.listUserSessions(userId, limit, cursor, includeMessages);
+    return res.json({
+      success: true,
+      ...page,
     });
   } catch (error) {
     next(error);

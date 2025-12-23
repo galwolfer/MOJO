@@ -20,6 +20,10 @@ class MongoMemoryStore {
     this.maxMessages = 50;
   }
 
+  _cacheKey(sessionId, userId) {
+    return `${userId || "unknown"}:${sessionId}`;
+  }
+
   /**
    * Get or create user by MongoDB _id
    */
@@ -97,15 +101,17 @@ class MongoMemoryStore {
   /**
    * Get session history from cache or database
    */
-  async getHistory(sessionId) {
+  async getHistory(sessionId, userId) {
+    const cacheKey = this._cacheKey(sessionId, userId);
+
     // Check cache first
-    if (this.sessions.has(sessionId)) {
-      return this.sessions.get(sessionId);
+    if (this.sessions.has(cacheKey)) {
+      return this.sessions.get(cacheKey);
     }
 
     // Load from database
     try {
-      const session = await Session.findOne({ sessionId });
+      const session = await Session.findOne({ sessionId, userId });
 
       if (session && session.messages.length > 0) {
         // Convert MongoDB documents to plain objects
@@ -118,18 +124,18 @@ class MongoMemoryStore {
         }));
 
         // Cache it
-        this.sessions.set(sessionId, messages);
+        this.sessions.set(cacheKey, messages);
         return messages;
       }
 
       // Return empty array if no session found
       const emptyHistory = [];
-      this.sessions.set(sessionId, emptyHistory);
+      this.sessions.set(cacheKey, emptyHistory);
       return emptyHistory;
     } catch (error) {
       console.error("Error loading session history:", error);
       const emptyHistory = [];
-      this.sessions.set(sessionId, emptyHistory);
+      this.sessions.set(cacheKey, emptyHistory);
       return emptyHistory;
     }
   }
@@ -140,7 +146,7 @@ class MongoMemoryStore {
   async addMessage(sessionId, userId, message) {
     try {
       // Add to cache
-      const history = await this.getHistory(sessionId);
+      const history = await this.getHistory(sessionId, userId);
       history.push(message);
 
       // Maintain message limit in cache
@@ -148,12 +154,20 @@ class MongoMemoryStore {
         history.shift();
       }
 
+      // Prevent sessionId collisions across users
+      const existing = await Session.findOne({ sessionId }).select("userId");
+      if (existing && existing.userId && existing.userId.toString() !== userId.toString()) {
+        throw new Error("Session ID does not belong to this user");
+      }
+
       // Update or create session in database
       await Session.findOneAndUpdate(
         { sessionId },
         {
-          $set: { userId, lastActiveAt: new Date() },
+          $setOnInsert: { userId },
+          $set: { lastActiveAt: new Date() },
           $push: { messages: message },
+          $inc: { messageCount: 1 },
         },
         { upsert: true, new: true }
       );
@@ -212,7 +226,12 @@ class MongoMemoryStore {
    */
   async clearSession(sessionId) {
     try {
-      this.sessions.delete(sessionId);
+      // Clear any cached entries for this session
+      for (const key of this.sessions.keys()) {
+        if (typeof key === "string" && key.endsWith(`:${sessionId}`)) {
+          this.sessions.delete(key);
+        }
+      }
       await Session.deleteOne({ sessionId });
     } catch (error) {
       console.error("Error clearing session:", error);
@@ -222,9 +241,139 @@ class MongoMemoryStore {
   /**
    * Get message count in session
    */
-  async getMessageCount(sessionId) {
-    const history = await this.getHistory(sessionId);
+  async getMessageCount(sessionId, userId) {
+    const history = await this.getHistory(sessionId, userId);
     return history.length;
+  }
+
+  /**
+   * List sessions for a user (cursor pagination)
+   */
+  async listSessions(userId, limit = 10, cursor, includeMessages = 0) {
+    const pageSize = Math.max(1, Math.min(50, Number(limit) || 10));
+    const include = Math.max(0, Math.min(50, Number(includeMessages) || 0));
+
+    const match = { userId };
+    if (cursor) {
+      const cursorDate = new Date(cursor);
+      if (!Number.isNaN(cursorDate.getTime())) {
+        match.lastActiveAt = { $lt: cursorDate };
+      }
+    }
+
+    const rows = await Session.aggregate([
+      { $match: match },
+      { $sort: { lastActiveAt: -1 } },
+      { $limit: pageSize + 1 },
+      {
+        $project: {
+          sessionId: 1,
+          lastActiveAt: 1,
+          createdAt: 1,
+          messageCount: { $size: "$messages" },
+          ...(include
+            ? {
+                messages: { $slice: ["$messages", -include] },
+              }
+            : {}),
+        },
+      },
+    ]);
+
+    const hasMore = rows.length > pageSize;
+    const items = hasMore ? rows.slice(0, pageSize) : rows;
+    const nextCursor = hasMore ? items[items.length - 1]?.lastActiveAt?.toISOString?.() : undefined;
+
+    // Normalize messages shape (if included)
+    const sessions = items.map((s) => {
+      if (!s.messages) return s;
+      return {
+        ...s,
+        messages: s.messages.map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+          functionCall: msg.functionCall,
+          name: msg.name,
+          timestamp: msg.timestamp,
+        })),
+      };
+    });
+
+    return { sessions, hasMore, nextCursor };
+  }
+
+  /**
+   * Fetch a page of history from the END of the session.
+   * offset=0 returns the latest `limit` messages; offset grows by limit to go older.
+   */
+  async getHistoryPage(sessionId, userId, limit = 10, offset = 0) {
+    const pageSize = Math.max(1, Math.min(100, Number(limit) || 10));
+    const pageOffset = Math.max(0, Number(offset) || 0);
+
+    const result = await Session.aggregate([
+      { $match: { sessionId, userId } },
+      {
+        $project: {
+          sessionId: 1,
+          lastActiveAt: 1,
+          createdAt: 1,
+          messageCount: { $size: "$messages" },
+          messages: 1,
+        },
+      },
+      {
+        $addFields: {
+          _start: {
+            $max: [
+              0,
+              {
+                $subtract: ["$messageCount", { $add: [pageOffset, pageSize] }],
+              },
+            ],
+          },
+        },
+      },
+      {
+        $project: {
+          sessionId: 1,
+          lastActiveAt: 1,
+          createdAt: 1,
+          messageCount: 1,
+          _start: 1,
+          page: { $slice: ["$messages", "$_start", pageSize] },
+        },
+      },
+    ]);
+
+    if (!result || result.length === 0) {
+      return { sessionId, messageCount: 0, offset: pageOffset, limit: pageSize, hasMore: false, history: [] };
+    }
+
+    const row = result[0];
+    const start = row._start || 0;
+    const total = row.messageCount || 0;
+    const history = (row.page || []).map((msg) => ({
+      role: msg.role,
+      content: msg.content,
+      functionCall: msg.functionCall,
+      name: msg.name,
+      timestamp: msg.timestamp,
+    }));
+
+    const hasMore = start > 0;
+    const nextOffset = hasMore ? pageOffset + pageSize : null;
+
+    return {
+      sessionId,
+      messageCount: total,
+      offset: pageOffset,
+      limit: pageSize,
+      hasMore,
+      nextOffset,
+      history,
+      lastActiveAt: row.lastActiveAt,
+      createdAt: row.createdAt,
+    };
   }
 
   /**
