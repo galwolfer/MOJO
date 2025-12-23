@@ -1,5 +1,6 @@
 import { AgentController } from "../agent/agentController.js";
 import { config } from "../config/env.js";
+import { User, Session } from "../models/index.js";
 
 // Create an instance of the agent
 const agent = new AgentController(config.geminiApiKey);
@@ -118,6 +119,72 @@ export async function getSessions(req, res, next) {
     });
   } catch (error) {
     next(error);
+  }
+}
+
+/**
+ * Quick get sessions from User.sessions (lightweight summary)
+ * GET /api/chat/user-sessions
+ */
+export async function getUserSessionsDoc(req, res, next) {
+  try {
+    const userId = req.user.userId;
+    const user = await User.findById(userId).select("sessions");
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+
+    const includeMessagesRaw = req.query?.includeMessages;
+    const includeMessages = Math.max(0, Math.min(50, Number(includeMessagesRaw) || 10));
+
+    const sessionSummaries = Array.isArray(user.sessions) ? user.sessions : [];
+    const sessionIds = sessionSummaries.map((s) => s.sessionId).filter(Boolean);
+
+    if (includeMessages === 0 || sessionIds.length === 0) {
+      return res.json({ success: true, sessions: sessionSummaries });
+    }
+
+    // Fetch the last N messages for these sessions from the Session collection
+    const sessionDocs = await Session.find({ userId, sessionId: { $in: sessionIds } })
+      .select({ sessionId: 1, lastActiveAt: 1, createdAt: 1, messageCount: 1, messages: 1 })
+      .lean();
+
+    const byId = new Map();
+    for (const s of sessionDocs) {
+      const msgs = Array.isArray(s.messages) ? s.messages : [];
+      const tail = includeMessages ? msgs.slice(-includeMessages) : [];
+      byId.set(s.sessionId, {
+        sessionId: s.sessionId,
+        lastActiveAt: s.lastActiveAt,
+        createdAt: s.createdAt,
+        messageCount: typeof s.messageCount === "number" && s.messageCount > 0 ? s.messageCount : msgs.length,
+        messages: tail.map((m) => ({
+          role: m.role,
+          content: m.content,
+          functionCall: m.functionCall,
+          name: m.name,
+          timestamp: m.timestamp,
+        })),
+      });
+    }
+
+    // Merge summaries with fetched messages, preserving the user's summary order
+    const merged = sessionSummaries.map((summary) => {
+      const full = byId.get(summary.sessionId);
+      if (!full) return summary;
+      return {
+        sessionId: summary.sessionId,
+        lastActiveAt: summary.lastActiveAt || full.lastActiveAt,
+        createdAt: summary.createdAt || full.createdAt,
+        messageCount: summary.messageCount || full.messageCount,
+        preview: summary.preview || "",
+        messages: full.messages,
+      };
+    });
+
+    return res.json({ success: true, sessions: merged });
+  } catch (err) {
+    next(err);
   }
 }
 
