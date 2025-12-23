@@ -11,7 +11,7 @@ interface ChatMessageBubbleProps {
   playOnceKey: string;
 }
 
-export default function ChatMessageBubble({ role, content, isLastMessage, playOnceKey }: ChatMessageBubbleProps) {
+function ChatMessageBubble({ role, content, isLastMessage, playOnceKey }: ChatMessageBubbleProps) {
   const isUser = role === "user";
 
   return (
@@ -27,6 +27,17 @@ export default function ChatMessageBubble({ role, content, isLastMessage, playOn
     </View>
   );
 }
+
+function areEqual(prev: ChatMessageBubbleProps, next: ChatMessageBubbleProps) {
+  return (
+    prev.role === next.role &&
+    prev.content === next.content &&
+    prev.isLastMessage === next.isLastMessage &&
+    prev.playOnceKey === next.playOnceKey
+  );
+}
+
+export default React.memo(ChatMessageBubble, areEqual);
 
 const styles = StyleSheet.create({
   messageRow: {

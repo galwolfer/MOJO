@@ -55,9 +55,7 @@ export default function MainLayout() {
         </View>
 
         {/* Main Content */}
-        <View
-          style={[styles.content, keyboardVisible && !hasNavWidget ? { paddingBottom: keyboardOffset } : undefined]}
-        >
+        <View style={[styles.content, keyboardVisible ? { paddingBottom: keyboardOffset } : undefined]}>
           {renderScreen()}
         </View>
 

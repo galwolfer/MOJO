@@ -7,6 +7,8 @@ import {
   ActivityIndicator,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  Platform,
+  InteractionManager,
 } from "react-native";
 import AppText from "../components/common/AppText";
 import Input from "../components/inputs/Input";
@@ -25,7 +27,10 @@ export default function ChatScreen() {
   const { token } = useAuth();
   const flatListRef = useRef<FlatList>(null);
   const { visible: keyboardVisible, height: keyboardHeight } = useKeyboard();
-  const listPaddingBottom = SPACING.md + (keyboardVisible ? keyboardHeight : 0);
+  // Keep a small padding inside the list; overall keyboard offset is handled at layout level to avoid double-padding
+  const listPaddingBottom = SPACING.md;
+  // Prevent scheduling multiple concurrent scroll timers when keyboard toggles repeatedly
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { sessions, isLoadingSessions, isLoadingMoreSessions, hasMoreSessions, loadMoreSessions, updateSession } =
     useChatSessions();
@@ -56,10 +61,47 @@ export default function ChatScreen() {
   }, [setNavBarConfig]);
 
   const scrollToBottom = useCallback(() => {
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+    // Clear any pending schedule to avoid buildup
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current as any);
+      scrollTimeoutRef.current = null;
+    }
+    // Schedule a scroll after layout settles. Use InteractionManager on native to be safer.
+    const run = () => flatListRef.current?.scrollToEnd({ animated: true });
+    if (Platform.OS !== "web" && InteractionManager?.runAfterInteractions) {
+      InteractionManager.runAfterInteractions(() => {
+        scrollTimeoutRef.current = setTimeout(() => {
+          run();
+          scrollTimeoutRef.current = null;
+        }, 50);
+      });
+    } else {
+      scrollTimeoutRef.current = setTimeout(() => {
+        run();
+        scrollTimeoutRef.current = null;
+      }, 100);
+    }
   }, []);
+
+  // When keyboard appears or its height changes, ensure the list scrolls to bottom
+  useEffect(() => {
+    if (keyboardVisible) {
+      // Ensure list scrolls to bottom after keyboard opens and layout updates
+      scrollToBottom();
+    } else {
+      // If keyboard closed, clear any pending scroll
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current as any);
+        scrollTimeoutRef.current = null;
+      }
+    }
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current as any);
+        scrollTimeoutRef.current = null;
+      }
+    };
+  }, [keyboardVisible, keyboardHeight, scrollToBottom]);
 
   const onScrollLoadMore = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -78,38 +120,40 @@ export default function ChatScreen() {
   }, [handleSend, sessionId, sessions, scrollToBottom]);
 
   // Put the chat input back into the shared NavBar (original behavior)
-  useEffect(() => {
-    setNavBarConfig({
-      show: true,
-      widget: (
-        <View style={[styles.inputContainer]}>
-          <View style={{ flex: 1 }}>
-            <Input
-              placeholder="Type a message..."
-              value={message}
-              onChangeText={setMessage}
-              onSubmitEditing={onSend}
-              returnKeyType="send"
-              editable={!isLoading}
-              multiline
-            />
-          </View>
-          <TouchableOpacity
-            style={[styles.sendButton, (!message.trim() || isLoading) && styles.sendButtonDisabled]}
-            onPress={onSend}
-            disabled={!message.trim() || isLoading}
-            activeOpacity={0.7}
-          >
-            {isLoading ? (
-              <ActivityIndicator size="small" color={COLORS.colorWhite} />
-            ) : (
-              <ICONS.send size={FONT_SIZES.base} color={COLORS.colorWhite} />
-            )}
-          </TouchableOpacity>
+  const navWidget = useMemo(
+    () => (
+      <View style={[styles.inputContainer]}>
+        <View style={{ flex: 1 }}>
+          <Input
+            placeholder="Type a message..."
+            value={message}
+            onChangeText={setMessage}
+            onSubmitEditing={onSend}
+            returnKeyType="send"
+            editable={!isLoading}
+            multiline
+          />
         </View>
-      ),
-    });
-  }, [handleSend, isLoading, message, setNavBarConfig]);
+        <TouchableOpacity
+          style={[styles.sendButton, (!message.trim() || isLoading) && styles.sendButtonDisabled]}
+          onPress={onSend}
+          disabled={!message.trim() || isLoading}
+          activeOpacity={0.7}
+        >
+          {isLoading ? (
+            <ActivityIndicator size="small" color={COLORS.colorWhite} />
+          ) : (
+            <ICONS.send size={FONT_SIZES.base} color={COLORS.colorWhite} />
+          )}
+        </TouchableOpacity>
+      </View>
+    ),
+    [message, isLoading, onSend]
+  );
+
+  useEffect(() => {
+    setNavBarConfig({ show: true, widget: navWidget });
+  }, [navWidget, setNavBarConfig]);
 
   const timelineItems: TimelineItem[] = useMemo(() => buildTimelineItems(sessions), [sessions]);
 
@@ -135,6 +179,12 @@ export default function ChatScreen() {
         onContentSizeChange={scrollToBottom}
         onScroll={onScrollLoadMore}
         scrollEventThrottle={16}
+        // Performance tweaks for large lists and frequent layout updates (keyboard)
+        removeClippedSubviews={Platform.OS !== "web"}
+        initialNumToRender={20}
+        maxToRenderPerBatch={12}
+        windowSize={21}
+        updateCellsBatchingPeriod={50}
         ListHeaderComponent={
           isLoadingMoreSessions ? (
             <View style={styles.loadMoreHeader}>
@@ -220,10 +270,11 @@ const styles = StyleSheet.create({
   inputContainer: {
     width: "100%",
     flexDirection: "row",
-    alignItems: "flex-end",
+    alignItems: "center",
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
+    paddingVertical: SPACING.md,
     gap: SPACING.sm,
+    minHeight: FONT_SIZES.base * 3.5,
   },
   sendButton: {
     width: FONT_SIZES.base * 2.5 + 1.5,

@@ -253,6 +253,9 @@ function Input<T = any>({
 
       <Pressable
         onPress={() => {
+          // Always focus the input when the wrapper is tapped to improve tap responsiveness
+          inputRef.current?.focus();
+
           if (options) {
             if (isOpen) {
               // close with animation
@@ -276,10 +279,11 @@ function Input<T = any>({
                 });
               });
             }
-            inputRef.current?.focus();
           }
         }}
         style={styles.inputWrapperPressable}
+        // Expand touchable area slightly so taps near the border are recognized
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
         <Animated.View
           ref={wrapperRef}
@@ -293,7 +297,8 @@ function Input<T = any>({
               type === "longtext" ? styles.textarea : undefined,
               (Platform as any).OS === "web" ? ({ outlineWidth: 0 } as any) : undefined,
             ]}
-            placeholder={Platform.OS === "android" ? "" : effectivePlaceholder}
+            // Use the native placeholder on all platforms so tapping it focuses the input reliably
+            placeholder={effectivePlaceholder}
             placeholderTextColor={COLORS.lightGray}
             keyboardType={getKeyboardType()}
             secureTextEntry={getSecureTextEntry()}
@@ -321,12 +326,6 @@ function Input<T = any>({
             <View style={{ marginRight: 8 }}>
               <Chevron isOpen={isOpen} size={TYPOGRAPHY.input.lineHeight ?? TYPOGRAPHY.input.fontSize} />
             </View>
-          )}
-
-          {Platform.OS === "android" && isEmpty && effectivePlaceholder && (
-            <Text style={styles.customPlaceholder} pointerEvents="none">
-              {effectivePlaceholder}
-            </Text>
           )}
         </Animated.View>
       </Pressable>
@@ -439,6 +438,9 @@ const styles = StyleSheet.create({
     ...(COMPONENT_STYLES.inputWrapperPressable as ViewStyle),
     // ensure the pressable doesn't vertically center content which can hide lines
     justifyContent: "flex-start",
+    // Improve tap target: add some vertical padding and a minimum height
+    paddingVertical: SPACING.md,
+    minHeight: FONT_SIZES.base * 3.5,
   },
   input: {
     flex: 1,

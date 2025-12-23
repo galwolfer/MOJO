@@ -171,6 +171,37 @@ class MongoMemoryStore {
         },
         { upsert: true, new: true }
       );
+
+      // Also update lightweight recent sessions summary on the User document
+      try {
+        const user = await User.findById(userId);
+        if (user) {
+          const existingEntry = (user.sessions || []).find((s) => s.sessionId === sessionId);
+
+          // Remove any previous summary for this sessionId
+          user.sessions = (user.sessions || []).filter((s) => s.sessionId !== sessionId);
+
+          const preview = message && message.content ? String(message.content).slice(0, 200) : "";
+
+          const summary = {
+            sessionId,
+            lastActiveAt: new Date(),
+            createdAt: existingEntry?.createdAt || new Date(),
+            messageCount: history.length,
+            preview,
+          };
+
+          // Add to front and cap to last 5
+          user.sessions.unshift(summary);
+          if (user.sessions.length > 5) {
+            user.sessions = user.sessions.slice(0, 5);
+          }
+
+          await user.save();
+        }
+      } catch (err) {
+        console.error("Error updating User.sessions summary:", err);
+      }
     } catch (error) {
       console.error("Error adding message:", error);
     }
