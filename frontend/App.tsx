@@ -1,5 +1,5 @@
 // #file:App.tsx
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet, View, useWindowDimensions, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -113,4 +113,3 @@ const styles = StyleSheet.create({
     width: "100%",
   },
 });
-

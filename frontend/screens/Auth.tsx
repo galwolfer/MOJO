@@ -12,9 +12,6 @@ import { useKeyboard } from "../hooks";
 
 import { login as apiLogin, register as apiRegister, setApiBase } from "../services/apiClient";
 
-// Optionally override the base URL (useful for dev / device testing)
-// setApiBase("http://10.0.2.2:3000/api");
-
 export default function AuthScreen() {
   const { signIn } = useAuth();
   const [screen, setScreen] = useState<"welcome" | "name" | "login" | "signup" | "done">("welcome");

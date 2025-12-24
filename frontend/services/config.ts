@@ -3,10 +3,19 @@
 
 import { Platform } from "react-native";
 
+// Helper: strip surrounding single/double quotes which may appear in .env values
+function stripQuotes(v?: string | null): string | undefined {
+  if (v === null || typeof v === "undefined") return undefined;
+  return String(v).replace(/^['"]|['"]$/g, "");
+}
+
 // Default machine IP — prefer setting DEFAULT_MACHINE_IP in your .env file
 // This allows overriding the IP used on Android devices/emulators.
 export const DEFAULT_MACHINE_IP =
-  (typeof process !== "undefined" && process.env && process.env.DEFAULT_MACHINE_IP) || "192.168.68.106";
+  (typeof process !== "undefined" && process.env && stripQuotes(process.env.EXPO_PUBLIC_DEFAULT_MACHINE_IP)) ||
+  "192.168.68.404";
+
+console.log("DEFAULT_MACHINE_IP:", DEFAULT_MACHINE_IP);
 
 // Initialize API base URL
 let API_BASE = "http://localhost:3000/api";
@@ -16,8 +25,16 @@ function initializeApiBase(): string {
   let base = "http://localhost:3000/api";
 
   try {
-    const envPort = typeof process !== "undefined" && process.env && (process.env.PORT || process.env.REACT_APP_PORT);
-    const envApiBase = typeof process !== "undefined" && process.env && process.env.API_BASE;
+    const envPort =
+      typeof process !== "undefined" &&
+      process.env &&
+      (stripQuotes(process.env.PORT) ||
+        stripQuotes(process.env.REACT_APP_PORT) ||
+        stripQuotes(process.env.EXPO_PUBLIC_API_PORT));
+    const envApiBase =
+      typeof process !== "undefined" &&
+      process.env &&
+      (stripQuotes(process.env.API_BASE) || stripQuotes(process.env.EXPO_PUBLIC_API_BASE));
 
     if (envApiBase) {
       base = envApiBase.replace(/\/$/, "");
@@ -63,6 +80,10 @@ function initializeApiBase(): string {
 
 // Initialize on module load
 API_BASE = initializeApiBase();
+
+/**
+ * Log environment and resolved API configuration to help debugging
+ */
 
 /**
  * Get the current API base URL
