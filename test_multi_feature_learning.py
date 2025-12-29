@@ -146,7 +146,7 @@ def test_motivation_feature_learning():
     print_header("TEST 2A: MOTIVATION LOW (train on motivation=1)")
     init_theta = np.zeros(n_features)
     init_theta[0] = 2.0
-    model_low = MultiFeatureLinUCB(n_features=n_features, alpha=0.1, init_theta=init_theta)
+    model_low = MultiFeatureLinUCB(n_features=n_features, alpha=0.1, init_theta=init_theta, prior_strength=5.0, learn_rate=0.5)
     x_low = extract_features(motivation=1, duration=60, difficulty=3, delta_hours=48, category="study", categories=CATEGORIES)
     print(f"\n{'Update':<8} {'Motivation':<12} {'Reward':<10} {'Score':<18} {'Category':<12}")
     print("-" * 70)
@@ -159,7 +159,7 @@ def test_motivation_feature_learning():
     print_header("TEST 2B: MOTIVATION HIGH (train on motivation=5)")
     init_theta = np.zeros(n_features)
     init_theta[0] = 2.0
-    model_high = MultiFeatureLinUCB(n_features=n_features, alpha=0.1, init_theta=init_theta)
+    model_high = MultiFeatureLinUCB(n_features=n_features, alpha=0.1, init_theta=init_theta, prior_strength=5.0, learn_rate=0.5)
     x_high = extract_features(motivation=5, duration=60, difficulty=3, delta_hours=48, category="study", categories=CATEGORIES)
     print(f"\n{'Update':<8} {'Motivation':<12} {'Reward':<10} {'Score':<18} {'Category':<12}")
     print("-" * 70)

@@ -310,6 +310,13 @@ class MultiFeatureLinUCB:
         default_factory=lambda: [0.85, 0.65, 0.45, 0.25]
     )
     init_theta: Sequence[float] = None
+    # Strength of the Bayesian prior encoded by init_theta.
+    # If > 0, we initialise A=λI, A_inv=(1/λ)I and b=λ·init_theta so that
+    # theta starts at init_theta and decays smoothly as data arrives.
+    prior_strength: float = 0.0
+    # Scales the magnitude of each incremental update to b.
+    # A value in (0,1] reduces abrupt changes; default 1.0 preserves original behaviour.
+    learn_rate: float = 1.0
     A: np.ndarray = field(init=False)
     b: np.ndarray = field(init=False)
     theta: np.ndarray = field(init=False)
@@ -321,7 +328,7 @@ class MultiFeatureLinUCB:
             raise ValueError("thresholds must contain exactly four values")
         if sorted(self.thresholds, reverse=True) != list(self.thresholds):
             raise ValueError("thresholds must be in non-increasing order")
-        # Initialize A as identity
+        # Initialize matrices
         self.A = np.eye(self.n_features)
         self.A_inv = np.eye(self.n_features)
         # Initialise b and theta
@@ -331,7 +338,17 @@ class MultiFeatureLinUCB:
         else:
             if len(self.init_theta) != self.n_features:
                 raise ValueError("init_theta length must match number of features")
-            self.theta = np.array(self.init_theta, dtype=float)
+            theta0 = np.array(self.init_theta, dtype=float)
+            if self.prior_strength > 0.0:
+                # Encode prior: A0=λI, b0=λ·theta0, theta=theta0
+                lam = float(self.prior_strength)
+                self.A = lam * np.eye(self.n_features)
+                self.A_inv = (1.0 / lam) * np.eye(self.n_features)
+                self.b = lam * theta0
+                self.theta = theta0
+            else:
+                # No prior; keep identity A and zero b
+                self.theta = theta0
 
     def predict_score(self, x: np.ndarray) -> float:
         """Compute the UCB score for a given feature vector.
@@ -397,10 +414,13 @@ class MultiFeatureLinUCB:
         x = x.reshape(-1, 1)  # column vector
         # Compute A_inv update (Sherman-Morrison):
         # A_inv ← A_inv - (A_inv x x^T A_inv) / (1 + x^T A_inv x)
-        denom = 1.0 + float(np.dot(np.dot(x.T, self.A_inv), x))
+        # Compute denominator safely as scalar, scaling the rank-one update by learn_rate (eta)
+        eta = float(self.learn_rate)
+        denom_val = np.dot(x.T, np.dot(self.A_inv, x))
+        denom = 1.0 + eta * float(denom_val.ravel()[0])
         Ax = np.dot(self.A_inv, x)
-        self.A_inv = self.A_inv - (np.dot(Ax, Ax.T) / denom)
+        self.A_inv = self.A_inv - (eta * np.dot(Ax, Ax.T) / denom)
         # Update b
-        self.b += reward * x.ravel()
+        self.b += eta * reward * x.ravel()
         # Update theta
         self.theta = np.dot(self.A_inv, self.b)
