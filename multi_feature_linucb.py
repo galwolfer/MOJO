@@ -25,6 +25,11 @@ consists of several interpretable features:
   - **Task Category**: one-hot encoding for the domain of the
     task (e.g. sport, study, work).  This allows the model to
     capture user-specific tendencies per domain.
+  - **Interaction Features** (optional): cross-product terms between
+    category and other features (difficulty, pressure).  This enables
+    learning category-specific exceptions, e.g., "work is generally bad
+    but good under urgent pressure".  Without interactions, a category
+    has a single global weight that applies to all feature combinations.
 
 The model can be initialised with an arbitrary list of categories
 and default parameters controlling exploration and classification
@@ -222,6 +227,136 @@ def extract_category_features(category: str, categories: Sequence[str]) -> List[
     return vec
 
 
+def extract_category_difficulty_interactions(
+    category: str, difficulty: int, categories: Sequence[str]
+) -> List[float]:
+    """Create interaction features between category and difficulty.
+
+    This enables the model to learn category-specific difficulty effects,
+    e.g., "work is bad for easy tasks but good for hard tasks".
+
+    Parameters
+    ----------
+    category : str
+        The task category.
+    difficulty : int
+        Difficulty rating (1–5).
+    categories : Sequence[str]
+        The list of valid categories.
+
+    Returns
+    -------
+    List[float]
+        A one-hot encoded list of length len(categories) * 3.
+        Only one element is 1.0 (the specific category-difficulty combo).
+    """
+    n_cats = len(categories)
+    n_diffs = 3  # easy, medium, hard
+    vec = [0.0] * (n_cats * n_diffs)
+    if not categories:
+        return vec
+
+    # Get category index
+    try:
+        cat_idx = categories.index(category)
+    except ValueError:
+        cat_idx = n_cats - 1
+
+    # Get difficulty index (same logic as extract_difficulty_features)
+    diff = int(difficulty)
+    if diff < 1:
+        diff = 1
+    if diff > 5:
+        diff = 5
+    if diff <= 2:
+        diff_idx = 0  # easy
+    elif diff == 3:
+        diff_idx = 1  # medium
+    else:
+        diff_idx = 2  # hard
+
+    # Set the interaction feature
+    vec[cat_idx * n_diffs + diff_idx] = 1.0
+    return vec
+
+
+def extract_category_pressure_interactions(
+    category: str, delta_hours: float, categories: Sequence[str]
+) -> List[float]:
+    """Create interaction features between category and time pressure.
+
+    This enables the model to learn category-specific pressure effects,
+    e.g., "work is bad normally but good under urgent pressure".
+
+    Parameters
+    ----------
+    category : str
+        The task category.
+    delta_hours : float
+        Hours remaining until deadline.
+    categories : Sequence[str]
+        The list of valid categories.
+
+    Returns
+    -------
+    List[float]
+        A one-hot encoded list of length len(categories) * 4.
+        Only one element is 1.0 (the specific category-pressure combo).
+    """
+    n_cats = len(categories)
+    n_pressures = 4  # no, mild, strong, urgent
+    vec = [0.0] * (n_cats * n_pressures)
+    if not categories:
+        return vec
+
+    # Get category index
+    try:
+        cat_idx = categories.index(category)
+    except ValueError:
+        cat_idx = n_cats - 1
+
+    # Get pressure index (same logic as extract_pressure_features)
+    h = float(delta_hours)
+    if h > 72.0:
+        press_idx = 0  # no pressure
+    elif h > 24.0:
+        press_idx = 1  # mild
+    elif h > 6.0:
+        press_idx = 2  # strong
+    else:
+        press_idx = 3  # urgent
+
+    # Set the interaction feature
+    vec[cat_idx * n_pressures + press_idx] = 1.0
+    return vec
+
+
+def get_feature_count(num_categories: int, use_interactions: bool = False) -> int:
+    """Calculate the total number of features for a given configuration.
+
+    Parameters
+    ----------
+    num_categories : int
+        The number of task categories.
+    use_interactions : bool, optional
+        Whether to include interaction features. Default is False.
+
+    Returns
+    -------
+    int
+        Total feature count:
+        - Base: 1 (motivation) + 2 (duration) + 3 (difficulty) + 4 (pressure)
+                + num_categories = 10 + num_categories
+        - With interactions: base + num_categories*3 (cat×diff)
+                            + num_categories*4 (cat×pressure)
+    """
+    base_features = 1 + 2 + 3 + 4 + num_categories  # 10 + num_categories
+    if use_interactions:
+        interaction_features = num_categories * 3 + num_categories * 4  # cat×diff + cat×pressure
+        return base_features + interaction_features
+    return base_features
+
+
 def extract_features(
     motivation: float,
     duration: float,
@@ -230,6 +365,7 @@ def extract_features(
     category: str,
     categories: Sequence[str],
     max_duration: float = 120.0,
+    use_interactions: bool = False,
 ) -> np.ndarray:
     """Assemble all feature components into a single numpy vector.
 
@@ -250,11 +386,18 @@ def extract_features(
     max_duration : float, optional
         The maximum duration used for normalising the duration feature.
         Default is 120.0 minutes.
+    use_interactions : bool, optional
+        Whether to include category×difficulty and category×pressure
+        interaction features. This enables the model to learn
+        category-specific exceptions (e.g., "work is bad except for
+        hard+urgent tasks"). Default is False.
 
     Returns
     -------
     numpy.ndarray
         A 1D array representing the complete feature vector for the task.
+        Length is 10 + len(categories) without interactions, or
+        10 + len(categories) + 7*len(categories) with interactions.
     """
     features = []
     # Motivation (1 feature)
@@ -267,6 +410,18 @@ def extract_features(
     features.extend(extract_pressure_features(delta_hours))
     # Category one-hot (len(categories) features)
     features.extend(extract_category_features(category, categories))
+
+    # Optional interaction features for category-specific learning
+    if use_interactions:
+        # Category × Difficulty interactions (len(categories) * 3 features)
+        features.extend(
+            extract_category_difficulty_interactions(category, difficulty, categories)
+        )
+        # Category × Pressure interactions (len(categories) * 4 features)
+        features.extend(
+            extract_category_pressure_interactions(category, delta_hours, categories)
+        )
+
     return np.array(features, dtype=float)
 
 
