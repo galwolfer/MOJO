@@ -13,7 +13,8 @@
     "test:memory": "node scripts/test_memory.js",
     "test:user-memory": "node scripts/test_user_memory_system.js",
     "migrate:memories": "node scripts/migrate_memories_to_users.js",
-    "lint": "echo \"(add ESLint if you want)\""
+    "lint": "echo \"(add ESLint if you want)\"",
+    "pytest": "pip install -r requirements.txt && pytest -q"
   },
   "keywords": [
     "ai",

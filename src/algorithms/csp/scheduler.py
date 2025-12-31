@@ -1,0 +1,357 @@
+"""CSP scheduler: variable generation, domain building and backtracking search.
+
+Provides `schedule_tasks_csp` as the main entrypoint and helper functions for
+variable/domain generation and the backtracking search.
+"""
+from datetime import datetime, timedelta
+from typing import List, Dict, Tuple, Optional
+import random
+
+from .constraints import satisfies_hard_constraints, compute_soft_score
+from .heuristics import select_variable_mrv, order_values_lcv, forward_check
+
+DEFAULT_WORKING_HOURS = {"startHour": 9, "startMinute": 0, "endHour": 18, "endMinute": 0}
+DEFAULT_DAILY_CAP_MINUTES = 240
+SLOT_GRANULARITY_MINUTES = 10
+MAX_BACKTRACK_ITERATIONS = 10000
+
+
+def start_of_day(dt: datetime) -> datetime:
+    # Normalize a datetime to midnight of the same day
+    return datetime(dt.year, dt.month, dt.day)
+
+
+def add_days(dt: datetime, days: int) -> datetime:
+    # Add a number of whole days to a datetime
+    return dt + timedelta(days=days)
+
+
+def add_minutes(dt: datetime, minutes: int) -> datetime:
+    # Add minutes to a datetime
+    return dt + timedelta(minutes=minutes)
+
+
+def build_working_window(day: datetime, working_hours: Dict) -> Dict:
+    # Build start/end datetimes for the given day according to working hours
+    start = datetime(day.year, day.month, day.day, working_hours.get("startHour", 9), working_hours.get("startMinute", 0))
+    end = datetime(day.year, day.month, day.day, working_hours.get("endHour", 18), working_hours.get("endMinute", 0))
+    return {"start": start, "end": end}
+
+
+def schedule_tasks_csp(tasks: List[dict], options: Dict = None) -> Dict:
+    options = options or {}
+    busy_blocks_by_date = options.get("busyBlocksByDate", {})
+    working_hours = options.get("workingHours", DEFAULT_WORKING_HOURS)
+    planning_horizon_days = options.get("planningHorizonDays", 14)
+    daily_cap_minutes = options.get("dailyCapMinutes", DEFAULT_DAILY_CAP_MINUTES)
+
+    today = start_of_day(datetime.now())
+    horizon_end = add_days(today, planning_horizon_days)
+
+    # Controlled randomness: set rng when randomize enabled (for deterministic ties)
+    randomize = options.get("randomize", False)
+    seed = options.get("seed", None)
+    rng: Optional[random.Random] = None
+    if randomize:
+        rng = random.Random(seed) if seed is not None else random.Random()
+
+    # Distribution strategy affects how leaky tasks are split into chunks
+    distribution_strategy = options.get("distributionStrategy", "balanced")
+    variables = generate_variables(tasks, horizon_end, rng=rng, distribution_strategy=distribution_strategy)
+
+    if not variables:
+        return {"plan": [], "unscheduled": []}
+
+    variable_domains = {}
+    variables_with_domains = []
+    variables_without_domains = []
+
+    for variable in variables:
+        domain = generate_domain(variable, today, horizon_end, busy_blocks_by_date, working_hours)
+        if domain:
+            variable_domains[variable["id"]] = domain
+            variables_with_domains.append(variable)
+        else:
+            variables_without_domains.append(variable)
+
+    result = backtrack_search(variables_with_domains, variable_domains, busy_blocks_by_date, working_hours, daily_cap_minutes, rng)
+
+    plan = []
+    unscheduled = []
+
+    assigned_var_ids = set(a["variableId"] for a in result["assignments"]) if result else set()
+
+    for assignment in result.get("assignments", []):
+        slot = assignment["slot"]
+        plan.append({
+            "taskId": assignment["taskId"],
+            "title": assignment.get("title"),
+            "date": slot["start"].date().isoformat(),
+            "start": slot["start"],
+            "end": slot["end"],
+            "minutes": slot.get("minutes"),
+        })
+
+    unscheduled_by_task = {}
+    for variable in variables_without_domains:
+        task_id = str(variable["taskId"])
+        if task_id not in unscheduled_by_task:
+            unscheduled_by_task[task_id] = {"taskId": variable["taskId"], "title": variable.get("title"), "remainingMinutes": 0}
+        unscheduled_by_task[task_id]["remainingMinutes"] += variable["chunkMinutes"]
+
+    for variable in variables_with_domains:
+        if variable["id"] not in assigned_var_ids:
+            task_id = str(variable["taskId"])
+            if task_id not in unscheduled_by_task:
+                unscheduled_by_task[task_id] = {"taskId": variable["taskId"], "title": variable.get("title"), "remainingMinutes": 0}
+            unscheduled_by_task[task_id]["remainingMinutes"] += variable["chunkMinutes"]
+
+    unscheduled.extend(unscheduled_by_task.values())
+
+    return {"plan": plan, "unscheduled": unscheduled}
+
+
+def generate_variables(tasks: List[dict], horizon_end: datetime, rng: Optional[random.Random] = None, distribution_strategy: str = "balanced") -> List[dict]:
+    # Convert tasks into chunk variables used by the CSP
+    variables = []
+    now = datetime.now()
+
+    for task in tasks:
+        total_minutes = task.get("estimatedDuration", 0) or 0
+        if total_minutes <= 0:
+            continue
+
+        task_type = task.get("taskType") or ("in_parts" if task.get("canSplit") else "perfect")
+
+        deadline = None
+        if task.get("dueDate"):
+            try:
+                deadline = datetime.fromisoformat(task["dueDate"]) if isinstance(task["dueDate"], str) else task["dueDate"]
+                deadline = deadline.replace(hour=23, minute=59, second=59, microsecond=999999)
+            except Exception:
+                deadline = horizon_end
+        else:
+            deadline = horizon_end
+
+        if deadline < now:
+            deadline = horizon_end
+
+        chunks = []
+
+        if task_type == "leaky":
+            # Leaky splitting: choose a chunk count and distribute STEPs
+            # according to the chosen `distribution_strategy` and optional `rng`.
+            import math
+
+            STEP = 10
+            min_chunk = task.get("minMinutes", 60)
+            max_chunk = task.get("maxMinutes", min_chunk)
+            rounded_min = math.ceil(min_chunk / STEP) * STEP
+            rounded_max = (max_chunk // STEP) * STEP
+            rounded_total = (total_minutes // STEP) * STEP
+
+            if rounded_min > rounded_max or rounded_total <= 0:
+                # Fallback to single chunk
+                chunks.append(max(rounded_total, 0))
+            else:
+                # feasible number of chunks
+                min_count = (rounded_total + rounded_max - 1) // rounded_max  # ceil(total/max)
+                max_count = rounded_total // rounded_min  # floor(total/min)
+
+                if min_count > max_count:
+                    # can't satisfy bounds, fallback
+                    chunks.append(rounded_total)
+                else:
+                    # pick chunk_count close to average chunk size
+                    avg = (rounded_min + rounded_max) / 2.0
+                    ideal = max(1, int(round(rounded_total / avg)))
+                    count = max(min_count, min(max_count, ideal))
+
+                    # base size per chunk (multiple of STEP)
+                    base = (rounded_total // count) // STEP * STEP
+                    if base < rounded_min:
+                        base = rounded_min
+                    remaining = rounded_total - base * count
+
+                    # allocate remaining STEPs across chunks with weights according to strategy
+                    steps = remaining // STEP
+                    if distribution_strategy == "increasing":
+                        # bias toward larger chunks later
+                        weights = [ (i + 1) ** 2 for i in range(count) ]
+                    elif distribution_strategy == "decreasing":
+                        # bias toward larger chunks earlier
+                        weights = [ (count - i) ** 2 for i in range(count) ]
+                    else:
+                        # balanced linear weights
+                        weights = [ i + 1 for i in range(count) ]
+                    total_w = sum(weights)
+                    extra_steps = [ (steps * w) // total_w for w in weights ]
+                    assigned = sum(extra_steps)
+                    leftover = steps - assigned
+                    # assign leftover steps using weighted random (if rng) or deterministic bias
+                    if rng:
+                        # randomized leftover assignment weighted by the chosen weights
+                        while leftover > 0:
+                            idx = rng.choices(range(count), weights=weights, k=1)[0]
+                            extra_steps[idx] += 1
+                            leftover -= 1
+                    else:
+                        # deterministic leftover assignment: bias larger later chunks
+                        idx = count - 1
+                        while leftover > 0:
+                            extra_steps[idx] += 1
+                            leftover -= 1
+                            idx -= 1
+                            if idx < 0:
+                                idx = count - 1
+
+                    chunks = [ base + s * STEP for s in extra_steps ]
+
+                    # enforce upper bound and redistribute any overflow
+                    overflow = 0
+                    for i in range(count):
+                        if chunks[i] > rounded_max:
+                            overflow += chunks[i] - rounded_max
+                            chunks[i] = rounded_max
+
+                    if overflow > 0:
+                        # try to redistribute overflow to chunks below max
+                        for i in range(count):
+                            can = rounded_max - chunks[i]
+                            give = min(can, overflow)
+                            if give > 0:
+                                chunks[i] += give
+                                overflow -= give
+                            if overflow <= 0:
+                                break
+
+                    # final cleanup: ensure all multiples of STEP and >0
+                    chunks = [ (c // STEP) * STEP for c in chunks if c > 0 ]
+
+        elif task_type == "perfect" or not task.get("canSplit"):
+            chunks.append(total_minutes)
+        elif task_type == "in_parts" and task.get("chunkCount"):
+            chunk_size = -(-total_minutes // task["chunkCount"])  # ceil
+            remaining = total_minutes
+            while remaining > 0:
+                size = min(chunk_size, remaining)
+                chunks.append(size)
+                remaining -= size
+        else:
+            chunk_size = task.get("minChunk", 30)
+            remaining = total_minutes
+            while remaining > 0:
+                size = min(chunk_size, remaining)
+                chunks.append(size)
+                remaining -= size
+
+        for i, c in enumerate(chunks):
+            variables.append({
+                "id": f"{task.get('_id')}_chunk_{i}",
+                "taskId": task.get("_id"),
+                "title": task.get("taskname") or task.get("title") or "(untitled)",
+                "chunkIndex": i,
+                "chunkMinutes": c,
+                "totalChunks": len(chunks),
+                "deadline": deadline,
+                "priorityScore": task.get("priorityScore", 0),
+                "canSplit": task.get("canSplit", False),
+                "taskType": task_type,
+            })
+
+    variables.sort(key=lambda a: (a["deadline"], -a.get("priorityScore", 0)))
+    return variables
+
+
+def generate_domain(variable: dict, today: datetime, horizon_end: datetime, busy_blocks_by_date: Dict, working_hours: Dict) -> List[dict]:
+    # Build available time slots (domain) for a variable's chunk size
+    slots = []
+    deadline = variable["deadline"] if variable["deadline"] < horizon_end else horizon_end
+    chunk_minutes = variable["chunkMinutes"]
+    now = datetime.now()
+
+    current_day = start_of_day(today)
+    while current_day <= deadline:
+        date_key = current_day.date().isoformat()
+        working_window = build_working_window(current_day, working_hours)
+        busy_blocks = busy_blocks_by_date.get(date_key, [])
+
+        slot_start = working_window["start"]
+        while slot_start < working_window["end"]:
+            slot_end = add_minutes(slot_start, chunk_minutes)
+            if slot_end > working_window["end"]:
+                break
+            if slot_start < now:
+                slot_start = add_minutes(slot_start, SLOT_GRANULARITY_MINUTES)
+                continue
+
+            candidate = {"start": slot_start, "end": slot_end, "minutes": chunk_minutes, "dateKey": date_key}
+            overlaps_with_busy = any(not (candidate["end"] <= b["start"] or candidate["start"] >= b["end"]) for b in busy_blocks)
+            if not overlaps_with_busy:
+                slots.append(candidate)
+
+            slot_start = add_minutes(slot_start, SLOT_GRANULARITY_MINUTES)
+
+        current_day = add_days(current_day, 1)
+
+    return slots
+
+
+def backtrack_search(variables: List[dict], variable_domains: Dict[str, List[dict]], busy_blocks_by_date: Dict, working_hours: Dict, daily_cap_minutes: int, rng: Optional[random.Random] = None):
+    # Backtracking CSP search with forward checking and soft scoring
+    assignments = []
+    assigned_slots = []
+    iterations = 0
+    domains = {k: list(v) for k, v in variable_domains.items()}
+
+    def backtrack():
+        nonlocal iterations, domains
+        iterations += 1
+        if iterations > MAX_BACKTRACK_ITERATIONS:
+            return True
+
+        assigned_ids = set(a["variableId"] for a in assignments)
+        unassigned = [ {"variable": v, "domain": domains.get(v["id"], [])} for v in variables if v["id"] not in assigned_ids]
+
+        if not unassigned:
+            return True
+
+        selected = select_variable_mrv(unassigned, rng)
+        if not selected or not selected.get("domain"):
+            return False
+
+        variable = selected["variable"]
+
+        ordered = order_values_lcv(selected["domain"], lambda slot: compute_soft_score(candidate_slot={**slot, "minutes": variable["chunkMinutes"]}, task_id=variable["taskId"], existing_assignments=assigned_slots, daily_cap_minutes=daily_cap_minutes), rng)
+
+        for slot in ordered:
+            candidate_slot = {"start": slot["start"], "end": slot["end"], "minutes": variable["chunkMinutes"], "dateKey": slot.get("dateKey"), "taskId": variable["taskId"]}
+            working_window = build_working_window(slot["start"], working_hours)
+            busy_blocks = busy_blocks_by_date.get(slot.get("dateKey"), [])
+
+            if not satisfies_hard_constraints(candidate_slot=candidate_slot, existing_assignments=assigned_slots, busy_blocks_for_day=busy_blocks, working_window=working_window, deadline=variable.get("deadline")):
+                continue
+
+            assignment = {"variableId": variable["id"], "taskId": variable["taskId"], "title": variable.get("title"), "slot": candidate_slot}
+            assignments.append(assignment)
+            assigned_slots.append(candidate_slot)
+
+            pruned = forward_check(candidate_slot, domains, variable["id"])
+            if pruned is not None:
+                saved = domains
+                domains = pruned
+                if backtrack():
+                    return True
+                domains = saved
+
+            assignments.pop()
+            assigned_slots.pop()
+
+        return False
+
+    backtrack()
+    return {"assignments": assignments, "iterations": iterations}
+
+
+def plan_tasks_csp(tasks: List[dict], options: Dict = None):
+    return schedule_tasks_csp(tasks, options)

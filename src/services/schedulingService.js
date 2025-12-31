@@ -20,11 +20,45 @@ import { Task } from "../models/Task.js";
 import { TaskSchedule } from "../models/TaskSchedule.js";
 import { BusyBlock } from "../models/BusyBlock.js";
 import { startOfDay, addDays } from "../utils/dateUtils.js";
-import { planTasksCSP } from "../algorithms/csp/scheduler.js";
 import { logEvent } from "./telemetryService.js";
 import { env } from "../config/env.js";
 import { logger } from "../utils/logger.js";
 import { updateAllScores } from "../scripts/updateScores.js";
+import { spawn } from "child_process";
+
+// Use Python scheduler CLI instead of JS implementation.
+async function callPythonScheduler(tasks, options) {
+  const py = spawn("python3", ["./src/algorithms/csp/py_scheduler_cli.py"]);
+
+  return new Promise((resolve, reject) => {
+    let stdout = "";
+    let stderr = "";
+    py.stdout.setEncoding("utf8");
+    py.stderr.setEncoding("utf8");
+    py.stdout.on("data", (chunk) => (stdout += chunk));
+    py.stderr.on("data", (chunk) => (stderr += chunk));
+    py.on("error", (err) => reject(err));
+    py.on("close", (code) => {
+      if (code !== 0) return reject(new Error(`Python scheduler failed: ${stderr}`));
+      try {
+        const parsed = JSON.parse(stdout || "{}");
+        // Convert ISO strings back to Date objects for Node consumers
+        parsed.plan = (parsed.plan || []).map((p) => ({
+          ...p,
+          start: new Date(p.start),
+          end: new Date(p.end),
+        }));
+        resolve(parsed);
+      } catch (e) {
+        reject(e);
+      }
+    });
+
+    const payload = JSON.stringify({ tasks, options });
+    py.stdin.write(payload);
+    py.stdin.end();
+  });
+}
 
 // =============================================================================
 // ROUTINE BLOCKS CONFIGURATION
@@ -279,7 +313,7 @@ export async function generatePlan({ userId, profile = {}, planningHorizonDays =
     return { plan: [], unscheduled: [], message: "All tasks already scheduled." };
   }
 
-  const { plan, unscheduled } = planTasksCSP(tasksForPlanning, {
+  const { plan, unscheduled } = await callPythonScheduler(tasksForPlanning, {
     busyBlocksByDate,
     planningHorizonDays,
     workingHours: profile.workingHours || { startHour: 9, startMinute: 0, endHour: 18, endMinute: 0 },
