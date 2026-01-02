@@ -9,6 +9,7 @@ interface ChatMessageBubbleProps {
   content: string;
   isLastMessage: boolean;
   playOnceKey: string;
+  timestamp?: Date;
   isError?: boolean;
   status?: "pending" | "failed" | "sent";
   onRetry?: () => void;
@@ -19,6 +20,7 @@ function ChatMessageBubble({
   content,
   isLastMessage,
   playOnceKey,
+  timestamp,
   isError,
   status,
   onRetry,
@@ -45,7 +47,8 @@ function ChatMessageBubble({
     <View style={[styles.messageRow, isUser ? styles.userMessageRow : styles.agentMessageRow]}>
       <TextBouble
         mode={isUser ? "user" : "agent"}
-        typewriter={!isUser && isLastMessage}
+        // Only animate typewriter for assistant messages that arrived very recently
+        typewriter={!isUser && isLastMessage && Boolean(timestamp && Date.now() - new Date(timestamp).getTime() < 5000)}
         playOnceKey={playOnceKey}
         style={styles.messageBubble}
       >

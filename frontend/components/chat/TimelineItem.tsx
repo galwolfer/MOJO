@@ -41,6 +41,7 @@ function TimelineItemComponent({ item, isLastItem, onRetry }: TimelineItemProps)
       content={item.content}
       isLastMessage={isLastItem}
       playOnceKey={item.id}
+      timestamp={item.timestamp}
       isError={item.isError}
       status={item.status}
       onRetry={retryHandler}
