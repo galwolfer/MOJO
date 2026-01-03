@@ -10,6 +10,7 @@ import {
   ScrollViewProps,
 } from "react-native";
 import { useLayout } from "../../context/LayoutContext";
+import { useNavigation } from "../../context/NavigationContext";
 import { useKeyboard } from "../../hooks";
 
 export type ScrollableContentRef = {
@@ -29,6 +30,8 @@ type ScrollableContentProps = ScrollViewProps & {
   extraBottomPadding?: number;
   /** Whether to auto-scroll content when the keyboard changes */
   keyboardScrollAdjust?: boolean;
+  /** Unique key for remembering scroll position across screen switches */
+  scrollKey?: string;
 };
 
 /**
@@ -46,20 +49,25 @@ const ScrollableContent = forwardRef<ScrollableContentRef, ScrollableContentProp
       extraTopPadding = 0,
       extraBottomPadding = 0,
       keyboardScrollAdjust = true,
+      scrollKey,
       contentContainerStyle,
       style,
       onScroll,
       scrollEventThrottle,
+      onContentSizeChange,
       ...scrollViewProps
     },
     ref
   ) => {
     const scrollViewRef = useRef<ScrollView>(null);
     const { dimensions } = useLayout();
+    const { scrollPositions, setScrollPosition } = useNavigation();
     const { visible: keyboardVisible, height: keyboardHeight } = useKeyboard();
     const scrollOffsetRef = useRef(0);
     const keyboardVisibleRef = useRef(false);
     const lastKeyboardHeightRef = useRef(0);
+    const restoreOffsetRef = useRef<number | null>(null);
+    const didRestoreRef = useRef(false);
 
     useImperativeHandle(ref, () => ({
       scrollToEnd: (animated = true) => {
@@ -76,9 +84,31 @@ const ScrollableContent = forwardRef<ScrollableContentRef, ScrollableContentProp
     const handleScroll = useCallback(
       (event: NativeSyntheticEvent<NativeScrollEvent>) => {
         scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+        if (scrollKey) {
+          setScrollPosition(scrollKey, scrollOffsetRef.current);
+        }
         onScroll?.(event);
       },
-      [onScroll]
+      [onScroll, scrollKey, setScrollPosition]
+    );
+
+    /**
+     * Restores scroll position after content lays out.
+     */
+    const handleContentSizeChange = useCallback(
+      (width: number, height: number) => {
+        if (scrollKey && !didRestoreRef.current) {
+          if (restoreOffsetRef.current === null) {
+            restoreOffsetRef.current = scrollPositions[scrollKey] ?? 0;
+          }
+          if (restoreOffsetRef.current > 0) {
+            scrollViewRef.current?.scrollTo({ y: restoreOffsetRef.current, animated: false });
+          }
+          didRestoreRef.current = true;
+        }
+        onContentSizeChange?.(width, height);
+      },
+      [onContentSizeChange, scrollKey, scrollPositions]
     );
 
     // Calculate top padding based on header
@@ -107,6 +137,7 @@ const ScrollableContent = forwardRef<ScrollableContentRef, ScrollableContentProp
         scrollEventThrottle={scrollEventThrottle ?? 16}
         {...scrollViewProps}
         onScroll={handleScroll}
+        onContentSizeChange={handleContentSizeChange}
       >
         {children}
       </ScrollView>

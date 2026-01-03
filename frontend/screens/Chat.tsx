@@ -22,13 +22,15 @@ import TimelineItemComponent from "../components/chat/TimelineItem";
 import type { ChatSessionSummary } from "../services/chatService";
 
 export default function ChatScreen() {
-  const { setHeaderConfig, setNavBarConfig } = useNavigation();
+  const { setHeaderConfig, setNavBarConfig, scrollPositions, setScrollPosition } = useNavigation();
   const { token } = useAuth();
   const sessionsRef = useRef<ChatSessionSummary[]>([]);
   const listRef = useRef<FlatList<TimelineItem>>(null);
   const scrollOffsetRef = useRef(0);
   const keyboardVisibleRef = useRef(false);
   const lastKeyboardHeightRef = useRef(0);
+  const restoreOffsetRef = useRef<number | null>(null);
+  const didRestoreRef = useRef(false);
   const { visible: keyboardVisible, height: keyboardHeight } = useKeyboard();
   const contentInsets = useContentInsets();
 
@@ -166,9 +168,28 @@ export default function ChatScreen() {
   /**
    * Tracks list scroll offset for keyboard adjustments.
    */
-  const handleListScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
-  }, []);
+  const handleListScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+      setScrollPosition("chat", scrollOffsetRef.current);
+    },
+    [setScrollPosition]
+  );
+
+  /**
+   * Restores list position after content lays out.
+   */
+  const handleContentSizeChange = useCallback(() => {
+    if (!didRestoreRef.current) {
+      if (restoreOffsetRef.current === null) {
+        restoreOffsetRef.current = scrollPositions.chat ?? 0;
+      }
+      if (restoreOffsetRef.current > 0) {
+        listRef.current?.scrollToOffset({ offset: restoreOffsetRef.current, animated: false });
+      }
+      didRestoreRef.current = true;
+    }
+  }, [scrollPositions.chat]);
 
   /**
    * Offsets list position by keyboard height when it appears/disappears.
@@ -221,6 +242,7 @@ export default function ChatScreen() {
         scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
         onScroll={handleListScroll}
+        onContentSizeChange={handleContentSizeChange}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <AppText variant="bodyText" style={styles.emptyText}>

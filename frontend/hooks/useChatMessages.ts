@@ -9,10 +9,7 @@ export function useChatMessages(updateSession: (session: ChatSessionSummary) => 
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string>(() => `session_${Date.now()}`);
 
-  const createClientId = useCallback(
-    () => `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    []
-  );
+  const createClientId = useCallback(() => `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, []);
 
   const buildSessionUpdate = (
     sessionId: string,
@@ -64,7 +61,7 @@ export function useChatMessages(updateSession: (session: ChatSessionSummary) => 
       if (options?.isRetry) {
         let found = false;
         nextMessages = nextMessages
-          .map((m) => {
+          .map((m): ChatMessage => {
             if (m.clientId === clientId) {
               found = true;
               return { ...m, status: "pending" };
@@ -109,8 +106,8 @@ export function useChatMessages(updateSession: (session: ChatSessionSummary) => 
           const sessionsAfter = getSessions();
           const existingAfter = sessionsAfter.find((s) => s.sessionId === sid);
           const baseAfter = existingAfter?.messages || optimisticMessages;
-          const updatedMessages = baseAfter.map((m) =>
-            m.clientId === clientId ? { ...m, status: "sent" } : m
+          const updatedMessages = baseAfter.map(
+            (m): ChatMessage => (m.clientId === clientId ? { ...m, status: "sent" } : m)
           );
           updatedMessages.push({
             role: "assistant",
@@ -125,8 +122,8 @@ export function useChatMessages(updateSession: (session: ChatSessionSummary) => 
           const sessionsAfter = getSessions();
           const existingAfter = sessionsAfter.find((s) => s.sessionId === currentSessionId);
           const baseAfter = existingAfter?.messages || optimisticMessages;
-          const updatedMessages = baseAfter
-            .map((m) => (m.clientId === clientId ? { ...m, status: "failed" } : m))
+          const updatedMessages: ChatMessage[] = baseAfter
+            .map((m): ChatMessage => (m.clientId === clientId ? { ...m, status: "failed" } : m))
             .filter((m) => !(m.isError && m.relatedClientId === clientId));
           updatedMessages.push({
             role: "assistant",
@@ -144,8 +141,8 @@ export function useChatMessages(updateSession: (session: ChatSessionSummary) => 
         const sessionsAfter = getSessions();
         const existingAfter = sessionsAfter.find((s) => s.sessionId === currentSessionId);
         const baseAfter = existingAfter?.messages || optimisticMessages;
-        const updatedMessages = baseAfter
-          .map((m) => (m.clientId === clientId ? { ...m, status: "failed" } : m))
+        const updatedMessages: ChatMessage[] = baseAfter
+          .map((m): ChatMessage => (m.clientId === clientId ? { ...m, status: "failed" } : m))
           .filter((m) => !(m.isError && m.relatedClientId === clientId));
         updatedMessages.push({
           role: "assistant",

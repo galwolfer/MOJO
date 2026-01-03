@@ -134,9 +134,27 @@ export const DIVIDER = {
   width: 0.9,
 };
 
+export const GLASS = {
+  surface: hexToRgba(COLORS.colorWhite, 0.5),
+  border: hexToRgba(COLORS.white, 0.65),
+  highlight: hexToRgba(COLORS.colorWhite, 0.9),
+  shade: hexToRgba(COLORS.colorWhite, 0.2),
+};
+
 // Reusable component-level styles. Keep UI surface tokens here so components
 // can import a consistent set of style primitives (web + RN friendly).
 export const COMPONENT_STYLES = {
+  glassSurface: {
+    backgroundColor: GLASS.surface,
+    borderWidth: 1,
+    borderColor: GLASS.border,
+    ...(Platform.OS === "web"
+      ? {
+          backdropFilter: "blur(18px)",
+          WebkitBackdropFilter: "blur(18px)",
+        }
+      : {}),
+  },
   inputWrapper: {
     display: "flex",
     flexDirection: "row",

@@ -1,7 +1,7 @@
 import React from "react";
-import { View, Text, StyleSheet, Image, useWindowDimensions, Platform } from "react-native";
-import { COLORS, SPACING, TYPOGRAPHY, SHADOWS, ICON_SIZES } from "../../theme";
-import { ICONS } from "../icons/icons";
+import { View, Text, StyleSheet, Platform } from "react-native";
+import { COLORS, SPACING, TYPOGRAPHY, SHADOWS, ICON_SIZES, COMPONENT_STYLES } from "../../theme";
+import GlassSurface from "./GlassSurface";
 
 type HeaderProps = {
   title?: string;
@@ -19,18 +19,20 @@ export default function Header({ title, Icon, show = true, rightElement, leftEle
 
   return (
     <View style={[styles.wrapper, style]}>
-      <View style={styles.container}>
-        {/* Left Section */}
-        <View style={styles.leftSection}>
-          {leftElement}
-          {Icon && !leftElement && <Icon size={ICON_SIZES.big} color={COLORS.primary1} />}
-          {title && <Text style={[TYPOGRAPHY.title, styles.titleText]}>{title}</Text>}
-        </View>
+      <GlassSurface intensity={50} style={[styles.blurSurface, COMPONENT_STYLES.glassSurface]}>
+        <View style={styles.container}>
+          {/* Left Section */}
+          <View style={styles.leftSection}>
+            {leftElement}
+            {Icon && !leftElement && <Icon size={ICON_SIZES.big} color={COLORS.primary1} />}
+            {title && <Text style={[TYPOGRAPHY.title, styles.titleText]}>{title}</Text>}
+          </View>
 
-        {/* Right Section */}
-        {rightElement && <View style={styles.rightSection}>{rightElement}</View>}
-      </View>
-      {element && <View>{element}</View>}
+          {/* Right Section */}
+          {rightElement && <View style={styles.rightSection}>{rightElement}</View>}
+        </View>
+        {element && <View>{element}</View>}
+      </GlassSurface>
     </View>
   );
 }
@@ -38,13 +40,17 @@ export default function Header({ title, Icon, show = true, rightElement, leftEle
 const styles = StyleSheet.create({
   wrapper: {
     width: "100%",
-    paddingHorizontal: SPACING.lg,
-    paddingTop: Platform.OS === "android" ? SPACING.xlg + SPACING.md : SPACING.lg,
-    paddingBottom: SPACING.lg,
-    backgroundColor: COLORS.white,
     borderBottomLeftRadius: SPACING.xlg,
     borderBottomRightRadius: SPACING.xlg,
     ...(SHADOWS.card as object),
+  },
+  blurSurface: {
+    paddingHorizontal: SPACING.lg,
+    paddingTop: Platform.OS === "android" ? SPACING.xlg + SPACING.md : SPACING.lg,
+    paddingBottom: SPACING.lg,
+    borderBottomLeftRadius: SPACING.xlg,
+    borderBottomRightRadius: SPACING.xlg,
+    overflow: "hidden",
   },
   container: {
     flexDirection: "row",

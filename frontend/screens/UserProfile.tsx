@@ -22,7 +22,12 @@ export default function UserProfileScreen() {
   }, []);
 
   return (
-    <ScrollableContent respectHeader={true} respectNavBar={true} contentContainerStyle={styles.contentContainer}>
+    <ScrollableContent
+      respectHeader={true}
+      respectNavBar={true}
+      scrollKey="user"
+      contentContainerStyle={styles.contentContainer}
+    >
       <Box title="User Information">
         <AppText variant="boldText">Username:</AppText>
         <AppText variant="bodyText">{user?.username}</AppText>

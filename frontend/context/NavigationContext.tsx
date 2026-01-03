@@ -24,6 +24,8 @@ export type ChatScrollState = {
   distanceFromBottom: number;
 };
 
+export type ScrollPositions = Record<string, number>;
+
 type NavigationContextType = {
   activeTab: TabName;
   setActiveTab: (tab: TabName) => void;
@@ -33,6 +35,8 @@ type NavigationContextType = {
   setNavBarConfig: (config: NavBarConfig) => void;
   chatScrollState: ChatScrollState;
   setChatScrollState: (state: ChatScrollState) => void;
+  scrollPositions: ScrollPositions;
+  setScrollPosition: (key: string, offset: number) => void;
 };
 
 const NavigationContext = createContext<NavigationContextType>({} as NavigationContextType);
@@ -52,6 +56,11 @@ export const NavigationProvider = ({ children }: { children: ReactNode }) => {
     hasScroll: false,
     distanceFromBottom: 0,
   });
+  const [scrollPositions, setScrollPositions] = useState<ScrollPositions>({});
+
+  const setScrollPosition = (key: string, offset: number) => {
+    setScrollPositions((prev) => ({ ...prev, [key]: offset }));
+  };
 
   return (
     <NavigationContext.Provider
@@ -64,6 +73,8 @@ export const NavigationProvider = ({ children }: { children: ReactNode }) => {
         setNavBarConfig,
         chatScrollState,
         setChatScrollState,
+        scrollPositions,
+        setScrollPosition,
       }}
     >
       {children}

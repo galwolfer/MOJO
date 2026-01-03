@@ -25,7 +25,12 @@ export default function CalendarScreen() {
   }, []);
 
   return (
-    <ScrollableContent respectHeader={true} respectNavBar={true} contentContainerStyle={styles.contentContainer}>
+    <ScrollableContent
+      respectHeader={true}
+      respectNavBar={true}
+      scrollKey="calendar"
+      contentContainerStyle={styles.contentContainer}
+    >
       <AppText variant="bodyText">Calendar / Tasks Screen Placeholder</AppText>
       <AppText variant="notes">Task list and calendar view...</AppText>
     </ScrollableContent>
