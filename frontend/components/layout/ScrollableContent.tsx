@@ -1,4 +1,4 @@
-import React, { useRef, forwardRef, useImperativeHandle } from "react";
+import React, { useRef, forwardRef, useImperativeHandle, useCallback, useEffect } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -27,6 +27,8 @@ type ScrollableContentProps = ScrollViewProps & {
   extraTopPadding?: number;
   /** Additional bottom padding beyond navbar */
   extraBottomPadding?: number;
+  /** Whether to auto-scroll content when the keyboard changes */
+  keyboardScrollAdjust?: boolean;
 };
 
 /**
@@ -43,8 +45,11 @@ const ScrollableContent = forwardRef<ScrollableContentRef, ScrollableContentProp
       respectNavBar = true,
       extraTopPadding = 0,
       extraBottomPadding = 0,
+      keyboardScrollAdjust = true,
       contentContainerStyle,
       style,
+      onScroll,
+      scrollEventThrottle,
       ...scrollViewProps
     },
     ref
@@ -52,6 +57,9 @@ const ScrollableContent = forwardRef<ScrollableContentRef, ScrollableContentProp
     const scrollViewRef = useRef<ScrollView>(null);
     const { dimensions } = useLayout();
     const { visible: keyboardVisible, height: keyboardHeight } = useKeyboard();
+    const scrollOffsetRef = useRef(0);
+    const keyboardVisibleRef = useRef(false);
+    const lastKeyboardHeightRef = useRef(0);
 
     useImperativeHandle(ref, () => ({
       scrollToEnd: (animated = true) => {
@@ -61,6 +69,17 @@ const ScrollableContent = forwardRef<ScrollableContentRef, ScrollableContentProp
         scrollViewRef.current?.scrollTo(options);
       },
     }));
+
+    /**
+     * Tracks scroll position while still allowing external scroll handlers.
+     */
+    const handleScroll = useCallback(
+      (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+        scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+        onScroll?.(event);
+      },
+      [onScroll]
+    );
 
     // Calculate top padding based on header
     const topPadding = respectHeader ? dimensions.headerHeight + extraTopPadding : extraTopPadding;
@@ -85,12 +104,52 @@ const ScrollableContent = forwardRef<ScrollableContentRef, ScrollableContentProp
         contentContainerStyle={computedContentStyle}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        scrollEventThrottle={16}
+        scrollEventThrottle={scrollEventThrottle ?? 16}
         {...scrollViewProps}
+        onScroll={handleScroll}
       >
         {children}
       </ScrollView>
     );
+
+    /**
+     * Offsets scroll position by keyboard height when it appears/disappears.
+     */
+    useEffect(() => {
+      if (!keyboardScrollAdjust) return;
+
+      const currentOffset = scrollOffsetRef.current;
+      const lastKeyboardHeight = lastKeyboardHeightRef.current;
+
+      if (keyboardVisible) {
+        const heightDelta = keyboardHeight - lastKeyboardHeight;
+        if (!keyboardVisibleRef.current) {
+          if (keyboardHeight > 0) {
+            scrollViewRef.current?.scrollTo({
+              y: Math.max(currentOffset + keyboardHeight, 0),
+              animated: true,
+            });
+          }
+          keyboardVisibleRef.current = true;
+          lastKeyboardHeightRef.current = keyboardHeight;
+        } else if (heightDelta !== 0) {
+          scrollViewRef.current?.scrollTo({
+            y: Math.max(currentOffset + heightDelta, 0),
+            animated: true,
+          });
+          lastKeyboardHeightRef.current = keyboardHeight;
+        }
+      } else if (keyboardVisibleRef.current) {
+        if (lastKeyboardHeight > 0) {
+          scrollViewRef.current?.scrollTo({
+            y: Math.max(currentOffset - lastKeyboardHeight, 0),
+            animated: true,
+          });
+        }
+        keyboardVisibleRef.current = false;
+        lastKeyboardHeightRef.current = 0;
+      }
+    }, [keyboardVisible, keyboardHeight, keyboardScrollAdjust]);
 
     // On iOS, use KeyboardAvoidingView for smoother keyboard handling
     if (Platform.OS === "ios") {

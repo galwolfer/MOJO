@@ -1,5 +1,13 @@
 import React, { useEffect, useMemo, useRef, useCallback, useState } from "react";
-import { View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform } from "react-native";
+import {
+  View,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+} from "react-native";
 import AppText from "../components/common/AppText";
 import Input from "../components/inputs/Input";
 import { COLORS, FONT_SIZES, SHADOWS, SPACING } from "../theme";
@@ -17,7 +25,11 @@ export default function ChatScreen() {
   const { setHeaderConfig, setNavBarConfig } = useNavigation();
   const { token } = useAuth();
   const sessionsRef = useRef<ChatSessionSummary[]>([]);
-  const { visible: keyboardVisible } = useKeyboard();
+  const listRef = useRef<FlatList<TimelineItem>>(null);
+  const scrollOffsetRef = useRef(0);
+  const keyboardVisibleRef = useRef(false);
+  const lastKeyboardHeightRef = useRef(0);
+  const { visible: keyboardVisible, height: keyboardHeight } = useKeyboard();
   const contentInsets = useContentInsets();
 
   const { sessions, isLoadingSessions, isLoadingMoreSessions, hasMoreSessions, loadMoreSessions, updateSession } =
@@ -151,17 +163,64 @@ export default function ChatScreen() {
     [contentInsets]
   );
 
+  /**
+   * Tracks list scroll offset for keyboard adjustments.
+   */
+  const handleListScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+  }, []);
+
+  /**
+   * Offsets list position by keyboard height when it appears/disappears.
+   */
+  useEffect(() => {
+    const currentOffset = scrollOffsetRef.current;
+    const lastKeyboardHeight = lastKeyboardHeightRef.current;
+
+    if (keyboardVisible) {
+      const heightDelta = keyboardHeight - lastKeyboardHeight;
+      if (!keyboardVisibleRef.current) {
+        if (keyboardHeight > 0) {
+          listRef.current?.scrollToOffset({
+            offset: Math.max(currentOffset + keyboardHeight, 0),
+            animated: true,
+          });
+        }
+        keyboardVisibleRef.current = true;
+        lastKeyboardHeightRef.current = keyboardHeight;
+      } else if (heightDelta !== 0) {
+        listRef.current?.scrollToOffset({
+          offset: Math.max(currentOffset + heightDelta, 0),
+          animated: true,
+        });
+        lastKeyboardHeightRef.current = keyboardHeight;
+      }
+    } else if (keyboardVisibleRef.current) {
+      if (lastKeyboardHeight > 0) {
+        listRef.current?.scrollToOffset({
+          offset: Math.max(currentOffset - lastKeyboardHeight, 0),
+          animated: true,
+        });
+      }
+      keyboardVisibleRef.current = false;
+      lastKeyboardHeightRef.current = 0;
+    }
+  }, [keyboardVisible, keyboardHeight]);
+
   return (
     <View style={styles.container}>
       {/* Messages List */}
       <FlatList
+        ref={listRef}
         data={timelineItems}
         renderItem={renderTimelineItem}
         keyExtractor={keyExtractor}
         contentContainerStyle={listContentStyle}
         showsVerticalScrollIndicator={false}
         scrollEnabled={true}
+        scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
+        onScroll={handleListScroll}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <AppText variant="bodyText" style={styles.emptyText}>
