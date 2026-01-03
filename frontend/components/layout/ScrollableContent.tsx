@@ -65,14 +65,9 @@ const ScrollableContent = forwardRef<ScrollableContentRef, ScrollableContentProp
     // Calculate top padding based on header
     const topPadding = respectHeader ? dimensions.headerHeight + extraTopPadding : extraTopPadding;
 
-    // Calculate bottom padding based on keyboard or navbar
-    // When keyboard is visible, we adjust for keyboard height
-    // When keyboard is hidden, we adjust for navbar
-    const bottomPadding = keyboardVisible
-      ? keyboardHeight + extraBottomPadding
-      : respectNavBar
-      ? dimensions.effectiveNavBarHeight + extraBottomPadding
-      : extraBottomPadding;
+    // Calculate bottom padding based on navbar plus keyboard height when visible.
+    const navBarPadding = respectNavBar ? dimensions.effectiveNavBarHeight : 0;
+    const bottomPadding = navBarPadding + extraBottomPadding + (keyboardVisible ? keyboardHeight : 0);
 
     const computedContentStyle = [
       styles.contentContainer,

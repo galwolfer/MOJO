@@ -6,6 +6,9 @@ type KeyboardState = {
   height: number;
 };
 
+/**
+ * Tracks keyboard visibility and height, including interactive frame changes on iOS.
+ */
 export default function useKeyboard(): KeyboardState {
   const [state, setState] = useState<KeyboardState>({ visible: false, height: 0 });
 
@@ -14,21 +17,30 @@ export default function useKeyboard(): KeyboardState {
 
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
     const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const changeEvent = Platform.OS === "ios" ? "keyboardWillChangeFrame" : null;
 
     const onShow = (event: KeyboardEvent) => {
-      setState({ visible: true, height: event.endCoordinates?.height ?? 0 });
+      const height = event.endCoordinates?.height ?? 0;
+      setState({ visible: true, height });
     };
 
     const onHide = () => {
       setState({ visible: false, height: 0 });
     };
 
+    const onChangeFrame = (event: KeyboardEvent) => {
+      const height = event.endCoordinates?.height ?? 0;
+      setState({ visible: height > 0, height });
+    };
+
     const showSub = Keyboard.addListener(showEvent, onShow);
     const hideSub = Keyboard.addListener(hideEvent, onHide);
+    const changeSub = changeEvent ? Keyboard.addListener(changeEvent, onChangeFrame) : null;
 
     return () => {
       showSub.remove();
       hideSub.remove();
+      changeSub?.remove();
     };
   }, []);
 

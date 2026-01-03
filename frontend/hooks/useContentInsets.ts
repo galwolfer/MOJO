@@ -5,7 +5,7 @@ import useKeyboard from "./useKeyboard";
 export type ContentInsets = {
   top: number;
   bottom: number;
-  /** Bottom inset when keyboard is visible */
+  /** Bottom inset when keyboard is visible (keyboard + navbar) */
   bottomWithKeyboard: number;
   /** Whether keyboard is currently visible */
   keyboardVisible: boolean;
@@ -42,7 +42,7 @@ export default function useContentInsets(): ContentInsets {
     () => ({
       top: dimensions.headerHeight,
       bottom: dimensions.effectiveNavBarHeight,
-      bottomWithKeyboard: keyboardHeight,
+      bottomWithKeyboard: dimensions.effectiveNavBarHeight + keyboardHeight,
       keyboardVisible,
       headerHeight: dimensions.headerHeight,
       navBarHeight: dimensions.navBarHeight,
