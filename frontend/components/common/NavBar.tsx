@@ -24,7 +24,7 @@ export default function NavBar({ show = true, hideIcons = false }: NavBarProps) 
 
   const widthStyle = keyboardVisible ? styles.fullWidth : {};
 
-  const marginStyle = keyboardVisible ? {} : { marginHorizontal: SPACING.lg };
+  const marginStyle = keyboardVisible ? { marginBottom: SPACING.md } : { marginHorizontal: SPACING.lg };
 
   const paddingStyle = keyboardVisible ? { paddingHorizontal: SPACING.lg } : {};
 
