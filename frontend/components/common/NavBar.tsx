@@ -3,6 +3,7 @@ import { View, StyleSheet, TouchableOpacity, Platform, Alert } from "react-nativ
 import { ICONS } from "../icons/icons";
 import { COLORS, SPACING, SHADOWS, ICON_SIZES } from "../../theme";
 import { useNavigation, TabName } from "../../context/NavigationContext";
+import useKeyboard from "../../hooks/useKeyboard";
 
 type NavBarProps = {
   show?: boolean;
@@ -11,6 +12,7 @@ type NavBarProps = {
 
 export default function NavBar({ show = true, hideIcons = false }: NavBarProps) {
   const { activeTab, setActiveTab, navBarConfig } = useNavigation();
+  const { visible: keyboardVisible } = useKeyboard();
 
   // Allow context to override the prop, but prop=false forces hide
   if (!show || navBarConfig.show === false) return null;
@@ -20,8 +22,18 @@ export default function NavBar({ show = true, hideIcons = false }: NavBarProps) 
     return activeTab === tab ? COLORS.primary1 : COLORS.lightGray;
   };
 
+  const widthStyle = keyboardVisible ? styles.fullWidth : {};
+
+  const marginStyle = keyboardVisible ? {} : { marginHorizontal: SPACING.lg };
+
+  const paddingStyle = keyboardVisible ? { paddingHorizontal: SPACING.lg } : {};
+
+  const cornerRadiusStyle = keyboardVisible
+    ? { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }
+    : { borderBottomLeftRadius: SPACING.xlg, borderBottomRightRadius: SPACING.xlg };
+
   return (
-    <View style={[styles.navBar, hideIcons ? styles.navBarCompact : undefined]}>
+    <View style={[styles.navBar, widthStyle, marginStyle, paddingStyle, cornerRadiusStyle]}>
       {/* Widget Area (e.g. Chat Input) */}
       {navBarConfig.widget && (
         <View style={[styles.widgetContainer, hideIcons ? styles.widgetContainerKeyboard : undefined]}>
@@ -53,33 +65,29 @@ export default function NavBar({ show = true, hideIcons = false }: NavBarProps) 
 
 const styles = StyleSheet.create({
   navBar: {
-    width: "100%",
     alignSelf: "stretch",
-    paddingTop: SPACING.md,
+    marginBottom: SPACING.xlg,
     backgroundColor: COLORS.white,
-    borderTopLeftRadius: SPACING.xlg,
-    borderTopRightRadius: SPACING.xlg,
+    borderRadius: SPACING.xlg,
     ...(SHADOWS.card as object),
   },
-  navBarCompact: {
-    paddingTop: SPACING.sm,
+  fullWidth: {
+    width: "100%",
   },
   widgetContainer: {
     width: "100%",
-    paddingBottom: SPACING.sm,
-    paddingHorizontal: SPACING.md,
+    marginBottom: -SPACING.lg,
   },
   widgetContainerKeyboard: {
-    paddingBottom: SPACING.xlg,
+    paddingBottom: SPACING.md,
   },
   wrapper: {
-    height: SPACING.xlg * 3 + (Platform.OS !== "web" ? SPACING.lg : 0),
-    paddingBottom: Platform.OS === "web" ? 0 : SPACING.lg,
+    height: SPACING.xlg * 2.5,
     width: "100%",
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: SPACING.lg,
+    paddingHorizontal: SPACING.md,
   },
   item: {
     flex: 1,

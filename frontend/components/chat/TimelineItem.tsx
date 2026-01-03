@@ -33,7 +33,7 @@ function TimelineItemComponent({ item, isLastItem, onRetry }: TimelineItemProps)
   }
 
   const retryHandler =
-    item.status === "failed" && item.clientId && onRetry ? () => onRetry(item.sessionId, item.clientId) : undefined;
+    item.status === "failed" && item.clientId && onRetry ? () => onRetry(item.sessionId, item.clientId!) : undefined;
 
   return (
     <ChatMessageBubble

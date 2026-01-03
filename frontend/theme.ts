@@ -1,5 +1,6 @@
 import { moderateScale, s, scale, verticalScale } from "react-native-size-matters";
 import { Platform } from "react-native";
+import { BorderlessButton } from "react-native-gesture-handler";
 
 export const COLORS = {
   // Primary colors
@@ -144,7 +145,11 @@ export const COMPONENT_STYLES = {
     // small additional gap used by Input
     gap: SPACING.sm + 2,
     alignSelf: "stretch",
-    borderRadius: SPACING.lg,
+    borderTopRightRadius: SPACING.lg,
+    borderTopLeftRadius: SPACING.lg,
+    borderBottomRightRadius: SPACING.lg,
+    borderBottomLeftRadius: SPACING.lg,
+
     borderWidth: 0.15,
     borderColor: COLORS.brightP1,
     backgroundColor: COLORS.white,
