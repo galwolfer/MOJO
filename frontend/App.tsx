@@ -9,6 +9,7 @@ import AuthScreen from "./screens/Auth";
 import { COLORS } from "./theme";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { NavigationProvider } from "./context/NavigationContext";
+import { LayoutProvider } from "./context/LayoutContext";
 import MainLayout from "./components/layout/MainLayout";
 
 SplashScreen.preventAutoHideAsync();
@@ -45,7 +46,7 @@ function AppContent() {
   // If we keep the frame here, we just render MainLayout inside it.
 
   const outerStyle = isDesktopLike ? styles.desktopOuter : styles.container;
-  const deviceWidth = 700;
+  const deviceWidth = isDesktopLike ? width : 700;
   const deviceHeight = Math.min(height, 1300);
   const deviceStyle = isDesktopLike
     ? [styles.deviceFrame, { width: deviceWidth, height: deviceHeight }]
@@ -78,7 +79,9 @@ export default function App() {
   return (
     <AuthProvider>
       <NavigationProvider>
-        <AppContent />
+        <LayoutProvider>
+          <AppContent />
+        </LayoutProvider>
       </NavigationProvider>
     </AuthProvider>
   );
@@ -87,9 +90,8 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.white3,
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: "red",
+    width: "100%",
   },
   desktopOuter: {
     flex: 1,
@@ -111,5 +113,6 @@ const styles = StyleSheet.create({
   deviceFull: {
     flex: 1,
     width: "100%",
+    backgroundColor: "red",
   },
 });

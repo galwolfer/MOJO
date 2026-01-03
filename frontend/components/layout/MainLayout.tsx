@@ -1,21 +1,47 @@
-import React from "react";
-import { View, StyleSheet, Platform, useWindowDimensions } from "react-native";
+import React, { useState, useCallback } from "react";
+import { View, StyleSheet, Platform, useWindowDimensions, LayoutChangeEvent } from "react-native";
 import { useNavigation } from "../../context/NavigationContext";
+import { useLayout } from "../../context/LayoutContext";
 import Header from "../common/Header";
 import NavBar from "../common/NavBar";
 import ChatScreen from "../../screens/Chat";
 import CalendarScreen from "../../screens/Calendar";
 import UserProfileScreen from "../../screens/UserProfile";
-import { COLORS } from "../../theme";
+import { COLORS, SPACING } from "../../theme";
 import { useKeyboard } from "../../hooks";
 
 export default function MainLayout() {
   const { activeTab, headerConfig, navBarConfig } = useNavigation();
+  const { setHeaderHeight, setNavBarHeight } = useLayout();
   const { width, height } = useWindowDimensions();
   const isDesktopLike = Platform.OS === "web" ? width >= 900 : width >= 900;
   const { visible: keyboardVisible, height: keyboardHeight } = useKeyboard();
   const keyboardOffset = keyboardVisible ? keyboardHeight : 0;
   const hasNavWidget = Boolean(navBarConfig.widget);
+
+  // Track actual measured heights of header and navbar
+  const [localHeaderHeight, setLocalHeaderHeight] = useState(0);
+  const [localNavBarHeight, setLocalNavBarHeight] = useState(0);
+
+  const onHeaderLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const { height } = event.nativeEvent.layout;
+      setLocalHeaderHeight(height);
+      setHeaderHeight(height);
+    },
+    [setHeaderHeight]
+  );
+
+  const onNavBarLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const { height } = event.nativeEvent.layout;
+      setLocalNavBarHeight(height);
+      // Effective height includes the bottom margin
+      const effectiveHeight = height + SPACING.xlg;
+      setNavBarHeight(height, effectiveHeight);
+    },
+    [setNavBarHeight]
+  );
 
   const renderScreen = () => {
     switch (activeTab) {
@@ -42,8 +68,11 @@ export default function MainLayout() {
   return (
     <View style={outerStyle}>
       <View style={deviceStyle}>
-        {/* Header */}
-        <View style={styles.headerContainer}>
+        {/* Main Content Area - Full screen */}
+        <View style={styles.contentArea}>{renderScreen()}</View>
+
+        {/* Floating Header */}
+        <View style={styles.headerContainer} onLayout={onHeaderLayout}>
           <Header
             title={headerConfig.title}
             show={headerConfig.show}
@@ -54,17 +83,10 @@ export default function MainLayout() {
           />
         </View>
 
-        {/* Main Content */}
-        <View style={[styles.content, keyboardVisible ? { paddingBottom: keyboardOffset } : undefined]}>
-          {renderScreen()}
-        </View>
-
-        {/* NavBar */}
+        {/* Floating NavBar */}
         <View
-          style={[
-            styles.navBarContainer,
-            keyboardOffset > 0 ? { transform: [{ translateY: -keyboardOffset }] } : undefined,
-          ]}
+          style={[styles.navBarContainer, keyboardOffset > 0 ? { bottom: keyboardOffset } : undefined]}
+          onLayout={onNavBarLayout}
         >
           <NavBar hideIcons={keyboardVisible && hasNavWidget} />
         </View>
@@ -76,6 +98,7 @@ export default function MainLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    width: "100%",
     backgroundColor: COLORS.white3,
   },
   desktopOuter: {
@@ -93,27 +116,29 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 18,
     elevation: 12,
-    display: "flex",
-    flexDirection: "column",
+    position: "relative",
   },
   deviceFull: {
     flex: 1,
     width: "100%",
-    display: "flex",
-    flexDirection: "column",
+    position: "relative",
+  },
+  contentArea: {
+    flex: 1,
+    width: "100%",
   },
   headerContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
     zIndex: 10,
-  },
-  content: {
-    flex: 1,
-    // Ensure content doesn't get hidden behind header/nav if they were absolute
-    // But here we are using flex column, so they stack naturally.
-    // If Header/NavBar have absolute positioning in their own styles, we might need to adjust.
-    // Based on previous App.tsx, they were absolute. Let's check Header/NavBar styles.
   },
   navBarContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
     zIndex: 10,
-    width: "100%",
   },
 });

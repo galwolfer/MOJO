@@ -4,6 +4,7 @@ import AppText from "../components/common/AppText";
 import { COLORS, SPACING } from "../theme";
 import { useNavigation } from "../context/NavigationContext";
 import { ICONS } from "../components/icons/icons";
+import ScrollableContent from "../components/layout/ScrollableContent";
 
 export default function CalendarScreen() {
   const { setHeaderConfig } = useNavigation();
@@ -24,16 +25,15 @@ export default function CalendarScreen() {
   }, []);
 
   return (
-    <View style={styles.container}>
+    <ScrollableContent respectHeader={true} respectNavBar={true} contentContainerStyle={styles.contentContainer}>
       <AppText variant="bodyText">Calendar / Tasks Screen Placeholder</AppText>
       <AppText variant="notes">Task list and calendar view...</AppText>
-    </View>
+    </ScrollableContent>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  contentContainer: {
     padding: SPACING.md,
     justifyContent: "center",
     alignItems: "center",

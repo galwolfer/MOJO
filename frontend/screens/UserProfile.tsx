@@ -6,7 +6,8 @@ import { COLORS, SPACING } from "../theme";
 import { useAuth } from "../context/AuthContext";
 import { useNavigation } from "../context/NavigationContext";
 import { ICONS } from "../components/icons/icons";
-import { Box, BoxContainer } from "../components";
+import { Box } from "../components";
+import ScrollableContent from "../components/layout/ScrollableContent";
 
 export default function UserProfileScreen() {
   const { user, signOut } = useAuth();
@@ -21,7 +22,7 @@ export default function UserProfileScreen() {
   }, []);
 
   return (
-    <BoxContainer>
+    <ScrollableContent respectHeader={true} respectNavBar={true} contentContainerStyle={styles.contentContainer}>
       <Box title="User Information">
         <AppText variant="boldText">Username:</AppText>
         <AppText variant="bodyText">{user?.username}</AppText>
@@ -51,14 +52,14 @@ export default function UserProfileScreen() {
           </>
         )}
       </Box>
-    </BoxContainer>
+    </ScrollableContent>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: SPACING.lg,
-    alignItems: "center",
+  contentContainer: {
+    padding: SPACING.md,
+    alignItems: "stretch",
+    gap: SPACING.lg,
   },
 });

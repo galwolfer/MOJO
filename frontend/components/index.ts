@@ -5,6 +5,8 @@ export { Checkbox as CheckboxNative } from "./icons/Checkbox.native";
 export { ProgressIcon } from "./icons/ProgressIcon";
 export { ProgressIcon as ProgressIconNative } from "./icons/ProgressIcon.native";
 export { default as BoxContainer } from "./layout/BoxContainer";
+export { default as ScrollableContent } from "./layout/ScrollableContent";
+export type { ScrollableContentRef } from "./layout/ScrollableContent";
 export { default as Input } from "./inputs/Input";
 export { default as PriorityList } from "./special/PriorityList";
 export { default as AppButton } from "./common/AppButton";

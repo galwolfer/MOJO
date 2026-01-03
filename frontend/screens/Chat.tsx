@@ -7,7 +7,7 @@ import { useNavigation } from "../context/NavigationContext";
 import { useAuth } from "../context/AuthContext";
 import { ICONS } from "../components/icons/icons";
 import { setChatAuthToken } from "../services/chatService";
-import { useKeyboard } from "../hooks";
+import { useKeyboard, useContentInsets } from "../hooks";
 import { useChatSessions, useChatMessages } from "../hooks";
 import { TimelineItem, buildTimelineItems } from "../utils/chatUtils";
 import TimelineItemComponent from "../components/chat/TimelineItem";
@@ -18,6 +18,7 @@ export default function ChatScreen() {
   const { token } = useAuth();
   const sessionsRef = useRef<ChatSessionSummary[]>([]);
   const { visible: keyboardVisible } = useKeyboard();
+  const contentInsets = useContentInsets();
 
   const { sessions, isLoadingSessions, isLoadingMoreSessions, hasMoreSessions, loadMoreSessions, updateSession } =
     useChatSessions();
@@ -137,6 +138,19 @@ export default function ChatScreen() {
 
   const keyExtractor = useCallback((item: TimelineItem) => item.id, []);
 
+  // Dynamic content container style based on floating header/navbar
+  const listContentStyle = useMemo(
+    () => ({
+      paddingHorizontal: SPACING.lg,
+      paddingTop: contentInsets.top + SPACING.md,
+      paddingBottom: contentInsets.keyboardVisible
+        ? contentInsets.bottomWithKeyboard + SPACING.md
+        : contentInsets.bottom + SPACING.md,
+      flexGrow: 1,
+    }),
+    [contentInsets]
+  );
+
   return (
     <View style={styles.container}>
       {/* Messages List */}
@@ -144,9 +158,10 @@ export default function ChatScreen() {
         data={timelineItems}
         renderItem={renderTimelineItem}
         keyExtractor={keyExtractor}
-        contentContainerStyle={styles.messagesList}
+        contentContainerStyle={listContentStyle}
         showsVerticalScrollIndicator={false}
-        scrollEnabled={false}
+        scrollEnabled={true}
+        keyboardShouldPersistTaps="handled"
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <AppText variant="bodyText" style={styles.emptyText}>
@@ -171,12 +186,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.white3,
-  },
-  messagesList: {
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.md,
-    paddingBottom: SPACING.md,
-    flexGrow: 1,
+    width: "100%",
   },
   emptyContainer: {
     flex: 1,
