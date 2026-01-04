@@ -9,14 +9,14 @@
  * Use `Box` to group related UI into visually distinct cards.
  */
 import React from "react";
-import { View, StyleSheet, Platform } from "react-native";
+import { View, StyleSheet, Platform, StyleProp, ViewStyle } from "react-native";
 import AppText from "../common/AppText";
 import { COLORS, SHADOWS, SPACING } from "../../theme";
 
 type BoxProps = {
   title?: string;
   children?: React.ReactNode;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
   /**
    * When `widget` is true the box uses a lighter surface (`COLORS.white3`)
    * suitable for embedding as a compact widget. Defaults to `false`.

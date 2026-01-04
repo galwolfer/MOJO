@@ -1,4 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
+
+/**
+ * useChatSessions
+ *
+ * Loads sessions with caching and merges local optimistic messages with server-provided data.
+ */
 import { useAuth } from "../context/AuthContext";
 import { listChatSessions, getChatUserSessions, ChatSessionSummary, ChatMessage } from "../services/chatService";
 import { loadCachedSessions, saveCachedSessions } from "../services/chatSessionCache";
@@ -128,7 +134,10 @@ export function useChatSessions() {
       const prev = map.get(next.sessionId);
 
       // Preserve messages if the incoming session doesn't include them.
-      const mergedMessages = mergeMessages(prev?.messages, Array.isArray(next.messages) ? next.messages : prev?.messages);
+      const mergedMessages = mergeMessages(
+        prev?.messages,
+        Array.isArray(next.messages) ? next.messages : prev?.messages
+      );
       const merged: ChatSessionSummary = {
         ...(prev || {}),
         ...next,

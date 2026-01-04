@@ -1,4 +1,12 @@
 import React, { useState, useCallback } from "react";
+
+/**
+ * MainLayout
+ *
+ * Composes the app's primary visual chrome: floating `Header` and `NavBar`
+ * with a central content area that renders the active screen. Handles
+ * measuring header/navbar heights and adapting to keyboard visibility.
+ */
 import { View, StyleSheet, Platform, useWindowDimensions, LayoutChangeEvent } from "react-native";
 import { useNavigation } from "../../context/NavigationContext";
 import { useLayout } from "../../context/LayoutContext";

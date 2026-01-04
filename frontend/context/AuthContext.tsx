@@ -1,4 +1,11 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
+
+/**
+ * AuthContext
+ *
+ * Provides `user`, `token`, and helpers `signIn`/`signOut` and persists
+ * token/user using secure storage on native or localStorage on web.
+ */
 import { Platform } from "react-native";
 import { setAuthToken } from "../services/apiClient";
 

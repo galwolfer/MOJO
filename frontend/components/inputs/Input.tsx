@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Animated,
   Platform,
-  Text,
   Modal,
   Easing,
   // Changed to Pressable for better handling of simultaneous gestures
@@ -90,6 +89,11 @@ function useWebCaret(idPrefix = "input") {
 
 /**
  * Input - A flexible input component with optional dropdown functionality.
+ *
+ * Note: dropdown `options` are supported for convenience but are considered
+ * a lightweight fallback — for complex/accessible selects prefer using a
+ * dedicated picker component.
+ *
  * @param type - The input type (text, email, password, number).
  * @param label - Optional label for the input.
  * @param error - Optional error message.
@@ -457,16 +461,6 @@ const styles = StyleSheet.create({
     ...(Platform.OS === "android" ? { includeFontPadding: false, textAlignVertical: "center" } : {}),
   },
 
-  customPlaceholder: {
-    position: "absolute",
-    left: SPACING.md,
-    top: SPACING.md,
-    fontFamily: FONTS.fredokaLight,
-    fontSize: TYPOGRAPHY.input.fontSize,
-    color: COLORS.lightGray,
-    lineHeight: TYPOGRAPHY.input.lineHeight,
-    pointerEvents: "none",
-  },
   errorText: {
     color: COLORS.primary7,
   },

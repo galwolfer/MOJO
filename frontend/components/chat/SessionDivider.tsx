@@ -1,4 +1,10 @@
 import React from "react";
+
+/**
+ * SessionDivider
+ *
+ * Small centered label used to separate chat sessions in the timeline.
+ */
 import { View, StyleSheet } from "react-native";
 import AppText from "../common/AppText";
 import { COLORS, SPACING } from "../../theme";

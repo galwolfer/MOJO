@@ -14,6 +14,8 @@ export { default as TextBouble } from "./common/TextBouble";
 export type { TextBoubleMode } from "./common/TextBouble";
 
 // Chat components
+/** Chat components */
 export { default as SessionDivider } from "./chat/SessionDivider";
 export { default as ChatMessageBubble } from "./chat/ChatMessageBubble";
-export { default as TimelineItem } from "./chat/TimelineItem";
+export { default as TimelineItemComponent } from "./chat/TimelineItem";
+export type { TimelineItem } from "./chat/TimelineItem";

@@ -1,4 +1,12 @@
 import React, { useState } from "react";
+
+/**
+ * AuthScreen
+ *
+ * Small onboarding and authentication screen that supports a lightweight
+ * multi-step flow: welcome -> name -> login/signup -> done. Uses `useAuth`
+ * to persist the authenticated user via `AuthProvider`.
+ */
 import { View, StyleSheet, ScrollView } from "react-native";
 import AppText from "../components/common/AppText";
 import AppButton from "../components/common/AppButton";
@@ -10,7 +18,7 @@ import { Box } from "../components";
 import { useAuth } from "../context/AuthContext";
 import { useKeyboard } from "../hooks";
 
-import { login as apiLogin, register as apiRegister, setApiBase } from "../services/apiClient";
+import { login as apiLogin, register as apiRegister } from "../services/apiClient";
 
 export default function AuthScreen() {
   const { signIn } = useAuth();
@@ -32,7 +40,7 @@ export default function AuthScreen() {
   const [displayName, setDisplayName] = useState("");
 
   // Pending auth state to hold data until user clicks "Go to start"
-  const [pendingAuth, setPendingAuth] = useState<{ token: string; user: any } | null>(null);
+  const [pendingAuth, setPendingAuth] = useState<{ token: string; user: any } | null>(null); // TODO: replace `any` with `User` type from AuthContext if desired
 
   const Mojo = ICONS.mojo as React.FC<any> | undefined;
   const { visible: keyboardVisible, height: keyboardHeight } = useKeyboard();

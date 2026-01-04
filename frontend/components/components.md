@@ -3,6 +3,12 @@
 This file documents the UI components in `frontend/components`.
 Update this file whenever you add, remove, or change a component.
 
+## Conventions
+
+- File layout: **helpers & types first → component function/JSX → styles (`StyleSheet.create`)**.
+- Add a short JSDoc block for each exported component (purpose + props + usage example).
+- Prefer theme tokens (`COLORS`, `SPACING`, `TYPOGRAPHY`) and `StyleProp` for style props.
+
 # Components
 
 This file documents the UI components in `frontend/components`.
@@ -44,7 +50,26 @@ Update this file whenever you add, remove, or change a component.
 - `TextBouble.tsx` — `frontend/components/common/TextBouble.tsx`
    - Text bubble component for displaying text in a styled bubble.
 
-- Barrel exports: `frontend/components/index.ts` exports the public components (e.g. `AppText`, `Box`, `BoxContainer`, `Checkbox`, `ProgressIcon`, `Input`, `ConicGradientBubble`, `PriorityList`, `TextBouble`). Use these for cleaner imports across the app.Maintenance
+- Barrel exports: `frontend/components/index.ts` exports the public components (e.g. `AppText`, `Box`, `BoxContainer`, `Checkbox`, `ProgressIcon`, `Input`, `ConicGradientBubble`, `PriorityList`, `TextBouble`). Use these for cleaner imports across the app.
+
+## Examples
+
+### AppButton
+```tsx
+<AppButton title="Save" onPress={save} icon="check" mode="filled" color="primary6" />
+```
+
+### Input
+```tsx
+<Input label="Email" placeholder="you@example.com" type="email" />
+```
+
+### AppText
+```tsx
+<AppText variant="title2">Welcome back</AppText>
+```
+
+## Maintenance
 ----------
 
 - `Icons` — `frontend/components/icons/icons.tsx`

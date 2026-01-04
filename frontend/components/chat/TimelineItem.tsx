@@ -1,4 +1,11 @@
 import React from "react";
+
+/**
+ * TimelineItem
+ *
+ * Renders either a `SessionDivider` or a chat `ChatMessageBubble` depending on `item.kind`.
+ * Uses `React.memo` with a detailed equality check to avoid unnecessary re-renders in long chat lists.
+ */
 import SessionDivider from "./SessionDivider";
 import ChatMessageBubble from "./ChatMessageBubble";
 

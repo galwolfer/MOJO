@@ -1,10 +1,16 @@
 import React, { createContext, useState, useContext, ReactNode } from "react";
 
+/**
+ * NavigationContext
+ *
+ * Centralized navigation and header/navbar configuration for the app.
+ */
+
 export type TabName = "chat" | "calendar" | "user";
 
 export type HeaderConfig = {
   title?: string;
-  icon?: any; // Icon component or source
+  icon?: React.ComponentType<{ size?: number; color?: string }>; // Icon component that accepts size/color
   show?: boolean;
   rightElement?: ReactNode;
   leftElement?: ReactNode; // e.g. Return icon

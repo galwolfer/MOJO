@@ -1,5 +1,5 @@
 import React from "react";
-import { Animated, Platform, TextInput, TextInputProps } from "react-native";
+import { Animated, Platform, TextInput, TextInputProps, StyleSheet } from "react-native";
 import { TYPOGRAPHY, COLORS } from "../../theme";
 
 interface InputFieldProps extends TextInputProps {
@@ -15,10 +15,10 @@ interface InputFieldProps extends TextInputProps {
  */
 const InputField = React.forwardRef<TextInput, InputFieldProps>(({ webNativeID, placeholderText, ...rest }, ref) => {
   return (
-    <Animated.View style={{ flex: 1 }}>
+    <Animated.View style={styles.container}>
       <TextInput
         ref={ref}
-        style={[{ flex: 1, padding: 12, fontFamily: TYPOGRAPHY.input.fontFamily, fontSize: TYPOGRAPHY.input.fontSize }]}
+        style={[styles.input]}
         placeholder={placeholderText ?? undefined}
         placeholderTextColor={COLORS.lightGray}
         {...((Platform as any).OS === "web" && webNativeID ? { nativeID: webNativeID } : {})}
@@ -29,5 +29,10 @@ const InputField = React.forwardRef<TextInput, InputFieldProps>(({ webNativeID, 
 });
 
 InputField.displayName = "InputField";
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  input: { flex: 1, padding: 12, fontFamily: TYPOGRAPHY.input.fontFamily, fontSize: TYPOGRAPHY.input.fontSize },
+});
 
 export default InputField;

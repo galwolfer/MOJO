@@ -1,5 +1,12 @@
 import React from "react";
 import { View, StyleSheet, TouchableOpacity } from "react-native";
+
+/**
+ * ChatMessageBubble
+ *
+ * Renders a single chat message with different presentation for the user vs assistant.
+ * Handles simple heuristics for error content and provides hooks for retrying failed messages.
+ */
 import AppText from "../common/AppText";
 import TextBouble from "../common/TextBouble";
 import { COLORS, SPACING } from "../../theme";
@@ -105,10 +112,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
     alignSelf: "flex-end",
   },
-  retryText: {
-    color: COLORS.primary7,
-    textDecorationLine: "underline",
-  },
+
   pendingText: {
     marginTop: SPACING.sm,
     alignSelf: "flex-end",

@@ -1,8 +1,7 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ViewStyle } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ViewStyle, StyleProp } from "react-native";
 import { COLORS, SPACING, TYPOGRAPHY, ICON_SIZES, getPalettePair } from "../../theme";
 import { ICONS } from "../icons/icons";
-import { transform } from "motion";
 
 interface TagProps {
   label: string;
@@ -11,7 +10,7 @@ interface TagProps {
   leftIcon?: React.ReactNode;
   /** choose a color palette 1..7, random if omitted */
   colorIndex?: number;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>; // accept style objects or arrays
 }
 
 /**
@@ -29,7 +28,7 @@ const Tag = ({ label, editable = false, onRemove, leftIcon, colorIndex, style }:
   return (
     <View style={[styles.root, { backgroundColor: pair.bg }, style]}>
       {leftIcon ? <View style={styles.leftIcon}>{leftIcon}</View> : null}
-      <Text style={[styles.label, { color: pair.text, translateY: 10 }]} numberOfLines={1} ellipsizeMode="tail">
+      <Text style={[styles.label, { color: pair.text }]} numberOfLines={1} ellipsizeMode="tail">
         {label}
       </Text>
       {editable && (
@@ -66,11 +65,6 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     justifyContent: "center",
     alignItems: "center",
-  },
-  remove: {
-    color: COLORS.darkP4,
-    fontSize: 14,
-    lineHeight: 14,
   },
 });
 

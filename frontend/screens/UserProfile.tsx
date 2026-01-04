@@ -1,4 +1,10 @@
 import React, { useEffect } from "react";
+
+/**
+ * UserProfileScreen
+ *
+ * Displays basic user information and a logout action via `useAuth`.
+ */
 import { View, StyleSheet, TouchableOpacity } from "react-native";
 import AppText from "../components/common/AppText";
 import AppButton from "../components/common/AppButton";

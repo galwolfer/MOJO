@@ -1,19 +1,30 @@
 import React from "react";
-import { View, Text, StyleSheet, Platform } from "react-native";
+import { View, Text, StyleSheet, Platform, StyleProp, ViewStyle } from "react-native";
 import { COLORS, SPACING, TYPOGRAPHY, SHADOWS, ICON_SIZES, COMPONENT_STYLES } from "../../theme";
 import GlassSurface from "./GlassSurface";
 
+/**
+ * HeaderProps
+ * - `Icon` should be a component that accepts `{ size, color }` props (standard for icon components)
+ * - `leftElement`, `rightElement`, `centerElement` and `element` allow injecting custom nodes
+ */
 type HeaderProps = {
   title?: string;
-  Icon?: any; // icon component
+  Icon?: React.ComponentType<{ size?: number; color?: string }>; // icon component
   show?: boolean;
   rightElement?: React.ReactNode;
   leftElement?: React.ReactNode;
   centerElement?: React.ReactNode;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
   element?: React.ReactNode;
 };
 
+/**
+ * Header
+ *
+ * Reusable app header. Use `leftElement` or `Icon` to show a leading control and
+ * `rightElement` for actions. Optional `element` renders an extra row under the main header.
+ */
 export default function Header({ title, Icon, show = true, rightElement, leftElement, element, style }: HeaderProps) {
   if (!show) return null;
 
@@ -66,11 +77,7 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: SPACING.md,
   },
-  centerSection: {
-    flex: 2,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+
   rightSection: {
     flexDirection: "row",
     alignItems: "center",

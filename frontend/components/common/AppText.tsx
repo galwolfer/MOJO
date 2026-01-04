@@ -12,7 +12,7 @@
  * typography changes are centralized.
  */
 import React from "react";
-import { Text, TextProps } from "react-native";
+import { Text, TextProps, TextStyle, StyleProp } from "react-native";
 import { TYPOGRAPHY } from "../../theme";
 
 type Variant = keyof typeof TYPOGRAPHY;
@@ -27,7 +27,7 @@ type AppTextProps = TextProps & {
  * typography presets. Default `variant` is `bodyText`.
  */
 const AppText = React.forwardRef<Text, AppTextProps>(({ variant = "bodyText", style, children, ...rest }, ref) => {
-  const variantStyle = (TYPOGRAPHY[variant] || TYPOGRAPHY.bodyText) as any;
+  const variantStyle: TextStyle = (TYPOGRAPHY[variant] || TYPOGRAPHY.bodyText) as TextStyle;
 
   return (
     <Text ref={ref} style={[variantStyle, style]} {...rest}>

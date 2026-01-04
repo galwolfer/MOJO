@@ -1,4 +1,10 @@
 import React, { useEffect } from "react";
+
+/**
+ * CalendarScreen
+ *
+ * Placeholder calendar screen — integrates with `NavigationContext` to set header content.
+ */
 import { View, StyleSheet, TouchableOpacity } from "react-native";
 import AppText from "../components/common/AppText";
 import { COLORS, SPACING } from "../theme";

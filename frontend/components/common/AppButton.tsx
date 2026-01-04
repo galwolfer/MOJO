@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { Pressable, View, StyleSheet, Animated, Easing } from "react-native";
+import { Pressable, View, StyleSheet, Animated, Easing, StyleProp, ViewStyle } from "react-native";
 import AppText from "./AppText";
 import { ICONS } from "../icons/icons";
 import { COLORS, SPACING, TYPOGRAPHY, SHADOWS } from "../../theme";
@@ -12,17 +12,25 @@ export type AppButtonProps = {
   iconPosition?: "left" | "right";
   mode?: "filled" | "light";
   color?: keyof typeof COLORS | string;
-  style?: any;
+  style?: StyleProp<ViewStyle>; // prefer StyleSheet or inline style for container customization
   disabled?: boolean;
   testID?: string;
 };
 
 /**
  * AppButton
+ *
+ * A small, reusable button used throughout the app. Key behavior:
  * - Supports an icon (from `frontend/components/icons/icons.tsx`) on the left or right
- * - Two modes: `filled` and `light`
- * - Color can be a key from `COLORS` in `frontend/theme.ts` or any color string
- * - Uses `SHADOWS.card` to match app surfaces
+ * - Two modes: `filled` (solid background) and `light` (transparent background + colored border)
+ * - `color` accepts a key from `COLORS` in `frontend/theme.ts` or any CSS color string
+ * - Adds `SHADOWS.card` for consistent elevated surfaces
+ * - Has a small press animation (scale + subtle opacity interpolation)
+ *
+ * Usage example:
+ * ```tsx
+ * <AppButton title="Save" onPress={save} icon="check" mode="filled" />
+ * ```
  */
 const AppButton: React.FC<AppButtonProps> = ({
   title,
@@ -142,12 +150,6 @@ const styles = StyleSheet.create({
     height: 22,
     alignItems: "center",
     justifyContent: "center",
-  },
-  pressed: {
-    transform: [{ scale: 0.96 }],
-  },
-  disabled: {
-    opacity: 0.5,
   },
 });
 

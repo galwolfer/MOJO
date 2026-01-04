@@ -1,5 +1,11 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from "react";
 
+/**
+ * LayoutContext
+ *
+ * Tracks measured header and navbar heights for layout calculations across the app.
+ */
+
 export type LayoutDimensions = {
   headerHeight: number;
   navBarHeight: number;

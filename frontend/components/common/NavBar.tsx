@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { View, StyleSheet, TouchableOpacity, Platform, Alert, Animated } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Platform, Animated } from "react-native";
 import { ICONS } from "../icons/icons";
 import { COLORS, SPACING, SHADOWS, ICON_SIZES } from "../../theme";
 import { useNavigation, TabName } from "../../context/NavigationContext";
@@ -10,6 +10,13 @@ type NavBarProps = {
   hideIcons?: boolean;
 };
 
+/**
+ * NavBar
+ *
+ * Bottom navigation bar. It reads `navBarConfig` from `NavigationContext` to optionally
+ * render widgets or a custom component. The bar animates in and out and adapts to
+ * keyboard visibility for full-width behavior.
+ */
 export default function NavBar({ show = true, hideIcons = false }: NavBarProps) {
   const { activeTab, setActiveTab, navBarConfig } = useNavigation();
   const { visible: keyboardVisible } = useKeyboard();

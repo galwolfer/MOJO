@@ -1,4 +1,11 @@
 import { useState, useCallback } from "react";
+
+/**
+ * useChatMessages
+ *
+ * Encapsulates optimistic send logic and in-memory message handling for a chat session.
+ * Exposes helpers to send and retry messages while keeping UI responsive.
+ */
 import { sendChatMessage, SendMessageResponse, ChatSessionSummary, ChatMessage } from "../services/chatService";
 
 const MAX_CACHED_MESSAGES_PER_SESSION = 50;
