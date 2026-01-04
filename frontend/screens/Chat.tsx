@@ -181,7 +181,7 @@ export default function ChatScreen() {
       if (didRestoreRef.current) {
         setScrollPosition("chat", scrollOffsetRef.current);
       }
-      const bottomThreshold = SPACING.lg;
+      const bottomThreshold = SPACING.lg * 10;
       const reachedBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - bottomThreshold;
       setIsAtBottom(reachedBottom);
     },
@@ -285,6 +285,28 @@ export default function ChatScreen() {
     }
     setIsAtBottom(true);
   }, []);
+
+  // Auto-scroll when a new message arrives and the user is already at the bottom.
+  // This keeps the view pinned to the latest message if the user hasn't scrolled up.
+  useEffect(() => {
+    if (!isAtBottom) return;
+    // Wait for layout to settle, then scroll
+    const task = InteractionManager.runAfterInteractions(() => {
+      const offset = Math.max(contentHeightRef.current - layoutHeightRef.current, 0);
+      if (offset <= 0) {
+        listRef.current?.scrollToEnd({ animated: true });
+      } else {
+        listRef.current?.scrollToOffset({ offset: offset + SPACING.sm, animated: true });
+      }
+    });
+
+    return () => {
+      // cancel if unmounted before interactions finish
+      try {
+        task.cancel();
+      } catch (_) {}
+    };
+  }, [timelineItems.length, isAtBottom]);
 
   return (
     <View style={styles.container}>
