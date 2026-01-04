@@ -25,6 +25,7 @@ export default function UserProfileScreen() {
     <ScrollableContent
       respectHeader={true}
       respectNavBar={true}
+      extraTopPadding={SPACING.lg}
       scrollKey="user"
       contentContainerStyle={styles.contentContainer}
     >

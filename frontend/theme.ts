@@ -148,6 +148,8 @@ export const COMPONENT_STYLES = {
     backgroundColor: GLASS.surface,
     borderWidth: 1,
     borderColor: GLASS.border,
+    // rounded corners and overflow hidden help the blur to render cleanly on native
+    overflow: "hidden" as any, // TypeScript workaround for web blur compatibility
     ...(Platform.OS === "web"
       ? {
           backdropFilter: "blur(18px)",

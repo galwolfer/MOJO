@@ -28,7 +28,7 @@ const BoxContainer: React.FC<Props> = ({ children, contentContainerStyle, ...res
 };
 
 export const boxContainerStyle: ViewStyle = {
-  padding: SPACING.md,
+  padding: SPACING.lg,
   alignItems: "stretch",
   gap: SPACING.lg,
 };

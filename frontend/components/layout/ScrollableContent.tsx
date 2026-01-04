@@ -12,6 +12,7 @@ import {
 import { useLayout } from "../../context/LayoutContext";
 import { useNavigation } from "../../context/NavigationContext";
 import { useKeyboard } from "../../hooks";
+import { SPACING } from "../../theme";
 
 export type ScrollableContentRef = {
   scrollToEnd: (animated?: boolean) => void;
@@ -123,6 +124,7 @@ const ScrollableContent = forwardRef<ScrollableContentRef, ScrollableContentProp
       {
         paddingTop: topPadding,
         paddingBottom: bottomPadding,
+        paddingHorizontal: SPACING.lg, // default side padding for consistent layout
       },
       contentContainerStyle,
     ];

@@ -7,6 +7,8 @@ import {
   ActivityIndicator,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  LayoutChangeEvent,
+  InteractionManager,
 } from "react-native";
 import AppText from "../components/common/AppText";
 import Input from "../components/inputs/Input";
@@ -16,6 +18,7 @@ import { useAuth } from "../context/AuthContext";
 import { ICONS } from "../components/icons/icons";
 import { setChatAuthToken } from "../services/chatService";
 import { useKeyboard, useContentInsets } from "../hooks";
+import GlassSurface from "../components/common/GlassSurface";
 import { useChatSessions, useChatMessages } from "../hooks";
 import { TimelineItem, buildTimelineItems } from "../utils/chatUtils";
 import TimelineItemComponent from "../components/chat/TimelineItem";
@@ -31,6 +34,8 @@ export default function ChatScreen() {
   const lastKeyboardHeightRef = useRef(0);
   const restoreOffsetRef = useRef<number | null>(null);
   const didRestoreRef = useRef(false);
+  const contentHeightRef = useRef(0);
+  const layoutHeightRef = useRef(0);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const { visible: keyboardVisible, height: keyboardHeight } = useKeyboard();
   const contentInsets = useContentInsets();
@@ -187,6 +192,7 @@ export default function ChatScreen() {
    * Restores list position after content lays out.
    */
   const handleContentSizeChange = useCallback(() => {
+    if (timelineItems.length === 0) return;
     if (!didRestoreRef.current) {
       if (restoreOffsetRef.current === null) {
         restoreOffsetRef.current = scrollPositions.chat ?? 0;
@@ -196,9 +202,40 @@ export default function ChatScreen() {
       } else {
         listRef.current?.scrollToEnd({ animated: false });
       }
+      const bottomThreshold = SPACING.lg;
+      const currentOffset = restoreOffsetRef.current ?? 0;
+      const reachedBottom = currentOffset + layoutHeightRef.current >= contentHeightRef.current - bottomThreshold;
+      setIsAtBottom(reachedBottom);
       didRestoreRef.current = true;
     }
-  }, [scrollPositions.chat]);
+  }, [scrollPositions.chat, timelineItems.length]);
+
+  const handleLayout = useCallback((event: LayoutChangeEvent) => {
+    layoutHeightRef.current = event.nativeEvent.layout.height;
+  }, []);
+
+  const handleListContentSizeChange = useCallback(
+    (width: number, height: number) => {
+      contentHeightRef.current = height;
+      handleContentSizeChange();
+    },
+    [handleContentSizeChange]
+  );
+
+  useEffect(() => {
+    if (didRestoreRef.current) return;
+    if ((scrollPositions.chat ?? 0) > 0) return;
+    if (timelineItems.length === 0) return;
+    const task = InteractionManager.runAfterInteractions(() => {
+      listRef.current?.scrollToEnd({ animated: false });
+      setIsAtBottom(true);
+      didRestoreRef.current = true;
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToEnd({ animated: false });
+      });
+    });
+    return () => task.cancel();
+  }, [timelineItems.length, scrollPositions.chat]);
 
   /**
    * Offsets list position by keyboard height when it appears/disappears.
@@ -237,6 +274,18 @@ export default function ChatScreen() {
     }
   }, [keyboardVisible, keyboardHeight]);
 
+  const scrollToBottom = useCallback(() => {
+    const offset = Math.max(contentHeightRef.current - layoutHeightRef.current, 0);
+    if (offset <= 0) {
+      // If content fits or is shorter than the view, fall back to scrollToEnd
+      listRef.current?.scrollToEnd({ animated: true });
+    } else {
+      // Add a small extra to ensure the last item is fully visible
+      listRef.current?.scrollToOffset({ offset: offset + SPACING.sm, animated: true });
+    }
+    setIsAtBottom(true);
+  }, []);
+
   return (
     <View style={styles.container}>
       {/* Messages List */}
@@ -251,7 +300,8 @@ export default function ChatScreen() {
         scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
         onScroll={handleListScroll}
-        onContentSizeChange={handleContentSizeChange}
+        onContentSizeChange={handleListContentSizeChange}
+        onLayout={handleLayout}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <AppText variant="bodyText" style={styles.emptyText}>
@@ -271,17 +321,24 @@ export default function ChatScreen() {
       {!isAtBottom && (
         <TouchableOpacity
           style={[
-            styles.scrollToBottomButton,
+            styles.scrollToBottomButtonContainer,
             {
+              // Align horizontally with the NavBar's visual content:
+              // when keyboard visible the NavBar uses paddingHorizontal = SPACING.lg
+              // otherwise it uses marginHorizontal + paddingHorizontal = SPACING.lg + SPACING.md
+              right: keyboardVisible ? SPACING.lg : SPACING.lg + SPACING.md,
+              // Position it just above the send button area (slightly lower than before)
               bottom: contentInsets.keyboardVisible
-                ? contentInsets.bottomWithKeyboard + SPACING.lg
-                : contentInsets.bottom + SPACING.lg,
+                ? contentInsets.bottomWithKeyboard + SPACING.sm
+                : contentInsets.bottom + SPACING.sm,
             },
           ]}
-          onPress={() => listRef.current?.scrollToEnd({ animated: true })}
+          onPress={scrollToBottom}
           activeOpacity={0.8}
         >
-          <ICONS.down size={ICON_SIZES.sm} color={COLORS.primary1} />
+          <GlassSurface intensity={50} style={styles.scrollToBottomButtonSurface}>
+            <ICONS.down size={FONT_SIZES.base} color={COLORS.primary1} />
+          </GlassSurface>
         </TouchableOpacity>
       )}
     </View>
@@ -331,15 +388,18 @@ const styles = StyleSheet.create({
   sendButtonDisabled: {
     backgroundColor: COLORS.lightGray,
   },
-  scrollToBottomButton: {
+  // Container to position the glossy button
+  scrollToBottomButtonContainer: {
     position: "absolute",
-    right: SPACING.lg,
-    width: SPACING.xlg,
-    height: SPACING.xlg,
-    borderRadius: SPACING.xlg,
-    backgroundColor: COLORS.white,
+  },
+  // Glass surface that matches the send button's size and proportions
+  scrollToBottomButtonSurface: {
+    width: FONT_SIZES.base * 2.5 + 1.5,
+    height: FONT_SIZES.base * 2.5 + 1.5,
+    borderRadius: FONT_SIZES.base,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
     ...(SHADOWS.card as object),
   },
 });

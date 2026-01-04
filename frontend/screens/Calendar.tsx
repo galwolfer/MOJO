@@ -28,6 +28,7 @@ export default function CalendarScreen() {
     <ScrollableContent
       respectHeader={true}
       respectNavBar={true}
+      extraTopPadding={SPACING.lg}
       scrollKey="calendar"
       contentContainerStyle={styles.contentContainer}
     >
