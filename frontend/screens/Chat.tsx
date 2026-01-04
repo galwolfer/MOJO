@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import AppText from "../components/common/AppText";
 import Input from "../components/inputs/Input";
-import { COLORS, FONT_SIZES, SHADOWS, SPACING } from "../theme";
+import { COLORS, FONT_SIZES, SHADOWS, SPACING, ICON_SIZES } from "../theme";
 import { useNavigation } from "../context/NavigationContext";
 import { useAuth } from "../context/AuthContext";
 import { ICONS } from "../components/icons/icons";
@@ -31,6 +31,7 @@ export default function ChatScreen() {
   const lastKeyboardHeightRef = useRef(0);
   const restoreOffsetRef = useRef<number | null>(null);
   const didRestoreRef = useRef(false);
+  const [isAtBottom, setIsAtBottom] = useState(true);
   const { visible: keyboardVisible, height: keyboardHeight } = useKeyboard();
   const contentInsets = useContentInsets();
 
@@ -170,8 +171,14 @@ export default function ChatScreen() {
    */
   const handleListScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
-      setScrollPosition("chat", scrollOffsetRef.current);
+      const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+      scrollOffsetRef.current = contentOffset.y;
+      if (didRestoreRef.current) {
+        setScrollPosition("chat", scrollOffsetRef.current);
+      }
+      const bottomThreshold = SPACING.lg;
+      const reachedBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - bottomThreshold;
+      setIsAtBottom(reachedBottom);
     },
     [setScrollPosition]
   );
@@ -186,6 +193,8 @@ export default function ChatScreen() {
       }
       if (restoreOffsetRef.current > 0) {
         listRef.current?.scrollToOffset({ offset: restoreOffsetRef.current, animated: false });
+      } else {
+        listRef.current?.scrollToEnd({ animated: false });
       }
       didRestoreRef.current = true;
     }
@@ -259,6 +268,22 @@ export default function ChatScreen() {
           </View>
         }
       />
+      {!isAtBottom && (
+        <TouchableOpacity
+          style={[
+            styles.scrollToBottomButton,
+            {
+              bottom: contentInsets.keyboardVisible
+                ? contentInsets.bottomWithKeyboard + SPACING.lg
+                : contentInsets.bottom + SPACING.lg,
+            },
+          ]}
+          onPress={() => listRef.current?.scrollToEnd({ animated: true })}
+          activeOpacity={0.8}
+        >
+          <ICONS.down size={ICON_SIZES.sm} color={COLORS.primary1} />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -305,5 +330,16 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: COLORS.lightGray,
+  },
+  scrollToBottomButton: {
+    position: "absolute",
+    right: SPACING.lg,
+    width: SPACING.xlg,
+    height: SPACING.xlg,
+    borderRadius: SPACING.xlg,
+    backgroundColor: COLORS.white,
+    alignItems: "center",
+    justifyContent: "center",
+    ...(SHADOWS.card as object),
   },
 });
