@@ -568,10 +568,18 @@ async function listTasks() {
     const detailParts = [
       `importance ${task.importance}`,
       `effort ${task.effort}`,
-      `score ${task.priorityScore ?? 0}`,
-      `tags: ${tags}`,
     ];
+
+    // Include description inside parentheses if available, quoted safely
+    const desc = task.description || task.note || "";
+    if (desc && String(desc).trim()) {
+      detailParts.push(`description: ${JSON.stringify(String(desc).trim())}`);
+    }
+
+    detailParts.push(`score ${task.priorityScore ?? 0}`);
+    detailParts.push(`tags: ${tags}`);
     if (subCategory) detailParts.push(`sub: ${subCategory}`);
+
     const line = `${index + 1}. ${paint(displayName, ansi.bold)}  ${theme.muted(`(${detailParts.join(", ")})`)}`;
     console.log(line);
   });
