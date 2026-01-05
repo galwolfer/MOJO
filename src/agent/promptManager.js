@@ -37,10 +37,10 @@ export class PromptManager {
     const messages = [new SystemMessage(systemPrompt)];
 
     // Add history (trimmed if necessary)
-    // Use TOKEN_BUDGET.MAX_HISTORY_TOKENS to guide slicing
-    // Approx 4 chars per token. Safe buffer: 1 message ~ 50 tokens.
-    // We keep last N turns verbatim.
-    const MAX_HISTORY_MSGS = 10;
+    // Use TOKEN_BUDGET.MAX_HISTORY_TOKENS to guide slicing dynamically
+    // Approx 4 chars per token. As a heuristic we cap message count to keep system prompts small.
+    const heuristicMsgs = Math.max(1, Math.floor(TOKEN_BUDGET.MAX_HISTORY_TOKENS / 150));
+    const MAX_HISTORY_MSGS = Math.min(10, heuristicMsgs);
     const recentHistory = history.slice(-MAX_HISTORY_MSGS);
 
     for (const msg of recentHistory) {

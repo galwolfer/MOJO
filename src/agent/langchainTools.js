@@ -2,7 +2,7 @@ import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
 import * as taskService from "../services/taskService.js";
 import { memoryStore } from "../services/memoryService.js";
-import { WIDGETS } from "./widgetManager.js";
+import { WIDGETS, TOOL_DESCRIPTIONS } from "./agentConfig.js";
 import { TASK_CONFIG, inferTaskProperties } from "./taskRules.js";
 
 /**
@@ -57,7 +57,7 @@ export function createLangChainTools(userId) {
      */
     new DynamicStructuredTool({
       name: "get_current_time",
-      description: "Returns current date/time",
+      description: TOOL_DESCRIPTIONS.get_current_time,
       schema: z.object({}), // No parameters needed
       func: async () => {
         const now = new Date();
@@ -82,8 +82,7 @@ ts="${now.toISOString()}"`;
      */
     new DynamicStructuredTool({
       name: "save_user_fact",
-      description:
-        "Save important facts about the user (name, age, location, education, work, preferences, skills). Use this when user shares personal information that should be remembered for future conversations. Write facts concisely (2-5 words).",
+      description: TOOL_DESCRIPTIONS.save_user_fact,
       schema: z.object({
         fact: z.string().describe("Concise fact about user (2-5 words, e.g., 'studies at Bar Ilan')"),
         category: z
@@ -134,8 +133,7 @@ err="${error.message}"`;
      */
     new DynamicStructuredTool({
       name: "save_conversation_note",
-      description:
-        "Save important information from the conversation (decisions, plans, requests, topics discussed). Use this for context that might be relevant in future conversations.",
+      description: TOOL_DESCRIPTIONS.save_conversation_note,
       schema: z.object({
         note: z.string().describe("Brief note about the conversation (5-20 words)"),
         importance: z.number().min(1).max(10).optional().default(5).describe("Importance level 1-10 (default: 5)"),
@@ -175,8 +173,7 @@ err="${error.message}"`;
      */
     new DynamicStructuredTool({
       name: "search_memories",
-      description:
-        "Search user's saved memories (facts about user, previous conversations). Use this when you need to recall information about the user that isn't in recent context.",
+      description: TOOL_DESCRIPTIONS.search_memories,
       schema: z.object({
         query: z.string().describe("What to search for in memories"),
         category: z
@@ -235,7 +232,7 @@ err="${error.message}"`;
      */
     new DynamicStructuredTool({
       name: "preview_task",
-      description: "CRITICAL: Call this tool IMMEDIATELY when user wants to create a new task. Do NOT respond with text. חובה להשתמש בכלי זה כאשר המשתמש מבקש ליצור משימה.",
+      description: TOOL_DESCRIPTIONS.preview_task,
       schema: z.object({
         name: z.string().describe("Task name"),
         deadline: z.string().describe("ISO 8601 date. Calculate from relative expressions."),
@@ -256,10 +253,10 @@ err="${error.message}"`;
       }),
       func: async (params) => {
         const { name, deadline, description, importance, effort, duration, tags, splitable, recurrence } = params;
-        
+
         // Infer properties from task name if not provided
         const inferred = inferTaskProperties(name);
-        
+
         // Apply defaults and inference
         const finalImportance = importance || inferred.importance;
         const finalEffort = effort || inferred.effort;
@@ -280,7 +277,7 @@ err="${error.message}"`;
           importance: finalImportance,
           effort: finalEffort,
           estimatedDuration: finalDuration,
-          canSplit: finalSplitable
+          canSplit: finalSplitable,
         };
 
         const widgetJson = {
@@ -299,14 +296,14 @@ err="${error.message}"`;
             estimatedDuration: finalDuration,
             canSplit: finalSplitable,
             confirmLabel: "Create Task",
-            cancelLabel: "Edit"
-          }
+            cancelLabel: "Edit",
+          },
         };
 
         return `Draft created successfully.
 Widget Payload: <WIDGET_JSON>${JSON.stringify(widgetJson)}</WIDGET_JSON>
 [SYSTEM INSTRUCTION: Output the above widget payload exactly. Address the user in their language to confirm the task.]`;
-      }
+      },
     }),
 
     /**
@@ -319,8 +316,7 @@ Widget Payload: <WIDGET_JSON>${JSON.stringify(widgetJson)}</WIDGET_JSON>
      */
     new DynamicStructuredTool({
       name: "add_task",
-      description:
-        "Create task with name, deadline, optional tag/recurrence. ONLY use this AFTER user confirmation. אסור להשתמש בכלי זה ישירות. רק לאחר אישור המשתמש.",
+      description: TOOL_DESCRIPTIONS.add_task,
       schema: z.object({
         name: z.string().describe("Task name"),
         deadline: z.string().describe("ISO 8601 date. Calculate from relative expressions."),
@@ -344,7 +340,7 @@ Widget Payload: <WIDGET_JSON>${JSON.stringify(widgetJson)}</WIDGET_JSON>
         try {
           // Infer properties from task name if not provided
           const inferred = inferTaskProperties(name);
-          
+
           // Apply defaults and inference
           const finalImportance = importance || inferred.importance;
           const finalEffort = effort || inferred.effort;
@@ -352,16 +348,16 @@ Widget Payload: <WIDGET_JSON>${JSON.stringify(widgetJson)}</WIDGET_JSON>
           const finalTags = tags || inferred.tags;
           const finalSplitable = splitable !== undefined ? splitable : TASK_CONFIG.defaults.splitable;
 
-          const taskData = { 
+          const taskData = {
             userId,
-            taskname: name, 
+            taskname: name,
             description: description || "",
             importance: finalImportance,
             effort: finalEffort,
             estimatedDuration: finalDuration,
             canSplit: finalSplitable,
-            tags: finalTags, 
-            dueDate: new Date(deadline) 
+            tags: finalTags,
+            dueDate: new Date(deadline),
           };
 
           // Add recurrence pattern if specified
@@ -414,7 +410,7 @@ int=${task.recurrence.interval}`;
      */
     new DynamicStructuredTool({
       name: "get_tasks",
-      description: "Retrieve tasks. Filter by tag/completion/date.",
+      description: TOOL_DESCRIPTIONS.get_tasks,
       schema: z.object({
         tag: z.string().optional(),
         completed: z.boolean().optional(),
@@ -480,7 +476,7 @@ int=${task.recurrence.interval}`;
      */
     new DynamicStructuredTool({
       name: "update_task",
-      description: "Update task name/tag/deadline/status",
+      description: TOOL_DESCRIPTIONS.update_task,
       schema: z.object({
         taskId: z.string().optional(),
         name: z.string().optional().describe("Task name to identify task when taskId is not provided"),
@@ -546,7 +542,7 @@ int=${task.recurrence.interval}`;
      */
     new DynamicStructuredTool({
       name: "delete_task",
-      description: "Delete task permanently",
+      description: TOOL_DESCRIPTIONS.delete_task,
       schema: z.object({
         taskId: z.string(),
       }),
@@ -575,7 +571,7 @@ int=${task.recurrence.interval}`;
      */
     new DynamicStructuredTool({
       name: "get_upcoming_tasks",
-      description: "Get tasks within N days",
+      description: TOOL_DESCRIPTIONS.get_upcoming_tasks,
       schema: z.object({
         days: z.number().optional().default(7),
       }),
@@ -605,7 +601,9 @@ int=${task.recurrence.interval}`;
             },
           };
 
-          return `Here are your upcoming tasks for the next ${days} days:\n<WIDGET_JSON>\n${JSON.stringify(widgetJson)}\n</WIDGET_JSON>`;
+          return `Here are your upcoming tasks for the next ${days} days:\n<WIDGET_JSON>\n${JSON.stringify(
+            widgetJson
+          )}\n</WIDGET_JSON>`;
         } catch (error) {
           return `Error retrieving upcoming tasks: ${error.message}`;
         }
@@ -622,7 +620,7 @@ int=${task.recurrence.interval}`;
      */
     new DynamicStructuredTool({
       name: "get_overdue_tasks",
-      description: "Get overdue incomplete tasks",
+      description: TOOL_DESCRIPTIONS.get_overdue_tasks,
       schema: z.object({}), // No parameters
       returnDirect: true,
       func: async () => {
@@ -650,7 +648,9 @@ int=${task.recurrence.interval}`;
             },
           };
 
-          return `You have ${tasks.length} overdue tasks:\n<WIDGET_JSON>\n${JSON.stringify(widgetJson)}\n</WIDGET_JSON>`;
+          return `You have ${tasks.length} overdue tasks:\n<WIDGET_JSON>\n${JSON.stringify(
+            widgetJson
+          )}\n</WIDGET_JSON>`;
         } catch (error) {
           return `Error retrieving overdue tasks: ${error.message}`;
         }

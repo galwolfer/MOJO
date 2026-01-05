@@ -552,8 +552,26 @@ Three levels of customization:
 
 - **MESSAGE_FLOW.md** - Detailed message flow diagrams
 - **MEMORY_EMBEDDING_SYSTEM.md** - Vector embedding details
-- **README.md** - General project overview
 - **TASKS_README.md** - Task management specifics
+
+---
+
+## 🧩 Refactor Notes & Guidelines
+
+This section consolidates the agent refactor guidance and single-source-of-truth rules introduced during the recent changes. Edit instructions and widget schemas in one place to keep behavior consistent.
+
+**Key files**
+- `agentConfig.js` — Central place for system prompts, policy anchors, widgets, and tool manifest strings. Edit strings here to change LLM instructions and widget descriptions in one place.
+- `prompts.js` — Thin wrappers that re-export builders and constants from `agentConfig` (kept for backwards compatibility).
+- `widgetManager.js` — Compatibility layer that delegates to `agentConfig` for widget data and prompt text.
+- `langchainTools.js` — Tools factory for LLM actions (memory, tasks, time). Keep business logic here; move descriptive strings to `agentConfig.js` when appropriate.
+
+**Guidelines**
+- **Edit prompts & widget text only in `agentConfig.js`.** This is the single source of truth for LLM-facing strings.
+- **Add widgets** by updating the `WIDGETS` map in `agentConfig.js` and extend `getWidgetPromptInstructions()` if needed.
+- **Tool descriptions** should be added to `TOOL_DESCRIPTIONS` for consistent LLM-facing help text.
+- **Keep tool logic** in `langchainTools.js`, but prefer referencing descriptions from `agentConfig.js`.
+- **Tests & docs:** Add unit tests when modifying tools or prompt behaviors to prevent regressions.
 
 ---
 

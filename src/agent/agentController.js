@@ -367,14 +367,8 @@ export class AgentController {
 
       // Background Task: Update Summary if needed
       if (messageIndex % TOKEN_BUDGET.SUMMARY_UPDATE_EVERY_K_TURNS === 0) {
-        console.log(
-          `[AgentController] Triggering background summary update for session ${sessionId} (Turn ${messageIndex})`
-        );
-        // TODO: Implement actual summarization logic here
-        // 1. Get full history
-        // 2. Call LLM to summarize older messages
-        // 3. Update session.summary
-        // 4. Prune old messages from DB if desired (or just keep them for archival)
+        // Trigger a background summarization job (non-blocking)
+        this._triggerSummaryUpdate(sessionId, userId, messageIndex);
       }
 
       return {
@@ -425,5 +419,28 @@ export class AgentController {
    */
   async listUserSessions(userId, limit, cursor, includeMessages) {
     return await memoryStore.listSessions(userId, limit, cursor, includeMessages);
+  }
+
+  /**
+   * Background summary update (non-blocking)
+   * @private
+   */
+  _triggerSummaryUpdate(sessionId, userId, messageIndex) {
+    setImmediate(async () => {
+      try {
+        console.log(`[AgentController] Background summary: collecting history for ${sessionId}`);
+        const history = await memoryStore.getHistory(sessionId, userId);
+        // Lightweight summarization placeholder: join last N messages.
+        const snippet = history
+          .slice(-20)
+          .map((m) => `${m.role}: ${m.content}`)
+          .join("\n");
+        const short = snippet.length > 1000 ? snippet.substring(0, 1000) + "..." : snippet;
+        await memoryStore.updateSessionSummary(sessionId, `AutoSummary (turn ${messageIndex}): ${short}`);
+        console.log(`[AgentController] Background summary update saved for session ${sessionId}`);
+      } catch (err) {
+        console.warn(`[AgentController] Summary update failed: ${err.message}`);
+      }
+    });
   }
 }
