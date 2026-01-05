@@ -2,6 +2,8 @@ import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
 import * as taskService from "../services/taskService.js";
 import { memoryStore } from "../services/memoryService.js";
+import { WIDGETS } from "./widgetManager.js";
+import { TASK_CONFIG, inferTaskProperties } from "./taskRules.js";
 
 /**
  * ========================================
@@ -224,28 +226,25 @@ err="${error.message}"`;
 
     /**
      * ==================
-     * TASK TOOL: add_task
+     * TASK TOOL: preview_task
      * ==================
-     * Create a new task in the user's task list.
-     *
-     * Parameters:
-     * - name: Task description (e.g., "Buy groceries", "Finish project report")
-     * - tag: Optional category (e.g., "work", "personal", "shopping")
-     * - deadline: ISO 8601 date string (e.g., "2024-12-25")
-     *   The LLM should interpret relative dates: "tomorrow" → ISO date
-     * - recurrence: Optional recurring pattern (daily, weekly, monthly, yearly)
-     *
-     * The LLM handles date calculation automatically - it should never ask user
-     * Example: "next Monday" or "in 3 days" should be converted to ISO date
+     * CRITICAL: This is the ONLY tool to use when user wants to create a new task.
+     * Call this tool IMMEDIATELY when user asks to add/create a task.
+     * Do NOT respond with text. Do NOT ask questions.
+     * חובה להשתמש בכלי זה כאשר המשתמש מבקש ליצור משימה חדשה.
      */
     new DynamicStructuredTool({
-      name: "add_task",
-      description:
-        "Create task with name, deadline, optional tag/recurrence. Calculate ISO date from relative expressions (never ask user).",
+      name: "preview_task",
+      description: "CRITICAL: Call this tool IMMEDIATELY when user wants to create a new task. Do NOT respond with text. חובה להשתמש בכלי זה כאשר המשתמש מבקש ליצור משימה.",
       schema: z.object({
         name: z.string().describe("Task name"),
-        tag: z.string().optional().describe("Category (optional)"),
         deadline: z.string().describe("ISO 8601 date. Calculate from relative expressions."),
+        description: z.string().optional().describe("Additional details"),
+        importance: z.number().min(1).max(5).optional().describe("1-5 scale (1=low, 5=critical)"),
+        effort: z.number().min(1).max(5).optional().describe("1-5 scale (1=easy, 5=hard)"),
+        duration: z.number().optional().describe("Estimated time in minutes"),
+        tags: z.array(z.string()).optional().describe("Categories"),
+        splitable: z.boolean().optional().describe("Can be split into chunks?"),
         recurrence: z
           .object({
             type: z.enum(["daily", "weekly", "monthly", "yearly"]),
@@ -255,12 +254,113 @@ err="${error.message}"`;
           })
           .optional(),
       }),
-      func: async ({ name, tag, deadline, recurrence }) => {
+      func: async (params) => {
+        const { name, deadline, description, importance, effort, duration, tags, splitable, recurrence } = params;
+        
+        // Infer properties from task name if not provided
+        const inferred = inferTaskProperties(name);
+        
+        // Apply defaults and inference
+        const finalImportance = importance || inferred.importance;
+        const finalEffort = effort || inferred.effort;
+        const finalDuration = duration || inferred.duration;
+        const finalTags = tags || inferred.tags;
+        const finalSplitable = splitable !== undefined ? splitable : TASK_CONFIG.defaults.splitable;
+
+        // Construct a mock task object
+        const draftTask = {
+          id: "draft-" + Date.now(),
+          title: name,
+          status: "draft",
+          dueDate: new Date(deadline).toISOString(),
+          priority: finalImportance >= 4 ? "high" : finalImportance <= 2 ? "low" : "medium",
+          tags: finalTags,
+          description: description || (recurrence ? `Recurrence: ${recurrence.type}` : ""),
+          // Extra fields for display if widget supports them
+          importance: finalImportance,
+          effort: finalEffort,
+          estimatedDuration: finalDuration,
+          canSplit: finalSplitable
+        };
+
+        const widgetJson = {
+          version: "1.0",
+          widget_type: "task_confirmation",
+          data: {
+            id: "draft-" + Date.now(),
+            title: name,
+            status: "draft",
+            dueDate: new Date(deadline).toISOString(),
+            priority: finalImportance >= 4 ? "high" : finalImportance <= 2 ? "low" : "medium",
+            tags: finalTags,
+            description: description || (recurrence ? `Recurrence: ${recurrence.type}` : ""),
+            importance: finalImportance,
+            effort: finalEffort,
+            estimatedDuration: finalDuration,
+            canSplit: finalSplitable,
+            confirmLabel: "Create Task",
+            cancelLabel: "Edit"
+          }
+        };
+
+        return `Draft created successfully.
+Widget Payload: <WIDGET_JSON>${JSON.stringify(widgetJson)}</WIDGET_JSON>
+[SYSTEM INSTRUCTION: Output the above widget payload exactly. Address the user in their language to confirm the task.]`;
+      }
+    }),
+
+    /**
+     * ==================
+     * TASK TOOL: add_task
+     * ==================
+     * Create a new task in the user's task list.
+     * ONLY use this AFTER user confirmation.
+     * אסור להשתמש בכלי זה ישירות. רק לאחר אישור המשתמש.
+     */
+    new DynamicStructuredTool({
+      name: "add_task",
+      description:
+        "Create task with name, deadline, optional tag/recurrence. ONLY use this AFTER user confirmation. אסור להשתמש בכלי זה ישירות. רק לאחר אישור המשתמש.",
+      schema: z.object({
+        name: z.string().describe("Task name"),
+        deadline: z.string().describe("ISO 8601 date. Calculate from relative expressions."),
+        description: z.string().optional().describe("Additional details"),
+        importance: z.number().min(1).max(5).optional().describe("1-5 scale (1=low, 5=critical)"),
+        effort: z.number().min(1).max(5).optional().describe("1-5 scale (1=easy, 5=hard)"),
+        duration: z.number().optional().describe("Estimated time in minutes"),
+        tags: z.array(z.string()).optional().describe("Categories"),
+        splitable: z.boolean().optional().describe("Can be split into chunks?"),
+        recurrence: z
+          .object({
+            type: z.enum(["daily", "weekly", "monthly", "yearly"]),
+            interval: z.number().optional().default(1),
+            endDate: z.string().optional(),
+            count: z.number().optional(),
+          })
+          .optional(),
+      }),
+      func: async (params) => {
+        const { name, deadline, description, importance, effort, duration, tags, splitable, recurrence } = params;
         try {
+          // Infer properties from task name if not provided
+          const inferred = inferTaskProperties(name);
+          
+          // Apply defaults and inference
+          const finalImportance = importance || inferred.importance;
+          const finalEffort = effort || inferred.effort;
+          const finalDuration = duration || inferred.duration;
+          const finalTags = tags || inferred.tags;
+          const finalSplitable = splitable !== undefined ? splitable : TASK_CONFIG.defaults.splitable;
+
           const taskData = { 
             userId,
             taskname: name, 
-            tags: tag ? [tag] : [], 
+            description: description || "",
+            importance: finalImportance,
+            effort: finalEffort,
+            estimatedDuration: finalDuration,
+            canSplit: finalSplitable,
+            tags: finalTags, 
             dueDate: new Date(deadline) 
           };
 
@@ -321,6 +421,7 @@ int=${task.recurrence.interval}`;
         dueBefore: z.string().optional(),
         dueAfter: z.string().optional(),
       }),
+      returnDirect: true,
       func: async ({ tag, completed, dueBefore, dueAfter }) => {
         try {
           // Build filter object for database query
@@ -336,23 +437,29 @@ int=${task.recurrence.interval}`;
           const tasks = await taskService.getTasksForUser(userId, filters);
 
           if (tasks.length === 0) {
-            return `ok=true\ncount=0\nmsg="No tasks found"`;
+            return "I couldn't find any tasks matching your criteria.";
           }
 
-          // Format results as a clear bulleted list for the LLM to present nicely
-          const items = tasks
-            .map((t, i) => {
-              const tagStr = Array.isArray(t.tags) && t.tags.length ? t.tags[0] : "";
-              const done = t.status === "done";
-              const dueStr = t.dueDate 
-                ? new Date(t.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                : "no due date";
-              return `• ${t.taskname}${tagStr ? ` [${tagStr}]` : ""} — due: ${dueStr}${done ? " ✓ done" : ""}`;
-            })
-            .join("\n");
-          return `ok=true\ncount=${tasks.length}\n\n[SYSTEM: Display this list exactly as is, do not reformat]\nYour tasks:\n${items}`;
+          // Construct Widget JSON
+          const widgetJson = {
+            version: "1.0",
+            widget_type: "task_list",
+            data: {
+              tasks: tasks.map((t) => ({
+                id: t._id,
+                title: t.taskname,
+                status: t.status,
+                dueDate: t.dueDate,
+                priority: t.priority,
+                tags: t.tags,
+                description: t.description,
+              })),
+            },
+          };
+
+          return `Here are the tasks I found:\n<WIDGET_JSON>\n${JSON.stringify(widgetJson)}\n</WIDGET_JSON>`;
         } catch (error) {
-          return `ok=false\nerr="${error.message}"`;
+          return `Error retrieving tasks: ${error.message}`;
         }
       },
     }),
@@ -472,22 +579,35 @@ int=${task.recurrence.interval}`;
       schema: z.object({
         days: z.number().optional().default(7),
       }),
+      returnDirect: true,
       func: async ({ days = 7 }) => {
         try {
           const tasks = await taskService.getUpcomingTasks(userId, days);
 
           if (tasks.length === 0) {
-            return `ok=true\ncount=0`;
+            return `You don't have any upcoming tasks for the next ${days} days.`;
           }
 
-          // Format as list of upcoming tasks
-          const items = tasks.map((t) => {
-            const dueStr = t.dueDate ? new Date(t.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "no date";
-            return `• ${t.taskname} (due: ${dueStr})`;
-          }).join("\n");
-          return `ok=true\ncount=${tasks.length}\n\n[SYSTEM: Display this list exactly as is, do not reformat]\nUpcoming tasks:\n${items}`;
+          // Construct Widget JSON
+          const widgetJson = {
+            version: "1.0",
+            widget_type: "task_list",
+            data: {
+              tasks: tasks.map((t) => ({
+                id: t._id,
+                title: t.taskname,
+                status: t.status,
+                dueDate: t.dueDate,
+                priority: t.priority,
+                tags: t.tags,
+                description: t.description,
+              })),
+            },
+          };
+
+          return `Here are your upcoming tasks for the next ${days} days:\n<WIDGET_JSON>\n${JSON.stringify(widgetJson)}\n</WIDGET_JSON>`;
         } catch (error) {
-          return `ok=false\nerr="${error.message}"`;
+          return `Error retrieving upcoming tasks: ${error.message}`;
         }
       },
     }),
@@ -504,25 +624,35 @@ int=${task.recurrence.interval}`;
       name: "get_overdue_tasks",
       description: "Get overdue incomplete tasks",
       schema: z.object({}), // No parameters
+      returnDirect: true,
       func: async () => {
         try {
           const tasks = await taskService.getOverdueTasks(userId);
 
           if (tasks.length === 0) {
-            return `ok=true\ncount=0`;
+            return "Great news! You don't have any overdue tasks.";
           }
 
-          // Format results with days overdue
-          const items = tasks
-            .map((t) => {
-              const days = Math.floor((new Date() - new Date(t.dueDate)) / 86400000);
-              const dueStr = t.dueDate ? new Date(t.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "no date";
-              return `• ${t.taskname} (due: ${dueStr}, ${days} days overdue)`;
-            })
-            .join("\n");
-          return `ok=true\ncount=${tasks.length}\n\n[SYSTEM: Display this list exactly as is, do not reformat]\nOverdue tasks:\n${items}`;
+          // Construct Widget JSON
+          const widgetJson = {
+            version: "1.0",
+            widget_type: "task_list",
+            data: {
+              tasks: tasks.map((t) => ({
+                id: t._id,
+                title: t.taskname,
+                status: t.status,
+                dueDate: t.dueDate,
+                priority: t.priority,
+                tags: t.tags,
+                description: t.description,
+              })),
+            },
+          };
+
+          return `You have ${tasks.length} overdue tasks:\n<WIDGET_JSON>\n${JSON.stringify(widgetJson)}\n</WIDGET_JSON>`;
         } catch (error) {
-          return `ok=false\nerr="${error.message}"`;
+          return `Error retrieving overdue tasks: ${error.message}`;
         }
       },
     }),

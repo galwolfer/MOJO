@@ -44,7 +44,6 @@ const router = Router();
 // All routes require authentication
 router.use(requireAuth);
 
-
 /* ─────────────────────────────────────────────────────────────────────────
    🔍 FILTERED QUERIES
    These routes must come before /:id routes to avoid conflicts
@@ -55,7 +54,6 @@ router.get("/upcoming/:days?", taskController.getUpcomingTasks);
 
 // Get all overdue tasks (past deadline + not completed)
 router.get("/overdue", taskController.getOverdueTasks);
-
 
 /* ─────────────────────────────────────────────────────────────────────────
    ⚠️  EXPIRED TASK MANAGEMENT
@@ -247,7 +245,6 @@ router.post("/expired/:id/handle", async (req, res, next) => {
   }
 });
 
-
 /* ─────────────────────────────────────────────────────────────────────────
    STANDARD CRUD OPERATIONS
    Basic create, read, update, delete operations for tasks
@@ -270,6 +267,5 @@ router.delete("/:id", taskController.deleteTask);
 
 // Toggle task completion status
 router.post("/:id/toggle", taskController.toggleTaskCompletion);
-
 
 export default router;

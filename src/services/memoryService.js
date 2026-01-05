@@ -25,6 +25,30 @@ class MongoMemoryStore {
   }
 
   /**
+   * Get session summary
+   */
+  async getSessionSummary(sessionId) {
+    try {
+      const session = await Session.findOne({ sessionId }).select("summary");
+      return session?.summary || "";
+    } catch (error) {
+      console.error("Error getting session summary:", error);
+      return "";
+    }
+  }
+
+  /**
+   * Update session summary
+   */
+  async updateSessionSummary(sessionId, summary) {
+    try {
+      await Session.findOneAndUpdate({ sessionId }, { summary });
+    } catch (error) {
+      console.error("Error updating session summary:", error);
+    }
+  }
+
+  /**
    * Get or create user by MongoDB _id
    */
   async getUserById(userId) {

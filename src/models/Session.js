@@ -44,6 +44,11 @@ const sessionSchema = new mongoose.Schema(
       default: 0,
       index: true,
     },
+    // Rolling summary of the conversation
+    summary: {
+      type: String,
+      default: "",
+    },
     lastActiveAt: {
       type: Date,
       default: Date.now,

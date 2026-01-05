@@ -2,7 +2,8 @@ import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 import { memoryStore } from "../services/memoryService.js";
 import { createLangChainTools } from "./langchainTools.js";
-import { buildSystemPromptWithUserContext } from "./prompts.js";
+import { PromptManager } from "./promptManager.js";
+import { TOKEN_BUDGET, LOGGING_FIELDS } from "./tokenBudget.js";
 import { User } from "../models/index.js";
 import { config } from "../config/env.js";
 
@@ -80,10 +81,15 @@ export class AgentController {
       // Store the user's message in the session for later retrieval
       await memoryStore.addUserMessage(sessionId, userId, userMessage);
 
+      // Get message count (Task 1)
+      const messageCount = await memoryStore.getMessageCount(sessionId, userId);
+      const messageIndex = messageCount; // 1-based index
+
       // STEP 2: RETRIEVE CONVERSATION HISTORY
       // Get all previous messages in this session (cached for performance)
       let history = await memoryStore.getHistory(sessionId, userId);
-      console.log(`[AgentController] History length: ${history.length}`);
+      const summary = await memoryStore.getSessionSummary(sessionId);
+      console.log(`[AgentController] History length: ${history.length}, Summary length: ${summary.length}`);
 
       // STEP 3: LOAD USER PROFILE
       // Get user's preferences: name, tone (friendly/professional), persona
@@ -132,7 +138,7 @@ export class AgentController {
 
       // SAFETY: Truncate long memory context to avoid huge prompts
       // The LLM can use search_memories tool for deeper recall if needed
-      const MAX_MEMORY_CHARS = 200;
+      const MAX_MEMORY_CHARS = TOKEN_BUDGET.MAX_MEMORY_TOKENS * 4; // Approx 4 chars per token
       if (memoryContext.length > MAX_MEMORY_CHARS) {
         console.warn(
           `[AgentController] memoryContext is ${memoryContext.length} chars; truncating to ${MAX_MEMORY_CHARS} chars. LLM can use search_memories tool for more.`
@@ -140,36 +146,23 @@ export class AgentController {
         memoryContext = memoryContext.substring(0, MAX_MEMORY_CHARS) + "...";
       }
 
-      // STEP 5: BUILD PERSONALIZED SYSTEM PROMPT
-      // Inject user context (name, preferences) into the system prompt
-      // This tells the LLM how to behave and remember important details
-      const systemPrompt = buildSystemPromptWithUserContext(userProfile, userId, memoryContext);
-      console.log(`[AgentController] System prompt length: ${systemPrompt.length} chars`);
+      // STEP 5 & 6: BUILD MESSAGES (Task 2 & 3)
+      const messages = PromptManager.buildMessages({
+        userMessage,
+        history,
+        summary,
+        userProfile,
+        userId,
+        memoryContext,
+        messageIndex,
+      });
 
-      // OPTIMIZATION: Trim conversation history to reduce token usage
-      // Keeping only last 10 messages balances context quality with token efficiency
-      const MAX_HISTORY_MESSAGES = 10;
-      if (history.length > MAX_HISTORY_MESSAGES) {
-        console.warn(
-          `[AgentController] history length is ${history.length}; trimming to last ${MAX_HISTORY_MESSAGES} messages to reduce prompt size.`
-        );
-        history = history.slice(-MAX_HISTORY_MESSAGES);
-      }
-
-      // STEP 6: PREPARE MESSAGES FOR LANGCHAIN
-      // Convert conversation history to LangChain message objects
-      const messages = [new SystemMessage(systemPrompt)];
-
-      for (const msg of history) {
-        if (msg.role === "user") {
-          messages.push(new HumanMessage(msg.content));
-        } else if (msg.role === "assistant") {
-          messages.push(new AIMessage(msg.content));
-        }
-      }
-
-      // Add the current user message
-      messages.push(new HumanMessage(userMessage));
+      // LOGGING (Task 0)
+      const systemMessage = messages.find((m) => m._getType() === "system");
+      const systemTokens = systemMessage ? systemMessage.content.length / 4 : 0; // Approx
+      console.log(`[TokenBudget] tokens_in_system: ~${Math.round(systemTokens)}`);
+      console.log(`[TokenBudget] tokens_in_memory: ~${Math.round(memoryContext.length / 4)}`);
+      console.log(`[TokenBudget] tokens_in_history: ~${Math.round(JSON.stringify(history).length / 4)}`);
 
       console.log(`[AgentController] Invoking LLM with ${messages.length} messages`);
 
@@ -226,6 +219,15 @@ export class AgentController {
                     tool_call_id: toolCall.id,
                   });
 
+                  // CHECK FOR RETURN DIRECT
+                  // If the tool is configured to return directly, we skip the final LLM generation
+                  // and return the tool's output as the final response.
+                  if (tool.returnDirect) {
+                    console.log(`[AgentController] Tool ${toolCall.name} requested returnDirect`);
+                    finalResponse = result;
+                    break; // Break the tool loop
+                  }
+
                   console.log(`[AgentController] Tool ${toolCall.name} executed successfully`);
                 } catch (error) {
                   console.error(`[AgentController] Tool execution error:`, error);
@@ -276,6 +278,19 @@ export class AgentController {
 
       // STEP 10: RETURN RESULT
       // Send back the response with metadata
+
+      // Background Task: Update Summary if needed
+      if (messageIndex % TOKEN_BUDGET.SUMMARY_UPDATE_EVERY_K_TURNS === 0) {
+        console.log(
+          `[AgentController] Triggering background summary update for session ${sessionId} (Turn ${messageIndex})`
+        );
+        // TODO: Implement actual summarization logic here
+        // 1. Get full history
+        // 2. Call LLM to summarize older messages
+        // 3. Update session.summary
+        // 4. Prune old messages from DB if desired (or just keep them for archival)
+      }
+
       return {
         success: true,
         response: finalResponse,
