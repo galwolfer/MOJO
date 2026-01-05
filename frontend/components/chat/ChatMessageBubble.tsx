@@ -8,7 +8,7 @@ import { View, StyleSheet, TouchableOpacity } from "react-native";
  * Handles simple heuristics for error content and provides hooks for retrying failed messages.
  */
 import AppText from "../common/AppText";
-import TextBouble from "../common/TextBouble";
+import TextBouble from "./TextBouble";
 import { COLORS, SPACING } from "../../theme";
 
 interface ChatMessageBubbleProps {

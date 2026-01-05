@@ -10,8 +10,8 @@ export type { ScrollableContentRef } from "./layout/ScrollableContent";
 export { default as Input } from "./inputs/Input";
 export { default as PriorityList } from "./special/PriorityList";
 export { default as AppButton } from "./common/AppButton";
-export { default as TextBouble } from "./common/TextBouble";
-export type { TextBoubleMode } from "./common/TextBouble";
+export { default as TextBouble } from "./chat/TextBouble";
+export type { TextBoubleMode } from "./chat/TextBouble";
 
 // Chat components
 /** Chat components */

@@ -41,7 +41,7 @@ const Storage = {
     if (SecureStore) return await SecureStore.setItemAsync(key, value);
   },
   deleteItem: async (key: string) => {
-    if (isWeb) {
+    if (isWeb) { 
       if (typeof localStorage !== "undefined") return localStorage.removeItem(key);
       return;
     }

@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import AppText from "../components/common/AppText";
 import Input from "../components/inputs/Input";
-import { COLORS, FONT_SIZES, SHADOWS, SPACING, ICON_SIZES } from "../theme";
+import { COLORS, FONT_SIZES, SHADOWS, SPACING } from "../theme";
 import { useNavigation } from "../context/NavigationContext";
 import { useAuth } from "../context/AuthContext";
 import { ICONS } from "../components/icons/icons";

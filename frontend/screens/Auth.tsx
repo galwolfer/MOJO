@@ -11,7 +11,7 @@ import { View, StyleSheet, ScrollView } from "react-native";
 import AppText from "../components/common/AppText";
 import AppButton from "../components/common/AppButton";
 import Input from "../components/inputs/Input";
-import TextBouble from "../components/common/TextBouble";
+import TextBouble from "../components/chat/TextBouble";
 import { ICONS } from "../components/icons/icons";
 import { COLORS, SPACING } from "../theme";
 import { Box } from "../components";
