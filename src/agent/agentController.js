@@ -2,6 +2,7 @@ import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 import { memoryStore } from "../services/memoryService.js";
 import { createLangChainTools } from "./langchainTools.js";
+import { validateToolCall, validateWidgetPayload } from "./security.js";
 import { PromptManager } from "./promptManager.js";
 import { TOKEN_BUDGET, LOGGING_FIELDS } from "./tokenBudget.js";
 import { User } from "../models/index.js";
@@ -190,7 +191,53 @@ export class AgentController {
 
         try {
           // Invoke the LLM with all available tools
-          const response = await llmWithTools.invoke(currentMessages);
+          let response;
+          try {
+            response = await llmWithTools.invoke(currentMessages);
+          } catch (err) {
+            console.error(
+              `[AgentController] LLM invocation failed. Sanitized messages:`,
+              currentMessages.map((m) => ({ type: m._getType && m._getType(), content: m.content }))
+            );
+            // If we saw the internal TypeError (reading 'message'), perform a minimal retry
+            // to help isolate provider/formatting issues (system + last user message)
+            if (err instanceof TypeError && /reading 'message'/.test(err.message)) {
+              console.warn(
+                `[AgentController] Detected TypeError in LLM invoke (reading 'message'). Retrying with minimal messages (system + last user message).`
+              );
+              const systemMsg = currentMessages.find((m) => m._getType && m._getType() === "system");
+              const lastUser = [...currentMessages].reverse().find((m) => m._getType && m._getType() === "human");
+              const fallback = [systemMsg, lastUser].filter(Boolean);
+              try {
+                console.log(`[AgentController] Attempting fallback invoke with ${fallback.length} messages`);
+                response = await llmWithTools.invoke(fallback);
+                console.log(`[AgentController] Fallback invoke succeeded.`);
+              } catch (err2) {
+                console.error(`[AgentController] Fallback invoke also failed:`, err2);
+                throw err; // rethrow original for visibility
+              }
+            } else {
+              throw err;
+            }
+          }
+
+          // SECURITY: Reject explicit 'system' messages coming from the model (prompt injection attempt).
+          if (response._getType && response._getType() === "system") {
+            console.warn(`[AgentController] Ignoring system message received from LLM (possible prompt injection).`);
+            const errText = `ok=false\nerr="System messages from the model are not allowed and were ignored."`;
+
+            // Persist a function result for auditing
+            await memoryStore.addFunctionResult(sessionId, userId, "_system_rejected", errText);
+
+            // Do not add it to history as a system message. Instead, add a tool-like failure so LLM sees it's not allowed
+            currentMessages.push({
+              role: "tool",
+              content: errText,
+            });
+
+            // Try loop again so the LLM can respond to the rejection
+            continue;
+          }
 
           // Check if the LLM wants to call any tools
           if (response.tool_calls && response.tool_calls.length > 0) {
@@ -208,11 +255,47 @@ export class AgentController {
 
               if (tool) {
                 try {
+                  // Validate the tool call args against tool schema and basic security checks
+                  const validation = validateToolCall(tool, toolCall.args || {});
+                  if (!validation.valid) {
+                    console.warn(
+                      `[AgentController] Tool call validation failed for ${toolCall.name}: ${validation.reason}`
+                    );
+                    const errText = `ok=false\nerr="Validation failed: ${validation.reason}"`;
+                    // Persist failure to session for auditing
+                    await memoryStore.addFunctionResult(sessionId, userId, toolCall.name, errText);
+
+                    // Do not execute the tool; notify LLM via tool response
+                    currentMessages.push({
+                      role: "tool",
+                      content: errText,
+                      tool_call_id: toolCall.id,
+                    });
+                    continue; // skip execution
+                  }
+
                   // Execute the tool with the arguments provided by the LLM
-                  const result = await tool.func(toolCall.args);
+                  let result = await tool.func(toolCall.args);
+
+                  // If result contains a widget payload, validate it
+                  if (typeof result === "string" && result.includes("<WIDGET_JSON>")) {
+                    const widgetValidation = validateWidgetPayload(result);
+                    if (!widgetValidation.valid) {
+                      console.warn(
+                        `[AgentController] Widget validation failed for ${toolCall.name}: ${widgetValidation.reason}`
+                      );
+                      // Persist failure for auditing
+                      await memoryStore.addFunctionResult(
+                        sessionId,
+                        userId,
+                        toolCall.name,
+                        `ok=false\nerr="Widget validation failed: ${widgetValidation.reason}"`
+                      );
+                      result = `ok=false\nerr="Widget validation failed: ${widgetValidation.reason}"`;
+                    }
+                  }
 
                   // Add the tool result to the message history
-                  // The LLM will use this result to inform its next response
                   currentMessages.push({
                     role: "tool",
                     content: result,
@@ -220,8 +303,6 @@ export class AgentController {
                   });
 
                   // CHECK FOR RETURN DIRECT
-                  // If the tool is configured to return directly, we skip the final LLM generation
-                  // and return the tool's output as the final response.
                   if (tool.returnDirect) {
                     console.log(`[AgentController] Tool ${toolCall.name} requested returnDirect`);
                     finalResponse = result;
@@ -240,6 +321,11 @@ export class AgentController {
                 }
               } else {
                 console.warn(`[AgentController] Tool not found: ${toolCall.name}`);
+                currentMessages.push({
+                  role: "tool",
+                  content: `ok=false\nerr="Tool not found: ${toolCall.name}"`,
+                  tool_call_id: toolCall.id,
+                });
               }
             }
             // Loop back: invoke LLM again with tool results

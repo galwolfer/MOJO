@@ -18,6 +18,7 @@
 
 import { WidgetManager } from "./widgetManager.js";
 import { getTaskFieldInstructions } from "./taskRules.js";
+import { POLICY_ANCHOR } from "./security.js";
 
 /**
  * BASE SYSTEM PROMPT - Core instructions for the LLM
@@ -123,8 +124,13 @@ export function buildSystemPromptWithUserContext(
   let prompt = "";
 
   // ALWAYS include the base identity and tool manifest to ensure the agent knows its rules and tools.
+  // For first-turns and reminder turns we insert a brief security "policy anchor" to resist prompt injection.
   // Optimization: We could potentially trim TOOL_MANIFEST if context is tight, but BASE_IDENTITY is critical.
-  prompt = `${BASE_IDENTITY}\n\n${TOOL_MANIFEST}`;
+  if (options.isFirstTurn || options.isReminderTurn) {
+    prompt = `${POLICY_ANCHOR}\n\n${BASE_IDENTITY}\n\n${TOOL_MANIFEST}`;
+  } else {
+    prompt = `${BASE_IDENTITY}\n\n${TOOL_MANIFEST}`;
+  }
 
   // ADD PERSONALITY AND TONE CUSTOMIZATION
   // This tells the LLM how to interact with this specific user
