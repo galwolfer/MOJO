@@ -81,6 +81,17 @@ export function validateWidgetPayload(raw) {
     }
   }
 
+  // Reject empty task lists to avoid showing widgets with no useful data
+  if (payload.widget_type === "task_list") {
+    if (!payload.data || !Array.isArray(payload.data.tasks)) {
+      return { valid: false, reason: "task_list payload missing tasks array" };
+    }
+    if (payload.data.tasks.length === 0) {
+      // Return parsed widget for special handling by the controller
+      return { valid: false, reason: "Empty task list", widget: payload };
+    }
+  }
+
   // No suspicious tokens in JSON string
   if (containsSuspiciousToken(JSON.stringify(payload)))
     return { valid: false, reason: "Widget payload contains suspicious tokens" };

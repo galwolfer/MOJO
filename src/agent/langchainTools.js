@@ -4,6 +4,8 @@ import * as taskService from "../services/taskService.js";
 import { memoryStore } from "../services/memoryService.js";
 import { WIDGETS, TOOL_DESCRIPTIONS } from "./agentConfig.js";
 import { TASK_CONFIG, inferTaskProperties } from "./taskRules.js";
+import { GeminiAdapter } from "./geminiAdapter.js";
+import { config } from "../config/env.js";
 
 /**
  * ========================================
@@ -136,20 +138,64 @@ err="${error.message}"`;
       description: TOOL_DESCRIPTIONS.save_conversation_note,
       schema: z.object({
         note: z.string().describe("Brief note about the conversation (5-20 words)"),
+        englishNote: z
+          .string()
+          .optional()
+          .describe("English translation of the note (preferred if source is not English)"),
         importance: z.number().min(1).max(10).optional().default(5).describe("Importance level 1-10 (default: 5)"),
       }),
-      func: async ({ note, importance = 5 }) => {
+      func: async ({ note, englishNote, importance = 5 }) => {
         try {
-          await memoryStore.saveConversationMemory(userId, note, "conversation", importance, {
+          const metadata = { source: "llm_tool" };
+          let noteToSave = note;
+
+          // Prefer the provided English translation when available
+          if (englishNote && englishNote.trim()) {
+            noteToSave = englishNote.trim();
+            metadata.originalText = note;
+            metadata.translated = true;
+            if (/[\u0590-\u05FF]/.test(note)) metadata.originalLanguage = "he";
+          } else {
+            // If the note contains non-ASCII characters, attempt to auto-translate via Gemini if available
+            if (/[^\u0000-\u007F]/.test(note)) {
+              if (config.geminiApiKey) {
+                try {
+                  const adapter = new GeminiAdapter(config.geminiApiKey, config.geminiModel);
+                  const messages = [
+                    {
+                      role: "system",
+                      content:
+                        "You are a concise translator. Translate the following text into concise English (5-20 words). Preserve date expressions (do NOT convert them to ISO). Reply ONLY with the translated text.",
+                    },
+                    { role: "user", content: note },
+                  ];
+                  const response = await adapter.generateContent(messages);
+                  const extracted = adapter.extractResponse(response);
+                  if (extracted && extracted.type === "text" && extracted.text) {
+                    noteToSave = extracted.text.trim().split(/\n/)[0];
+                    metadata.originalText = note;
+                    metadata.translated = true;
+                    if (/[\u0590-\u05FF]/.test(note)) metadata.originalLanguage = "he";
+                  } else {
+                    metadata.needsTranslation = true;
+                  }
+                } catch (err) {
+                  metadata.needsTranslation = true;
+                }
+              } else {
+                metadata.needsTranslation = true;
+              }
+            }
+          }
+
+          await memoryStore.saveConversationMemory(userId, noteToSave, "conversation", importance, {
             source: "llm_tool",
+            metadata,
           });
 
-          return `ok=true
-msg="Saved note: ${note}"
-imp=${importance}`;
+          return `ok=true\nmsg="Saved note: ${noteToSave}"\nimp=${importance}`;
         } catch (error) {
-          return `ok=false
-err="${error.message}"`;
+          return `ok=false\nerr="${error.message}"`;
         }
       },
     }),
@@ -227,13 +273,13 @@ err="${error.message}"`;
      * ==================
      * CRITICAL: This is the ONLY tool to use when user wants to create a new task.
      * Call this tool IMMEDIATELY when user asks to add/create a task.
-     * Do NOT respond with text. Do NOT ask questions.
-     * Always use this tool when the user requests to create a new task.
+     * After the tool returns a widget, generate a brief, natural confirmation message in the user's language that references the widget and asks for confirmation if needed.
+     * Use this tool immediately when the user requests creating a task.
      */
     new DynamicStructuredTool({
       name: "preview_task",
       description: TOOL_DESCRIPTIONS.preview_task,
-      returnDirect: true,
+      returnDirect: false,
       schema: z.object({
         name: z.string().describe("Task name"),
         deadline: z.string().describe("ISO 8601 date. Calculate from relative expressions."),
@@ -285,8 +331,7 @@ err="${error.message}"`;
           },
         };
 
-        return `Great — I prepared a draft task. Would you like me to create it?
-<WIDGET_JSON>${JSON.stringify(widgetJson)}</WIDGET_JSON>`;
+        return `<WIDGET_JSON>${JSON.stringify(widgetJson)}</WIDGET_JSON>`;
       },
     }),
 
@@ -296,12 +341,12 @@ err="${error.message}"`;
      * ==================
      * Create a new task in the user's task list.
      * ONLY use this AFTER user confirmation.
-     * Only call this tool after explicit user confirmation.
+     * Do not call this tool directly; call only after explicit user confirmation.
      */
     new DynamicStructuredTool({
       name: "add_task",
       description: TOOL_DESCRIPTIONS.add_task,
-      returnDirect: true,
+      returnDirect: false,
       schema: z.object({
         name: z.string().describe("Task name"),
         deadline: z.string().describe("ISO 8601 date. Calculate from relative expressions."),
@@ -361,9 +406,10 @@ err="${error.message}"`;
 
           console.log(`[LOG] Task created: ${task._id} ${recurrence ? "(recurring)" : ""}`);
 
-          return `Task "${task.taskname}" created successfully. (ID: ${task._id})`;
+          // Return structured result only (LLM will generate user-facing confirmation)
+          return `ok=true\nmsg="Task created"\nid="${task._id}"`;
         } catch (error) {
-          return `Sorry, there was an error creating the task: ${error.message}`;
+          return `ok=false\nerr="${error.message}"`;
         }
       },
     }),
@@ -391,7 +437,7 @@ err="${error.message}"`;
         dueBefore: z.string().optional(),
         dueAfter: z.string().optional(),
       }),
-      returnDirect: true,
+      returnDirect: false,
       func: async ({ tag, completed, dueBefore, dueAfter }) => {
         try {
           // Build filter object for database query
@@ -427,7 +473,8 @@ err="${error.message}"`;
             },
           };
 
-          return `Here are the tasks I found:\n<WIDGET_JSON>\n${JSON.stringify(widgetJson)}\n</WIDGET_JSON>`;
+          // Return widget only; the LLM should generate the natural assistant message referencing this widget
+          return `<WIDGET_JSON>${JSON.stringify(widgetJson)}</WIDGET_JSON>`;
         } catch (error) {
           return `Error retrieving tasks: ${error.message}`;
         }
@@ -463,14 +510,15 @@ err="${error.message}"`;
         try {
           // If taskId not provided, try to resolve by exact task name
           if (!taskId) {
-            if (!name) return `You must provide a taskId or a task name to update.`;
+            if (!name) return `You must provide a taskId or task name to update.`;
             const candidates = await taskService.getTasksForUser(userId, { taskname: name });
             if (!candidates || candidates.length === 0) {
               return `Task "${name}" not found.`;
             }
             if (candidates.length > 1) {
               const list = candidates.map((c) => `- ${c.taskname} (${c._id})`).join("\n");
-              return `Multiple tasks found with that name. Please specify which one:\n${list}`;
+              return `I found multiple tasks with that name. Please specify the exact task:\n${list}`;
+            }
             taskId = candidates[0]._id;
           }
 
@@ -482,7 +530,10 @@ err="${error.message}"`;
           if (deadline !== undefined) {
             const d = new Date(deadline);
             if (isNaN(d.getTime())) {
-              return `The provided date format is invalid.`;
+              return `The deadline date format you provided is invalid.`;
+            }
+            updates.dueDate = d;
+          }
 
           if (completed !== undefined) updates.status = completed ? "done" : "todo";
 
@@ -545,7 +596,7 @@ err="${error.message}"`;
       schema: z.object({
         days: z.number().optional().default(7),
       }),
-      returnDirect: true,
+      returnDirect: false,
       func: async ({ days = 7 }) => {
         try {
           const tasks = await taskService.getUpcomingTasks(userId, days);
@@ -571,9 +622,8 @@ err="${error.message}"`;
             },
           };
 
-          return `Here are your upcoming tasks for the next ${days} days:\n<WIDGET_JSON>\n${JSON.stringify(
-            widgetJson
-          )}\n</WIDGET_JSON>`;
+          // Return widget only; LLM should generate the natural message referencing it
+          return `<WIDGET_JSON>${JSON.stringify(widgetJson)}</WIDGET_JSON>`;
         } catch (error) {
           return `Error retrieving upcoming tasks: ${error.message}`;
         }
@@ -592,7 +642,7 @@ err="${error.message}"`;
       name: "get_overdue_tasks",
       description: TOOL_DESCRIPTIONS.get_overdue_tasks,
       schema: z.object({}), // No parameters
-      returnDirect: true,
+      returnDirect: false,
       func: async () => {
         try {
           const tasks = await taskService.getOverdueTasks(userId);
@@ -618,9 +668,8 @@ err="${error.message}"`;
             },
           };
 
-          return `You have ${tasks.length} overdue tasks:\n<WIDGET_JSON>\n${JSON.stringify(
-            widgetJson
-          )}\n</WIDGET_JSON>`;
+          // Return widget only; LLM should generate a natural message referencing it
+          return `<WIDGET_JSON>${JSON.stringify(widgetJson)}</WIDGET_JSON>`;
         } catch (error) {
           return `Error retrieving overdue tasks: ${error.message}`;
         }

@@ -108,12 +108,6 @@ export class AgentController {
         persona: userProfile.persona,
       });
 
-      // Detect input language using simple script check (adds a signal for the prompt)
-      // If Hebrew characters are present, mark as 'he', otherwise default to 'en'
-      const inputLanguage = /[\u0590-\u05FF]/.test(userMessage) ? "he" : "en";
-      userProfile.inputLanguage = inputLanguage;
-      console.log(`[AgentController] Detected user input language: ${inputLanguage}`);
-
       // STEP 4: SEMANTIC MEMORY RETRIEVAL
       // Use vector embeddings to find memories relevant to the user's message
       // This allows the agent to "remember" past facts and decisions
@@ -323,15 +317,25 @@ export class AgentController {
                       console.warn(
                         `[AgentController] Widget validation failed for ${toolCall.name}: ${widgetValidation.reason}`
                       );
-                      // Persist failure for auditing
-                      await memoryStore.addToolResult(
-                        sessionId,
-                        userId,
-                        toolCall.id,
-                        toolCall.name,
-                        `ok=false\nerr="Widget validation failed: ${widgetValidation.reason}"`
-                      );
-                      result = `ok=false\nerr="Widget validation failed: ${widgetValidation.reason}"`;
+
+                      // Special-case: empty task list -> replace with text response instead of showing empty widget
+                      if (
+                        widgetValidation.reason === "Empty task list" &&
+                        widgetValidation.widget?.widget_type === "task_list"
+                      ) {
+                        console.log(`[AgentController] Replacing empty task_list widget with a text response`);
+                        result = `I couldn't find any tasks.`; // Plain text response; LLM can follow up naturally
+                      } else {
+                        // Persist failure for auditing
+                        await memoryStore.addToolResult(
+                          sessionId,
+                          userId,
+                          toolCall.id,
+                          toolCall.name,
+                          `ok=false\nerr="Widget validation failed: ${widgetValidation.reason}"`
+                        );
+                        result = `ok=false\nerr="Widget validation failed: ${widgetValidation.reason}"`;
+                      }
                     }
                   }
 
