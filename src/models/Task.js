@@ -1,4 +1,3 @@
-// Notes are in English as requested.
 import mongoose from "mongoose";
 import { updateAllScores } from "../scripts/updateScores.js";
 import { detectTags } from "../algorithms/priority/tagging.js";

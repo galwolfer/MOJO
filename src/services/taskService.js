@@ -19,6 +19,10 @@
  */
 
 import cron from "node-cron";
+/*
+ * File: src/services/taskService.js
+ * Purpose: Business logic for task persistence and expired checks
+ */
 import { Task } from "../models/Task.js";
 import { TaskSchedule } from "../models/TaskSchedule.js";
 import { BusyBlock } from "../models/BusyBlock.js";

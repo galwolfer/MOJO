@@ -1,4 +1,8 @@
-// Notes are in English as requested.
+
+/*
+ * File: src/routes/Users.js
+ * Purpose: User listing and creation routes
+ */
 import { Router } from "express";
 import * as users from "../controllers/Users.js";
 

@@ -1,3 +1,7 @@
+/*
+ * File: src/models/Session.js
+ * Purpose: Session model storing conversation messages and metadata
+ */
 import mongoose from "mongoose";
 
 /**

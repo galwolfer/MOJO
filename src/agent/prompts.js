@@ -26,8 +26,37 @@ import {
 } from "./agentConfig.js";
 
 /**
- * Backwards-compatible prompt helpers using centralized `agentConfig`.
- * Keep these thin wrappers so callers can continue to import from `prompts.js`.
+ * Build a personalized system prompt with user-specific context
+ *
+ * This function takes the base system prompt and injects:
+ * 1. USER IDENTIFICATION - userId and optionally user's name
+ * 2. PERSONALITY SETTINGS - How to respond (tone and persona)
+ * 3. MEMORY CONTEXT - Recent relevant memories injected into the prompt
+ *
+ * PERSONALIZATION TIERS:
+ * - Tone: Sets communication style (friendly, professional, casual, etc.)
+ * - Persona: Optional roleplay instruction (e.g., "act as a coach")
+ * - Memories: Relevant facts and past discussions automatically retrieved
+ *
+ * The final prompt tells the LLM:
+ * - Who it's talking to (user identification)
+ * - How to talk to them (tone/persona)
+ * - What to remember about them (memory context)
+ *
+ * @param {Object} userProfile - User preferences { name, tone, persona }
+ * @param {string} userId - User's MongoDB _id (for tool binding)
+ * @param {string} memoryContext - Formatted memories to inject into prompt
+ * @returns {string} Complete personalized system prompt
+ *
+ * Example output:
+ * ```
+ * You are MOJO, a helpful AI assistant...
+ * [base rules]
+ * PERSONALITY: Act as a friendly coach. Tone: warm, approachable, conversational.
+ * User: 5f7a8b9c0d1e2f3g4h5i6j (user)
+ * Memory: studies at Bar Ilan; likes coding;
+ * Past: discussed project timeline yesterday;
+ * ```
  */
 
 // Expose current identity text (evaluated per import)

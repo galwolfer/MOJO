@@ -1,4 +1,7 @@
-// Notes are in English as requested.
+/*
+ * File: src/routes/health.js
+ * Purpose: Simple health check route
+ */
 import { Router } from "express";
 const router = Router();
 

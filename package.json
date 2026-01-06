@@ -8,12 +8,15 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "cli": "node src/cli.js",
+    "test:scheduler": "node scripts/test_scheduler.js",
+    "debug:plan": "node scripts/debug_plan.js",
     "test:memory": "node scripts/test_memory.js",
     "test:user-memory": "node scripts/test_user_memory_system.js",
     "test:security": "node scripts/test_security_hardening.js",
     "test:security:integration": "node scripts/test_security_integration.js",
     "migrate:memories": "node scripts/migrate_memories_to_users.js",
-    "lint": "echo \"(add ESLint if you want)\""
+    "lint": "echo \"(add ESLint if you want)\"",
+    "pytest": "pip install -r requirements.txt && pytest -q"
   },
   "keywords": [
     "ai",

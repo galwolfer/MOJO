@@ -1,4 +1,7 @@
-// Notes are in English as requested.
+/*
+ * File: src/controllers/Users.js
+ * Purpose: Basic user listing and creation (mostly used by admin/CLI)
+ */
 import { User } from "../models/User.js";
 import bcrypt from "bcryptjs";
 

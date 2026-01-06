@@ -1,3 +1,7 @@
+/*
+ * File: src/services/index.js
+ * Purpose: Service registry and coacher algorithm for priority scoring
+ */
 /**
  * @fileoverview Services Index & Coacher Algorithm
  * @module services/index
@@ -6,7 +10,7 @@
  * Re-exports services from subdirectories and provides the main task prioritization logic.
  *
  * Key responsibilities:
- * - Export team-specific placeholder services (Ofek, Gal)
+ * - Export placeholder services (profile)
  * - Provide coacherAlgorithm for task scoring and prioritization
  * - Bridge between database tasks and priority scoring algorithm
  * - Convert task formats for compatibility with scoring engine
@@ -23,34 +27,22 @@
  * @requires algorithms/priority/priority - Task scoring algorithm
  */
 
-// ==================== OFEK — SERVICES (START) ====================
-export const ofekService = {
-  // Example: fetch items from a DB (mocked)
-  list: async () => {
-    // TODO(Ofek): connect to DB and return items
-    return [];
-  },
-  create: async (data) => {
-    // TODO(Ofek): insert item in DB
-    return { id: "mock-id", ...data };
-  },
-};
-// ==================== OFEK — SERVICES (END) ======================
 
-// ==================== GAL — SERVICES (START) =====================
-export const galService = {
+
+// ==================== PROFILE — SERVICES (START) =====================
+export const profileService = {
   getProfile: async () => {
-    // TODO(Gal): query user profile
-    return { name: "Gal", role: "teammate" };
+    // TODO(profile): query user profile
+    return { name: "user", role: "member" };
   },
   updateProfile: async (data) => {
-    // TODO(Gal): update user profile
+    // TODO(profile): update user profile
     return { ...data, updatedAt: new Date().toISOString() };
   },
 };
-// ==================== GAL — SERVICES (END) =======================
+// ==================== PROFILE — SERVICES (END) =======================
 
-// ==================== JONI — SERVICES (START) ====================
+// ==================== PRIORITY — SERVICES (START) ====================
 import { Task } from "../models/Task.js";
 import { scoreActivities } from "../algorithms/priority/priority.js";
 
@@ -119,4 +111,4 @@ export const coacherAlgorithm = {
 
 export default coacherAlgorithm;
 
-// ==================== JONI — SERVICES (END) ======================
+// ==================== PRIORITY — SERVICES (END) ======================

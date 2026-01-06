@@ -1,4 +1,7 @@
-// Telemetry model for tracking user actions and system events
+/*
+ * File: src/models/EventLog.js
+ * Purpose: Telemetry model for tracking user actions and system events
+ */
 import mongoose from "mongoose";
 
 const eventLogSchema = new mongoose.Schema(

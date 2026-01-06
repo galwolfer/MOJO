@@ -50,3 +50,6 @@ data/vector_db/
 # Test users and data (optional)
 # Uncomment to ignore test data
 # data/test_*
+
+# Python bytecode caches
+__pycache__/

@@ -50,6 +50,9 @@ const STOP_WORDS = new Set([
   "your",
 ]);
 
+// Low-value tokens that should be de-emphasized when forming labels
+const LOW_VALUE = new Set(["final", "finish", "homework", "task", "project", "do", "complete", "complete", "assignment"]);
+
 // Keep a small alias map so related terms collapse to the same canonical token.
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -59,6 +62,60 @@ const normalizeToken = (token) => {
   return trimmed.replace(/s$/i, "");
 };
 
+// Remove common leading imperative/filler phrases so labels focus on the object
+const LEADING_PHRASES = [
+  "go to the",
+  "go to",
+  "go",
+  "finish",
+  "do",
+  "complete",
+  "start",
+  "attend",
+  "meet",
+  "call",
+  "plan",
+  "schedule",
+  "buy",
+  "order",
+  "pay",
+  "submit",
+  "turn in",
+  "read",
+  "watch",
+  "study",
+];
+
+const stripLeadingPhrases = (text = "") => {
+  let s = String(text || "").toLowerCase().trim();
+  if (!s) return "";
+  // remove punctuation for matching
+  s = s.replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  // repeatedly strip any known leading phrase
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const p of LEADING_PHRASES) {
+      if (s === p) {
+        s = "";
+        changed = true;
+        break;
+      }
+      if (s.startsWith(p + " ")) {
+        s = s.slice(p.length).trim();
+        changed = true;
+        break;
+      }
+    }
+    // also remove a leading lone 'to' or 'the'
+    if (!changed && (s.startsWith("to ") || s.startsWith("the "))) {
+      s = s.split(/\s+/).slice(1).join(" ").trim();
+      changed = true;
+    }
+  }
+  return s;
+};
+
 // Normalize the raw title/description text into consistent tokens.
 const cleanTokens = (text = "") =>
   text
@@ -66,7 +123,7 @@ const cleanTokens = (text = "") =>
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
     .map(normalizeToken)
-    .filter((token) => token && token.length > 2 && !STOP_WORDS.has(token));
+    .filter((token) => token && token.length > 1 && !STOP_WORDS.has(token));
 
 const uniqueTokens = (tokens = []) => {
   const seen = new Set();
@@ -85,10 +142,25 @@ const toLabel = (tokens = []) => {
   if (!tokens.length) return "";
   const meaningful = uniqueTokens(tokens);
   if (!meaningful.length) return "";
-  return meaningful
+  // Prioritize non-LOW_VALUE tokens; only use LOW_VALUE if nothing else available
+  const highValue = meaningful.filter((t) => !LOW_VALUE.has(t));
+  const selected = highValue.length ? highValue : meaningful;
+  return selected
     .slice(0, 3)
     .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
     .join(" ");
+};
+
+// Extract n-grams (bigrams/trigrams) from token list to capture phrases
+const extractNgrams = (tokens = [], n = 2) => {
+  const out = [];
+  for (let i = 0; i + n <= tokens.length; i++) {
+    const slice = tokens.slice(i, i + n);
+    // skip if any token is low-value or stop word
+    if (slice.some((t) => LOW_VALUE.has(t) || STOP_WORDS.has(t))) continue;
+    out.push(slice.join(" "));
+  }
+  return out;
 };
 
 const jaccard = (aTokens = [], bTokens = []) => {
@@ -211,25 +283,82 @@ export async function generateSubCategory({
     };
   }
 
-  const text = `${title || ""} ${description || ""}`.trim();
-  const textTokens = cleanTokens(text);
+  // Use title (not description) for subcategory inference per user request
   const normalizedTags = Array.isArray(tags) ? tags.map((tag) => String(tag || "").toLowerCase()) : [];
 
-  let suggestion = buildHeuristicSuggestion(textTokens, normalizedTags);
+  // Strip common leading filler/action phrases (e.g., "finish", "go to the")
+  const strippedTitle = stripLeadingPhrases(String(title || ""));
+  // Build initial heuristic suggestion using title tokens (description ignored)
+  const titleTokens = cleanTokens(strippedTitle);
+  let suggestion = buildHeuristicSuggestion(titleTokens, normalizedTags);
+
+  // Build additional candidate labels from n-grams to capture phrases like "fold clothes"
+  const candidates = new Map();
+  const addCandidate = (lab, src, weight = 0.0) => {
+    if (!lab) return;
+    const key = String(lab).trim();
+    if (!key) return;
+    if (!candidates.has(key)) candidates.set(key, { label: key, sources: new Set(), base: 0 });
+    const c = candidates.get(key);
+    c.sources.add(src);
+    c.base = Math.max(c.base, weight);
+  };
+
+  // heuristic and tag fallback candidates
+  if (suggestion.label) addCandidate(suggestion.label, suggestion.source, suggestion.confidence);
+  const tagLabel = buildTagLabel(normalizedTags);
+  if (tagLabel) addCandidate(tagLabel, "tag-fallback", 0.25);
+
+  // n-grams and tokens derived ONLY from the title (description intentionally ignored)
+  const allTokens = titleTokens.slice();
+  [2, 3].forEach((n) => {
+    extractNgrams(titleTokens, n).forEach((ng) => addCandidate(toLabel(cleanTokens(ng)), `title-ngram${n}`, 0.45));
+  });
+
+  // compound candidates combining tags with title tokens (e.g., 'AI Exercises')
+  const tagTokens = (normalizedTags || []).map((t) => tokenizeTag(t));
+  tagTokens.forEach((tg) => {
+    uniqueTokens(allTokens).forEach((t) => {
+      if (!t || LOW_VALUE.has(t) || STOP_WORDS.has(t)) return;
+      addCandidate(toLabel(cleanTokens(`${tg} ${t}`)), `tag-token`, 0.35);
+    });
+  });
+
+  // also include single-token labels from title (de-emphasize low-value ones)
+  uniqueTokens(allTokens).forEach((t) => {
+    if (LOW_VALUE.has(t)) return;
+    addCandidate(toLabel([t]), "token", 0.35);
+  });
 
   const history = await fetchHistoricalSubCategories(TaskModel, userId);
-  if (history.length) {
-    const scored = history
-      .map((entry) => scoreHistoryEntry(entry, textTokens, normalizedTags))
-      .filter(Boolean)
-      .sort((a, b) => b.score - a.score);
-    const best = scored[0];
-    if (best && best.score >= 0.2) {
-      suggestion = {
-        label: best.label,
-        source: best.source,
-        confidence: best.confidence,
-      };
+  // Score candidates by combining text similarity, tag overlap, and history matches
+  const scoredCandidates = [];
+  for (const [k, info] of candidates.entries()) {
+    const candTokens = cleanTokens(k);
+    // compute similarity using title only (description excluded)
+    const textSim = jaccard(titleTokens, candTokens);
+    const tagSim = tagOverlap(normalizedTags, (k || "").split(/\s+/));
+    // history boost: check if this label appeared in history and take its best score
+    let historyBoost = 0;
+    if (history.length) {
+      for (const h of history) {
+        if (String(h.subCategory?.label || "").toLowerCase() === String(k).toLowerCase()) {
+          historyBoost = Math.max(historyBoost, 0.2);
+        }
+      }
+    }
+
+    // combine signals — tuned weights: textSim (0.6), tagSim (0.25), historyBoost (0.15), base from candidate
+    const score = (textSim * 0.6) + (tagSim * 0.25) + (historyBoost * 0.15) + (info.base || 0);
+    scoredCandidates.push({ label: k, score, sources: Array.from(info.sources) });
+  }
+
+  scoredCandidates.sort((a, b) => b.score - a.score);
+
+  if (scoredCandidates.length) {
+    const best = scoredCandidates[0];
+    if (best.score >= 0.25) {
+      suggestion = { label: best.label, source: best.sources.join("|"), confidence: clamp(best.score, 0.25, 0.98) };
     }
   }
 

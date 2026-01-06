@@ -1,6 +1,9 @@
-// Notes are in English as requested.
-// A single router that exposes subpaths per teammate.
-// Each block is delimited so Ofek / Gal / Joni can work safely in parallel.
+/*
+ * File: src/routes/index.js
+ * Purpose: Central router that mounts feature routers and team endpoints
+ */
+// A single router that exposes subpaths per feature.
+// Each block is delimited so teams can work safely in parallel.
 
 import { Router } from "express";
 import healthRouter from "./health.js";
@@ -8,17 +11,14 @@ import chatRouter from "./chat.js";
 import authRouter from "./auth.js";
 import tasksRouter from "./tasks.js";
 import {
-  // Ofek controllers
-  ofekListItems,
-  ofekCreateItem,
-  // Gal controllers
-  galGetProfile,
-  galUpdateProfile,
-  // Joni controllers
-  joniCoachNext,
-  joniCoachFeedback,
-  joniStats,
-  joniTriggerJob,
+  // Profile controllers
+  profileGet,
+  profileUpdate,
+  // Priority controllers
+  priorityNext,
+  priorityFeedback,
+  priorityStats,
+  priorityTriggerJob,
 } from "../controllers/index.js";
 
 const router = Router();
@@ -29,8 +29,8 @@ router.use(healthRouter);
 // Authentication routes (public)
 router.use("/auth", authRouter);
 
-// ==================== OFEK — ROUTES (START) ====================
-// Base path for Ofek's feature-set
+// ==================== INFRA — CORE ROUTES (START) ====================
+// Core routes: chat, tasks and other shared feature routers
 
 // Chat/Agent routes
 router.use("/chat", chatRouter);
@@ -38,22 +38,22 @@ router.use("/chat", chatRouter);
 // Tasks routes
 router.use("/tasks", tasksRouter);
 
-// ==================== OFEK — ROUTES (END) ======================
+// ==================== INFRA — CORE ROUTES (END) ======================
 
-// ==================== GAL — ROUTES (START) =====================
-// Base path for Gal's feature-set
-router.get("/gal/profile", galGetProfile);
-router.put("/gal/profile", galUpdateProfile);
-// Add more Gal routes below
-// router.get('/gal/things', ...);
-// ==================== GAL — ROUTES (END) =======================
+// ==================== PROFILE — ROUTES (START) =====================
+// Base path for profile feature
+router.get("/profile", profileGet);
+router.put("/profile", profileUpdate);
+// Add more profile routes below
+// router.get('/profile/things', ...);
+// ==================== PROFILE — ROUTES (END) =======================
 
-// ==================== JONI — ROUTES (START) ====================
-router.post("/joni/coach/next", joniCoachNext);
-router.post("/joni/coach/feedback", joniCoachFeedback);
+// ==================== PRIORITY — ROUTES (START) ====================
+router.post("/priority/coach/next", priorityNext);
+router.post("/priority/coach/feedback", priorityFeedback);
 
-router.get("/joni/stats", joniStats);
-router.post("/joni/job", joniTriggerJob);
-// ==================== JONI — ROUTES (END) ======================
+router.get("/priority/stats", priorityStats);
+router.post("/priority/job", priorityTriggerJob);
+// ==================== PRIORITY — ROUTES (END) ======================
 
 export default router;

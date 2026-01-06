@@ -20,11 +20,45 @@ import { Task } from "../models/Task.js";
 import { TaskSchedule } from "../models/TaskSchedule.js";
 import { BusyBlock } from "../models/BusyBlock.js";
 import { startOfDay, addDays } from "../utils/dateUtils.js";
-import { planTasksCSP } from "../algorithms/csp/scheduler.js";
 import { logEvent } from "./telemetryService.js";
 import { env } from "../config/env.js";
 import { logger } from "../utils/logger.js";
 import { updateAllScores } from "../scripts/updateScores.js";
+import { spawn } from "child_process";
+
+// Use Python scheduler CLI instead of JS implementation.
+async function callPythonScheduler(tasks, options) {
+  const py = spawn("python3", ["./src/algorithms/csp/py_scheduler_cli.py"]);
+
+  return new Promise((resolve, reject) => {
+    let stdout = "";
+    let stderr = "";
+    py.stdout.setEncoding("utf8");
+    py.stderr.setEncoding("utf8");
+    py.stdout.on("data", (chunk) => (stdout += chunk));
+    py.stderr.on("data", (chunk) => (stderr += chunk));
+    py.on("error", (err) => reject(err));
+    py.on("close", (code) => {
+      if (code !== 0) return reject(new Error(`Python scheduler failed: ${stderr}`));
+      try {
+        const parsed = JSON.parse(stdout || "{}");
+        // Convert ISO strings back to Date objects for Node consumers
+        parsed.plan = (parsed.plan || []).map((p) => ({
+          ...p,
+          start: new Date(p.start),
+          end: new Date(p.end),
+        }));
+        resolve(parsed);
+      } catch (e) {
+        reject(e);
+      }
+    });
+
+    const payload = JSON.stringify({ tasks, options });
+    py.stdin.write(payload);
+    py.stdin.end();
+  });
+}
 
 // =============================================================================
 // ROUTINE BLOCKS CONFIGURATION
@@ -161,14 +195,28 @@ export function describeRoutineWindows(blocks = DEFAULT_ROUTINE_BLOCKS) {
 
 /**
  * Persist a generated plan to the database.
- * Clears existing future planned sessions before saving new ones.
+ * Clears existing future planned/skipped sessions before saving new ones.
+ * Also cleans up orphan schedules (where task no longer exists).
  */
 export async function persistPlan(userId, plan) {
   const now = new Date();
+
+  // Clean up orphan schedules (taskId references deleted tasks)
+  const existingTaskIds = await Task.find({ userId }).distinct("_id");
+  const existingTaskIdSet = new Set(existingTaskIds.map((id) => id.toString()));
+  const allSchedules = await TaskSchedule.find({ userId, start: { $gte: now } }).lean();
+  const orphanIds = allSchedules
+    .filter((s) => !existingTaskIdSet.has(s.taskId?.toString()))
+    .map((s) => s._id);
+  if (orphanIds.length > 0) {
+    await TaskSchedule.deleteMany({ _id: { $in: orphanIds } });
+  }
+
+  // Clear future planned/skipped sessions (not completed ones)
   await TaskSchedule.deleteMany({
     userId,
     start: { $gte: now },
-    status: { $ne: "done" },
+    status: { $ne: "completed" },
   });
 
   if (!plan.length) return;
@@ -223,7 +271,7 @@ export async function generatePlan({ userId, profile = {}, planningHorizonDays =
   const completedSessions = await TaskSchedule.find({
     userId,
     end: { $gte: now },
-    status: { $in: ["done", "in_progress"] },
+    status: "completed",
   }).lean();
 
   const remainingByTaskId = new Map(
@@ -265,7 +313,7 @@ export async function generatePlan({ userId, profile = {}, planningHorizonDays =
     return { plan: [], unscheduled: [], message: "All tasks already scheduled." };
   }
 
-  const { plan, unscheduled } = planTasksCSP(tasksForPlanning, {
+  const { plan, unscheduled } = await callPythonScheduler(tasksForPlanning, {
     busyBlocksByDate,
     planningHorizonDays,
     workingHours: profile.workingHours || { startHour: 9, startMinute: 0, endHour: 18, endMinute: 0 },

@@ -1,3 +1,8 @@
+/*
+ * File: src/controllers/authController.js
+ * Purpose: Handles user registration, login and profile updates
+ */
+
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { User } from "../models/index.js";

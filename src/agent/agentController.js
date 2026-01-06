@@ -1,3 +1,7 @@
+/*
+ * File: src/agent/agentController.js
+ * Purpose: Orchestrates LLM interactions, memory retrieval and tool calls
+ */
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { HumanMessage, AIMessage, SystemMessage, ToolMessage } from "@langchain/core/messages";
 import { memoryStore } from "../services/memoryService.js";

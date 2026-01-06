@@ -1,3 +1,7 @@
+/*
+ * File: src/models/TaskSchedule.js
+ * Purpose: Stores scheduled task sessions and time allocations
+ */
 import mongoose from "mongoose";
 
 const taskScheduleSchema = new mongoose.Schema(

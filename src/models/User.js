@@ -1,3 +1,7 @@
+/*
+ * File: src/models/User.js
+ * Purpose: User model with embedded memory sub-schema
+ */
 import mongoose from "mongoose";
 
 /**
