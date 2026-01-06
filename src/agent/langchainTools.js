@@ -228,7 +228,7 @@ err="${error.message}"`;
      * CRITICAL: This is the ONLY tool to use when user wants to create a new task.
      * Call this tool IMMEDIATELY when user asks to add/create a task.
      * Do NOT respond with text. Do NOT ask questions.
-     * חובה להשתמש בכלי זה כאשר המשתמש מבקש ליצור משימה חדשה.
+     * Always use this tool when the user requests to create a new task.
      */
     new DynamicStructuredTool({
       name: "preview_task",
@@ -285,7 +285,7 @@ err="${error.message}"`;
           },
         };
 
-        return `מעולה, הכנתי טיוטה למשימה. האם תרצה שאצור אותה?
+        return `Great — I prepared a draft task. Would you like me to create it?
 <WIDGET_JSON>${JSON.stringify(widgetJson)}</WIDGET_JSON>`;
       },
     }),
@@ -296,7 +296,7 @@ err="${error.message}"`;
      * ==================
      * Create a new task in the user's task list.
      * ONLY use this AFTER user confirmation.
-     * אסור להשתמש בכלי זה ישירות. רק לאחר אישור המשתמש.
+     * Only call this tool after explicit user confirmation.
      */
     new DynamicStructuredTool({
       name: "add_task",
@@ -361,9 +361,9 @@ err="${error.message}"`;
 
           console.log(`[LOG] Task created: ${task._id} ${recurrence ? "(recurring)" : ""}`);
 
-          return `המשימה "${task.taskname}" נוצרה בהצלחה. (ID: ${task._id})`;
+          return `Task "${task.taskname}" created successfully. (ID: ${task._id})`;
         } catch (error) {
-          return `מצטער, הייתה שגיאה ביצירת המשימה: ${error.message}`;
+          return `Sorry, there was an error creating the task: ${error.message}`;
         }
       },
     }),
@@ -463,15 +463,14 @@ err="${error.message}"`;
         try {
           // If taskId not provided, try to resolve by exact task name
           if (!taskId) {
-            if (!name) return `חובה לספק מזהה משימה (taskId) או שם משימה (name) כדי לעדכן.`;
+            if (!name) return `You must provide a taskId or a task name to update.`;
             const candidates = await taskService.getTasksForUser(userId, { taskname: name });
             if (!candidates || candidates.length === 0) {
-              return `המשימה "${name}" לא נמצאה.`;
+              return `Task "${name}" not found.`;
             }
             if (candidates.length > 1) {
               const list = candidates.map((c) => `- ${c.taskname} (${c._id})`).join("\n");
-              return `מצאתי כמה משימות עם השם הזה. אנא ציין את המשימה המדויקת:\n${list}`;
-            }
+              return `Multiple tasks found with that name. Please specify which one:\n${list}`;
             taskId = candidates[0]._id;
           }
 
@@ -483,10 +482,7 @@ err="${error.message}"`;
           if (deadline !== undefined) {
             const d = new Date(deadline);
             if (isNaN(d.getTime())) {
-              return `פורמט התאריך שסיפקת אינו תקין.`;
-            }
-            updates.dueDate = d;
-          }
+              return `The provided date format is invalid.`;
 
           if (completed !== undefined) updates.status = completed ? "done" : "todo";
 
@@ -494,14 +490,14 @@ err="${error.message}"`;
           const result = await taskService.updateTask({ userId, taskId, updates });
 
           if (!result.success) {
-            return `שגיאה בעדכון המשימה: ${result.error}`;
+            return `Error updating task: ${result.error}`;
           }
 
           const task = result.task;
 
-          return `המשימה "${task.taskname}" עודכנה בהצלחה. (ID: ${task._id})`;
+          return `Task "${task.taskname}" updated successfully. (ID: ${task._id})`;
         } catch (error) {
-          return `מצטער, הייתה שגיאה בעדכון המשימה: ${error.message}`;
+          return `Sorry, there was an error updating the task: ${error.message}`;
         }
       },
     }),
@@ -524,11 +520,11 @@ err="${error.message}"`;
         try {
           const result = await taskService.deleteTask({ taskId, userId });
           if (!result.success) {
-            return `שגיאה במחיקת המשימה: ${result.error}`;
+            return `Error deleting task: ${result.error}`;
           }
-          return `המשימה נמחקה בהצלחה.`;
+          return `Task deleted successfully.`;
         } catch (error) {
-          return `מצטער, הייתה שגיאה במחיקת המשימה: ${error.message}`;
+          return `Sorry, there was an error deleting the task: ${error.message}`;
         }
       },
     }),

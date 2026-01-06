@@ -108,6 +108,12 @@ export class AgentController {
         persona: userProfile.persona,
       });
 
+      // Detect input language using simple script check (adds a signal for the prompt)
+      // If Hebrew characters are present, mark as 'he', otherwise default to 'en'
+      const inputLanguage = /[\u0590-\u05FF]/.test(userMessage) ? "he" : "en";
+      userProfile.inputLanguage = inputLanguage;
+      console.log(`[AgentController] Detected user input language: ${inputLanguage}`);
+
       // STEP 4: SEMANTIC MEMORY RETRIEVAL
       // Use vector embeddings to find memories relevant to the user's message
       // This allows the agent to "remember" past facts and decisions
