@@ -34,40 +34,11 @@ export class PromptManager {
       systemPrompt += `\n\nPREVIOUS CONVERSATION SUMMARY:\n${summary}`;
     }
 
+    // Add freshness reminder to system prompt to override history bias
+    // This forces the model to ignore stale data in history and rely on tools for current state
+    systemPrompt += `\n\nCRITICAL: If the user asks to see/list tasks, you MUST call the "get_tasks" tool. Do NOT answer from memory or history. Your internal knowledge is STALE. Always fetch fresh data.`;
+
     const messages = [new SystemMessage(systemPrompt)];
-
-    // Add history (trimmed if necessary)
-    // Use TOKEN_BUDGET.MAX_HISTORY_TOKENS to guide slicing dynamically
-    // Approx 4 chars per token. As a heuristic we cap message count to keep system prompts small.
-    const heuristicMsgs = Math.max(1, Math.floor(TOKEN_BUDGET.MAX_HISTORY_TOKENS / 150));
-    const MAX_HISTORY_MSGS = Math.min(20, heuristicMsgs); // Increased history window for tool context
-    const recentHistory = history.slice(-MAX_HISTORY_MSGS);
-
-    for (const msg of recentHistory) {
-      if (msg.role === "user") {
-        messages.push(new HumanMessage(msg.content));
-      } else if (msg.role === "assistant") {
-        // Handle tool calls in assistant messages
-        if (msg.toolCalls && msg.toolCalls.length > 0) {
-          messages.push(
-            new AIMessage({
-              content: msg.content || "",
-              tool_calls: msg.toolCalls,
-            })
-          );
-        } else {
-          messages.push(new AIMessage(msg.content));
-        }
-      } else if (msg.role === "tool" || msg.role === "function") {
-        // Handle tool responses
-        messages.push(
-          new ToolMessage({
-            content: msg.content,
-            tool_call_id: msg.tool_call_id || msg.name || "unknown",
-          })
-        );
-      }
-    }
 
     messages.push(new HumanMessage(userMessage));
 

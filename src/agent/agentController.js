@@ -196,15 +196,78 @@ export class AgentController {
       // 1. Call a tool (memory, tasks, time) and get a result
       // 2. Return a text response (no tool needed)
       let finalResponse = null;
-      let iteration = 0;
       let currentMessages = [...messages];
 
+      // Heuristic shortcut: If the user explicitly asks to LIST/SHOW their tasks, call the get_tasks tool directly
+      // This avoids model history bias and ensures the data is fresh and authoritative
+      try {
+        const showTasksRE = /\b(משימות|הצג לי|תציג|תראה|להציג|הצג|show|list|display)\b/i;
+        if (showTasksRE.test(userMessage)) {
+          const getTasksTool = tools.find((t) => t.name === "get_tasks");
+          if (getTasksTool) {
+            const callId = `direct_get_tasks_${Date.now()}`;
+            let result = await getTasksTool.func({});
+
+            // Validate widget payload like normal tool execution
+            if (typeof result === "string" && result.includes("<WIDGET_JSON>")) {
+              const widgetValidation = validateWidgetPayload(result);
+              if (!widgetValidation.valid) {
+                if (
+                  widgetValidation.reason === "Empty task list" &&
+                  widgetValidation.widget?.widget_type === "task_list"
+                ) {
+                  result = `I couldn't find any tasks.`;
+                } else {
+                  await memoryStore.addToolResult(
+                    sessionId,
+                    userId,
+                    callId,
+                    getTasksTool.name,
+                    `ok=false\nerr="Widget validation failed: ${widgetValidation.reason}"`
+                  );
+                  result = `ok=false\nerr="Widget validation failed: ${widgetValidation.reason}"`;
+                }
+              }
+            }
+
+            // Persist and add to messages so LLM can craft a natural response referencing it
+            await memoryStore.addToolResult(sessionId, userId, callId, getTasksTool.name, result);
+            currentMessages.push(
+              new ToolMessage({
+                content: result,
+                tool_call_id: callId,
+                name: getTasksTool.name,
+              })
+            );
+
+            // Extract entities from the result so recent entities are available
+            this._extractAndTrackEntities(sessionId, getTasksTool.name, {}, result);
+
+            // Let the LLM generate the final assistant message referencing the widget/tool result
+            try {
+              const toolResponse = await llmWithTools.invoke(currentMessages);
+              if (!(toolResponse.tool_calls && toolResponse.tool_calls.length > 0)) {
+                finalResponse =
+                  typeof toolResponse.content === "string" ? toolResponse.content : toolResponse.text || "";
+              } else {
+                // If the model still asks for additional tool calls, fall back to normal loop
+                currentMessages.push(toolResponse);
+              }
+            } catch (err) {
+              console.warn(`[AgentController] Shortcut LLM invoke failed, falling back to agent loop: ${err.message}`);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn(`[AgentController] Shortcut get_tasks execution failed: ${err.message}`);
+      }
+
+      let iteration = 0;
       while (iteration < this.maxIterations && !finalResponse) {
         iteration++;
         console.log(`[AgentController] Agent loop iteration ${iteration}/${this.maxIterations}`);
 
         try {
-          // Invoke the LLM with all available tools
           let response;
           try {
             response = await llmWithTools.invoke(currentMessages);
@@ -248,6 +311,7 @@ export class AgentController {
               new ToolMessage({
                 content: errText,
                 tool_call_id: "_system_rejected",
+                name: "_system_rejected",
               })
             );
 
@@ -299,6 +363,7 @@ export class AgentController {
                       new ToolMessage({
                         content: errText,
                         tool_call_id: toolCall.id,
+                        name: toolCall.name || toolCall.id || "unknown",
                       })
                     );
                     continue; // skip execution
@@ -344,6 +409,7 @@ export class AgentController {
                     new ToolMessage({
                       content: result,
                       tool_call_id: toolCall.id,
+                      name: toolCall.name || toolCall.id || "unknown",
                     })
                   );
                   await memoryStore.addToolResult(sessionId, userId, toolCall.id, toolCall.name, result);
@@ -364,6 +430,7 @@ export class AgentController {
                     new ToolMessage({
                       content: errText,
                       tool_call_id: toolCall.id,
+                      name: toolCall.name || toolCall.id || "unknown",
                     })
                   );
                   await memoryStore.addToolResult(sessionId, userId, toolCall.id, toolCall.name, errText);
@@ -375,6 +442,7 @@ export class AgentController {
                   new ToolMessage({
                     content: errText,
                     tool_call_id: toolCall.id,
+                    name: toolCall.name || toolCall.id || "unknown",
                   })
                 );
                 await memoryStore.addToolResult(sessionId, userId, toolCall.id, "unknown", errText);
