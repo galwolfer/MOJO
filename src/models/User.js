@@ -140,6 +140,22 @@ const userSchema = new mongoose.Schema(
       type: [memorySchema],
       default: [],
     },
+    // Lightweight recent sessions summary for quick UI access (keeps last N sessions)
+    sessions: {
+      type: [
+        new mongoose.Schema(
+          {
+            sessionId: { type: String, required: true, index: true },
+            lastActiveAt: { type: Date, default: Date.now },
+            createdAt: { type: Date, default: Date.now },
+            messageCount: { type: Number, default: 0 },
+            preview: { type: String, default: "" },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
     // Metadata for user-level information
     metadata: {
       type: Map,

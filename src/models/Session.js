@@ -37,6 +37,13 @@ const sessionSchema = new mongoose.Schema(
         },
       },
     ],
+    // Optional cached count for efficient pagination.
+    // Falls back to messages.length if missing for existing documents.
+    messageCount: {
+      type: Number,
+      default: 0,
+      index: true,
+    },
     lastActiveAt: {
       type: Date,
       default: Date.now,

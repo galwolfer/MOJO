@@ -1,0 +1,363 @@
+import React from "react";
+import { View, StyleSheet, TouchableOpacity, ScrollViewProps } from "react-native";
+import BoxContainer from "./components/layout/BoxContainer";
+import AppText from "./components/common/AppText";
+import {
+  COLORS,
+  SPACING,
+  FONTS,
+  SYSTEM_FONTS,
+  TYPOGRAPHY,
+  SHADOWS,
+  paletteIndexFromKey,
+  ICON_SIZES,
+  IconSizeKey,
+} from "./theme";
+import { Checkbox } from "./components/icons/Checkbox";
+import { ProgressIcon } from "./components/icons/ProgressIcon";
+import { ICONS, ICON_NAMES } from "./components/icons/icons";
+import Box from "./components/layout/Box";
+import Input from "./components/inputs/Input";
+import Tag from "./components/inputs/tag";
+import PriorityList, { PriorityListItem } from "./components/special/PriorityList";
+import { useState } from "react";
+import TextBouble from "./components/chat/TextBouble";
+import { AppButton } from "./components";
+
+const ColorSwatch = ({ name, hex }: { name: string; hex: string }) => (
+  <View style={styles.swatchWrap}>
+    <View style={[styles.swatch, { backgroundColor: hex }]} />
+    <AppText variant="notes" style={styles.swatchLabel}>
+      {name}
+    </AppText>
+    <AppText variant="notes" style={styles.hexLabel}>
+      {hex}
+    </AppText>
+  </View>
+);
+
+interface ThemeShowcaseProps extends ScrollViewProps {
+  iconsSize?: IconSizeKey;
+}
+
+const ThemeShowcase: React.FC<ThemeShowcaseProps> = ({
+  iconsSize = "md",
+  contentContainerStyle,
+  style,
+  ...scrollProps
+}) => {
+  const [isChecked, setIsChecked] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [textInput, setTextInput] = useState("");
+  const [emailInput, setEmailInput] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
+  const [fruitInput, setFruitInput] = useState("");
+  const [selectedFruit, setSelectedFruit] = useState<string | null>(null);
+  const [numberInput, setNumberInput] = useState("");
+  const [singleOption, setSingleOption] = useState<string[]>([]);
+  const [multiOptions, setMultiOptions] = useState<string[]>([]);
+  const [priorityItems, setPriorityItems] = useState<PriorityListItem[]>([
+    { id: "studies", label: "My studies", icon: <ICONS.study size={20} color={COLORS.primary2} /> },
+    { id: "workout", label: "My workout routine", icon: <ICONS.workout size={20} color={COLORS.primary6} /> },
+    { id: "friends", label: "Meeting my friends", icon: <ICONS.friends size={20} color={COLORS.primary3} /> },
+    { id: "partner", label: "Being with my partner", icon: <ICONS.heart size={20} color={COLORS.primary4} /> },
+  ]);
+  const fruits = ["Apple", "Banana", "Cherry", "Date", "Elderberry"];
+
+  return (
+    <BoxContainer
+      style={[styles.scroll, style]}
+      contentContainerStyle={[styles.contentContainer, contentContainerStyle]}
+      {...scrollProps}
+    >
+      <AppText variant="title">Theme Showcase</AppText>
+      <TextBouble mode="user">
+        <AppText variant="bodyText">
+          User bubble (p1 background), with the normal shadow and top-left corner not xlg.
+        </AppText>
+      </TextBouble>
+
+      <TextBouble mode="agent">
+        <AppText variant="bodyText">
+          User bubble (p1 background), with the normal shadow and top-left corner not xlg.{" "}
+        </AppText>
+      </TextBouble>
+
+      <Box title="Colors">
+        <View style={styles.colorsGrid}>
+          {Object.entries(COLORS).map(([name, hex]) => (
+            <ColorSwatch key={name} name={name} hex={hex} />
+          ))}
+        </View>
+      </Box>
+
+      <Box title="Spacing">
+        <View style={styles.spacingCol}>
+          {Object.entries(SPACING).map(([k, v]) => (
+            <View key={k}>
+              <View style={[styles.spacingBox, { height: v * 3, width: v * 6 }]} />
+              <AppText variant="notes">{`${k} — ${v}px`}</AppText>
+            </View>
+          ))}
+        </View>
+      </Box>
+
+      <Box title="Typography Presets">
+        <View style={styles.typoList}>
+          {Object.entries(TYPOGRAPHY).map(([key, styleObj]) => (
+            <View key={key} style={styles.typoRow}>
+              <AppText variant={key as any} style={styles.typoSample}>
+                {key} — The quick brown fox jumps
+              </AppText>
+              <AppText variant="notes">{JSON.stringify(styleObj).slice(0, 80)}...</AppText>
+            </View>
+          ))}
+        </View>
+      </Box>
+      <Box title="Interactive Components">
+        <View style={{ gap: 20, paddingBottom: 40 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <AppText variant="bodyText">Checkbox:</AppText>
+            <Checkbox checked={isChecked} onChange={setIsChecked} size={ICON_SIZES[iconsSize]} />
+          </View>
+
+          <View style={{ gap: 10 }}>
+            <AppText variant="bodyText">Progress Icon (Value: {progress.toFixed(1)}):</AppText>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 20 }}>
+              <ProgressIcon value={progress} size={ICON_SIZES[iconsSize]} />
+              <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
+                {[0, 0.25, 0.5, 0.75, 1].map((val) => (
+                  <TouchableOpacity
+                    key={val}
+                    onPress={() => setProgress(val)}
+                    style={{ padding: 8, backgroundColor: "#eee", borderRadius: 4 }}
+                  >
+                    <AppText variant="notes" style={{ fontSize: 12 }}>
+                      {val * 100}%
+                    </AppText>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>
+
+          <View style={{ gap: 10 }}>
+            <AppText variant="bodyText">Input:</AppText>
+            <Input value={textInput} onChangeText={setTextInput} placeholder="Enter text..." />
+            <Input
+              type="email"
+              label="Email"
+              value={emailInput}
+              onChangeText={setEmailInput}
+              placeholder="your@email.com"
+            />
+            <Input
+              type="password"
+              label="Password"
+              value={passwordInput}
+              onChangeText={setPasswordInput}
+              placeholder="Enter password"
+              error={passwordInput && passwordInput.length < 6 ? "Password too short" : undefined}
+            />
+            <Input
+              type="number"
+              label="Number"
+              value={numberInput}
+              onChangeText={setNumberInput}
+              placeholder="Enter a number"
+            />
+            <Input
+              type="text"
+              label="Fruit (Single Select)"
+              placeholder="Select a fruit..."
+              options={fruits}
+              value={fruitInput}
+              onChangeText={(t) => {
+                setFruitInput(t);
+                setSelectedFruit(null);
+              }}
+              onSelect={(values: string[]) => {
+                const val = values[0] || "";
+                setSelectedFruit(val);
+                setFruitInput(val);
+              }}
+            />
+
+            {singleOption.length > 0 && <AppText variant="notes">Selected: {singleOption.join(", ")}</AppText>}
+            <Input
+              label="Multi-Select Dropdown"
+              placeholder="Select multiple fruits..."
+              options={fruits}
+              multiSelect
+              value={multiOptions.join(", ")}
+              onSelect={setMultiOptions}
+              iconSize={iconsSize}
+            />
+            {multiOptions.length > 0 && (
+              <View style={{ marginTop: SPACING.sm, flexDirection: "row", gap: SPACING.sm, flexWrap: "wrap" }}>
+                {multiOptions.map((m) => (
+                  <Tag
+                    key={m}
+                    label={m}
+                    colorIndex={paletteIndexFromKey(m)}
+                    editable
+                    onRemove={() => setMultiOptions((prev) => prev.filter((x) => x !== m))}
+                  />
+                ))}
+              </View>
+            )}
+            <AppText variant="bodyText" style={{ marginTop: SPACING.md }}>
+              Rank your goals by priority:
+            </AppText>
+            <PriorityList
+              items={priorityItems}
+              onChange={(next) => {
+                setPriorityItems(next);
+              }}
+            />
+            <AppText variant="bodyText" style={{ marginTop: SPACING.md }}>
+              Buttons:
+            </AppText>
+            <View style={{ flexDirection: "row", gap: 12, marginTop: SPACING.sm }}>
+              <AppButton
+                title="Back"
+                icon="left"
+                iconPosition="left"
+                mode="light"
+                color="primary1"
+                onPress={() => setProgress(0)}
+              />
+              <AppButton
+                title="Next"
+                icon="right"
+                iconPosition="right"
+                mode="filled"
+                color="primary6"
+                onPress={() => setProgress(1)}
+              />
+            </View>
+          </View>
+        </View>
+      </Box>
+
+      <Box title="Icon Library (All Icons)">
+        <View style={{ gap: 12, paddingBottom: 20 }}>
+          <AppText variant="bodyText">All icons from icons-lib with CSS color control (primary1 color):</AppText>
+          <View style={styles.iconsGrid}>
+            {ICON_NAMES.map((iconName) => {
+              const IconComponent = ICONS[iconName];
+              return (
+                <View key={iconName} style={styles.iconItem}>
+                  <View style={styles.iconWrapper}>
+                    <IconComponent size={ICON_SIZES[iconsSize]} color={COLORS.primary1} />
+                  </View>
+                  <AppText variant="notes" style={styles.iconLabel}>
+                    {iconName}
+                  </AppText>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      </Box>
+    </BoxContainer>
+  );
+};
+
+const styles = StyleSheet.create({
+  colorsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.md,
+  },
+  swatchWrap: {
+    width: "30%",
+    marginBottom: SPACING.md,
+    padding: SPACING.sm,
+  },
+  swatch: {
+    height: 64,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#eee",
+    ...(SHADOWS.card as object),
+  },
+  swatchLabel: {
+    marginTop: 6,
+    color: COLORS.black,
+  },
+  hexLabel: {
+    color: COLORS.grayLight,
+  },
+  spacingRow: {
+    flexDirection: "row",
+    justifyContent: "flex-start",
+  },
+  spacingCol: {
+    alignItems: "center",
+  },
+  spacingBox: {
+    backgroundColor: COLORS.black,
+    borderRadius: 6,
+    marginBottom: 6,
+    padding: SPACING.sm,
+    ...(SHADOWS.card as object),
+  },
+
+  fontsList: {
+    marginTop: 6,
+  },
+  fontRow: {
+    marginBottom: 10,
+  },
+  fontSample: {
+    fontSize: 20,
+  },
+
+  typoList: {
+    marginTop: 6,
+  },
+  typoRow: {
+    marginBottom: 12,
+  },
+  typoSample: {
+    marginBottom: 6,
+  },
+
+  iconsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: SPACING.sm,
+    marginTop: SPACING.sm,
+  },
+  iconItem: {
+    alignItems: "center",
+    width: 80,
+    color: COLORS.primary1,
+    marginBottom: SPACING.md,
+  },
+  iconWrapper: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    padding: SPACING.lg,
+    backgroundColor: COLORS.white,
+    alignItems: "center",
+    justifyContent: "center",
+    ...(SHADOWS.card as object),
+  },
+  iconLabel: {
+    marginTop: 6,
+    fontSize: 11,
+    textAlign: "center",
+  },
+  scroll: {
+    flex: 1,
+  },
+  contentContainer: {
+    paddingBottom: SPACING.xlg * 2,
+  },
+});
+
+export default ThemeShowcase;

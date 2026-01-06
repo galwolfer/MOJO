@@ -82,7 +82,7 @@ export class AgentController {
 
       // STEP 2: RETRIEVE CONVERSATION HISTORY
       // Get all previous messages in this session (cached for performance)
-      let history = await memoryStore.getHistory(sessionId);
+      let history = await memoryStore.getHistory(sessionId, userId);
       console.log(`[AgentController] History length: ${history.length}`);
 
       // STEP 3: LOAD USER PROFILE
@@ -102,11 +102,7 @@ export class AgentController {
       // This allows the agent to "remember" past facts and decisions
       console.log(`[AgentController] Retrieving relevant memories for query: "${userMessage.substring(0, 50)}..."`);
 
-      const relevantMemories = await memoryStore.retrieveRelevantMemories(
-        userId,
-        userMessage,
-        5 
-      );
+      const relevantMemories = await memoryStore.retrieveRelevantMemories(userId, userMessage, 5);
 
       // Format memories in compact structure to minimize token usage
       // Primary memories: User facts (location, education, preferences)
@@ -284,7 +280,7 @@ export class AgentController {
         success: true,
         response: finalResponse,
         sessionId,
-        messageCount: await memoryStore.getMessageCount(sessionId),
+        messageCount: await memoryStore.getMessageCount(sessionId, userId),
       };
     } catch (error) {
       console.error("Agent processing error:", error);
@@ -312,6 +308,21 @@ export class AgentController {
    * @returns {Promise<Array>} Array of message objects { role, content, timestamp }
    */
   async getSessionHistory(sessionId, userId) {
-    return await memoryStore.getHistory(sessionId);
+    return await memoryStore.getHistory(sessionId, userId);
+  }
+
+  /**
+   * Retrieve a page of session history from the END of the session.
+   */
+  async getSessionHistoryPage(sessionId, userId, limit, offset) {
+    return await memoryStore.getHistoryPage(sessionId, userId, limit, offset);
+  }
+
+  /**
+   * List a user's sessions with cursor pagination.
+   * If includeMessages is set, include the last N messages per session.
+   */
+  async listUserSessions(userId, limit, cursor, includeMessages) {
+    return await memoryStore.listSessions(userId, limit, cursor, includeMessages);
   }
 }
