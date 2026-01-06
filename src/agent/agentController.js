@@ -513,15 +513,18 @@ export class AgentController {
             const widget = JSON.parse(widgetMatch[1]);
             if (widget.data?.tasks && Array.isArray(widget.data.tasks)) {
               // Add each task to context (most recent first = last in array)
-              widget.data.tasks.slice().reverse().forEach((task) => {
-                if (task.id && task.title) {
-                  memoryStore.addSessionEntity(sessionId, "task", task.id, task.title, {
-                    action: "listed",
-                    status: task.status,
-                    dueDate: task.dueDate,
-                  });
-                }
-              });
+              widget.data.tasks
+                .slice()
+                .reverse()
+                .forEach((task) => {
+                  if (task.id && task.title) {
+                    memoryStore.addSessionEntity(sessionId, "task", task.id, task.title, {
+                      action: "listed",
+                      status: task.status,
+                      dueDate: task.dueDate,
+                    });
+                  }
+                });
             }
           } catch (e) {
             // Ignore JSON parse errors
