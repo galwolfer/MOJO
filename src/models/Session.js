@@ -21,7 +21,7 @@ const sessionSchema = new mongoose.Schema(
       {
         role: {
           type: String,
-          enum: ["user", "assistant", "system", "function"],
+          enum: ["user", "assistant", "system", "function", "tool"],
           required: true,
         },
         content: {
@@ -30,7 +30,9 @@ const sessionSchema = new mongoose.Schema(
         functionCall: {
           type: mongoose.Schema.Types.Mixed,
         },
-        name: String, // For function results
+        toolCalls: [mongoose.Schema.Types.Mixed],
+        tool_call_id: String,
+        name: String, // For tool/function results
         timestamp: {
           type: Date,
           default: Date.now,

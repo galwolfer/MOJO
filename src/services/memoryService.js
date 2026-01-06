@@ -18,6 +18,92 @@ class MongoMemoryStore {
     // In-memory cache for active sessions (for performance)
     this.sessions = new Map();
     this.maxMessages = 50;
+
+    // Session entity context - tracks recently discussed entities per session
+    // Key: sessionId, Value: { entities: [{ type, id, name, timestamp }], lastUpdate }
+    this.sessionEntityContext = new Map();
+    this.maxEntitiesPerSession = 10;
+  }
+
+  /**
+   * Add an entity to the session context (e.g., when a task is created/mentioned)
+   * @param {string} sessionId - Session ID
+   * @param {string} type - Entity type (e.g., "task")
+   * @param {string} id - Entity ID
+   * @param {string} name - Entity name/title for display
+   * @param {Object} metadata - Additional entity data
+   */
+  addSessionEntity(sessionId, type, id, name, metadata = {}) {
+    if (!this.sessionEntityContext.has(sessionId)) {
+      this.sessionEntityContext.set(sessionId, { entities: [], lastUpdate: new Date() });
+    }
+
+    const context = this.sessionEntityContext.get(sessionId);
+
+    // Remove existing entry with same id to avoid duplicates
+    context.entities = context.entities.filter((e) => !(e.type === type && e.id === id));
+
+    // Add new entity at the front (most recent)
+    context.entities.unshift({
+      type,
+      id,
+      name,
+      timestamp: new Date(),
+      ...metadata,
+    });
+
+    // Limit to max entities
+    if (context.entities.length > this.maxEntitiesPerSession) {
+      context.entities = context.entities.slice(0, this.maxEntitiesPerSession);
+    }
+
+    context.lastUpdate = new Date();
+    console.log(`[EntityContext] Added ${type} "${name}" (${id}) to session ${sessionId}`);
+  }
+
+  /**
+   * Get the session entity context for prompt injection
+   * @param {string} sessionId - Session ID
+   * @returns {Array} Array of recent entities
+   */
+  getSessionEntities(sessionId) {
+    const context = this.sessionEntityContext.get(sessionId);
+    return context?.entities || [];
+  }
+
+  /**
+   * Get the most recent entity of a given type
+   * @param {string} sessionId - Session ID
+   * @param {string} type - Entity type (e.g., "task")
+   * @returns {Object|null} Most recent entity of that type
+   */
+  getLastEntity(sessionId, type) {
+    const entities = this.getSessionEntities(sessionId);
+    return entities.find((e) => e.type === type) || null;
+  }
+
+  /**
+   * Build entity context string for prompt injection
+   * @param {string} sessionId - Session ID
+   * @returns {string} Formatted entity context for the LLM
+   */
+  buildEntityContextString(sessionId) {
+    const entities = this.getSessionEntities(sessionId);
+    if (entities.length === 0) return "";
+
+    let contextStr = "\nRECENT ENTITIES (for reference resolution):";
+    entities.forEach((e, idx) => {
+      contextStr += `\n- ${e.type}: "${e.name}" (id=${e.id})${idx === 0 ? " [MOST RECENT]" : ""}`;
+    });
+    return contextStr;
+  }
+
+  /**
+   * Clear session entity context (called when session is cleared)
+   * @param {string} sessionId - Session ID
+   */
+  clearSessionEntityContext(sessionId) {
+    this.sessionEntityContext.delete(sessionId);
   }
 
   _cacheKey(sessionId, userId) {
@@ -143,6 +229,8 @@ class MongoMemoryStore {
           role: msg.role,
           content: msg.content,
           functionCall: msg.functionCall,
+          toolCalls: msg.toolCalls,
+          tool_call_id: msg.tool_call_id,
           name: msg.name,
           timestamp: msg.timestamp,
         }));
@@ -254,6 +342,31 @@ class MongoMemoryStore {
   }
 
   /**
+   * Add an assistant message with tool calls
+   */
+  async addAssistantToolCalls(sessionId, userId, content, toolCalls) {
+    await this.addMessage(sessionId, userId, {
+      role: "assistant",
+      content: content || "",
+      toolCalls,
+      timestamp: new Date(),
+    });
+  }
+
+  /**
+   * Add a tool result
+   */
+  async addToolResult(sessionId, userId, tool_call_id, name, result) {
+    await this.addMessage(sessionId, userId, {
+      role: "tool",
+      tool_call_id,
+      name,
+      content: result,
+      timestamp: new Date(),
+    });
+  }
+
+  /**
    * Add a function call
    */
   async addFunctionCall(sessionId, userId, functionCall) {
@@ -277,7 +390,7 @@ class MongoMemoryStore {
   }
 
   /**
-   * Clear session (cache + database)
+   * Clear session (cache + database + entity context)
    */
   async clearSession(sessionId) {
     try {
@@ -287,6 +400,8 @@ class MongoMemoryStore {
           this.sessions.delete(key);
         }
       }
+      // Clear entity context for this session
+      this.clearSessionEntityContext(sessionId);
       await Session.deleteOne({ sessionId });
     } catch (error) {
       console.error("Error clearing session:", error);

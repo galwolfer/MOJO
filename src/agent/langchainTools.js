@@ -233,6 +233,7 @@ err="${error.message}"`;
     new DynamicStructuredTool({
       name: "preview_task",
       description: TOOL_DESCRIPTIONS.preview_task,
+      returnDirect: true,
       schema: z.object({
         name: z.string().describe("Task name"),
         deadline: z.string().describe("ISO 8601 date. Calculate from relative expressions."),
@@ -264,22 +265,6 @@ err="${error.message}"`;
         const finalTags = tags || inferred.tags;
         const finalSplitable = splitable !== undefined ? splitable : TASK_CONFIG.defaults.splitable;
 
-        // Construct a mock task object
-        const draftTask = {
-          id: "draft-" + Date.now(),
-          title: name,
-          status: "draft",
-          dueDate: new Date(deadline).toISOString(),
-          priority: finalImportance >= 4 ? "high" : finalImportance <= 2 ? "low" : "medium",
-          tags: finalTags,
-          description: description || (recurrence ? `Recurrence: ${recurrence.type}` : ""),
-          // Extra fields for display if widget supports them
-          importance: finalImportance,
-          effort: finalEffort,
-          estimatedDuration: finalDuration,
-          canSplit: finalSplitable,
-        };
-
         const widgetJson = {
           version: "1.0",
           widget_type: "task_confirmation",
@@ -300,9 +285,8 @@ err="${error.message}"`;
           },
         };
 
-        return `Draft created successfully.
-Widget Payload: <WIDGET_JSON>${JSON.stringify(widgetJson)}</WIDGET_JSON>
-[SYSTEM INSTRUCTION: Output the above widget payload exactly. Address the user in their language to confirm the task.]`;
+        return `מעולה, הכנתי טיוטה למשימה. האם תרצה שאצור אותה?
+<WIDGET_JSON>${JSON.stringify(widgetJson)}</WIDGET_JSON>`;
       },
     }),
 
@@ -317,6 +301,7 @@ Widget Payload: <WIDGET_JSON>${JSON.stringify(widgetJson)}</WIDGET_JSON>
     new DynamicStructuredTool({
       name: "add_task",
       description: TOOL_DESCRIPTIONS.add_task,
+      returnDirect: true,
       schema: z.object({
         name: z.string().describe("Task name"),
         deadline: z.string().describe("ISO 8601 date. Calculate from relative expressions."),
@@ -376,20 +361,9 @@ Widget Payload: <WIDGET_JSON>${JSON.stringify(widgetJson)}</WIDGET_JSON>
 
           console.log(`[LOG] Task created: ${task._id} ${recurrence ? "(recurring)" : ""}`);
 
-          // Return structured response
-          let result = `ok=true\nmsg="Task created"\nid="${task._id}"
-name="${task.taskname}"`;
-          if (task.tags && task.tags.length > 0) result += `\ntag="${task.tags[0]}"`;
-          result += `\ndue="${task.dueDate.toISOString()}"`;
-
-          if (task.recurrence?.type) {
-            result += `\nrecur="${task.recurrence.type}"
-int=${task.recurrence.interval}`;
-          }
-
-          return result;
+          return `המשימה "${task.taskname}" נוצרה בהצלחה. (ID: ${task._id})`;
         } catch (error) {
-          return `ok=false\nerr="${error.message}"`;
+          return `מצטער, הייתה שגיאה ביצירת המשימה: ${error.message}`;
         }
       },
     }),
@@ -477,6 +451,7 @@ int=${task.recurrence.interval}`;
     new DynamicStructuredTool({
       name: "update_task",
       description: TOOL_DESCRIPTIONS.update_task,
+      returnDirect: true,
       schema: z.object({
         taskId: z.string().optional(),
         name: z.string().optional().describe("Task name to identify task when taskId is not provided"),
@@ -488,14 +463,14 @@ int=${task.recurrence.interval}`;
         try {
           // If taskId not provided, try to resolve by exact task name
           if (!taskId) {
-            if (!name) return `ok=false\nerr="taskId or name is required"`;
+            if (!name) return `חובה לספק מזהה משימה (taskId) או שם משימה (name) כדי לעדכן.`;
             const candidates = await taskService.getTasksForUser(userId, { taskname: name });
             if (!candidates || candidates.length === 0) {
-              return `ok=false\nerr="Task not found by name: ${name}"`;
+              return `המשימה "${name}" לא נמצאה.`;
             }
             if (candidates.length > 1) {
-              const list = candidates.map((c) => `- ${c._id}: ${c.taskname}`).join("\\n");
-              return `ok=false\nerr="Multiple tasks found matching name. Please provide taskId. Candidates:\n${list}"`;
+              const list = candidates.map((c) => `- ${c.taskname} (${c._id})`).join("\n");
+              return `מצאתי כמה משימות עם השם הזה. אנא ציין את המשימה המדויקת:\n${list}`;
             }
             taskId = candidates[0]._id;
           }
@@ -508,7 +483,7 @@ int=${task.recurrence.interval}`;
           if (deadline !== undefined) {
             const d = new Date(deadline);
             if (isNaN(d.getTime())) {
-              return `ok=false\nerr="Invalid deadline format"`;
+              return `פורמט התאריך שסיפקת אינו תקין.`;
             }
             updates.dueDate = d;
           }
@@ -519,16 +494,14 @@ int=${task.recurrence.interval}`;
           const result = await taskService.updateTask({ userId, taskId, updates });
 
           if (!result.success) {
-            return `ok=false\nerr="${result.error}"`;
+            return `שגיאה בעדכון המשימה: ${result.error}`;
           }
 
           const task = result.task;
 
-          return `ok=true\nmsg="Updated"\nid="${task._id}"\nname="${task.taskname}"${
-            task.tags && task.tags.length > 0 ? `\ntag="${task.tags[0]}"` : ""
-          }\ndue="${task.dueDate ? new Date(task.dueDate).toISOString() : ""}"\ndone=${task.status === "done"}`;
+          return `המשימה "${task.taskname}" עודכנה בהצלחה. (ID: ${task._id})`;
         } catch (error) {
-          return `ok=false\nerr="${error.message}"`;
+          return `מצטער, הייתה שגיאה בעדכון המשימה: ${error.message}`;
         }
       },
     }),
@@ -543,6 +516,7 @@ int=${task.recurrence.interval}`;
     new DynamicStructuredTool({
       name: "delete_task",
       description: TOOL_DESCRIPTIONS.delete_task,
+      returnDirect: true,
       schema: z.object({
         taskId: z.string(),
       }),
@@ -550,11 +524,11 @@ int=${task.recurrence.interval}`;
         try {
           const result = await taskService.deleteTask({ taskId, userId });
           if (!result.success) {
-            return `ok=false\nerr="${result.error}"`;
+            return `שגיאה במחיקת המשימה: ${result.error}`;
           }
-          return `ok=true\nmsg="Deleted"`;
+          return `המשימה נמחקה בהצלחה.`;
         } catch (error) {
-          return `ok=false\nerr="${error.message}"`;
+          return `מצטער, הייתה שגיאה במחיקת המשימה: ${error.message}`;
         }
       },
     }),

@@ -1,5 +1,5 @@
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
+import { HumanMessage, AIMessage, SystemMessage, ToolMessage } from "@langchain/core/messages";
 import { memoryStore } from "../services/memoryService.js";
 import { createLangChainTools } from "./langchainTools.js";
 import { validateToolCall, validateWidgetPayload } from "./security.js";
@@ -147,10 +147,20 @@ export class AgentController {
         memoryContext = memoryContext.substring(0, MAX_MEMORY_CHARS) + "...";
       }
 
+      // STEP 4.5: ADD SESSION ENTITY CONTEXT
+      // Inject recently discussed entities (tasks, etc.) for reference resolution
+      // This allows the LLM to understand "this task", "that one", "delete it", etc.
+      const entityContext = memoryStore.buildEntityContextString(sessionId);
+      if (entityContext) {
+        memoryContext += entityContext;
+        console.log(`[AgentController] Added entity context (${entityContext.length} chars)`);
+      }
+
       // STEP 5 & 6: BUILD MESSAGES (Task 2 & 3)
+      // Pass history excluding the message we just saved, as buildMessages adds userMessage explicitly
       const messages = PromptManager.buildMessages({
         userMessage,
-        history,
+        history: history.slice(0, -1),
         summary,
         userProfile,
         userId,
@@ -227,13 +237,15 @@ export class AgentController {
             const errText = `ok=false\nerr="System messages from the model are not allowed and were ignored."`;
 
             // Persist a function result for auditing
-            await memoryStore.addFunctionResult(sessionId, userId, "_system_rejected", errText);
+            await memoryStore.addToolResult(sessionId, userId, "_system_rejected", "_system_rejected", errText);
 
             // Do not add it to history as a system message. Instead, add a tool-like failure so LLM sees it's not allowed
-            currentMessages.push({
-              role: "tool",
-              content: errText,
-            });
+            currentMessages.push(
+              new ToolMessage({
+                content: errText,
+                tool_call_id: "_system_rejected",
+              })
+            );
 
             // Try loop again so the LLM can respond to the rejection
             continue;
@@ -242,6 +254,19 @@ export class AgentController {
           // Check if the LLM wants to call any tools
           if (response.tool_calls && response.tool_calls.length > 0) {
             console.log(`[AgentController] Tool calls requested: ${response.tool_calls.length}`);
+
+            // Normalize content to string for persistence (LangChain/Gemini may return array)
+            let persistentContent = "";
+            if (typeof response.content === "string") {
+              persistentContent = response.content;
+            } else if (Array.isArray(response.content)) {
+              persistentContent = response.content
+                .map((c) => (typeof c === "string" ? c : c.text || JSON.stringify(c)))
+                .join("\n");
+            }
+
+            // Persist assistant message with tool calls to session history
+            await memoryStore.addAssistantToolCalls(sessionId, userId, persistentContent, response.tool_calls);
 
             // Add the LLM's response (which includes tool calls) to the message history
             currentMessages.push(response);
@@ -263,19 +288,23 @@ export class AgentController {
                     );
                     const errText = `ok=false\nerr="Validation failed: ${validation.reason}"`;
                     // Persist failure to session for auditing
-                    await memoryStore.addFunctionResult(sessionId, userId, toolCall.name, errText);
+                    await memoryStore.addToolResult(sessionId, userId, toolCall.id, toolCall.name, errText);
 
                     // Do not execute the tool; notify LLM via tool response
-                    currentMessages.push({
-                      role: "tool",
-                      content: errText,
-                      tool_call_id: toolCall.id,
-                    });
+                    currentMessages.push(
+                      new ToolMessage({
+                        content: errText,
+                        tool_call_id: toolCall.id,
+                      })
+                    );
                     continue; // skip execution
                   }
 
                   // Execute the tool with the arguments provided by the LLM
                   let result = await tool.func(toolCall.args);
+
+                  // ENTITY CONTEXT: Extract and track entities from tool results
+                  this._extractAndTrackEntities(sessionId, toolCall.name, toolCall.args, result);
 
                   // If result contains a widget payload, validate it
                   if (typeof result === "string" && result.includes("<WIDGET_JSON>")) {
@@ -285,9 +314,10 @@ export class AgentController {
                         `[AgentController] Widget validation failed for ${toolCall.name}: ${widgetValidation.reason}`
                       );
                       // Persist failure for auditing
-                      await memoryStore.addFunctionResult(
+                      await memoryStore.addToolResult(
                         sessionId,
                         userId,
+                        toolCall.id,
                         toolCall.name,
                         `ok=false\nerr="Widget validation failed: ${widgetValidation.reason}"`
                       );
@@ -295,12 +325,14 @@ export class AgentController {
                     }
                   }
 
-                  // Add the tool result to the message history
-                  currentMessages.push({
-                    role: "tool",
-                    content: result,
-                    tool_call_id: toolCall.id,
-                  });
+                  // Add the tool result to the message history and persist it
+                  currentMessages.push(
+                    new ToolMessage({
+                      content: result,
+                      tool_call_id: toolCall.id,
+                    })
+                  );
+                  await memoryStore.addToolResult(sessionId, userId, toolCall.id, toolCall.name, result);
 
                   // CHECK FOR RETURN DIRECT
                   if (tool.returnDirect) {
@@ -312,20 +344,26 @@ export class AgentController {
                   console.log(`[AgentController] Tool ${toolCall.name} executed successfully`);
                 } catch (error) {
                   console.error(`[AgentController] Tool execution error:`, error);
-                  // Even if tool fails, add the error to the message history
-                  currentMessages.push({
-                    role: "tool",
-                    content: `ok=false\nerr="${error.message}"`,
-                    tool_call_id: toolCall.id,
-                  });
+                  // Even if tool fails, add the error to the message history and persist it
+                  const errText = `ok=false\nerr="${error.message}"`;
+                  currentMessages.push(
+                    new ToolMessage({
+                      content: errText,
+                      tool_call_id: toolCall.id,
+                    })
+                  );
+                  await memoryStore.addToolResult(sessionId, userId, toolCall.id, toolCall.name, errText);
                 }
               } else {
                 console.warn(`[AgentController] Tool not found: ${toolCall.name}`);
-                currentMessages.push({
-                  role: "tool",
-                  content: `ok=false\nerr="Tool not found: ${toolCall.name}"`,
-                  tool_call_id: toolCall.id,
-                });
+                const errText = `ok=false\nerr="Tool not found: ${toolCall.name}"`;
+                currentMessages.push(
+                  new ToolMessage({
+                    content: errText,
+                    tool_call_id: toolCall.id,
+                  })
+                );
+                await memoryStore.addToolResult(sessionId, userId, toolCall.id, "unknown", errText);
               }
             }
             // Loop back: invoke LLM again with tool results
@@ -419,6 +457,93 @@ export class AgentController {
    */
   async listUserSessions(userId, limit, cursor, includeMessages) {
     return await memoryStore.listSessions(userId, limit, cursor, includeMessages);
+  }
+
+  /**
+   * Extract and track entities from tool calls and results
+   * This enables the LLM to resolve references like "this task", "delete it", etc.
+   * @private
+   */
+  _extractAndTrackEntities(sessionId, toolName, args, result) {
+    try {
+      // Task-related tools
+      if (toolName === "add_task" || toolName === "preview_task") {
+        // Extract task ID from result (format: id="xxx" or from widget JSON)
+        const idMatch = result.match(/id="([^"]+)"/);
+        const taskName = args.name || "Untitled Task";
+
+        if (idMatch) {
+          memoryStore.addSessionEntity(sessionId, "task", idMatch[1], taskName, {
+            action: toolName === "add_task" ? "created" : "previewed",
+            dueDate: args.deadline,
+          });
+        }
+
+        // Also extract from widget JSON if present
+        const widgetMatch = result.match(/<WIDGET_JSON>([^<]+)<\/WIDGET_JSON>/);
+        if (widgetMatch) {
+          try {
+            const widget = JSON.parse(widgetMatch[1]);
+            if (widget.data?.id) {
+              memoryStore.addSessionEntity(sessionId, "task", widget.data.id, widget.data.title || taskName, {
+                action: toolName === "add_task" ? "created" : "previewed",
+                dueDate: widget.data.dueDate,
+                status: widget.data.status,
+              });
+            }
+          } catch (e) {
+            // Ignore JSON parse errors
+          }
+        }
+      }
+
+      // Update task - track the updated task
+      if (toolName === "update_task" && args.taskId) {
+        const taskName = args.name || args.taskname || "Updated Task";
+        memoryStore.addSessionEntity(sessionId, "task", args.taskId, taskName, {
+          action: "updated",
+        });
+      }
+
+      // Get tasks - track all returned tasks (user might refer to any of them)
+      if (toolName === "get_tasks" || toolName === "get_upcoming_tasks" || toolName === "get_overdue_tasks") {
+        const widgetMatch = result.match(/<WIDGET_JSON>([^<]+)<\/WIDGET_JSON>/);
+        if (widgetMatch) {
+          try {
+            const widget = JSON.parse(widgetMatch[1]);
+            if (widget.data?.tasks && Array.isArray(widget.data.tasks)) {
+              // Add each task to context (most recent first = last in array)
+              widget.data.tasks.slice().reverse().forEach((task) => {
+                if (task.id && task.title) {
+                  memoryStore.addSessionEntity(sessionId, "task", task.id, task.title, {
+                    action: "listed",
+                    status: task.status,
+                    dueDate: task.dueDate,
+                  });
+                }
+              });
+            }
+          } catch (e) {
+            // Ignore JSON parse errors
+          }
+        }
+      }
+
+      // Delete task - remove from context after deletion
+      if (toolName === "delete_task" && result.includes("ok=true")) {
+        // Task was deleted successfully - we could optionally remove it from context
+        // But keeping it allows the LLM to confirm what was deleted
+        if (args.taskId) {
+          memoryStore.addSessionEntity(sessionId, "task", args.taskId, "Deleted Task", {
+            action: "deleted",
+          });
+        }
+      }
+
+      console.log(`[AgentController] Entity extraction complete for ${toolName}`);
+    } catch (err) {
+      console.warn(`[AgentController] Entity extraction failed: ${err.message}`);
+    }
   }
 
   /**

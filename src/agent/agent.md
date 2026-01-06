@@ -33,20 +33,53 @@ This document provides a comprehensive understanding of:
 1. Save user message
 2. Load conversation history & user profile
 3. Retrieve relevant memories using semantic search
-4. Build personalized system prompt
-5. AGENT LOOP (max 3 iterations):
+4. Retrieve session entity context (recently discussed tasks, etc.)
+5. Build personalized system prompt with entity context
+6. AGENT LOOP (max 3 iterations):
    - Invoke LLM with tools
-   - If tool calls → execute them → loop back
+   - If tool calls → execute them → extract entities → loop back
    - If no tool calls → return response
-6. Save assistant response
-7. Return result to caller
+7. Save assistant response
+8. Return result to caller
 ```
 
 **Key Features:**
 - **Semantic Memory Retrieval:** Uses vector embeddings to find relevant past information
+- **Session Entity Context:** Tracks recently discussed entities (tasks, etc.) for reference resolution
 - **Context Management:** Limits history to last 10 messages to save tokens
 - **Tool Binding:** LLM has access to 10+ tools for actions (memory, tasks, time)
 - **MAX_TOKENS Handling:** Gracefully retries with shorter prompts if model hits token limit
+
+---
+
+### 1.5 **Session Entity Context** - Reference Resolution
+**Purpose:** Enables the LLM to understand contextual references like "this task", "delete it", etc.
+
+**How it works:**
+1. When tools execute (add_task, preview_task, get_tasks, etc.), entity info is extracted
+2. Entities (tasks with IDs and names) are stored in session memory
+3. Entity context is injected into the system prompt
+4. LLM can resolve "this task" → most recent task ID
+
+**Example Flow:**
+```
+User: "Create a task to finish my homework"
+→ preview_task executed → Entity tracked: {type: "task", id: "draft-123", name: "Finish my homework"}
+
+User: "Yes, create it"  
+→ add_task executed → Entity tracked: {type: "task", id: "abc123", name: "Finish my homework"}
+
+User: "Delete this task"
+→ LLM sees entity context: task "Finish my homework" (id=abc123) [MOST RECENT]
+→ LLM calls delete_task with taskId="abc123"
+```
+
+**Entity Context Format (in prompt):**
+```
+RECENT ENTITIES (for reference resolution):
+- task: "Finish my homework" (id=abc123) [MOST RECENT]
+- task: "Buy groceries" (id=def456)
+```
 
 ---
 

@@ -1,4 +1,4 @@
-import { SystemMessage, HumanMessage, AIMessage } from "@langchain/core/messages";
+import { SystemMessage, HumanMessage, AIMessage, ToolMessage } from "@langchain/core/messages";
 import { buildSystemPromptWithUserContext } from "./prompts.js";
 import { TOKEN_BUDGET } from "./tokenBudget.js";
 
@@ -40,17 +40,33 @@ export class PromptManager {
     // Use TOKEN_BUDGET.MAX_HISTORY_TOKENS to guide slicing dynamically
     // Approx 4 chars per token. As a heuristic we cap message count to keep system prompts small.
     const heuristicMsgs = Math.max(1, Math.floor(TOKEN_BUDGET.MAX_HISTORY_TOKENS / 150));
-    const MAX_HISTORY_MSGS = Math.min(10, heuristicMsgs);
+    const MAX_HISTORY_MSGS = Math.min(20, heuristicMsgs); // Increased history window for tool context
     const recentHistory = history.slice(-MAX_HISTORY_MSGS);
 
     for (const msg of recentHistory) {
       if (msg.role === "user") {
         messages.push(new HumanMessage(msg.content));
       } else if (msg.role === "assistant") {
-        messages.push(new AIMessage(msg.content));
+        // Handle tool calls in assistant messages
+        if (msg.toolCalls && msg.toolCalls.length > 0) {
+          messages.push(
+            new AIMessage({
+              content: msg.content || "",
+              tool_calls: msg.toolCalls,
+            })
+          );
+        } else {
+          messages.push(new AIMessage(msg.content));
+        }
+      } else if (msg.role === "tool" || msg.role === "function") {
+        // Handle tool responses
+        messages.push(
+          new ToolMessage({
+            content: msg.content,
+            tool_call_id: msg.tool_call_id || msg.name || "unknown",
+          })
+        );
       }
-      // Note: Tool calls/results are currently not persisted in history for next turn context
-      // If they were, we would handle them here.
     }
 
     messages.push(new HumanMessage(userMessage));
