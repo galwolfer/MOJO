@@ -30,6 +30,10 @@ const taskSchema = new mongoose.Schema(
     // Cached score so we can sort quickly (optional)
     // add field: user's behaviour default value ineffective
     priorityScore: { type: Number, default: 0 },
+    // ML Prediction fields
+    predictedCompletionCategory: { type: Number, min: 1, max: 5 }, // 1=very quick, 5=won't complete
+    predictionScore: { type: Number, min: 0, max: 1 }, // confidence score (0-1)
+    actualCompletionMinutes: { type: Number }, // minutes taken when task completes (for reward calculation)
     subCategory: {
       label: { type: String, default: "", trim: true },
       source: { type: String, default: "heuristic", trim: true },

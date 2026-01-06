@@ -21,7 +21,7 @@ Run with: python test_user_behavior_learning.py
 """
 
 import numpy as np
-from predict_model.multi_feature_linucb import MultiFeatureLinUCB, extract_features
+from multi_feature_linucb import MultiFeatureLinUCB, extract_features
 
 # Standard categories used across all tests
 CATEGORIES = ["sport", "study", "work", "home", "health", "habits"]

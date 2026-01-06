@@ -217,7 +217,7 @@ export async function updateTask({ userId, taskId, updates }) {
   const allowedFields = [
     "taskname", "description", "importance", "effort", "estimatedDuration",
     "canSplit", "minChunk", "taskType", "chunkCount", "chunkMinutes",
-    "minMinutes", "maxMinutes", "dueDate", "status", "tags",
+    "minMinutes", "maxMinutes", "dueDate", "status", "tags", "actualCompletionMinutes",
   ];
 
   const sanitizedUpdates = {};
@@ -329,6 +329,56 @@ export async function deleteTask({ taskId, userId }) {
     });
 
     return { success: true, taskname };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Mark a task as complete and record actual completion time.
+ * @param {object} params - { taskId, userId }
+ * @returns {Promise<object>} { success, task, actualCompletionMinutes }
+ */
+export async function completeTask({ taskId, userId }) {
+  if (!taskId) {
+    return { success: false, error: "Task ID is required." };
+  }
+
+  try {
+    const task = await Task.findOne({ _id: taskId, userId });
+
+    if (!task) {
+      return { success: false, error: "Task not found or you don't have permission." };
+    }
+
+    // Calculate actual completion time in minutes from task creation
+    const actualCompletionMinutes = Math.round(
+      (Date.now() - task.createdAt.getTime()) / (1000 * 60)
+    );
+
+    const updated = await Task.findByIdAndUpdate(
+      taskId,
+      {
+        $set: {
+          status: "done",
+          actualCompletionMinutes,
+        },
+      },
+      { new: true }
+    ).lean();
+
+    await logEvent({
+      type: "task_completed",
+      userId,
+      payload: {
+        taskId: taskId.toString(),
+        taskname: task.taskname,
+        actualCompletionMinutes,
+        estimatedDuration: task.estimatedDuration,
+      },
+    });
+
+    return { success: true, task: updated, actualCompletionMinutes };
   } catch (error) {
     return { success: false, error: error.message };
   }
