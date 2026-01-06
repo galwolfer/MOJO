@@ -1,3 +1,8 @@
+/*
+ * File: src/controllers/taskController.js
+ * Purpose: Task-related HTTP controllers (create, update, list, expired management)
+ */
+
 import * as taskService from "../services/taskService.js";
 import { logger } from "../utils/logger.js";
 

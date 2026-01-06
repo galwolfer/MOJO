@@ -1,5 +1,7 @@
-// src/server.js
-// Notes are in English as requested.
+/*
+ * File: src/server.js
+ * Purpose: Bootstraps HTTP server, database connection and background jobs
+ */
 import { createServer } from "http";
 import app from "./app.js";
 import { env } from "./config/env.js";

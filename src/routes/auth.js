@@ -1,3 +1,8 @@
+/*
+ * File: src/routes/auth.js
+ * Purpose: Authentication routes (register, login, profile)
+ */
+
 import express from "express";
 import { register, login, getMe, updateProfile } from "../controllers/authController.js";
 import { requireAuth } from "../middlewares/auth.js";

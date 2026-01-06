@@ -1,4 +1,7 @@
-// Notes are in English as requested.
+/*
+ * File: src/config/env.js
+ * Purpose: Environment variables and runtime configuration
+ */
 import dotenv from "dotenv";
 dotenv.config();
 

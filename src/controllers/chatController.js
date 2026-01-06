@@ -1,3 +1,8 @@
+/*
+ * File: src/controllers/chatController.js
+ * Purpose: Chat endpoints integrating the AgentController for messages and sessions
+ */
+
 import { AgentController } from "../agent/agentController.js";
 import { config } from "../config/env.js";
 import { User, Session } from "../models/index.js";

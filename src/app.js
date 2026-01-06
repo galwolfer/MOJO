@@ -1,3 +1,7 @@
+/*
+ * File: src/app.js
+ * Purpose: Express application setup and route mounting
+ */
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";

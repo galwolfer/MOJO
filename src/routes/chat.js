@@ -1,3 +1,8 @@
+/*
+ * File: src/routes/chat.js
+ * Purpose: Chat-related routes (message, reset, history, sessions)
+ */
+
 import express from "express";
 import {
   sendMessage,

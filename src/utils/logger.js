@@ -1,4 +1,7 @@
-// Notes are in English as requested.
+/*
+ * File: src/utils/logger.js
+ * Purpose: Minimal logger facade for server logs
+ */
 const base =
   (level) =>
   (...args) =>

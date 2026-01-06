@@ -1,3 +1,8 @@
+/*
+ * File: src/routes/tasks.js
+ * Purpose: Task CRUD and expired task management endpoints
+ */
+
 import { Router } from "express";
 import { requireAuth } from "../middlewares/auth.js";
 import * as taskController from "../controllers/taskController.js";

@@ -1,3 +1,7 @@
+/*
+ * File: src/models/index.js
+ * Purpose: Single entry-point exporting Mongoose models
+ */
 // Export all models from a single entry point
 export { User } from "./User.js";
 export { Session } from "./Session.js";

@@ -1,3 +1,7 @@
+/*
+ * File: src/models/Memory.js
+ * Purpose: (Deprecated) Separate memory model for migration/compatibility
+ */
 import mongoose from "mongoose";
 
 /**

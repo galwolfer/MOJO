@@ -72,9 +72,7 @@ During active development you can replace `node src/server.js` with:
 
 ## Team MOJO
 
-- **Ofek** - Agent & Tools
-- **Gal** - API & Routes
-- **Joni** - Services & DB
+This project is maintained by the single MOJO team (all contributors). The team owns the agent, API, and services components together.
 
 ---
 

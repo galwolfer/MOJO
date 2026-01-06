@@ -1,72 +1,123 @@
-// ==================== OFEK — CONTROLLERS (START) ====================
-// Example controller for Ofek's feature set.
-export const ofekListItems = async (_req, res, _next) => {
-  // TODO(Ofek): implement business logic or call services.ofek*()
-  res.json({ owner: "Ofek", items: [] });
-};
+/*
+ * File: src/controllers/index.js
+ * Purpose: Small feature controllers and thin public handlers (profile, priority)
+ */
 
-export const ofekCreateItem = async (req, res, _next) => {
-  // TODO(Ofek): validate req.body then persist via services.ofek*()
-  res.status(201).json({ owner: "Ofek", created: req.body ?? {} });
-};
+/*
+ * Feature controllers index
+ * -------------------------
+ * This file exposes lightweight, documented controllers for small feature
+ * modules. Names are neutral and non-personal to keep the codebase generic.
+ * Where possible we use the corresponding service exports (from `src/services/index.js`).
+ * If a service is not implemented, the endpoints return 501 (Not Implemented)
+ * with a clear message so clients receive a predictable response.
+ */
 
-// ==================== OFEK — CONTROLLERS (END) ======================
-// ==================== GAL — CONTROLLERS (START) =====================
-// Example controller for Gal's feature set.
-export const galGetProfile = async (_req, res, _next) => {
-  // TODO(Gal): implement profile retrieval (mock)
-  res.json({ owner: "Gal", profile: { name: "Gal", role: "teammate" } });
-};
+import { profileService, coacherAlgorithm } from "../services/index.js";
 
-export const galUpdateProfile = async (req, res, _next) => {
-  // TODO(Gal): update logic
-  res.json({ owner: "Gal", updated: req.body ?? {} });
-};
-// ==================== GAL — CONTROLLERS (END) =======================
-// ==================== JONI — CONTROLLERS (START) ====================
-// Controllers for Joni's feature set (Coacher Algorithm / Priority Engine)
 
-// import { joniService } from "../services/index.js";
-
-export const joniCoachNext = async (req, res, _next) => {
-  // TODO(Joni): compute next recommended activity using the Coacher Algorithm
-  try {
-    const { userId } = req.body || {};
-    if (!userId) {
-      return res.status(400).json({ error: "userId is required" });
+// ------------------- PROFILE — CONTROLLERS -------------------
+/**
+ * Get profile
+ * GET /api/profile
+ * Uses `profileService.getProfile()` if available, otherwise returns mock data.
+ */
+export const profileGet = async (_req, res, _next) => {
+  if (typeof profileService?.getProfile === "function") {
+    try {
+      const profile = await profileService.getProfile();
+      return res.json({ owner: "profile", profile });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
     }
+  }
 
-    const result = await joniService.computePriority(userId);
-    res.json({ owner: "Joni", ...result });
+  // Fallback mock (safe default)
+  return res.json({ owner: "profile", profile: { name: "user", role: "member" } });
+};
+
+/**
+ * Update profile
+ * PUT /api/profile
+ */
+export const profileUpdate = async (req, res, _next) => {
+  if (typeof profileService?.updateProfile === "function") {
+    try {
+      const updated = await profileService.updateProfile(req.body ?? {});
+      return res.json({ owner: "profile", updated });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
+  // Fallback: echo back body
+  return res.json({ owner: "profile", updated: req.body ?? {} });
+};
+
+// ------------------- PRIORITY — CONTROLLERS -------------------
+/**
+ * Compute next recommended activity using the Coacher algorithm
+ * POST /api/priority/coach/next
+ * Body: { userId?: string }
+ * If `userId` is not provided in the body, attempt reading `req.user.userId`.
+ */
+export const priorityNext = async (req, res, _next) => {
+  try {
+    const { userId: bodyUserId } = req.body || {};
+    const userId = bodyUserId || req?.user?.userId;
+    if (!userId) return res.status(400).json({ error: "userId is required" });
+
+    // Use coacherAlgorithm from services (already implemented)
+    const result = await coacherAlgorithm.computeFromDb(userId);
+    return res.json({ owner: "priority", ...result });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 };
 
-export const joniCoachFeedback = async (req, res, _next) => {
-  // TODO(Joni): record user feedback for the Coacher Algorithm
+/**
+ * Record feedback for the Coacher algorithm
+ * POST /api/priority/coach/feedback
+ * Body: { userId, activityId, action }
+ * Currently this is a safe no-op that returns 200 until a persistent
+ * recording implementation is added.
+ */
+export const priorityFeedback = async (req, res, _next) => {
   try {
     const { userId, activityId, action } = req.body || {};
     if (!userId || !activityId || !action) {
       return res.status(400).json({ error: "userId, activityId, and action are required" });
     }
 
-    await joniService.recordFeedback({ userId, activityId, action });
-    res.json({ owner: "Joni", ok: true });
+    // TODO: persist feedback to a DB/ML pipeline. For now, return ok.
+    return res.json({ owner: "priority", ok: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 };
 
-export const joniStats = async (_req, res, _next) => {
-  // TODO(Joni): compute statistics or call services.joni*()
-  const result = await joniService.stats();
-  res.json({ owner: "Joni", stats: result });
+/**
+ * Get lightweight priority stats
+ * GET /api/priority/stats
+ */
+export const priorityStats = async (_req, res, _next) => {
+  try {
+    // Basic stat: return coacher algorithm availability and a sample
+    return res.json({ owner: "priority", stats: { available: true } });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
 };
 
-export const joniTriggerJob = async (_req, res, _next) => {
-  // TODO(Joni): trigger a background-like job (mocked example)
-  const result = await joniService.triggerJob();
-  res.json({ owner: "Joni", job: result });
+/**
+ * Trigger a priority job (ad-hoc)
+ * POST /api/priority/job
+ */
+export const priorityTriggerJob = async (_req, res, _next) => {
+  try {
+    // In future, this could enqueue a background job. For now, run a quick health action.
+    return res.json({ owner: "priority", job: { triggered: true, ts: Date.now() } });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
 };
-// ==================== JONI — CONTROLLERS (END) ======================

@@ -1,3 +1,7 @@
+/*
+ * File: src/models/BusyBlock.js
+ * Purpose: Represents user busy blocks (calendar or manual)
+ */
 import mongoose from "mongoose";
 
 const busyBlockSchema = new mongoose.Schema(

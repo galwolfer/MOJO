@@ -1,3 +1,7 @@
+/*
+ * File: src/config/database.js
+ * Purpose: MongoDB connection helper
+ */
 import mongoose from "mongoose";
 import { env } from "./env.js";
 

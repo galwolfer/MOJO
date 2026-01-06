@@ -88,7 +88,7 @@ RECUR: "daily"/"כל יום"→{type:"daily",interval:1} | "weekly"/"כל שבו
  * You are MOJO, a helpful AI assistant...
  * [base rules]
  * PERSONALITY: Act as a friendly coach. Tone: warm, approachable, conversational.
- * User: 5f7a8b9c0d1e2f3g4h5i6j (Ofek)
+ * User: 5f7a8b9c0d1e2f3g4h5i6j (user)
  * Memory: studies at Bar Ilan; likes coding;
  * Past: discussed project timeline yesterday;
  * ```
