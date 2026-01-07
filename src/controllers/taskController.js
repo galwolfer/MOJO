@@ -18,21 +18,17 @@ import { logger } from "../utils/logger.js";
 export async function createTask(req, res) {
   try {
     const userId = req.user.userId;
-    const { name, tag, deadline, recurrence } = req.body;
+    const { name, taskname, tag, tags, deadline, recurrence } = req.body;
+
+    const title = (taskname || name || "").trim();
 
     // Validation
-    if (!name || !name.trim()) {
-      return res.status(400).json({
-        success: false,
-        error: "Task name is required",
-      });
+    if (!title) {
+      return res.status(400).json({ success: false, error: "Task title is required" });
     }
 
     if (!deadline) {
-      return res.status(400).json({
-        success: false,
-        error: "Deadline is required",
-      });
+      return res.status(400).json({ success: false, error: "Deadline is required" });
     }
 
     // Validate recurrence if provided
@@ -61,8 +57,8 @@ export async function createTask(req, res) {
 
     const task = await taskService.createTask({
       userId,
-      taskname: name.trim(),
-      tags: tag ? [tag.trim()] : [],
+      taskname: title,
+      tags: tags || (tag ? [tag.trim()] : []),
       dueDate: deadline ? new Date(deadline) : null,
       recurrence,
     });
@@ -177,8 +173,17 @@ export async function updateTask(req, res) {
 
     // Map public API fields to service field names
     const updates = {};
-    if (raw.name !== undefined) updates.taskname = typeof raw.name === "string" ? raw.name.trim() : raw.name;
+    if (raw.taskname !== undefined || raw.name !== undefined)
+      updates.taskname =
+        typeof (raw.taskname || raw.name) === "string" ? (raw.taskname || raw.name).trim() : raw.taskname || raw.name;
+    if (raw.tags !== undefined) updates.tags = Array.isArray(raw.tags) ? raw.tags : [];
     if (raw.tag !== undefined) updates.tags = raw.tag ? [String(raw.tag).trim()] : [];
+    if (raw.importance !== undefined) updates.importance = Number(raw.importance);
+    if (raw.effort !== undefined) updates.effort = Number(raw.effort);
+    if (raw.estimatedDuration !== undefined) updates.estimatedDuration = Number(raw.estimatedDuration);
+    if (raw.canSplit !== undefined) updates.canSplit = Boolean(raw.canSplit);
+    if (raw.taskType !== undefined) updates.taskType = raw.taskType;
+    if (raw.subCategory !== undefined) updates.subCategory = raw.subCategory;
     if (raw.completed !== undefined) updates.status = raw.completed ? "done" : "todo";
 
     // Validate and map deadline if provided

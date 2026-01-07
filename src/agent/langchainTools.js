@@ -281,14 +281,15 @@ err="${error.message}"`;
       description: TOOL_DESCRIPTIONS.preview_task,
       returnDirect: false,
       schema: z.object({
-        name: z.string().describe("Task name"),
-        deadline: z.string().describe("ISO 8601 date. Calculate from relative expressions."),
-        description: z.string().optional().describe("Additional details"),
-        importance: z.number().min(1).max(5).optional().describe("1-5 scale (1=low, 5=critical)"),
-        effort: z.number().min(1).max(5).optional().describe("1-5 scale (1=easy, 5=hard)"),
-        duration: z.number().optional().describe("Estimated time in minutes"),
-        tags: z.array(z.string()).optional().describe("Categories"),
-        splitable: z.boolean().optional().describe("Can be split into chunks?"),
+        taskname: z.string().describe("Task title (required)"),
+        deadline: z.string().describe("ISO date (YYYY-MM-DD). Convert relative dates before calling"),
+        description: z.string().optional().describe("Optional details"),
+        importance: z.number().min(1).max(5).optional().describe("1-5 importance (AI can infer)"),
+        effort: z.number().min(1).max(5).optional().describe("1-5 effort (AI can infer)"),
+        duration: z.number().optional().describe("Estimated minutes (AI can infer)"),
+        tags: z.array(z.string()).optional().describe("Category tags (AI can suggest)"),
+        canSplit: z.boolean().optional().describe("Can the task be split?"),
+        taskType: z.string().optional().describe("Task splitting strategy (perfect/in_parts/leaky)"),
         recurrence: z
           .object({
             type: z.enum(["daily", "weekly", "monthly", "yearly"]),
@@ -299,7 +300,8 @@ err="${error.message}"`;
           .optional(),
       }),
       func: async (params) => {
-        const { name, deadline, description, importance, effort, duration, tags, splitable, recurrence } = params;
+        const { taskname, deadline, description, importance, effort, duration, tags, canSplit, taskType, recurrence } =
+          params;
 
         try {
           // Validate deadline is a valid date
@@ -316,23 +318,24 @@ err="${error.message}"`;
           const finalEffort = effort || inferred.effort;
           const finalDuration = duration || inferred.duration;
           const finalTags = tags || inferred.tags;
-          const finalSplitable = splitable !== undefined ? splitable : TASK_CONFIG.defaults.splitable;
+          const finalCanSplit = canSplit !== undefined ? canSplit : TASK_CONFIG.defaults.splitable;
 
           const widgetJson = {
             version: "1.0",
             widget_type: "task_confirmation",
             data: {
               id: "draft-" + Date.now(),
-              title: name,
+              title: taskname,
               status: "draft",
               dueDate: new Date(deadline).toISOString(),
-              priority: finalImportance >= 4 ? "high" : finalImportance <= 2 ? "low" : "medium",
-              tags: finalTags,
-              description: description || (recurrence ? `Recurrence: ${recurrence.type}` : ""),
               importance: finalImportance,
               effort: finalEffort,
               estimatedDuration: finalDuration,
-              canSplit: finalSplitable,
+              priority: finalImportance >= 4 ? "high" : finalImportance <= 2 ? "low" : "medium",
+              tags: finalTags,
+              taskType: taskType || TASK_CONFIG.defaults.taskType,
+              description: description || (recurrence ? `Recurrence: ${recurrence.type}` : ""),
+              canSplit: finalCanSplit,
               confirmLabel: "Create Task",
               cancelLabel: "Edit",
             },
@@ -358,14 +361,15 @@ err="${error.message}"`;
       description: TOOL_DESCRIPTIONS.add_task,
       returnDirect: false,
       schema: z.object({
-        name: z.string().describe("Task name"),
-        deadline: z.string().describe("ISO 8601 date. Calculate from relative expressions."),
+        taskname: z.string().describe("Task title"),
+        deadline: z.string().describe("ISO date (YYYY-MM-DD). Convert relative dates before calling"),
         description: z.string().optional().describe("Additional details"),
-        importance: z.number().min(1).max(5).optional().describe("1-5 scale (1=low, 5=critical)"),
-        effort: z.number().min(1).max(5).optional().describe("1-5 scale (1=easy, 5=hard)"),
-        duration: z.number().optional().describe("Estimated time in minutes"),
+        importance: z.number().min(1).max(5).optional().describe("1-5 importance (AI can infer)"),
+        effort: z.number().min(1).max(5).optional().describe("1-5 effort (AI can infer)"),
+        duration: z.number().optional().describe("Estimated minutes (AI can infer)"),
         tags: z.array(z.string()).optional().describe("Categories"),
-        splitable: z.boolean().optional().describe("Can be split into chunks?"),
+        canSplit: z.boolean().optional().describe("Can be split into chunks?"),
+        taskType: z.string().optional().describe("Task splitting strategy"),
         recurrence: z
           .object({
             type: z.enum(["daily", "weekly", "monthly", "yearly"]),
@@ -376,27 +380,29 @@ err="${error.message}"`;
           .optional(),
       }),
       func: async (params) => {
-        const { name, deadline, description, importance, effort, duration, tags, splitable, recurrence } = params;
+        const { taskname, deadline, description, importance, effort, duration, tags, canSplit, taskType, recurrence } =
+          params;
         try {
-          // Infer properties from task name if not provided
-          const inferred = inferTaskProperties(name);
+          // Infer properties from task title if not provided
+          const inferred = inferTaskProperties(taskname);
 
           // Apply defaults and inference
           const finalImportance = importance || inferred.importance;
           const finalEffort = effort || inferred.effort;
           const finalDuration = duration || inferred.duration;
           const finalTags = tags || inferred.tags;
-          const finalSplitable = splitable !== undefined ? splitable : TASK_CONFIG.defaults.splitable;
+          const finalCanSplit = canSplit !== undefined ? canSplit : TASK_CONFIG.defaults.splitable;
 
           const taskData = {
             userId,
-            taskname: name,
+            taskname: taskname,
             description: description || "",
             importance: finalImportance,
             effort: finalEffort,
             estimatedDuration: finalDuration,
-            canSplit: finalSplitable,
+            canSplit: finalCanSplit,
             tags: finalTags,
+            taskType: taskType || TASK_CONFIG.defaults.taskType,
             dueDate: new Date(deadline),
           };
 
@@ -478,10 +484,15 @@ err="${error.message}"`;
                 id: t._id,
                 title: t.taskname,
                 status: t.status,
-                dueDate: t.dueDate,
-                priority: t.priority,
+                dueDate: t.dueDate ? new Date(t.dueDate).toISOString() : null,
+                importance: t.importance,
+                priorityScore: t.priorityScore || 0,
+                taskType: t.taskType || null,
+                subCategory: t.subCategory || null,
                 tags: t.tags,
                 description: t.description,
+                estimatedDuration: t.estimatedDuration,
+                canSplit: t.canSplit,
               })),
             },
           };
@@ -514,23 +525,40 @@ err="${error.message}"`;
       returnDirect: false,
       schema: z.object({
         taskId: z.string().optional(),
-        name: z.string().optional().describe("Task name to identify task when taskId is not provided"),
-        tag: z.string().optional(),
+        taskname: z.string().optional().describe("Task title to identify task when taskId is not provided"),
+        tags: z.array(z.string()).optional().describe("Replace tags or provide new tags array"),
+        importance: z.number().min(1).max(5).optional().describe("Importance 1-5"),
+        effort: z.number().min(1).max(5).optional().describe("Effort 1-5"),
+        estimatedDuration: z.number().optional().describe("Estimated minutes"),
+        canSplit: z.boolean().optional().describe("Can be split?"),
+        taskType: z.string().optional().describe("Task splitting strategy"),
         deadline: z.string().optional(),
         completed: z.boolean().optional(),
         confirm: z.boolean().optional().describe("Must be true to perform the update"),
       }),
-      func: async ({ taskId, name, tag, deadline, completed, confirm }) => {
+      func: async ({
+        taskId,
+        taskname,
+        tags,
+        importance,
+        effort,
+        estimatedDuration,
+        canSplit,
+        taskType,
+        deadline,
+        completed,
+        confirm,
+      }) => {
         try {
           // Require explicit confirmation to avoid accidental changes
           if (!confirm) {
             return `ok=false\nerr="confirmation_required"`;
           }
 
-          // If taskId not provided, try to resolve by exact task name
+          // If taskId not provided, try to resolve by exact task title
           if (!taskId) {
-            if (!name) return `ok=false\nerr="task_identifier_required"`;
-            const candidates = await taskService.getTasksForUser(userId, { taskname: name });
+            if (!taskname) return `ok=false\nerr="task_identifier_required"`;
+            const candidates = await taskService.getTasksForUser(userId, { taskname: taskname });
             if (!candidates || candidates.length === 0) {
               return `ok=false\nerr="task_not_found"`;
             }
@@ -543,8 +571,13 @@ err="${error.message}"`;
 
           // Build update object with only specified fields
           const updates = {};
-          if (name !== undefined) updates.taskname = name;
-          if (tag !== undefined) updates.tags = [tag];
+          if (taskname !== undefined) updates.taskname = taskname;
+          if (tags !== undefined) updates.tags = tags;
+          if (importance !== undefined) updates.importance = importance;
+          if (effort !== undefined) updates.effort = effort;
+          if (estimatedDuration !== undefined) updates.estimatedDuration = estimatedDuration;
+          if (canSplit !== undefined) updates.canSplit = canSplit;
+          if (taskType !== undefined) updates.taskType = taskType;
 
           if (deadline !== undefined) {
             const d = new Date(deadline);
@@ -576,7 +609,10 @@ err="${error.message}"`;
                 description: task.description,
                 status: task.status,
                 dueDate: task.dueDate ? new Date(task.dueDate).toISOString() : null,
-                priority: task.importance,
+                importance: task.importance,
+                priorityScore: task.priorityScore || 0,
+                taskType: task.taskType || null,
+                subCategory: task.subCategory || null,
                 tags: task.tags,
                 estimatedDuration: task.estimatedDuration,
                 canSplit: task.canSplit,
@@ -658,10 +694,15 @@ err="${error.message}"`;
                 id: t._id,
                 title: t.taskname,
                 status: t.status,
-                dueDate: t.dueDate,
-                priority: t.priority,
+                dueDate: t.dueDate ? new Date(t.dueDate).toISOString() : null,
+                importance: t.importance,
+                priorityScore: t.priorityScore || 0,
+                taskType: t.taskType || null,
+                subCategory: t.subCategory || null,
                 tags: t.tags,
                 description: t.description,
+                estimatedDuration: t.estimatedDuration,
+                canSplit: t.canSplit,
               })),
             },
           };
@@ -704,10 +745,15 @@ err="${error.message}"`;
                 id: t._id,
                 title: t.taskname,
                 status: t.status,
-                dueDate: t.dueDate,
-                priority: t.priority,
+                dueDate: t.dueDate ? new Date(t.dueDate).toISOString() : null,
+                importance: t.importance,
+                priorityScore: t.priorityScore || 0,
+                taskType: t.taskType || null,
+                subCategory: t.subCategory || null,
                 tags: t.tags,
                 description: t.description,
+                estimatedDuration: t.estimatedDuration,
+                canSplit: t.canSplit,
               })),
             },
           };

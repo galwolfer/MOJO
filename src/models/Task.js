@@ -27,6 +27,14 @@ const taskSchema = new mongoose.Schema(
     minMinutes: { type: Number, min: 1 },
     maxMinutes: { type: Number, min: 1 },
     earliestStart: { type: Date },
+    // Recurrence settings for repeating tasks
+    recurrence: {
+      type: { type: String, enum: ["daily", "weekly", "monthly", "yearly"] },
+      interval: { type: Number, default: 1 },
+      endDate: { type: Date },
+      count: { type: Number },
+      completedDates: { type: [Date], default: [] },
+    },
     // Cached score so we can sort quickly (optional)
     // add field: user's behaviour default value ineffective
     priorityScore: { type: Number, default: 0 },
@@ -84,16 +92,18 @@ taskSchema.pre("save", async function () {
 
 // Compound indexes for efficient queries
 taskSchema.index({ userId: 1, dueDate: 1 });
-taskSchema.index({ userId: 1, tag: 1 });
-taskSchema.index({ userId: 1, completed: 1 });
+// Index tags array and status for common queries
+taskSchema.index({ userId: 1, tags: 1 });
+taskSchema.index({ userId: 1, status: 1 });
 
 // Methods
 taskSchema.methods.markComplete = function () {
-  this.completed = true;
+  this.status = "done";
+  return this.save();
 };
 
 taskSchema.methods.markIncomplete = function () {
-  this.completed = false;
+  this.status = "todo";
   return this.save();
 };
 

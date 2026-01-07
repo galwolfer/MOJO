@@ -59,13 +59,14 @@ export const WIDGETS = {
       title: "Task title",
       status: "Task status (draft)",
       dueDate: "ISO due date",
-      priority: "Priority level (high/medium/low)",
-      tags: "Array of category tags",
-      description: "Task description",
       importance: "Importance level 1-5",
       effort: "Effort level 1-5",
       estimatedDuration: "Estimated minutes",
       canSplit: "Boolean can be split",
+      taskType: "Task splitting strategy (perfect/in_parts/leaky)",
+      category: "Primary category (e.g., work). Use a single category. Legacy: tags array also accepted",
+      tags: "Legacy tags array (optional)",
+      description: "Task description",
       confirmLabel: "Label for confirm button",
       cancelLabel: "Label for cancel button",
     },
@@ -82,7 +83,7 @@ export function getWidgetPromptInstructions() {
   return instructions;
 }
 
-export const TOOL_MANIFEST = `MEMORY TOOLS:\n- save_user_fact: When user shares personal info (name, location, education, work, preferences)\n- save_conversation_note: When user makes decisions/plans/requests\n- search_memories: To recall past info about user not in recent context\n- Write concisely (2-5 words for facts, 5-20 for notes)\n\nPERSONALITY TOOLS:\n- set_tone: Change how you communicate (friendly/professional/casual/formal/enthusiastic)\n- set_persona: Change WHO you act as (any character/role)\n\nTASK TOOLS:\n- preview_task: Draft and show a task_confirmation widget.\n- add_task: Create only after explicit confirmation (yes/כן).\n- get_tasks: Retrieve tasks\n- update_task: Modify task\n- delete_task: Delete only on explicit user delete + confirm.\n- get_upcoming_tasks: Tasks due soon\n- get_overdue_tasks: Late tasks\n\nDATES: convert relative dates (e.g., tomorrow/מחר) to ISO before calling tools.
+export const TOOL_MANIFEST = `MEMORY TOOLS:\n- save_user_fact: When user shares personal info (name, location, education, work, preferences)\n- save_conversation_note: When user makes decisions/plans/requests\n- search_memories: To recall past info about user not in recent context\n- Write concisely (2-5 words for facts, 5-20 for notes)\n\nPERSONALITY TOOLS:\n- set_tone: Change how you communicate (friendly/professional/casual/formal/enthusiastic)\n- set_persona: Change WHO you act as (any character/role)\n\nTASK TOOLS:\n- preview_task: Draft and show a task_confirmation widget. Required fields: taskname, deadline; AI can fill optional fields.\n- add_task: Create only after explicit confirmation (yes/כן).\n- get_tasks: Retrieve tasks\n- update_task: Modify task\n- delete_task: Delete only on explicit user delete + confirm.\n- get_upcoming_tasks: Tasks due soon\n- get_overdue_tasks: Late tasks\n\nDATES: convert relative dates (e.g., tomorrow/מחר) to ISO before calling tools.
 - Recognize relative date expressions in any language (e.g., "tomorrow", "in two weeks", or equivalents in other languages) and convert them to ISO dates.\nRECUR: "daily"→{type:"daily",interval:1} | "weekly"→{type:"weekly",interval:1}\n\nREFERENCE RESOLUTION:\n- When user says "this task", "that task", "it", "the task" → use the MOST RECENT task from RECENT ENTITIES context\n- When user says "delete this", "update it" → resolve to the last mentioned entity and use its ID\n- The RECENT ENTITIES section shows recently discussed items with their IDs - use these for operations\n- When users use equivalents in other languages (e.g., "this task" in their language), resolve to the most recently mentioned entity.`;
 
 // Short descriptions for tools. Use these for LLM-facing description fields so they can be adjusted in one place.
@@ -91,10 +92,13 @@ export const TOOL_DESCRIPTIONS = {
   save_user_fact: "Save a concise personal fact (2-5 words)",
   save_conversation_note: "Save a brief note about a decision or plan (5-20 words)",
   search_memories: "Retrieve saved memories",
-  preview_task: "Return a task_confirmation widget for user approval",
-  add_task: "Create a task after explicit user confirmation",
+  preview_task:
+    "Return a task_confirmation widget for approval. Required: taskname, deadline. Optional: description, category (preferred), tags (legacy), importance, effort, estimatedDuration, canSplit, taskType.",
+  add_task:
+    "Create a task after explicit user confirmation. Required: taskname, deadline. AI may fill optional fields.",
   get_tasks: "Fetch tasks (filters/search)",
-  update_task: "Update a task; requires confirm=true",
+  update_task:
+    "Update a task; requires confirm=true. Accepts: taskname, category, tags, importance, effort, estimatedDuration, canSplit, taskType, deadline, completed.",
   delete_task: "Delete a task only on explicit user request + confirm=true",
   get_upcoming_tasks: "Return tasks due within N days",
   get_overdue_tasks: "Return overdue incomplete tasks",
@@ -116,6 +120,7 @@ CRITICAL:
 - Convert relative dates to ISO before calling tools.
 - Use RECENT ENTITIES only for reference resolution, not for building lists.
 - Always use <WIDGET_JSON> when showing tasks.
+- Always respond in the same language as the user's message.
 
 ${getWidgetPromptInstructions()}
 

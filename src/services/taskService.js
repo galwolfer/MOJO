@@ -244,6 +244,8 @@ export async function updateTask({ userId, taskId, updates }) {
     "dueDate",
     "status",
     "tags",
+    "recurrence",
+    "subCategory",
   ];
 
   const sanitizedUpdates = {};

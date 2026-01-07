@@ -12,7 +12,7 @@
 export const TASK_CONFIG = {
   // Fields that the LLM MUST obtain from the user.
   // If these are missing, the LLM should ask the user instead of guessing.
-  required_fields: ["name", "deadline"],
+  required_fields: ["taskname", "deadline"],
 
   // Fields that the LLM can infer from context or leave to defaults.
   optional_fields: [
@@ -22,7 +22,7 @@ export const TASK_CONFIG = {
     "duration", // minutes (estimatedDuration)
     "tags",
     "recurrence",
-    "splitable", // boolean (canSplit)
+    "canSplit", // boolean
   ],
 
   // Default values to use if the LLM/User doesn't provide them
@@ -125,11 +125,11 @@ export function inferTaskProperties(taskName) {
  * Helper to generate system prompt instructions regarding task fields
  */
 export function getTaskFieldInstructions() {
-  return `TASK FIELDS POLICY:
-- REQUIRED: ${TASK_CONFIG.required_fields.join(", ")} (Ask user if missing)
-- OPTIONAL: ${TASK_CONFIG.optional_fields.join(", ")} (Infer or use defaults)
-- AUTO-INFER: Tags, importance, effort, duration based on task name keywords
-- DEFAULTS: Duration=${TASK_CONFIG.defaults.duration}m, Importance=${TASK_CONFIG.defaults.importance}/5, Effort=${
+  return `TASK FIELDS:
+- REQUIRED: ${TASK_CONFIG.required_fields.join(", ")}
+- OPTIONAL: ${TASK_CONFIG.optional_fields.join(", ")}
+- AI HELP: The model can infer tags, importance, effort, and estimated duration from the title.
+- DEFAULTS: duration=${TASK_CONFIG.defaults.duration}m, importance=${TASK_CONFIG.defaults.importance}/5, effort=${
     TASK_CONFIG.defaults.effort
   }/5`;
 }

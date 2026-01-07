@@ -555,28 +555,70 @@ export class AgentController {
   _sanitizeResponse(response) {
     if (!response || typeof response !== "string") return response;
 
-    // Remove any raw function call JSON objects that look like:
-    // {"type":"functionCall","functionCall":{...}}
-    // This pattern should never appear in user-facing output
-    let cleaned = response.replace(/\{\s*"type"\s*:\s*"functionCall"\s*,\s*"functionCall"\s*:\s*\{[^}]*\}\s*\}/g, "");
+    let cleaned = String(response);
 
-    // Remove any standalone JSON objects that start with { and contain "type" or "functionCall"
-    // but are not valid <WIDGET_JSON> tags
-    cleaned = cleaned.replace(/\{\s*"(type|functionCall|name|args)"\s*:/g, (match, group, offset) => {
-      // Check if this is part of a <WIDGET_JSON> tag - if so, don't remove it
-      const beforeText = cleaned.substring(Math.max(0, offset - 50), offset);
-      if (beforeText.includes("<WIDGET_JSON>")) {
-        return match; // Keep it, it's part of valid widget JSON
+    // Remove full JSON blocks that contain ""type":"functionCall""
+    let search = '"type":"functionCall"';
+    let idx = cleaned.indexOf(search);
+    while (idx !== -1) {
+      // find the opening brace before idx
+      let open = cleaned.lastIndexOf('{', idx);
+      if (open === -1) break;
+
+      // find matching closing brace by scanning, respecting string literals
+      let depth = 0;
+      let inString = false;
+      let escape = false;
+      let close = -1;
+      for (let i = open; i < cleaned.length; i++) {
+        const ch = cleaned[i];
+        if (inString) {
+          if (escape) {
+            escape = false;
+          } else if (ch === '\\') {
+            escape = true;
+          } else if (ch === '"') {
+            inString = false;
+          }
+        } else {
+          if (ch === '"') {
+            inString = true;
+          } else if (ch === '{') {
+            depth++;
+          } else if (ch === '}') {
+            depth--;
+            if (depth === 0) {
+              close = i;
+              break;
+            }
+          }
+        }
       }
-      // Otherwise, this is a stray function call object - mark for removal
+
+      if (close === -1) break; // bail if not found
+
+      // remove the entire block
+      cleaned = cleaned.slice(0, open) + cleaned.slice(close + 1);
+
+      // search again
+      idx = cleaned.indexOf(search);
+    }
+
+    // Remove stray lines that are just closing braces or empty objects
+    cleaned = cleaned.replace(/^\s*}\s*$/gm, "");
+    cleaned = cleaned.replace(/\{\s*\}/g, "");
+
+    // Remove any leftover incomplete JSON starts (but keep widget JSON)
+    cleaned = cleaned.replace(/\{\s*"(type|functionCall|name|args)"\s*:/g, (match, group, offset) => {
+      const beforeText = cleaned.substring(Math.max(0, offset - 50), offset);
+      if (beforeText.includes("<WIDGET_JSON>")) return match;
       return "";
     });
 
-    // Clean up multiple consecutive newlines
-    cleaned = cleaned.replace(/\n\s*\n+/g, "\n");
+    // Clean up extra newlines and whitespace
+    cleaned = cleaned.replace(/\n\s*\n+/g, "\n").trim();
 
-    // Trim whitespace
-    return cleaned.trim();
+    return cleaned;
   }
 
   /**
@@ -591,15 +633,15 @@ export class AgentController {
   _extractAndTrackEntities(sessionId, toolName, args, result) {
     try {
       // Task-related tools
-      if (toolName === "add_task") {
+      if (toolName === "add_task" || toolName === "preview_task") {
         // Extract task ID from result (format: id="xxx" or from widget JSON)
         const idMatch = result.match(/id="([^"]+)"/);
-        const taskName = args.name || "Untitled Task";
+        const taskName = args?.taskname || args?.name || "Untitled Task";
 
         if (idMatch) {
           memoryStore.addSessionEntity(sessionId, "task", idMatch[1], taskName, {
             action: toolName === "add_task" ? "created" : "previewed",
-            dueDate: args.deadline,
+            dueDate: args?.deadline || args?.dueDate,
           });
         }
 
@@ -613,6 +655,8 @@ export class AgentController {
                 action: toolName === "add_task" ? "created" : "previewed",
                 dueDate: widget.data.dueDate,
                 status: widget.data.status,
+                importance: widget.data.importance,
+                taskType: widget.data.taskType,
               });
             }
           } catch (e) {
