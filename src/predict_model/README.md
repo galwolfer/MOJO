@@ -41,7 +41,26 @@ A brief, practical guide to the files in `src/predict_model` and how to use them
 ```python
 from predict_model.multi_feature_linucb import MultiFeatureLinUCB, extract_features
 
-CATEGORIES = ["sport", "study", "work", "home", "health", "habits"]
+CATEGORIES = [
+    "study_and_education",
+    "skill_building",
+    "workout",
+    "reflection",
+    "home_and_chores",
+    "family",
+    "life_management",
+    "work_and_career",
+    "creative_projects",
+    "hobbies",
+    "relationship",
+    "goals",
+    "mindfulness",
+    "health",
+    "social_activity",
+    "recovery",
+    "exploration",
+    "uncategorized",
+]
 
 # Create model
 n_features = 1 + 2 + 3 + 4 + len(CATEGORIES)

@@ -6,7 +6,7 @@ import { summarizeTags, categoryForTag } from "./tagging.js";
 import { loadSuggestionModel, scoreCategory } from "./modelScorer.js";
 
 const SUGGESTION_LIBRARY = {
-  work: [
+  work_and_career: [
     {
       title: "Plan upcoming work sprint",
       description: "Outline key goals and deliverables for the next work cycle.",
@@ -16,7 +16,7 @@ const SUGGESTION_LIBRARY = {
       description: "Check milestones and adjust priorities with stakeholders.",
     },
   ],
-  study: [
+  study_and_education: [
     {
       title: "Schedule focused study session",
       description: "Block time to review notes and tackle difficult topics.",
@@ -89,13 +89,13 @@ const SUGGESTION_LIBRARY = {
 };
 
 const CATEGORY_LABELS = {
-  work: "work & projects",
-  study: "studies & learning",
+  work_and_career: "work & projects",
+  study_and_education: "studies & learning",
   health: "health & fitness",
-  social: "social life",
-  finance: "finances & admin",
-  household: "household",
-  creative: "creative projects",
+  social_activity: "social life",
+  life_management: "finances & admin",
+  home_and_chores: "household",
+  creative_projects: "creative projects",
   misc: "general life",
 };
 
@@ -151,7 +151,7 @@ export async function suggestTaskFromProfile(profile = {}, tasks = []) {
 function countTasksByCategory(tasks) {
   const counts = {};
   tasks.forEach((task) => {
-    const tags = summarizeTags(task.tags);
+    const tags = summarizeTags(task.categories);
     const categoriesForTask = new Set(tags.map((tag) => categoryForTag(tag)));
     if (!categoriesForTask.size) {
       categoriesForTask.add("misc");

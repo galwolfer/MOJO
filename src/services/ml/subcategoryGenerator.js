@@ -193,8 +193,8 @@ const shouldRespectManual = (subCategory = {}) => {
 
 const tokenizeTag = (tag) => tag.replace(/[^a-z0-9]/g, " ").split(/\s+/)[0] || tag;
 
-const buildTagLabel = (tags = []) =>
-  tags
+const buildTagLabel = (categories = []) =>
+  categories
     .map((tag) => String(tag || "").trim())
     .filter(Boolean)
     .map((tag) => tag.toLowerCase())
@@ -206,7 +206,7 @@ const buildTagLabel = (tags = []) =>
     .join(" / ");
 
 // Try to build a heuristic label, falling back to a lightweight tag summary.
-const buildHeuristicSuggestion = (tokens = [], tags = []) => {
+const buildHeuristicSuggestion = (tokens = [], categories = []) => {
   const label = toLabel(tokens);
   if (label) {
     return {
@@ -215,7 +215,7 @@ const buildHeuristicSuggestion = (tokens = [], tags = []) => {
       confidence: 0.4,
     };
   }
-  const tagLabel = buildTagLabel(tags);
+  const tagLabel = buildTagLabel(categories);
   if (tagLabel) {
     return {
       label: tagLabel,
@@ -238,7 +238,7 @@ const fetchHistoricalSubCategories = async (TaskModel, userId) => {
         subCategory: 1,
         taskname: 1,
         description: 1,
-        tags: 1,
+        categories: 1,
         updatedAt: 1,
       }
     )
@@ -251,11 +251,11 @@ const fetchHistoricalSubCategories = async (TaskModel, userId) => {
   }
 };
 
-const scoreHistoryEntry = (entry, tokens = [], tags = []) => {
+const scoreHistoryEntry = (entry, tokens = [], categories = []) => {
   if (!entry?.subCategory?.label) return null;
   const entryTokens = cleanTokens(`${entry.taskname || ""} ${entry.description || ""} ${entry.subCategory.label}`);
   const similarity = jaccard(tokens, entryTokens);
-  const tagScore = tagOverlap(tags, entry.tags || []);
+  const tagScore = tagOverlap(categories, entry.categories || []);
   const recencyBoost = entry.updatedAt ? 0.1 : 0;
   const score = similarity * 0.7 + tagScore * 0.2 + recencyBoost;
   return {
@@ -270,7 +270,7 @@ export async function generateSubCategory({
   userId,
   title = "",
   description = "",
-  tags = [],
+  categories = [],
   current = {},
   TaskModel = null,
 } = {}) {
@@ -284,7 +284,7 @@ export async function generateSubCategory({
   }
 
   // Use title (not description) for subcategory inference per user request
-  const normalizedTags = Array.isArray(tags) ? tags.map((tag) => String(tag || "").toLowerCase()) : [];
+  const normalizedTags = Array.isArray(categories) ? categories.map((tag) => String(tag || "").toLowerCase()) : []; 
 
   // Strip common leading filler/action phrases (e.g., "finish", "go to the")
   const strippedTitle = stripLeadingPhrases(String(title || ""));

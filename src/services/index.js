@@ -61,7 +61,7 @@ export const coacherAlgorithm = {
         effort: 1,
         dueDate: 1,
         status: 1,
-        tags: 1,
+        categories: 1,
         duration_min: 1,
         recurrence: 1,
         timeOfDay: 1,
@@ -80,7 +80,7 @@ export const coacherAlgorithm = {
       effort: Number.isFinite(t.effort) ? t.effort : 2,
       dueDate: t.dueDate ? new Date(t.dueDate) : null,
       status: t.status || "todo",
-      tags: Array.isArray(t.tags) ? t.tags : [],
+      categories: Array.isArray(t.categories) ? t.categories : [],
     }));
 
     return this.computeFromTasks(normalized, userProfile);
@@ -100,7 +100,7 @@ export const coacherAlgorithm = {
       status: mapStatus(t.status), // critical
       deadline: t.dueDate ? new Date(t.dueDate).toISOString() : null,
       required_context: { timeOfDay: t.timeOfDay || "any" },
-      tags: Array.isArray(t.tags) ? t.tags : [],
+      categories: Array.isArray(t.categories) ? t.categories : [],
     }));
 
     const result = scoreActivities(activities, userProfile);

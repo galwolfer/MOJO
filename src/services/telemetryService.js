@@ -46,12 +46,12 @@ export async function logEvent({ type, userId = null, payload = {}, context = ""
 
 /**
  * Record when the system generates/suggests a subcategory for a task.
- * @param {{ userId: string, taskId: string, tags?: string[], subCategory?: object, context?: string }} params
+ * @param {{ userId: string, taskId: string, categories?: string[], subCategory?: object, context?: string }} params
  */
 export async function recordSubCategoryGeneration({
   userId,
   taskId,
-  tags = [],
+  categories = [],
   subCategory = null,
   context = "",
 }) {
@@ -61,7 +61,7 @@ export async function recordSubCategoryGeneration({
     userId,
     payload: {
       taskId,
-      tags,
+      categories,
       suggestion: {
         label: subCategory.label,
         source: subCategory.source,
@@ -70,7 +70,7 @@ export async function recordSubCategoryGeneration({
     },
     context,
   });
-}
+} 
 
 /**
  * Record when a user overrides a suggested subcategory.

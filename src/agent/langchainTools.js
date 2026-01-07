@@ -260,7 +260,7 @@ err="${error.message}"`;
           const taskData = { 
             userId,
             taskname: name, 
-            tags: tag ? [tag] : [], 
+            categories: tag ? [tag] : [], 
             dueDate: new Date(deadline) 
           };
 
@@ -283,7 +283,7 @@ err="${error.message}"`;
           // Return structured response
           let result = `ok=true\nmsg="Task created"\nid="${task._id}"
 name="${task.taskname}"`;
-          if (task.tags && task.tags.length > 0) result += `\ntag="${task.tags[0]}"`;
+          if (task.categories && task.categories.length > 0) result += `\ncategory="${task.categories[0]}"`; 
           result += `\ndue="${task.dueDate.toISOString()}"`;
 
           if (task.recurrence?.type) {
@@ -325,7 +325,7 @@ int=${task.recurrence.interval}`;
         try {
           // Build filter object for database query
           const filters = {};
-          if (tag) filters.tags = tag;
+          if (tag) filters.categories = tag;
           if (completed !== undefined) {
             filters.status = completed ? "done" : { $ne: "done" };
           }
@@ -342,7 +342,7 @@ int=${task.recurrence.interval}`;
           // Format results as a clear bulleted list for the LLM to present nicely
           const items = tasks
             .map((t, i) => {
-              const tagStr = Array.isArray(t.tags) && t.tags.length ? t.tags[0] : "";
+              const tagStr = Array.isArray(t.categories) && t.categories.length ? t.categories[0] : "";
               const done = t.status === "done";
               const dueStr = t.dueDate 
                 ? new Date(t.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
@@ -400,7 +400,7 @@ int=${task.recurrence.interval}`;
           // Build update object with only specified fields
           const updates = {};
           if (name !== undefined) updates.taskname = name;
-          if (tag !== undefined) updates.tags = [tag];
+          if (tag !== undefined) updates.categories = [tag];
 
           if (deadline !== undefined) {
             const d = new Date(deadline);
@@ -422,7 +422,7 @@ int=${task.recurrence.interval}`;
           const task = result.task;
 
           return `ok=true\nmsg="Updated"\nid="${task._id}"\nname="${task.taskname}"${
-            task.tags && task.tags.length > 0 ? `\ntag="${task.tags[0]}"` : ""
+            task.categories && task.categories.length > 0 ? `\ncategory="${task.categories[0]}"` : ""
           }\ndue="${task.dueDate ? new Date(task.dueDate).toISOString() : ""}"\ndone=${task.status === "done"}`;
         } catch (error) {
           return `ok=false\nerr="${error.message}"`;

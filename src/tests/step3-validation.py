@@ -174,7 +174,7 @@ def test_suite_6_health_check():
     assert health['model_loaded'] is True, "✅ Model is loaded"
     print("✅ Model is loaded")
     
-    assert len(health['categories']) == 6, "✅ 6 categories configured"
+    assert len(health['categories']) == 18, "✅ 18 categories configured"
     print(f"✅ Categories: {', '.join(health['categories'])}")
 
 

@@ -12,7 +12,7 @@ const taskSchema = new mongoose.Schema(
     status: { type: String, enum: ["todo", "in_progress", "done"], default: "todo" },
     importance: { type: Number, min: 1, max: 5, default: 3 }, // 1=low, 5=high
     effort: { type: Number, min: 1, max: 5, default: 3 }, // 1=small, 5=big
-    tags: { type: [String], default: [] },
+    categories: { type: [String], default: [] },
     estimatedDuration: { type: Number, min: 15, default: 60 }, // minutes
     canSplit: { type: Boolean, default: true },
     minChunk: { type: Number, min: 15, default: 30 }, // minimum chunk length in minutes when splitting
@@ -59,27 +59,27 @@ taskSchema.post("remove", async function () {
 });
 
 taskSchema.pre("save", async function () {
-  const shouldRefreshTags =
-    !this.tags?.length || this.isNew || this.isModified("taskname") || this.isModified("description");
+  const shouldRefreshCategories =
+    !this.categories?.length || this.isNew || this.isModified("taskname") || this.isModified("description");
 
-  if (shouldRefreshTags) {
-    const autoTags = detectTags({
+  if (shouldRefreshCategories) {
+    const autoCategories = detectTags({
       title: this.taskname,
       description: this.description,
-      tags: this.tags,
+      categories: this.categories,
     });
-    this.tags = autoTags;
+    this.categories = autoCategories;
   }
 
   const hasManualSubCategory = this.subCategory?.label && this.subCategory?.source === "user";
-  const shouldRefreshSubCategory = (shouldRefreshTags || !this.subCategory?.label) && !hasManualSubCategory;
+  const shouldRefreshSubCategory = (shouldRefreshCategories || !this.subCategory?.label) && !hasManualSubCategory;
 
   if (shouldRefreshSubCategory) {
     this.subCategory = await generateSubCategory({
       userId: this.userId,
       title: this.taskname,
       description: this.description,
-      tags: this.tags,
+      categories: this.categories,
       current: this.subCategory,
       TaskModel: this.constructor,
     });
@@ -88,7 +88,7 @@ taskSchema.pre("save", async function () {
 
 // Compound indexes for efficient queries
 taskSchema.index({ userId: 1, dueDate: 1 });
-taskSchema.index({ userId: 1, tag: 1 });
+taskSchema.index({ userId: 1, categories: 1 });
 taskSchema.index({ userId: 1, completed: 1 });
 
 // Methods

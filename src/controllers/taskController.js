@@ -18,7 +18,7 @@ import { logger } from "../utils/logger.js";
 export async function createTask(req, res) {
   try {
     const userId = req.user.userId;
-    const { name, tag, deadline, recurrence } = req.body;
+    const { name, tag, categories, deadline, recurrence } = req.body;
 
     // Validation
     if (!name || !name.trim()) {
@@ -62,7 +62,7 @@ export async function createTask(req, res) {
     const task = await taskService.createTask({
       userId,
       taskname: name.trim(),
-      tags: tag ? [tag.trim()] : [],
+      categories: categories && Array.isArray(categories) ? categories.map((c) => String(c).trim()) : tag ? [String(tag).trim()] : [],
       dueDate: deadline ? new Date(deadline) : null,
       recurrence,
     });
@@ -95,13 +95,15 @@ export async function createTask(req, res) {
 export async function getTasks(req, res) {
   try {
     const userId = req.user.userId;
-    const { tag, completed, dueBefore, dueAfter } = req.query;
+    const { tag, category, completed, dueBefore, dueAfter } = req.query;
 
     // Build filters
     const filters = {};
 
-    if (tag) {
-      filters.tag = tag;
+    if (category) {
+      filters.categories = category;
+    } else if (tag) {
+      filters.categories = tag;
     }
 
     if (completed !== undefined) {
@@ -178,7 +180,8 @@ export async function updateTask(req, res) {
     // Map public API fields to service field names
     const updates = {};
     if (raw.name !== undefined) updates.taskname = typeof raw.name === "string" ? raw.name.trim() : raw.name;
-    if (raw.tag !== undefined) updates.tags = raw.tag ? [String(raw.tag).trim()] : [];
+    if (raw.tag !== undefined) updates.categories = raw.tag ? [String(raw.tag).trim()] : [];
+    if (raw.categories !== undefined) updates.categories = Array.isArray(raw.categories) ? raw.categories.map((c) => String(c).trim()) : [] ;
     if (raw.completed !== undefined) updates.status = raw.completed ? "done" : "todo";
 
     // Validate and map deadline if provided

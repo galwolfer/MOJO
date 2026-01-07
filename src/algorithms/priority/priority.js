@@ -90,14 +90,14 @@ export function scoreActivities(activities, profile = {}) {
     // V: small constant bonus for variety
     const eps = 0; // no randomization
 
-    const normalizedTags = summarizeTags(a.tags);
-    const tagDetails = describeTagWeights(normalizedTags, preferences);
-    const multiplier = computeTagMultiplier(normalizedTags, preferences);
+    const normalizedCategories = summarizeTags(a.categories);
+    const tagDetails = describeTagWeights(normalizedCategories, preferences);
+    const multiplier = computeTagMultiplier(normalizedCategories, preferences);
     // rawScore: weighted linear combination of components -> scaled to 0..100
     // weights: urgency 35%, importance 25%, context 15%, streak 10%, diversity 5%, effort penalty -20%
     const rawScore = clamp(100 * (0.35 * U + 0.25 * I + 0.15 * C + 0.1 * S + 0.05 * V + 0.05 * eps - 0.2 * E), 0, 100);
     const score = clamp(rawScore * multiplier, 0, 100);
-    // apply tag-based multiplier (preferences or tag boosts/penalties)
+    // apply category-based multiplier (preferences or category boosts/penalties)
     const window = nextFreeSlot(a.duration_min);
     const reason = buildReason({ U, I, C, S, E, tagInfo: tagDetails });
     out.push({
@@ -106,7 +106,7 @@ export function scoreActivities(activities, profile = {}) {
       score,
       window,
       reason,
-      tags: summarizeTags(a.tags),
+      categories: summarizeTags(a.categories),
       tagDetails,
     });
   }

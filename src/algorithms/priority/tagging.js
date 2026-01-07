@@ -15,39 +15,74 @@ const TAG_BLUEPRINTS = [
     keywords: ["study", "exam", "homework", "lecture", "course", "learn", "reading", "assignment"],
   },
   {
+    tag: "skill",
+    weight: 1.1,
+    keywords: ["skill", "practice", "exercise", "skill-building", "tutorial", "workshop"],
+  },
+  {
+    tag: "workout",
+    weight: 1.12,
+    keywords: ["workout", "gym", "run", "exercise", "yoga", "training", "fitness"],
+  },
+  {
     tag: "health",
     weight: 1.18,
-    keywords: ["doctor", "dentist", "medication", "workout", "gym", "run", "yoga", "physio"],
+    keywords: ["doctor", "dentist", "medication", "checkup", "diet", "sleep", "wellness", "symptom"],
   },
   {
     tag: "finance",
     weight: 1.12,
-    keywords: ["invoice", "budget", "tax", "payment", "bank", "expense", "billing"],
+    keywords: ["invoice", "budget", "tax", "payment", "bank", "expense", "billing", "bills"],
   },
   {
     tag: "family",
     weight: 1.1,
-    keywords: ["family", "kids", "parent", "birthday", "anniversary", "school"],
+    keywords: ["family", "kids", "children", "parent", "birthday", "anniversary", "school"],
   },
   {
     tag: "social",
     weight: 1.05,
-    keywords: ["call", "meet", "hangout", "coffee", "friend", "party", "network", "friends", "dinner"],
+    keywords: ["call", "meet", "hangout", "coffee", "friend", "party", "network", "dinner"],
   },
   {
-    tag: "sports",
-    weight: 0.98,
-    keywords: ["game", "match", "practice", "training", "team", "tournament", "run", "sports", "swim"],
+    tag: "creative",
+    weight: 1.05,
+    keywords: ["design", "paint", "write", "compose", "draw", "sketch", "photo", "video"],
+  },
+  {
+    tag: "hobby",
+    weight: 0.95,
+    keywords: ["hobby", "hobbies", "gardening", "gaming", "craft", "collect", "model"],
+  },
+  {
+    tag: "reflection",
+    weight: 0.9,
+    keywords: ["reflect", "journal", "reflection", "review", "retrospective"],
+  },
+  {
+    tag: "mindfulness",
+    weight: 0.95,
+    keywords: ["mindful", "mindfulness", "meditation", "breath", "breathing", "awareness"],
+  },
+  {
+    tag: "goals",
+    weight: 1.05,
+    keywords: ["goal", "goals", "milestone", "objective", "target"],
+  },
+  {
+    tag: "recovery",
+    weight: 0.9,
+    keywords: ["recovery", "rest", "rehab", "therapy", "recover"],
+  },
+  {
+    tag: "explore",
+    weight: 0.95,
+    keywords: ["explore", "exploration", "discover", "trip", "travel", "adventure"],
   },
   {
     tag: "household",
     weight: 0.95,
     keywords: ["clean", "laundry", "dishes", "cook", "groceries", "repair", "chores"],
-  },
-  {
-    tag: "creative",
-    weight: 1.05,
-    keywords: ["design", "paint", "write", "compose", "draw", "sketch"],
   },
   {
     tag: "misc",
@@ -72,16 +107,23 @@ const TAG_WEIGHTS = TAG_BLUEPRINTS.reduce((acc, { tag, weight }) => {
 
 // Map tags to broader life categories for user preferences
 const TAG_TO_CATEGORY = {
-  work: "work",
-  study: "study",
+  work: "work_and_career",
+  study: "study_and_education",
+  skill: "skill_building",
+  workout: "workout",
   health: "health",
-  sports: "health",
-  finance: "finance",
-  family: "social",
-  social: "social",
-  household: "household",
-  creative: "creative",
-  misc: "misc",
+  finance: "life_management",
+  family: "family",
+  social: "social_activity",
+  household: "home_and_chores",
+  creative: "creative_projects",
+  hobby: "hobbies",
+  reflection: "reflection",
+  mindfulness: "mindfulness",
+  goals: "goals",
+  recovery: "recovery",
+  explore: "exploration",
+  misc: "uncategorized",
 };
 
 const DEFAULT_TAG = "misc";
@@ -96,8 +138,8 @@ const normalizeTokens = (text = "") =>
 
 // normalizeTokens: produce keyword tokens from title/description
 
-export function detectTags({ title = "", description = "", tags = [] } = {}) {
-  const base = Array.isArray(tags) ? tags.filter(Boolean) : [];
+export function detectTags({ title = "", description = "", categories = [] } = {}) {
+  const base = Array.isArray(categories) ? categories.filter(Boolean) : [];
   const tokens = [...normalizeTokens(title), ...normalizeTokens(description)];
 
   const found = new Set(base.map((t) => t.toLowerCase()));
@@ -128,8 +170,8 @@ export const categoryForTag = (tag) => TAG_TO_CATEGORY[tag] || "misc";
 const hasPreferences = (preferences) =>
   preferences && Object.values(preferences).some((v) => Number.isFinite(v));
 
-export function computeTagMultiplier(taskTags = [], preferences = {}) {
-  const tags = Array.isArray(taskTags) && taskTags.length ? taskTags : [DEFAULT_TAG];
+export function computeTagMultiplier(taskCategories = [], preferences = {}) {
+  const tags = Array.isArray(taskCategories) && taskCategories.length ? taskCategories : [DEFAULT_TAG];
   let multiplier = 0;
   let weightSum = 0;
   const usePreferences = hasPreferences(preferences);
@@ -153,9 +195,9 @@ export function computeTagMultiplier(taskTags = [], preferences = {}) {
 
 // computeTagMultiplier: average weight for a task's tags, using user preferences when available
 
-export function summarizeTags(tags = []) {
-  if (!Array.isArray(tags) || !tags.length) return ["misc"];
-  return tags.map((t) => String(t).toLowerCase());
+export function summarizeTags(categories = []) {
+  if (!Array.isArray(categories) || !categories.length) return ["misc"];
+  return categories.map((t) => String(t).toLowerCase());
 }
 
 // summarizeTags: normalize tag list to lowercase array (fall back to 'misc')
@@ -164,8 +206,8 @@ export function getTagBlueprints() {
   return TAG_BLUEPRINTS.map(({ tag, weight }) => ({ tag, weight }));
 }
 
-export function describeTagWeights(tags = [], preferences = {}) {
-  const normalized = summarizeTags(tags);
+export function describeTagWeights(categories = [], preferences = {}) {
+  const normalized = summarizeTags(categories);
   const usePreferences = hasPreferences(preferences);
   return normalized.map((tag) => ({
     tag,

@@ -38,7 +38,26 @@ class ModelService:
     """Wrapper service for the LinUCB ML model."""
 
     # Standard task categories (must match ML_CATEGORIES in mlInputConverter.js)
-    CATEGORIES = ["work", "personal", "health", "learning", "home", "other"]
+    CATEGORIES = [
+        "study_and_education",
+        "skill_building",
+        "workout",
+        "reflection",
+        "home_and_chores",
+        "family",
+        "life_management",
+        "work_and_career",
+        "creative_projects",
+        "hobbies",
+        "relationship",
+        "goals",
+        "mindfulness",
+        "health",
+        "social_activity",
+        "recovery",
+        "exploration",
+        "uncategorized",
+    ]
 
     # Model hyperparameters
     ALPHA = 0.1  # Exploration parameter for LinUCB
@@ -76,7 +95,7 @@ class ModelService:
                 print(f"⚠️  Failed to load model: {e}. Creating new model.", file=sys.stderr)
 
         # Calculate total number of features:
-        # motivation=1 + duration=2 + difficulty=3 + pressure=4 + category=6
+        # motivation=1 + duration=2 + difficulty=3 + pressure=4 + category=18
         total_features = 1 + 2 + 3 + 4 + len(self.CATEGORIES)
         
         # Create fresh model
@@ -105,7 +124,7 @@ class ModelService:
             'duration': float,        # Estimated minutes
             'difficulty': 1-5,        # Task effort
             'delta_hours': float,     # Hours until deadline (0 if no deadline)
-            'category': 0-5,          # Task category (0=work, 5=other)
+            'category': 0-17,         # Task category (index into CATEGORIES)
         }
 
         Output:

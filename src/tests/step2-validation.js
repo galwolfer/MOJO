@@ -3,7 +3,7 @@
  * 
  * Validates the mlInputConverter utilities work correctly:
  * - taskToMLInput() converts Task to {motivation, duration, difficulty, delta_hours, category}
- * - categoryNormalizer() properly maps subCategories and tags to 0-5 range
+ * - categoryNormalizer() properly maps subCategories and categories to 0-17 range
  * - calculateReward() produces correct 0-1 confidence scores
  */
 
@@ -30,18 +30,18 @@ console.log('\n🧪 Step 2 Validation: ML Input Converter\n');
 console.log('📋 Test Suite 1: categoryNormalizer()\n');
 
 assert(
-  categoryNormalizer('', []) === ML_CATEGORIES.OTHER,
-  'Empty input defaults to OTHER (5)'
+  categoryNormalizer('', []) === ML_CATEGORIES.UNCATEGORIZED,
+  'Empty input defaults to UNCATEGORIZED'
 );
 
 assert(
-  categoryNormalizer('Work Project', []) === ML_CATEGORIES.WORK,
-  'Detects WORK category from label'
+  categoryNormalizer('Work Project', []) === ML_CATEGORIES.WORK_AND_CAREER,
+  'Detects WORK_AND_CAREER category from label'
 );
 
 assert(
-  categoryNormalizer('', ['work', 'meeting']) === ML_CATEGORIES.WORK,
-  'Detects WORK category from tags'
+  categoryNormalizer('', ['work', 'meeting']) === ML_CATEGORIES.WORK_AND_CAREER,
+  'Detects WORK_AND_CAREER category from categories'
 );
 
 assert(
@@ -50,23 +50,23 @@ assert(
 );
 
 assert(
-  categoryNormalizer('Personal Travel', ['vacation']) === ML_CATEGORIES.PERSONAL,
-  'Detects PERSONAL category'
+  categoryNormalizer('Personal Travel', ['vacation']) === ML_CATEGORIES.EXPLORATION,
+  'Detects EXPLORATION (travel) category'
 );
 
 assert(
-  categoryNormalizer('Python Course', ['education']) === ML_CATEGORIES.LEARNING,
-  'Detects LEARNING category'
+  categoryNormalizer('Python Course', ['education']) === ML_CATEGORIES.STUDY_AND_EDUCATION,
+  'Detects STUDY_AND_EDUCATION category'
 );
 
 assert(
-  categoryNormalizer('Kitchen Cleaning', ['chore']) === ML_CATEGORIES.HOME,
-  'Detects HOME category'
+  categoryNormalizer('Kitchen Cleaning', ['chore']) === ML_CATEGORIES.HOME_AND_CHORES,
+  'Detects HOME_AND_CHORES category'
 );
 
 assert(
-  categoryNormalizer('Random Thing', []) === ML_CATEGORIES.OTHER,
-  'Unknown category defaults to OTHER'
+  categoryNormalizer('Random Thing', []) === ML_CATEGORIES.UNCATEGORIZED,
+  'Unknown category defaults to UNCATEGORIZED'
 );
 
 // ============================================================================
@@ -79,7 +79,7 @@ const basicTask = {
   effort: 3,
   estimatedDuration: 120,
   subCategory: { label: 'Work Project' },
-  tags: ['urgent'],
+  categories: ['urgent'],
 };
 
 const basicInput = taskToMLInput(basicTask);
@@ -100,7 +100,7 @@ assert(
 );
 
 assert(
-  basicInput.category === ML_CATEGORIES.WORK,
+  basicInput.category === ML_CATEGORIES.WORK_AND_CAREER,
   'category normalized from subCategory.label'
 );
 
@@ -123,7 +123,7 @@ const taskWithDeadline = {
   estimatedDuration: 60,
   dueDate: futureDate,
   subCategory: { label: 'Urgent Work' },
-  tags: [],
+  categories: [],
 };
 
 const inputWithDeadline = taskToMLInput(taskWithDeadline);
@@ -160,8 +160,8 @@ assert(
 );
 
 assert(
-  minimalInput.category === ML_CATEGORIES.OTHER,
-  'category defaults to OTHER (5)'
+  minimalInput.category === ML_CATEGORIES.UNCATEGORIZED,
+  'category defaults to UNCATEGORIZED'
 );
 
 assert(
@@ -222,7 +222,7 @@ const realTask = {
   estimatedDuration: 180, // 3 hours
   dueDate: new Date(now.getTime() + 86400000), // tomorrow
   subCategory: { label: 'Work Report', source: 'heuristic' },
-  tags: ['urgent', 'work', 'reporting'],
+  categories: ['urgent', 'work', 'reporting'],
   status: 'todo',
 };
 
@@ -232,7 +232,7 @@ assert(
   realInput.motivation === 5 &&
   realInput.difficulty === 4 &&
   realInput.duration === 180 &&
-  realInput.category === ML_CATEGORIES.WORK,
+  realInput.category === ML_CATEGORIES.WORK_AND_CAREER,
   'Real task converted correctly'
 );
 
