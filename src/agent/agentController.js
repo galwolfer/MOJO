@@ -390,6 +390,10 @@ export class AgentController {
                       ) {
                         console.log(`[AgentController] Replacing empty task_list widget with structured empty result`);
                         result = `ok=true\ncount=0`;
+                      } else if (toolCall.name === "preview_task") {
+                        // For preview_task, always pass the widget through even if validation issues
+                        // The LLM will handle any display errors gracefully
+                        console.log(`[AgentController] Allowing preview_task widget despite validation issue`);
                       } else {
                         // Persist failure for auditing
                         await memoryStore.addToolResult(
@@ -475,6 +479,7 @@ export class AgentController {
       // STEP 9: SAVE ASSISTANT RESPONSE
       // Store the final response in the session
       if (finalResponse) {
+        finalResponse = this._sanitizeResponse(finalResponse);
         await memoryStore.addAssistantMessage(sessionId, userId, finalResponse);
       } else {
         // Fallback response if something went wrong
@@ -542,8 +547,45 @@ export class AgentController {
   }
 
   /**
+   * Sanitize response to remove raw function call JSON that shouldn't be displayed
+   * @param {string} response - The raw response from the LLM
+   * @returns {string} Cleaned response
+   * @private
+   */
+  _sanitizeResponse(response) {
+    if (!response || typeof response !== "string") return response;
+
+    // Remove any raw function call JSON objects that look like:
+    // {"type":"functionCall","functionCall":{...}}
+    // This pattern should never appear in user-facing output
+    let cleaned = response.replace(/\{\s*"type"\s*:\s*"functionCall"\s*,\s*"functionCall"\s*:\s*\{[^}]*\}\s*\}/g, "");
+
+    // Remove any standalone JSON objects that start with { and contain "type" or "functionCall"
+    // but are not valid <WIDGET_JSON> tags
+    cleaned = cleaned.replace(/\{\s*"(type|functionCall|name|args)"\s*:/g, (match, group, offset) => {
+      // Check if this is part of a <WIDGET_JSON> tag - if so, don't remove it
+      const beforeText = cleaned.substring(Math.max(0, offset - 50), offset);
+      if (beforeText.includes("<WIDGET_JSON>")) {
+        return match; // Keep it, it's part of valid widget JSON
+      }
+      // Otherwise, this is a stray function call object - mark for removal
+      return "";
+    });
+
+    // Clean up multiple consecutive newlines
+    cleaned = cleaned.replace(/\n\s*\n+/g, "\n");
+
+    // Trim whitespace
+    return cleaned.trim();
+  }
+
+  /**
    * Extract and track entities from tool calls and results
    * This enables the LLM to resolve references like "this task", "delete it", etc.
+   * @param {string} sessionId - Session ID
+   * @param {string} toolName - Name of the tool that was called
+   * @param {Object} args - Arguments passed to the tool
+   * @param {string} result - Result returned by the tool
    * @private
    */
   _extractAndTrackEntities(sessionId, toolName, args, result) {
@@ -556,7 +598,7 @@ export class AgentController {
 
         if (idMatch) {
           memoryStore.addSessionEntity(sessionId, "task", idMatch[1], taskName, {
-            action: "created",
+            action: toolName === "add_task" ? "created" : "previewed",
             dueDate: args.deadline,
           });
         }
@@ -568,7 +610,7 @@ export class AgentController {
             const widget = JSON.parse(widgetMatch[1]);
             if (widget.data?.id) {
               memoryStore.addSessionEntity(sessionId, "task", widget.data.id, widget.data.title || taskName, {
-                action: "created",
+                action: toolName === "add_task" ? "created" : "previewed",
                 dueDate: widget.data.dueDate,
                 status: widget.data.status,
               });

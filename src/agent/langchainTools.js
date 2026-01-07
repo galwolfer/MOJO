@@ -301,37 +301,47 @@ err="${error.message}"`;
       func: async (params) => {
         const { name, deadline, description, importance, effort, duration, tags, splitable, recurrence } = params;
 
-        // Infer properties from task name if not provided
-        const inferred = inferTaskProperties(name);
+        try {
+          // Validate deadline is a valid date
+          const deadlineDate = new Date(deadline);
+          if (isNaN(deadlineDate.getTime())) {
+            return `ok=false\nerr="Invalid deadline date: ${deadline}"`;
+          }
 
-        // Apply defaults and inference
-        const finalImportance = importance || inferred.importance;
-        const finalEffort = effort || inferred.effort;
-        const finalDuration = duration || inferred.duration;
-        const finalTags = tags || inferred.tags;
-        const finalSplitable = splitable !== undefined ? splitable : TASK_CONFIG.defaults.splitable;
+          // Infer properties from task name if not provided
+          const inferred = inferTaskProperties(name);
 
-        const widgetJson = {
-          version: "1.0",
-          widget_type: "task_confirmation",
-          data: {
-            id: "draft-" + Date.now(),
-            title: name,
-            status: "draft",
-            dueDate: new Date(deadline).toISOString(),
-            priority: finalImportance >= 4 ? "high" : finalImportance <= 2 ? "low" : "medium",
-            tags: finalTags,
-            description: description || (recurrence ? `Recurrence: ${recurrence.type}` : ""),
-            importance: finalImportance,
-            effort: finalEffort,
-            estimatedDuration: finalDuration,
-            canSplit: finalSplitable,
-            confirmLabel: "Create Task",
-            cancelLabel: "Edit",
-          },
-        };
+          // Apply defaults and inference
+          const finalImportance = importance || inferred.importance;
+          const finalEffort = effort || inferred.effort;
+          const finalDuration = duration || inferred.duration;
+          const finalTags = tags || inferred.tags;
+          const finalSplitable = splitable !== undefined ? splitable : TASK_CONFIG.defaults.splitable;
 
-        return `<WIDGET_JSON>${JSON.stringify(widgetJson)}</WIDGET_JSON>`;
+          const widgetJson = {
+            version: "1.0",
+            widget_type: "task_confirmation",
+            data: {
+              id: "draft-" + Date.now(),
+              title: name,
+              status: "draft",
+              dueDate: new Date(deadline).toISOString(),
+              priority: finalImportance >= 4 ? "high" : finalImportance <= 2 ? "low" : "medium",
+              tags: finalTags,
+              description: description || (recurrence ? `Recurrence: ${recurrence.type}` : ""),
+              importance: finalImportance,
+              effort: finalEffort,
+              estimatedDuration: finalDuration,
+              canSplit: finalSplitable,
+              confirmLabel: "Create Task",
+              cancelLabel: "Edit",
+            },
+          };
+
+          return `<WIDGET_JSON>${JSON.stringify(widgetJson)}</WIDGET_JSON>`;
+        } catch (error) {
+          return `ok=false\nerr="Failed to generate preview: ${error.message}"`;
+        }
       },
     }),
 

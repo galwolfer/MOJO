@@ -43,6 +43,38 @@ export class PromptManager {
 
     const messages = [new SystemMessage(systemPrompt)];
 
+    // Convert and add history
+    if (history && history.length > 0) {
+      // Limit history to prevent token overflow
+      const recentHistory = history.slice(-15); // Adjust as needed based on TOKEN_BUDGET
+
+      recentHistory.forEach((msg) => {
+        if (msg.role === "human" || msg.role === "user") {
+          messages.push(new HumanMessage(msg.content));
+        } else if (msg.role === "assistant") {
+          // Check if it has tool calls
+          if (msg.toolCalls && msg.toolCalls.length > 0) {
+            messages.push(
+              new AIMessage({
+                content: msg.content || "",
+                tool_calls: msg.toolCalls,
+              })
+            );
+          } else {
+            messages.push(new AIMessage(msg.content));
+          }
+        } else if (msg.role === "tool") {
+          messages.push(
+            new ToolMessage({
+              content: msg.content,
+              tool_call_id: msg.tool_call_id,
+              name: msg.name,
+            })
+          );
+        }
+      });
+    }
+
     messages.push(new HumanMessage(userMessage));
 
     return messages;
