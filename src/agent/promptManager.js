@@ -29,6 +29,9 @@ export class PromptManager {
       isReminderTurn,
     });
 
+    // Add current timestamp for date calculations
+    systemPrompt += `\n\nCURRENT_TIME: ${new Date().toISOString()}`;
+
     // Inject summary if available
     if (summary) {
       systemPrompt += `\n\nPREVIOUS CONVERSATION SUMMARY:\n${summary}`;

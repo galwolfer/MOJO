@@ -421,6 +421,7 @@ err="${error.message}"`;
      * Retrieve tasks matching specified filters.
      *
      * Filters:
+     * - search: Search by task name (partial match)
      * - tag: Filter by category (e.g., "work", "personal")
      * - completed: Filter by completion status (true/false)
      * - dueBefore: Get tasks due before a specific date
@@ -432,16 +433,18 @@ err="${error.message}"`;
       name: "get_tasks",
       description: TOOL_DESCRIPTIONS.get_tasks,
       schema: z.object({
+        search: z.string().optional().describe("Search query to find tasks by name/title"),
         tag: z.string().optional(),
         completed: z.boolean().optional(),
         dueBefore: z.string().optional(),
         dueAfter: z.string().optional(),
       }),
       returnDirect: false,
-      func: async ({ tag, completed, dueBefore, dueAfter }) => {
+      func: async ({ search, tag, completed, dueBefore, dueAfter }) => {
         try {
           // Build filter object for database query
           const filters = {};
+          if (search) filters.taskname = { $regex: search, $options: "i" };
           if (tag) filters.tags = tag;
           if (completed !== undefined) {
             filters.status = completed ? "done" : { $ne: "done" };
@@ -453,7 +456,7 @@ err="${error.message}"`;
           const tasks = await taskService.getTasksForUser(userId, filters);
 
           if (tasks.length === 0) {
-            return "I couldn't find any tasks matching your criteria.";
+            return `ok=true\ncount=0`;
           }
 
           // Construct Widget JSON
@@ -476,7 +479,7 @@ err="${error.message}"`;
           // Return widget only; the LLM should generate the natural assistant message referencing this widget
           return `<WIDGET_JSON>${JSON.stringify(widgetJson)}</WIDGET_JSON>`;
         } catch (error) {
-          return `Error retrieving tasks: ${error.message}`;
+          return `ok=false\nerr="${error.message}"`;
         }
       },
     }),
@@ -498,26 +501,32 @@ err="${error.message}"`;
     new DynamicStructuredTool({
       name: "update_task",
       description: TOOL_DESCRIPTIONS.update_task,
-      returnDirect: true,
+      returnDirect: false,
       schema: z.object({
         taskId: z.string().optional(),
         name: z.string().optional().describe("Task name to identify task when taskId is not provided"),
         tag: z.string().optional(),
         deadline: z.string().optional(),
         completed: z.boolean().optional(),
+        confirm: z.boolean().optional().describe("Must be true to perform the update"),
       }),
-      func: async ({ taskId, name, tag, deadline, completed }) => {
+      func: async ({ taskId, name, tag, deadline, completed, confirm }) => {
         try {
+          // Require explicit confirmation to avoid accidental changes
+          if (!confirm) {
+            return `ok=false\nerr="confirmation_required"`;
+          }
+
           // If taskId not provided, try to resolve by exact task name
           if (!taskId) {
-            if (!name) return `You must provide a taskId or task name to update.`;
+            if (!name) return `ok=false\nerr="task_identifier_required"`;
             const candidates = await taskService.getTasksForUser(userId, { taskname: name });
             if (!candidates || candidates.length === 0) {
-              return `Task "${name}" not found.`;
+              return `ok=false\nerr="task_not_found"`;
             }
             if (candidates.length > 1) {
               const list = candidates.map((c) => `- ${c.taskname} (${c._id})`).join("\n");
-              return `I found multiple tasks with that name. Please specify the exact task:\n${list}`;
+              return `ok=false\nerr="multiple_tasks_found"\nlist="${list}"`;
             }
             taskId = candidates[0]._id;
           }
@@ -530,7 +539,7 @@ err="${error.message}"`;
           if (deadline !== undefined) {
             const d = new Date(deadline);
             if (isNaN(d.getTime())) {
-              return `The deadline date format you provided is invalid.`;
+              return `ok=false\nerr="Invalid date format. Use ISO 8601 (YYYY-MM-DD)."`;
             }
             updates.dueDate = d;
           }
@@ -541,14 +550,33 @@ err="${error.message}"`;
           const result = await taskService.updateTask({ userId, taskId, updates });
 
           if (!result.success) {
-            return `Error updating task: ${result.error}`;
+            return `ok=false\nerr="${result.error}"`;
           }
 
           const task = result.task;
 
-          return `Task "${task.taskname}" updated successfully. (ID: ${task._id})`;
+          // Construct task_detail widget to show the updated task
+          const widgetJson = {
+            version: "1.0",
+            widget_type: "task_detail",
+            data: {
+              task: {
+                id: task._id,
+                title: task.taskname,
+                description: task.description,
+                status: task.status,
+                dueDate: task.dueDate ? new Date(task.dueDate).toISOString() : null,
+                priority: task.importance,
+                tags: task.tags,
+                estimatedDuration: task.estimatedDuration,
+                canSplit: task.canSplit,
+              },
+            },
+          };
+
+          return `<WIDGET_JSON>${JSON.stringify(widgetJson)}</WIDGET_JSON>`;
         } catch (error) {
-          return `Sorry, there was an error updating the task: ${error.message}`;
+          return `ok=false\nerr="${error.message}"`;
         }
       },
     }),
@@ -563,19 +591,25 @@ err="${error.message}"`;
     new DynamicStructuredTool({
       name: "delete_task",
       description: TOOL_DESCRIPTIONS.delete_task,
-      returnDirect: true,
+      returnDirect: false,
       schema: z.object({
         taskId: z.string(),
+        confirm: z.boolean().optional().describe("Must be true to perform deletion"),
       }),
-      func: async ({ taskId }) => {
+      func: async ({ taskId, confirm }) => {
         try {
+          if (!confirm) return `ok=false\nerr="confirmation_required"`;
+
           const result = await taskService.deleteTask({ taskId, userId });
           if (!result.success) {
-            return `Error deleting task: ${result.error}`;
+            return `ok=false\nerr="${result.error}"`;
           }
-          return `Task deleted successfully.`;
+          return `ok=true\nid="${taskId}"`;
         } catch (error) {
-          return `Sorry, there was an error deleting the task: ${error.message}`;
+          if (error.message && (error.message.includes("ObjectId") || error.kind === "ObjectId")) {
+            return `ok=false\nerr="Invalid Task ID"`;
+          }
+          return `ok=false\nerr="${error.message}"`;
         }
       },
     }),
@@ -602,7 +636,7 @@ err="${error.message}"`;
           const tasks = await taskService.getUpcomingTasks(userId, days);
 
           if (tasks.length === 0) {
-            return `You don't have any upcoming tasks for the next ${days} days.`;
+            return `ok=true\ncount=0`;
           }
 
           // Construct Widget JSON
@@ -625,7 +659,7 @@ err="${error.message}"`;
           // Return widget only; LLM should generate the natural message referencing it
           return `<WIDGET_JSON>${JSON.stringify(widgetJson)}</WIDGET_JSON>`;
         } catch (error) {
-          return `Error retrieving upcoming tasks: ${error.message}`;
+          return `ok=false\nerr="${error.message}"`;
         }
       },
     }),
@@ -648,7 +682,7 @@ err="${error.message}"`;
           const tasks = await taskService.getOverdueTasks(userId);
 
           if (tasks.length === 0) {
-            return "Great news! You don't have any overdue tasks.";
+            return `ok=true\ncount=0`;
           }
 
           // Construct Widget JSON
@@ -671,7 +705,7 @@ err="${error.message}"`;
           // Return widget only; LLM should generate a natural message referencing it
           return `<WIDGET_JSON>${JSON.stringify(widgetJson)}</WIDGET_JSON>`;
         } catch (error) {
-          return `Error retrieving overdue tasks: ${error.message}`;
+          return `ok=false\nerr="${error.message}"`;
         }
       },
     }),

@@ -1,10 +1,10 @@
 /**
  * @fileoverview Task Service
  * @module services/taskService
- * 
+ *
  * Consolidated service for task management, busy blocks, and expiration checking.
  * Handles all CRUD operations, status synchronization, and task-related telemetry.
- * 
+ *
  * Key responsibilities:
  * - Create, read, update, delete tasks
  * - Sync task status with scheduled sessions
@@ -12,7 +12,7 @@
  * - Manage busy blocks (user unavailability)
  * - Check and handle expired tasks
  * - Record task-related telemetry events
- * 
+ *
  * @requires models/Task - Task database model
  * @requires models/TaskSchedule - Schedule database model
  * @requires models/BusyBlock - BusyBlock database model
@@ -137,6 +137,20 @@ export async function getTasksForUser(userId, filter = {}) {
 }
 
 /**
+ * Backwards-compatible helper used by HTTP controllers
+ * Accepts filters: tag, completed (boolean), dueBefore, dueAfter, search
+ */
+export async function getTasks(userId, filters = {}) {
+  const q = { userId };
+  if (filters.tag) q.tags = filters.tag;
+  if (filters.completed !== undefined) q.status = filters.completed ? "done" : { $ne: "done" };
+  if (filters.dueBefore) q.dueDate = { ...q.dueDate, $lte: new Date(filters.dueBefore) };
+  if (filters.dueAfter) q.dueDate = { ...q.dueDate, $gte: new Date(filters.dueAfter) };
+  if (filters.search) q.taskname = { $regex: filters.search, $options: "i" };
+  return Task.find(q).lean();
+}
+
+/**
  * Fetch upcoming tasks for a user.
  */
 export async function getUpcomingTasks(userId, days = 7) {
@@ -215,9 +229,21 @@ export async function updateTask({ userId, taskId, updates }) {
   }
 
   const allowedFields = [
-    "taskname", "description", "importance", "effort", "estimatedDuration",
-    "canSplit", "minChunk", "taskType", "chunkCount", "chunkMinutes",
-    "minMinutes", "maxMinutes", "dueDate", "status", "tags",
+    "taskname",
+    "description",
+    "importance",
+    "effort",
+    "estimatedDuration",
+    "canSplit",
+    "minChunk",
+    "taskType",
+    "chunkCount",
+    "chunkMinutes",
+    "minMinutes",
+    "maxMinutes",
+    "dueDate",
+    "status",
+    "tags",
   ];
 
   const sanitizedUpdates = {};
@@ -231,11 +257,7 @@ export async function updateTask({ userId, taskId, updates }) {
     return { success: false, error: "No valid fields to update." };
   }
 
-  const updated = await Task.findByIdAndUpdate(
-    taskId,
-    { $set: sanitizedUpdates },
-    { new: true }
-  ).lean();
+  const updated = await Task.findByIdAndUpdate(taskId, { $set: sanitizedUpdates }, { new: true }).lean();
 
   await logEvent({
     type: "task_updated",

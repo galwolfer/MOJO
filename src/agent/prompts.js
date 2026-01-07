@@ -59,10 +59,9 @@ import {
  * ```
  */
 
-// Expose current identity text (evaluated per import)
-export const BASE_IDENTITY = getBaseIdentity();
+// Helper to get fresh identity text
+export const getSystemBaseIdentity = () => getBaseIdentity();
 export { TOOL_MANIFEST, REMINDER_PROMPT, NORMAL_PROMPT };
-export const SYSTEM_PROMPT = `${BASE_IDENTITY}\n\n${TOOL_MANIFEST}`;
 
 /**
  * Re-exported builder that uses the centralized generator so prompts are editable in one place

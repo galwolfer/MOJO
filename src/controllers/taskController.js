@@ -238,7 +238,7 @@ export async function deleteTask(req, res) {
 
     return res.status(200).json({
       success: true,
-      message: "Task deleted successfully",
+      id,
     });
   } catch (error) {
     logger.error("Error in deleteTask controller:", error);

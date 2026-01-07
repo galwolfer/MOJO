@@ -216,7 +216,7 @@ export class AgentController {
                   widgetValidation.reason === "Empty task list" &&
                   widgetValidation.widget?.widget_type === "task_list"
                 ) {
-                  result = `I couldn't find any tasks.`;
+                  result = `ok=true\ncount=0`;
                 } else {
                   await memoryStore.addToolResult(
                     sessionId,
@@ -383,13 +383,13 @@ export class AgentController {
                         `[AgentController] Widget validation failed for ${toolCall.name}: ${widgetValidation.reason}`
                       );
 
-                      // Special-case: empty task list -> replace with text response instead of showing empty widget
+                      // Special-case: empty task list -> return structured empty result instead of showing empty widget
                       if (
                         widgetValidation.reason === "Empty task list" &&
                         widgetValidation.widget?.widget_type === "task_list"
                       ) {
-                        console.log(`[AgentController] Replacing empty task_list widget with a text response`);
-                        result = `I couldn't find any tasks.`; // Plain text response; LLM can follow up naturally
+                        console.log(`[AgentController] Replacing empty task_list widget with structured empty result`);
+                        result = `ok=true\ncount=0`;
                       } else {
                         // Persist failure for auditing
                         await memoryStore.addToolResult(
@@ -581,7 +581,7 @@ export class AgentController {
 
       // Update task - track the updated task
       if (toolName === "update_task" && args.taskId) {
-        const taskName = args.name || args.taskname || "Updated Task";
+        const taskName = args.name || args.tagname || "Updated Task";
         memoryStore.addSessionEntity(sessionId, "task", args.taskId, taskName, {
           action: "updated",
         });
