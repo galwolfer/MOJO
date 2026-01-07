@@ -549,14 +549,14 @@ export class AgentController {
   _extractAndTrackEntities(sessionId, toolName, args, result) {
     try {
       // Task-related tools
-      if (toolName === "add_task" || toolName === "preview_task") {
+      if (toolName === "add_task") {
         // Extract task ID from result (format: id="xxx" or from widget JSON)
         const idMatch = result.match(/id="([^"]+)"/);
         const taskName = args.name || "Untitled Task";
 
         if (idMatch) {
           memoryStore.addSessionEntity(sessionId, "task", idMatch[1], taskName, {
-            action: toolName === "add_task" ? "created" : "previewed",
+            action: "created",
             dueDate: args.deadline,
           });
         }
@@ -568,7 +568,7 @@ export class AgentController {
             const widget = JSON.parse(widgetMatch[1]);
             if (widget.data?.id) {
               memoryStore.addSessionEntity(sessionId, "task", widget.data.id, widget.data.title || taskName, {
-                action: toolName === "add_task" ? "created" : "previewed",
+                action: "created",
                 dueDate: widget.data.dueDate,
                 status: widget.data.status,
               });
@@ -616,13 +616,8 @@ export class AgentController {
 
       // Delete task - remove from context after deletion
       if (toolName === "delete_task" && result.includes("ok=true")) {
-        // Task was deleted successfully - we could optionally remove it from context
-        // But keeping it allows the LLM to confirm what was deleted
-        if (args.taskId) {
-          memoryStore.addSessionEntity(sessionId, "task", args.taskId, "Deleted Task", {
-            action: "deleted",
-          });
-        }
+        // Task was deleted successfully - optionally log but don't add as active entity
+        // to prevent confusion in future references
       }
 
       console.log(`[AgentController] Entity extraction complete for ${toolName}`);
