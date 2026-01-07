@@ -594,18 +594,20 @@ Three levels of customization:
 This section consolidates the agent refactor guidance and single-source-of-truth rules introduced during the recent changes. Edit instructions and widget schemas in one place to keep behavior consistent.
 
 **Key files**
-- `agentConfig.js` — Central place for system prompts, policy anchors, widgets, and tool manifest strings. Edit strings here to change LLM instructions and widget descriptions in one place.
-- `prompts.js` — Thin wrappers that re-export builders and constants from `agentConfig` (kept for backwards compatibility).
-- `widgetManager.js` — Compatibility layer that delegates to `agentConfig` for widget data and prompt text.
-- `langchainTools.js` — Tools factory for LLM actions (memory, tasks, time). Keep business logic here; move descriptive strings to `agentConfig.js` when appropriate.
+- `agentConfig.js` - Central place for system prompts, policy anchors, and prompt assembly.
+- `missions/` - One file per mission (tool): schema, behavior, and execution logic live here.
+- `missions/registry.js` - Mission registry for tool creation and prompt manifest sections.
+- `widgets/registry.js` - Widget definitions used by validation and prompt instructions.
+- `langchainTools.js` - Thin factory that builds tools from mission definitions.
+- `widgetManager.js` - Compatibility layer that delegates to `agentConfig` for widget prompt text.
+- `prompts.js` - Thin wrappers that re-export builders and constants from `agentConfig` (kept for backwards compatibility).
 
 **Guidelines**
-- **Edit prompts & widget text only in `agentConfig.js`.** This is the single source of truth for LLM-facing strings.
-- **Add widgets** by updating the `WIDGETS` map in `agentConfig.js` and extend `getWidgetPromptInstructions()` if needed.
-- **Tool descriptions** should be added to `TOOL_DESCRIPTIONS` for consistent LLM-facing help text.
-- **Keep tool logic** in `langchainTools.js`, but prefer referencing descriptions from `agentConfig.js`.
+- **Edit prompts only in `agentConfig.js`.** This is the single source of truth for LLM-facing strings.
+- **Add widgets** in `widgets/registry.js` and extend `getWidgetPromptInstructions()` if needed.
+- **Tool descriptions and behavior** belong in the relevant mission file; the registry exposes them for prompts.
+- **Keep tool logic** inside mission files, not in `langchainTools.js`.
 - **Tests & docs:** Add unit tests when modifying tools or prompt behaviors to prevent regressions.
-
 ---
 
 ## 🎓 Summary
@@ -666,3 +668,5 @@ If you'd like, I can add a migration helper and unit tests that assert memory-sa
 If you want, I can now:
 - Run a quick static check (lint) on the modified files, or
 - Generate a short unit test that exercises `retrieveRelevantMemories` using a small in-memory `User` mock.
+
+

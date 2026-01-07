@@ -39,13 +39,13 @@ export class AgentController {
     this.apiKey = apiKey;
     // maxIterations prevents infinite loops if tool calling goes awry
     // Each iteration: LLM → Tool Call → Tool Execution → Loop back
-    this.maxIterations = 3;
+    this.maxIterations = 5;
 
     // Initialize ChatGoogleGenerativeAI with optimized settings
     // temperature: 0.2 = low randomness, focused responses
     // maxOutputTokens: 768 = balanced between detail and token efficiency
     this.llm = new ChatGoogleGenerativeAI({
-      model: config.geminiModel || "gemini-2.0-flash",
+      model: config.geminiModel || "gemini-3.0-flash",
       apiKey: apiKey,
       temperature: 0.2, // Low temperature = focused, deterministic responses
       maxOutputTokens: 768, // Balanced token limit
@@ -332,6 +332,7 @@ export class AgentController {
                 .map((c) => (typeof c === "string" ? c : c.text || JSON.stringify(c)))
                 .join("\n");
             }
+            persistentContent = this._sanitizeResponse(persistentContent);
 
             // Persist assistant message with tool calls to session history
             await memoryStore.addAssistantToolCalls(sessionId, userId, persistentContent, response.tool_calls);
@@ -562,7 +563,7 @@ export class AgentController {
     let idx = cleaned.indexOf(search);
     while (idx !== -1) {
       // find the opening brace before idx
-      let open = cleaned.lastIndexOf('{', idx);
+      let open = cleaned.lastIndexOf("{", idx);
       if (open === -1) break;
 
       // find matching closing brace by scanning, respecting string literals
@@ -575,7 +576,7 @@ export class AgentController {
         if (inString) {
           if (escape) {
             escape = false;
-          } else if (ch === '\\') {
+          } else if (ch === "\\") {
             escape = true;
           } else if (ch === '"') {
             inString = false;
@@ -583,9 +584,9 @@ export class AgentController {
         } else {
           if (ch === '"') {
             inString = true;
-          } else if (ch === '{') {
+          } else if (ch === "{") {
             depth++;
-          } else if (ch === '}') {
+          } else if (ch === "}") {
             depth--;
             if (depth === 0) {
               close = i;

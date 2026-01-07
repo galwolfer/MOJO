@@ -3,6 +3,7 @@
  * Manages conversation memory, user profiles, and embeddings using MongoDB
  */
 import { User, Session, Memory } from "../models/index.js";
+import { config } from "../config/env.js";
 import {
   storePrimaryMemory,
   storeConversationMemory,
@@ -345,25 +346,45 @@ class MongoMemoryStore {
    * Add an assistant message with tool calls
    */
   async addAssistantToolCalls(sessionId, userId, content, toolCalls) {
-    await this.addMessage(sessionId, userId, {
-      role: "assistant",
-      content: content || "",
-      toolCalls,
-      timestamp: new Date(),
-    });
+    // Optionally persist assistant messages that include toolCalls; disabled by default
+    if (config.persistAssistantToolCalls) {
+      await this.addMessage(sessionId, userId, {
+        role: "assistant",
+        content: content || "",
+        toolCalls,
+        timestamp: new Date(),
+      });
+    } else {
+      console.log(
+        `[MemoryStore] Skipping persistence of assistant tool call message (toolCalls=${
+          toolCalls?.length || 0
+        }). Set PERSIST_ASSISTANT_TOOL_CALLS=true to enable.`
+      );
+    }
   }
 
   /**
    * Add a tool result
    */
   async addToolResult(sessionId, userId, tool_call_id, name, result) {
-    await this.addMessage(sessionId, userId, {
-      role: "tool",
-      tool_call_id,
-      name,
-      content: result,
-      timestamp: new Date(),
-    });
+    // By default we do NOT persist tool results into session.messages because
+    // tool outputs can be large, sensitive, or duplicative. This keeps the
+    // messages collection clean and prevents tool payloads from being shown
+    // in the normal chat history in the UI.
+    if (config.persistToolResults) {
+      await this.addMessage(sessionId, userId, {
+        role: "tool",
+        tool_call_id,
+        name,
+        content: result,
+        timestamp: new Date(),
+      });
+    } else {
+      // Keep a debug log for visibility (non-persistent by default)
+      console.log(
+        `[MemoryStore] Skipping persistence of tool result for ${name} (id=${tool_call_id}). Set PERSIST_TOOL_RESULTS=true to enable.`
+      );
+    }
   }
 
   /**

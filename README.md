@@ -395,8 +395,8 @@ Create a `.env` file with:
 ```env
 # Gemini API
 GEMINI_API_KEY=your-gemini-api-key
-# Gemini model (options: gemini-2.0-flash, gemini-2.0-flash-lite, gemini-2.5-flash, gemini-2.5-flash-lite, gemini-2.5-flash-image)
-GEMINI_MODEL=gemini-2.0-flash
+# Gemini model (options: gemini-2.0-flash, gemini-2.0-flash-lite, gemini-2.5-flash, gemini-2.5-flash-lite, gemini-2.5-flash-image, gemini-3, gemini-3-lite, gemini-3-image, gemini-3-flash)
+GEMINI_MODEL=gemini-2.5-flash
 
 # MongoDB
 MONGODB_URI=mongodb://localhost:27017/mojo

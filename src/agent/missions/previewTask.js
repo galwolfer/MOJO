@@ -1,0 +1,176 @@
+import { z } from "zod";
+import { GuidedMission } from "./GuidedMission.js";
+import { TASK_CONFIG, inferTaskProperties } from "../taskRules.js";
+
+/**
+ * Parse relative date strings like "next Thursday", "tomorrow", "in 3 days"
+ * and convert them to ISO format (YYYY-MM-DD)
+ */
+function parseRelativeDate(dateString) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 4 = Thursday
+
+  const lowerStr = dateString.toLowerCase().trim();
+
+  // Handle: "tomorrow"
+  if (lowerStr === "tomorrow" || lowerStr === "מחר") {
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split("T")[0];
+  }
+
+  // Handle: "today"
+  if (lowerStr === "today" || lowerStr === "היום") {
+    return today.toISOString().split("T")[0];
+  }
+
+  // Handle: "next Thursday", "this Thursday", "Thursday", etc.
+  const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  const hebrewDays = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+
+  for (let i = 0; i < days.length; i++) {
+    const engDay = days[i];
+    const hebDay = hebrewDays[i];
+    if (
+      lowerStr.includes(engDay) ||
+      lowerStr.includes(hebDay) ||
+      lowerStr.includes(`ליום ${hebDay}`) ||
+      lowerStr.includes(`ל${hebDay}`)
+    ) {
+      // Calculate days until next occurrence of this day
+      let daysToAdd = (i - dayOfWeek + 7) % 7;
+
+      // If it's today, move to next week
+      if (daysToAdd === 0) {
+        daysToAdd = 7;
+      }
+
+      // If user says "next" explicitly
+      if (lowerStr.includes("next") || lowerStr.includes("הקרוב")) {
+        if (daysToAdd === 0) daysToAdd = 7; // Ensure it's in the future
+      }
+
+      const targetDate = new Date(today);
+      targetDate.setDate(targetDate.getDate() + daysToAdd);
+      return targetDate.toISOString().split("T")[0];
+    }
+  }
+
+  // Handle: "in 3 days", "in 1 week", etc.
+  const relativeRegex = /in\s+(\d+)\s+(days?|weeks?|hours?)/i;
+  const hebrewRelativeRegex = /בעוד\s+(\d+)\s+(ימים?|שבועות?|שעות?)/i;
+  let match = lowerStr.match(relativeRegex) || lowerStr.match(hebrewRelativeRegex);
+  if (match) {
+    const amount = parseInt(match[1]);
+    const unit = match[2].toLowerCase();
+
+    const futureDate = new Date(today);
+    if (unit.includes("day")) futureDate.setDate(futureDate.getDate() + amount);
+    else if (unit.includes("week")) futureDate.setDate(futureDate.getDate() + amount * 7);
+    else if (unit.includes("hour")) futureDate.setHours(futureDate.getHours() + amount);
+
+    return futureDate.toISOString().split("T")[0];
+  }
+
+  // If already in ISO format (YYYY-MM-DD), return as-is
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+    return dateString;
+  }
+
+  // Fallback: throw error if can't parse
+  throw new Error(
+    `Cannot parse date: "${dateString}". Use formats like "2026-01-09", "tomorrow", "next Thursday", etc.`
+  );
+}
+
+const previewTaskMission = new GuidedMission({
+  name: "preview_task",
+  group: "task",
+  description:
+    "Return a task_confirmation widget for approval. Required: taskname, deadline. Optional: description, category (preferred), tags (legacy), importance, effort, estimatedDuration, canSplit, taskType.",
+  missionInfo:
+    "Draft and show a task_confirmation widget. Required fields: taskname, deadline; AI can fill optional fields.",
+  behavior: ["Use when user asks to create a task.", "After confirmation, call add_task."],
+  widgets: ["task_confirmation"],
+  schema: z.object({
+    taskname: z.string().describe("Task title (required)"),
+    deadline: z.string().describe("ISO date (YYYY-MM-DD). Convert relative dates before calling"),
+    description: z.string().optional().describe("Optional details"),
+    importance: z.number().min(1).max(5).optional().describe("1-5 importance (AI can infer)"),
+    effort: z.number().min(1).max(5).optional().describe("1-5 effort (AI can infer)"),
+    duration: z.number().optional().describe("Estimated minutes (AI can infer)"),
+    tags: z.array(z.string()).optional().describe("Category tags (AI can suggest)"),
+    canSplit: z.boolean().optional().describe("Can the task be split?"),
+    taskType: z.string().optional().describe("Task splitting strategy (perfect/in_parts/leaky)"),
+    recurrence: z
+      .object({
+        type: z.enum(["daily", "weekly", "monthly", "yearly"]),
+        interval: z.number().optional().default(1),
+        endDate: z.string().optional(),
+        count: z.number().optional(),
+      })
+      .optional(),
+  }),
+  execute: async ({ args }) => {
+    const { taskname, deadline, description, importance, effort, duration, tags, canSplit, taskType, recurrence } =
+      args;
+
+    try {
+      // Parse relative dates (e.g., "next Thursday", "tomorrow", "in 3 days") to ISO format
+      let finalDeadline = deadline;
+      try {
+        finalDeadline = parseRelativeDate(deadline);
+      } catch (e) {
+        // If parsing fails, try to use it as-is (might be ISO format already)
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(deadline)) {
+          return `ok=false\nerr="Invalid deadline format: ${deadline}. Use 'YYYY-MM-DD', 'tomorrow', 'next Thursday', etc."`;
+        }
+        finalDeadline = deadline;
+      }
+
+      // Validate deadline is a valid date
+      const deadlineDate = new Date(finalDeadline);
+      if (isNaN(deadlineDate.getTime())) {
+        return `ok=false\nerr="Invalid deadline date: ${finalDeadline}"`;
+      }
+
+      // Infer properties from task name if not provided
+      const inferred = inferTaskProperties(taskname);
+
+      // Apply defaults and inference
+      const finalImportance = importance || inferred.importance;
+      const finalEffort = effort || inferred.effort;
+      const finalDuration = duration || inferred.duration;
+      const finalTags = tags || inferred.tags;
+      const finalCanSplit = canSplit !== undefined ? canSplit : TASK_CONFIG.defaults.splitable;
+
+      const widgetJson = {
+        version: "1.0",
+        widget_type: "task_confirmation",
+        data: {
+          id: "draft-" + Date.now(),
+          title: taskname,
+          status: "draft",
+          dueDate: new Date(finalDeadline).toISOString(),
+          importance: finalImportance,
+          effort: finalEffort,
+          estimatedDuration: finalDuration,
+          priority: finalImportance >= 4 ? "high" : finalImportance <= 2 ? "low" : "medium",
+          tags: finalTags,
+          taskType: taskType || TASK_CONFIG.defaults.taskType,
+          description: description || (recurrence ? `Recurrence: ${recurrence.type}` : ""),
+          canSplit: finalCanSplit,
+          confirmLabel: "Create Task",
+          cancelLabel: "Edit",
+        },
+      };
+
+      return JSON.stringify(widgetJson);
+    } catch (error) {
+      return `ok=false\nerr="Failed to generate preview: ${error.message}"`;
+    }
+  },
+});
+
+export default previewTaskMission;

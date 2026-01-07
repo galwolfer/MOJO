@@ -10,6 +10,34 @@ import { User, Session } from "../models/index.js";
 // Create an instance of the agent
 const agent = new AgentController(config.geminiApiKey);
 
+function sanitizeMessageForClient(message) {
+  const sanitized = { ...message };
+  if (typeof sanitized.content === "string") {
+    sanitized.content = agent._sanitizeResponse(sanitized.content);
+  }
+  delete sanitized.functionCall;
+  delete sanitized.toolCalls;
+  delete sanitized.function_call;
+  delete sanitized.tool_calls;
+  return sanitized;
+}
+
+function sanitizeHistoryForClient(history) {
+  if (!Array.isArray(history)) return [];
+  return history.map((msg) => sanitizeMessageForClient(msg));
+}
+
+function sanitizeSessionsForClient(sessions) {
+  if (!Array.isArray(sessions)) return [];
+  return sessions.map((session) => {
+    if (!session.messages) return session;
+    return {
+      ...session,
+      messages: sanitizeHistoryForClient(session.messages),
+    };
+  });
+}
+
 /**
  * Chat Controller - API Endpoints
  */
@@ -37,7 +65,11 @@ export async function sendMessage(req, res, next) {
     // Process the message
     const result = await agent.processMessage(session, message, userId);
 
-    res.json(result);
+    const response = {
+      ...result,
+      response: typeof result.response === "string" ? agent._sanitizeResponse(result.response) : result.response,
+    };
+    res.json(response);
   } catch (error) {
     next(error);
   }
@@ -91,6 +123,7 @@ export async function getHistory(req, res, next) {
       return res.json({
         success: true,
         ...page,
+        history: sanitizeHistoryForClient(page.history),
       });
     }
 
@@ -101,7 +134,7 @@ export async function getHistory(req, res, next) {
       success: true,
       sessionId,
       messageCount: history.length,
-      history,
+      history: sanitizeHistoryForClient(history),
     });
   } catch (error) {
     next(error);
@@ -121,6 +154,7 @@ export async function getSessions(req, res, next) {
     return res.json({
       success: true,
       ...page,
+      sessions: sanitizeSessionsForClient(page.sessions),
     });
   } catch (error) {
     next(error);
@@ -163,13 +197,15 @@ export async function getUserSessionsDoc(req, res, next) {
         lastActiveAt: s.lastActiveAt,
         createdAt: s.createdAt,
         messageCount: typeof s.messageCount === "number" && s.messageCount > 0 ? s.messageCount : msgs.length,
-        messages: tail.map((m) => ({
-          role: m.role,
-          content: m.content,
-          functionCall: m.functionCall,
-          name: m.name,
-          timestamp: m.timestamp,
-        })),
+        messages: sanitizeHistoryForClient(
+          tail.map((m) => ({
+            role: m.role,
+            content: m.content,
+            functionCall: m.functionCall,
+            name: m.name,
+            timestamp: m.timestamp,
+          }))
+        ),
       });
     }
 

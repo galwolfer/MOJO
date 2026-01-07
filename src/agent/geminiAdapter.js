@@ -30,7 +30,7 @@ export class GeminiAdapter {
   // adapter is easy to instantiate in tests and lightweight runners.
   // - `apiKey`: Google API key with access to the Generative Language API.
   // - `model`: override default model name for testing or staging.
-  constructor(apiKey, model = config.geminiModel || "gemini-2.0-flash") {
+  constructor(apiKey, model = config.geminiModel || "gemini-2.5-flash") {
     this.apiKey = apiKey;
     this.model = model;
     this.baseUrl = "https://generativelanguage.googleapis.com/v1beta/models";
