@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { updateAllScores } from "../scripts/updateScores.js";
 import { detectTags } from "../algorithms/priority/tagging.js";
 import { generateSubCategory } from "../services/ml/subcategoryGenerator.js";
+import { predictTask } from "../services/mlPredictionService.js";
 
 const taskSchema = new mongoose.Schema(
   {
@@ -83,6 +84,32 @@ taskSchema.pre("save", async function () {
       current: this.subCategory,
       TaskModel: this.constructor,
     });
+  }
+
+  // ML Prediction: Predict task completion difficulty when task is new or key fields change
+  const shouldPredict = 
+    this.isNew || 
+    this.isModified("importance") || 
+    this.isModified("effort") || 
+    this.isModified("estimatedDuration") ||
+    this.isModified("dueDate") ||
+    this.isModified("category");
+
+  if (shouldPredict) {
+    try {
+      // Get ML prediction for this task
+      const prediction = await predictTask(this);
+      
+      // Populate prediction fields
+      this.predictionScore = prediction.score;
+      this.predictedCompletionCategory = prediction.category;
+      
+      console.log(`🤖 ML Prediction: score=${prediction.score.toFixed(3)}, category=${prediction.category}`);
+    } catch (error) {
+      // Don't break task save if ML prediction fails
+      console.error('⚠️  ML Prediction failed (task will save without predictions):', error.message);
+      // Leave prediction fields undefined - they'll remain empty in DB
+    }
   }
 });
 

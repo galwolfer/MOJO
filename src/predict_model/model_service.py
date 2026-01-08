@@ -63,19 +63,28 @@ class ModelService:
     ALPHA = 0.1  # Exploration parameter for LinUCB
     MAX_DURATION = 120  # Maximum task duration in minutes (for feature normalization)
 
-    def __init__(self, model_path: Optional[str] = None):
+    def __init__(self, model_path: Optional[str] = None, user_id: Optional[str] = None):
         """
         Initialize the model service.
 
         Args:
             model_path: Path to pickle file for model persistence.
-                       Defaults to 'model.pkl' in the script directory.
+                       If None and user_id provided, uses 'user_models/model_{user_id}.pkl'
+                       If None and no user_id, uses 'model.pkl' (legacy global model)
+            user_id: User ID for per-user model persistence.
         """
         if model_path is None:
             script_dir = Path(__file__).parent
-            model_path = script_dir / "model.pkl"
+            if user_id:
+                # Store per-user models in user_models subdirectory
+                user_models_dir = script_dir / "user_models"
+                user_models_dir.mkdir(exist_ok=True)  # Create directory if it doesn't exist
+                model_path = user_models_dir / f"model_{user_id}.pkl"
+            else:
+                model_path = script_dir / "model.pkl"
         
         self.model_path = Path(model_path)
+        self.user_id = user_id
         self.model = self._load_or_create_model()
 
     def _load_or_create_model(self) -> MultiFeatureLinUCB:
@@ -89,7 +98,8 @@ class ModelService:
             try:
                 with open(self.model_path, 'rb') as f:
                     model = pickle.load(f)
-                print(f"✅ Loaded model from {self.model_path}", file=sys.stderr)
+                user_context = f" for user {self.user_id}" if self.user_id else " (global)"
+                print(f"✅ Loaded model from {self.model_path}{user_context}", file=sys.stderr)
                 return model
             except Exception as e:
                 print(f"⚠️  Failed to load model: {e}. Creating new model.", file=sys.stderr)
@@ -103,7 +113,8 @@ class ModelService:
             n_features=total_features,
             alpha=self.ALPHA
         )
-        print(f"✅ Created new model with {total_features} features", file=sys.stderr)
+        user_context = f" for user {self.user_id}" if self.user_id else " (global)"
+        print(f"✅ Created new model with {total_features} features{user_context}", file=sys.stderr)
         return model
 
     def _save_model(self) -> None:
@@ -161,6 +172,10 @@ class ModelService:
             # Get predictions from the model
             score = self.model.predict_score(features)      # 0-1 confidence
             category = self.model.predict_category(features)  # 1-5 difficulty
+
+            # Persist model file after first prediction (ensures file exists)
+            if not self.model_path.exists():
+                self._save_model()
 
             return {
                 'score': float(score),
@@ -248,36 +263,50 @@ def main():
     CLI interface for the model service.
 
     Usage:
-        python model_service.py predict '{"motivation": 4, "duration": 60, ...}'
-        python model_service.py train '{"motivation": 4, ...}' 0.75
-        python model_service.py health
+        python model_service.py predict <userId> '{"motivation": 4, "duration": 60, ...}'
+        python model_service.py train <userId> '{"motivation": 4, ...}' 0.75
+        python model_service.py health [userId]
     """
     if len(sys.argv) < 2:
-        print("Usage: python model_service.py <command> [args...]", file=sys.stderr)
+        print("Usage: python model_service.py <command> <userId> [args...]", file=sys.stderr)
         print("Commands:", file=sys.stderr)
-        print("  predict <json>  - Predict on task", file=sys.stderr)
-        print("  train <json> <reward>  - Train on completed task", file=sys.stderr)
-        print("  health  - Check service health", file=sys.stderr)
+        print("  predict <userId> <json>  - Predict on task for specific user", file=sys.stderr)
+        print("  train <userId> <json> <reward>  - Train on completed task for specific user", file=sys.stderr)
+        print("  health [userId]  - Check service health", file=sys.stderr)
         sys.exit(1)
 
-    service = ModelService()
     command = sys.argv[1]
+    
+    # Extract userId if provided (not for health check without userId)
+    user_id = None
+    arg_offset = 2
+    if command in ['predict', 'train']:
+        if len(sys.argv) < 3:
+            print(f"❌ {command} requires userId argument", file=sys.stderr)
+            sys.exit(1)
+        user_id = sys.argv[2]
+        arg_offset = 3
+    elif command == 'health' and len(sys.argv) >= 3:
+        user_id = sys.argv[2]
+        arg_offset = 3
+    
+    service = ModelService(user_id=user_id)
 
     try:
         if command == 'predict':
-            if len(sys.argv) < 3:
+            if len(sys.argv) < arg_offset + 1:
                 print("❌ predict requires task JSON argument", file=sys.stderr)
                 sys.exit(1)
-            task_input = json.loads(sys.argv[2])
+            task_input = json.loads(sys.argv[arg_offset])
             result = service.predict(task_input)
             print(json.dumps(result))
 
         elif command == 'train':
-            if len(sys.argv) < 4:
+            if len(sys.argv) < arg_offset + 2:
                 print("❌ train requires task JSON and reward arguments", file=sys.stderr)
                 sys.exit(1)
-            task_input = json.loads(sys.argv[2])
-            reward = float(sys.argv[3])
+            task_input = json.loads(sys.argv[arg_offset])
+            reward = float(sys.argv[arg_offset + 1])
             result = service.train(task_input, reward)
             print(json.dumps(result))
 
