@@ -86,7 +86,20 @@ taskSchema.pre("save", async function () {
     });
   }
 
-  // ML Prediction: Predict task completion difficulty when task is new or key fields change
+  // ========================================================================
+  // ML PREDICTION: Auto-predict task difficulty on creation/modification
+  // ========================================================================
+  // Triggers when:
+  // - New task created
+  // - Key fields modified (importance, effort, estimatedDuration, dueDate, category)
+  // 
+  // Process:
+  // 1. Convert task to ML input (5 fields → 28 engineered features)
+  // 2. Call Python ML service (loads user's model or creates new one)
+  // 3. Get prediction: score (0-1 confidence) + category (1-5 difficulty)
+  // 4. Store in predictionScore and predictedCompletionCategory fields
+  // 
+  // Result: Every task gets instant ML predictions at save time
   const shouldPredict = 
     this.isNew || 
     this.isModified("importance") || 
@@ -100,14 +113,26 @@ taskSchema.pre("save", async function () {
       // Get ML prediction for this task
       const prediction = await predictTask(this);
       
-      // Populate prediction fields
+      // Validate prediction response
+      if (!prediction || typeof prediction.score !== 'number' || !prediction.category) {
+        console.error('⚠️  ML Prediction returned invalid data:', prediction);
+        // Leave prediction fields undefined - task will save without predictions
+        return;
+      }
+      
+      // Populate prediction fields (stored in MongoDB for priority calculations)
       this.predictionScore = prediction.score;
       this.predictedCompletionCategory = prediction.category;
       
       console.log(`🤖 ML Prediction: score=${prediction.score.toFixed(3)}, category=${prediction.category}`);
     } catch (error) {
       // Don't break task save if ML prediction fails
-      console.error('⚠️  ML Prediction failed (task will save without predictions):', error.message);
+      console.error('⚠️  ML Prediction failed (task will save without predictions):', {
+        taskId: this._id,
+        userId: this.userId,
+        error: error.message,
+        stack: error.stack?.split('\n')[0], // First line of stack for debugging
+      });
       // Leave prediction fields undefined - they'll remain empty in DB
     }
   }

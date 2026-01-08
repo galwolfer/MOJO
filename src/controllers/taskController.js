@@ -343,3 +343,37 @@ export async function toggleTaskCompletion(req, res) {
     });
   }
 }
+
+/**
+ * Complete a task (with ML training)
+ * POST /api/tasks/:id/complete
+ */
+export async function completeTask(req, res) {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+
+    const result = await taskService.completeTask({ taskId: id, userId });
+
+    if (!result || result.success === false) {
+      return res.status(404).json({
+        success: false,
+        error: result?.error || "Task not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      task: result.task,
+      actualCompletionMinutes: result.actualCompletionMinutes,
+      message: "Task completed successfully",
+    });
+  } catch (error) {
+    logger.error("Error in completeTask controller:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: "Failed to complete task",
+    });
+  }
+}

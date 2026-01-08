@@ -149,7 +149,7 @@ export async function trainTask(task) {
     }
 
     // Validate task has required fields
-    if (!task.estimatedDuration || !task.actualCompletionMinutes) {
+    if (task.estimatedDuration === undefined || task.actualCompletionMinutes === undefined) {
       throw new Error('Task missing estimatedDuration or actualCompletionMinutes');
     }
 

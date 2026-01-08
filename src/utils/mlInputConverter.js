@@ -184,15 +184,35 @@ function categoryNormalizer(subCategoryLabel = '', category = '') {
  * 
  * @param {Object} task - MongoDB Task document with all fields
  * @returns {Object} Input object with structure {motivation, duration, difficulty, delta_hours, category}
- * @throws {Error} If required fields are missing
+ * @throws {Error} If required fields are missing or invalid
  */
 function taskToMLInput(task) {
+  // Validate task object exists
   if (!task) {
-    throw new Error('Task object is required');
+    throw new Error('Task object is required for ML input conversion');
   }
 
-  // Extract and validate required fields
-  const importance = task.importance || 3; // 1-5, default 3
+  // Validate required fields with detailed error messages
+  if (!task.userId) {
+    throw new Error(`Task missing userId field (taskId: ${task._id})`);
+  }
+  
+  if (typeof task.importance !== 'number' || task.importance < 1 || task.importance > 5) {
+    console.warn(`⚠️  Task has invalid importance: ${task.importance}, defaulting to 3`);
+  }
+  
+  if (typeof task.effort !== 'number' || task.effort < 1 || task.effort > 5) {
+    console.warn(`⚠️  Task has invalid effort: ${task.effort}, defaulting to 3`);
+  }
+  
+  if (typeof task.estimatedDuration !== 'number' || task.estimatedDuration <= 0) {
+    throw new Error(`Task has invalid estimatedDuration: ${task.estimatedDuration} (taskId: ${task._id})`);
+  }
+
+  // Extract and validate required fields with safe defaults
+  const importance = (typeof task.importance === 'number' && task.importance >= 1 && task.importance <= 5) 
+    ? task.importance 
+    : 3; // Default to 3 if invalid
   const effort = task.effort || 3; // 1-5, default 3
   const estimatedDuration = task.estimatedDuration || 60; // minutes, default 60
   const dueDate = task.dueDate;
@@ -243,8 +263,14 @@ function taskToMLInput(task) {
  */
 function calculateReward(estimatedMinutes, actualMinutes) {
   // Handle invalid inputs gracefully
-  if (!estimatedMinutes || !actualMinutes || estimatedMinutes <= 0 || actualMinutes <= 0) {
+  if (estimatedMinutes === undefined || actualMinutes === undefined || estimatedMinutes <= 0 || actualMinutes < 0) {
     return undefined; // Cannot calculate, skip training
+  }
+
+  // Special case: task completed instantly (0 minutes)
+  // This means the estimate was way off - give very low reward to penalize overestimation
+  if (actualMinutes === 0) {
+    return 0.1; // Heavy penalty for tasks that complete much faster than estimated
   }
 
   // Ratio of actual to estimated time

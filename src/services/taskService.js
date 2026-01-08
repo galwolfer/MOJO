@@ -28,6 +28,7 @@ import { TaskSchedule } from "../models/TaskSchedule.js";
 import { BusyBlock } from "../models/BusyBlock.js";
 import { logEvent, recordSubCategoryGeneration } from "./telemetryService.js";
 import { categoryForTag } from "../algorithms/priority/tagging.js";
+import { trainTask } from "./mlPredictionService.js";
 import { logger } from "../utils/logger.js";
 import { startOfDay } from "../utils/dateUtils.js";
 
@@ -335,7 +336,20 @@ export async function deleteTask({ taskId, userId }) {
 }
 
 /**
- * Mark a task as complete and record actual completion time.
+ * Mark a task as complete and trigger ML model training
+ * 
+ * ⭐ CRITICAL FUNCTION FOR ML LEARNING ⭐
+ * 
+ * This is where the ML model learns from actual user behavior:
+ * 1. Calculates actual work time from completed TaskSchedule sessions
+ * 2. Saves actualCompletionMinutes to the task
+ * 3. Triggers ML model training with reward based on estimation accuracy
+ * 
+ * The ML model learns:
+ * - How accurate the user's time estimates were (reward calculation)
+ * - Task characteristics (importance, effort, category, deadline pressure)
+ * - User-specific patterns across similar tasks (per-user models)
+ * 
  * @param {object} params - { taskId, userId }
  * @returns {Promise<object>} { success, task, actualCompletionMinutes }
  */
@@ -351,10 +365,29 @@ export async function completeTask({ taskId, userId }) {
       return { success: false, error: "Task not found or you don't have permission." };
     }
 
-    // Calculate actual completion time in minutes from task creation
-    const actualCompletionMinutes = Math.round(
-      (Date.now() - task.createdAt.getTime()) / (1000 * 60)
+    // Calculate actual completion time by summing all completed work sessions
+    const completedSessions = await TaskSchedule.find({ 
+      taskId, 
+      status: "completed" 
+    }).lean();
+    
+    const actualCompletionMinutes = completedSessions.reduce(
+      (total, session) => total + (session.minutes || 0), 
+      0
     );
+
+    // ========================================================================
+    // VALIDATION: Warn if no work sessions tracked (edge case)
+    // ========================================================================
+    if (actualCompletionMinutes === 0) {
+      console.warn(`⚠️  Task completed with 0 minutes tracked:`, {
+        taskId: taskId.toString(),
+        taskname: task.taskname,
+        estimatedDuration: task.estimatedDuration,
+        sessionCount: completedSessions.length,
+      });
+      // Still proceed - user might have completed task without tracking sessions
+    }
 
     const updated = await Task.findByIdAndUpdate(
       taskId,
@@ -365,7 +398,7 @@ export async function completeTask({ taskId, userId }) {
         },
       },
       { new: true }
-    ).lean();
+    ).lean(); // Get plain object directly
 
     await logEvent({
       type: "task_completed",
@@ -377,6 +410,35 @@ export async function completeTask({ taskId, userId }) {
         estimatedDuration: task.estimatedDuration,
       },
     });
+
+    // ========================================================================
+    // ML TRAINING: Train with completion data (with comprehensive error handling)
+    // ========================================================================
+    try {
+      console.log(`🎯 Training ML model for completed task: ${task.taskname}`);
+      
+      const trainingResult = await trainTask(updated);
+      
+      if (trainingResult.success) {
+        console.log(`✅ ML model trained successfully (reward: ${trainingResult.reward?.toFixed(3)})`);
+      } else {
+        console.error(`❌ ML training failed:`, {
+          taskId: taskId.toString(),
+          taskname: task.taskname,
+          error: trainingResult.error,
+          actualMinutes: actualCompletionMinutes,
+          estimatedMinutes: task.estimatedDuration,
+        });
+      }
+    } catch (mlError) {
+      // Don't fail task completion if ML training fails
+      console.error(`❌ ML training error (task still completed):`, {
+        taskId: taskId.toString(),
+        taskname: task.taskname,
+        error: mlError.message,
+        stack: mlError.stack?.split('\n')[0],
+      });
+    }
 
     return { success: true, task: updated, actualCompletionMinutes };
   } catch (error) {
