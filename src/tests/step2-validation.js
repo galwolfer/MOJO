@@ -30,42 +30,42 @@ console.log('\n🧪 Step 2 Validation: ML Input Converter\n');
 console.log('📋 Test Suite 1: categoryNormalizer()\n');
 
 assert(
-  categoryNormalizer('', []) === ML_CATEGORIES.UNCATEGORIZED,
+  categoryNormalizer('', '') === ML_CATEGORIES.UNCATEGORIZED,
   'Empty input defaults to UNCATEGORIZED'
 );
 
 assert(
-  categoryNormalizer('Work Project', []) === ML_CATEGORIES.WORK_AND_CAREER,
+  categoryNormalizer('Work Project', '') === ML_CATEGORIES.WORK_AND_CAREER,
   'Detects WORK_AND_CAREER category from label'
 );
 
 assert(
-  categoryNormalizer('', ['work', 'meeting']) === ML_CATEGORIES.WORK_AND_CAREER,
-  'Detects WORK_AND_CAREER category from categories'
+  categoryNormalizer('', 'work_and_career') === ML_CATEGORIES.WORK_AND_CAREER,
+  'Detects WORK_AND_CAREER category from category field'
 );
 
 assert(
-  categoryNormalizer('Fitness', ['health']) === ML_CATEGORIES.HEALTH,
+  categoryNormalizer('Fitness', 'health') === ML_CATEGORIES.HEALTH,
   'Detects HEALTH category (multiple sources)'
 );
 
 assert(
-  categoryNormalizer('Personal Travel', ['vacation']) === ML_CATEGORIES.EXPLORATION,
+  categoryNormalizer('Personal Travel', 'exploration') === ML_CATEGORIES.EXPLORATION,
   'Detects EXPLORATION (travel) category'
 );
 
 assert(
-  categoryNormalizer('Python Course', ['education']) === ML_CATEGORIES.STUDY_AND_EDUCATION,
+  categoryNormalizer('Python Course', 'study_and_education') === ML_CATEGORIES.STUDY_AND_EDUCATION,
   'Detects STUDY_AND_EDUCATION category'
 );
 
 assert(
-  categoryNormalizer('Kitchen Cleaning', ['chore']) === ML_CATEGORIES.HOME_AND_CHORES,
+  categoryNormalizer('Kitchen Cleaning', 'home_and_chores') === ML_CATEGORIES.HOME_AND_CHORES,
   'Detects HOME_AND_CHORES category'
 );
 
 assert(
-  categoryNormalizer('Random Thing', []) === ML_CATEGORIES.UNCATEGORIZED,
+  categoryNormalizer('Random Thing', '') === ML_CATEGORIES.UNCATEGORIZED,
   'Unknown category defaults to UNCATEGORIZED'
 );
 
@@ -79,7 +79,7 @@ const basicTask = {
   effort: 3,
   estimatedDuration: 120,
   subCategory: { label: 'Work Project' },
-  categories: ['urgent'],
+  category: 'work_and_career',
 };
 
 const basicInput = taskToMLInput(basicTask);
@@ -123,7 +123,7 @@ const taskWithDeadline = {
   estimatedDuration: 60,
   dueDate: futureDate,
   subCategory: { label: 'Urgent Work' },
-  categories: [],
+  category: '',
 };
 
 const inputWithDeadline = taskToMLInput(taskWithDeadline);
@@ -222,7 +222,7 @@ const realTask = {
   estimatedDuration: 180, // 3 hours
   dueDate: new Date(now.getTime() + 86400000), // tomorrow
   subCategory: { label: 'Work Report', source: 'heuristic' },
-  categories: ['urgent', 'work', 'reporting'],
+  category: 'work_and_career',
   status: 'todo',
 };
 

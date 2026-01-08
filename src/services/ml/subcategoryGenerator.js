@@ -337,7 +337,7 @@ const SUBCATEGORY_MAP = {
     { label: "Research", keywords: ["research", "look up", "find out", "investigate", "search"] },
     { label: "Planning", keywords: ["plan", "planning", "prepare", "organize", "schedule"] },
     { label: "Waiting", keywords: ["waiting", "pending", "hold", "expect", "response"] },
-    { label: "Miscellaneous", keywords: ["misc", "other", "random", "various", "general"] },
+    { label: "Uncategorized", keywords: ["other", "random", "various", "general"] },
   ],
 };
 
@@ -466,7 +466,7 @@ function findSubcategory(text = "", category = "") {
  * @param {string} options.userId - User ID (not used in manual mapping but kept for API compatibility)
  * @param {string} options.title - Task title
  * @param {string} options.description - Task description
- * @param {string[]} options.categories - Task categories array
+ * @param {string} options.category - Task category (single string)
  * @param {Object} options.current - Current subcategory (for manual override check)
  * @param {Object} options.TaskModel - Mongoose model (not used in manual mapping)
  * @returns {Object} { label, source, confidence, updatedAt }
@@ -475,7 +475,7 @@ export async function generateSubCategory({
   userId,
   title = "",
   description = "",
-  categories = [],
+  category = "",
   current = {},
   TaskModel = null,
 } = {}) {
@@ -492,13 +492,13 @@ export async function generateSubCategory({
   // Combine title and description for keyword matching
   const combinedText = `${title || ""} ${description || ""}`.trim();
   
-  // Get the primary category (first one in the array)
-  const primaryCategory = Array.isArray(categories) && categories.length > 0
-    ? String(categories[0] || "").toLowerCase().replace(/[^a-z_]/g, "")
+  // Normalize category to lowercase with underscores only
+  const normalizedCategory = category 
+    ? String(category).toLowerCase().replace(/[^a-z_]/g, "")
     : "uncategorized";
   
   // Find matching subcategory
-  const result = findSubcategory(combinedText, primaryCategory);
+  const result = findSubcategory(combinedText, normalizedCategory);
   
   if (result) {
     return {

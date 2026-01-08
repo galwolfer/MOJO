@@ -95,7 +95,7 @@ router.get("/expired", async (req, res, next) => {
         importance: task.importance,
         status: task.status,
         estimatedDuration: task.estimatedDuration,
-        categories: task.categories,
+        category: task.category,
       };
     });
 

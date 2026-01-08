@@ -51,25 +51,37 @@ const CATEGORY_NAMES = {
 };
 
 /**
- * Normalize subCategory label and categories to standard ML category (0-17)
+ * Normalize subCategory label and category to standard ML category (0-17)
  * 
  * @param {string} subCategoryLabel - The subCategory.label from Task model
- * @param {string[]} categories - Array of categories from Task model
+ * @param {string} category - Single category from Task model
  * @returns {number} Normalized category 0-17
  */
-function categoryNormalizer(subCategoryLabel = '', categories = []) {
+function categoryNormalizer(subCategoryLabel = '', category = '') {
   const label = (subCategoryLabel || '').toLowerCase().trim();
-  const normalizedCategories = (Array.isArray(categories) ? categories : []).map((t) => (t || '').toLowerCase());
-  const allText = [label, ...normalizedCategories].join(' ');
+  const normalizedCategory = (category || '').toLowerCase().trim();
+  const allText = `${label} ${normalizedCategory}`;
 
-  // Respect explicit categories first (categories should override noisy labels)
-  const tagSet = new Set(normalizedCategories);
-  if (tagSet.has('health')) return ML_CATEGORIES.HEALTH;
-  if (tagSet.has('workout') || tagSet.has('sports') || tagSet.has('gym')) return ML_CATEGORIES.WORKOUT;
-  if (tagSet.has('study') || tagSet.has('education') || tagSet.has('course')) return ML_CATEGORIES.STUDY_AND_EDUCATION; 
-  if (tagSet.has('chore') || tagSet.has('chores')) return ML_CATEGORIES.HOME_AND_CHORES;
-  if (tagSet.has('work') || tagSet.has('meeting') || tagSet.has('project')) return ML_CATEGORIES.WORK_AND_CAREER; 
-  if (tagSet.has('vacation') || tagSet.has('travel')) return ML_CATEGORIES.EXPLORATION;
+  // Respect explicit category first (category should override noisy labels)
+  if (normalizedCategory) {
+    if (normalizedCategory.includes('health')) return ML_CATEGORIES.HEALTH;
+    if (normalizedCategory.includes('workout') || normalizedCategory.includes('sports') || normalizedCategory.includes('gym')) return ML_CATEGORIES.WORKOUT;
+    if (normalizedCategory.includes('study') || normalizedCategory.includes('education') || normalizedCategory.includes('course')) return ML_CATEGORIES.STUDY_AND_EDUCATION; 
+    if (normalizedCategory.includes('chore') || normalizedCategory.includes('home')) return ML_CATEGORIES.HOME_AND_CHORES;
+    if (normalizedCategory.includes('work') || normalizedCategory.includes('career') || normalizedCategory.includes('meeting') || normalizedCategory.includes('project')) return ML_CATEGORIES.WORK_AND_CAREER; 
+    if (normalizedCategory.includes('vacation') || normalizedCategory.includes('travel') || normalizedCategory.includes('exploration')) return ML_CATEGORIES.EXPLORATION;
+    if (normalizedCategory.includes('skill')) return ML_CATEGORIES.SKILL_BUILDING;
+    if (normalizedCategory.includes('reflection')) return ML_CATEGORIES.REFLECTION;
+    if (normalizedCategory.includes('family')) return ML_CATEGORIES.FAMILY;
+    if (normalizedCategory.includes('life') || normalizedCategory.includes('management')) return ML_CATEGORIES.LIFE_MANAGEMENT;
+    if (normalizedCategory.includes('creative') || normalizedCategory.includes('project')) return ML_CATEGORIES.CREATIVE_PROJECTS;
+    if (normalizedCategory.includes('hobby') || normalizedCategory.includes('hobbies')) return ML_CATEGORIES.HOBBIES;
+    if (normalizedCategory.includes('relationship')) return ML_CATEGORIES.RELATIONSHIP;
+    if (normalizedCategory.includes('goal')) return ML_CATEGORIES.GOALS;
+    if (normalizedCategory.includes('mindful')) return ML_CATEGORIES.MINDFULNESS;
+    if (normalizedCategory.includes('social')) return ML_CATEGORIES.SOCIAL_ACTIVITY;
+    if (normalizedCategory.includes('recovery')) return ML_CATEGORIES.RECOVERY;
+  }
 
   // Study & Education (fallback to label matching)
   if (allText.match(/study|education|course|lecture|homework|exam|assignment|reading/i)) {
@@ -168,7 +180,7 @@ function categoryNormalizer(subCategoryLabel = '', categories = []) {
  * 2. duration (estimated minutes)
  * 3. difficulty (1-5, from effort field)
  * 4. delta_hours (time until dueDate in hours, 0 if no deadline)
- * 5. category (0-17, normalized from subCategory + categories)
+ * 5. category (0-17, normalized from subCategory + category)
  * 
  * @param {Object} task - MongoDB Task document with all fields
  * @returns {Object} Input object with structure {motivation, duration, difficulty, delta_hours, category}
@@ -185,7 +197,7 @@ function taskToMLInput(task) {
   const estimatedDuration = task.estimatedDuration || 60; // minutes, default 60
   const dueDate = task.dueDate;
   const subCategoryLabel = task.subCategory?.label || '';
-  const categories = task.categories || [];
+  const category = task.category || '';
 
   // Calculate delta_hours: time remaining until deadline in hours
   // If no deadline, use 0 (will be handled by model)
@@ -197,14 +209,14 @@ function taskToMLInput(task) {
   }
 
   // Normalize category to 0-17
-  const category = categoryNormalizer(subCategoryLabel, categories);
+  const normalizedCategory = categoryNormalizer(subCategoryLabel, category);
 
   return {
     motivation: importance,           // 1-5: user's importance rating
     duration: estimatedDuration,      // minutes: user's estimated time
     difficulty: effort,               // 1-5: user's effort estimate
     delta_hours: deltaHours,          // hours: time until deadline
-    category: category,               // 0-17: normalized category
+    category: normalizedCategory,     // 0-17: normalized category
   };
 }
 

@@ -76,7 +76,7 @@ const SUGGESTION_LIBRARY = {
       description: "Brainstorm concepts for your next creative endeavor.",
     },
   ],
-  misc: [
+  uncategorized: [
     {
       title: "Reflect on personal goals",
       description: "Journal or plan next steps for personal growth.",
@@ -96,7 +96,7 @@ const CATEGORY_LABELS = {
   life_management: "finances & admin",
   home_and_chores: "household",
   creative_projects: "creative projects",
-  misc: "general life",
+  uncategorized: "general life",
 };
 
 const DEFAULT_PRIORITY = 3;
@@ -131,7 +131,7 @@ export async function suggestTaskFromProfile(profile = {}, tasks = []) {
   scoredCategories.sort((a, b) => b.score - a.score || b.priority - a.priority);
 
   const best = scoredCategories[0];
-  const library = SUGGESTION_LIBRARY[best.category] || SUGGESTION_LIBRARY.misc;
+  const library = SUGGESTION_LIBRARY[best.category] || SUGGESTION_LIBRARY.uncategorized;
   const suggestion = library[Math.floor(Math.random() * library.length)];
   const trackingId = crypto.randomUUID();
 
@@ -154,7 +154,7 @@ function countTasksByCategory(tasks) {
     const tags = summarizeTags(task.categories);
     const categoriesForTask = new Set(tags.map((tag) => categoryForTag(tag)));
     if (!categoriesForTask.size) {
-      categoriesForTask.add("misc");
+      categoriesForTask.add("uncategorized");
     }
     categoriesForTask.forEach((category) => {
       counts[category] = (counts[category] || 0) + 1;

@@ -53,19 +53,23 @@ export function scoreActivities(activities, profile = {}) {
     if (S > 0.5) parts.push("Maintains streak");
     if (C < 0.4) parts.push("Poor timing");
     if (E > 0.6) parts.push("High effort required");
-    const boostedTag =
-      tagInfo?.find((info) => info.source === "preference" && info.weight > 1.05) ||
-      tagInfo?.find((info) => info.weight > 1.05);
-    const loweredTag =
-      tagInfo?.find((info) => info.source === "preference" && info.weight < 0.95) ||
-      tagInfo?.find((info) => info.weight < 0.95);
-    if (boostedTag) {
-      const label = boostedTag.source === "preference" ? boostedTag.category : boostedTag.tag;
-      parts.push(`Boosted by ${capitalize(label)}`);
-    } else if (loweredTag) {
-      const label = loweredTag.source === "preference" ? loweredTag.category : loweredTag.tag;
-      parts.push(`Lower priority (${capitalize(label)})`);
+    
+    // tagInfo is now a single object, not an array
+    if (tagInfo) {
+      const isBoosted = tagInfo.source === "preference" && tagInfo.weight > 1.05;
+      const isLowered = tagInfo.source === "preference" && tagInfo.weight < 0.95;
+      const isBaselineBoosted = tagInfo.source === "baseline" && tagInfo.weight > 1.05;
+      const isBaselineLowered = tagInfo.source === "baseline" && tagInfo.weight < 0.95;
+      
+      if (isBoosted || isBaselineBoosted) {
+        const label = tagInfo.source === "preference" ? tagInfo.category : tagInfo.tag;
+        parts.push(`Boosted by ${capitalize(label)}`);
+      } else if (isLowered || isBaselineLowered) {
+        const label = tagInfo.source === "preference" ? tagInfo.category : tagInfo.tag;
+        parts.push(`Lower priority (${capitalize(label)})`);
+      }
     }
+    
     return parts.join(" · ") || "Good overall match";
   };
 
@@ -90,9 +94,9 @@ export function scoreActivities(activities, profile = {}) {
     // V: small constant bonus for variety
     const eps = 0; // no randomization
 
-    const normalizedCategories = summarizeTags(a.categories);
-    const tagDetails = describeTagWeights(normalizedCategories, preferences);
-    const multiplier = computeTagMultiplier(normalizedCategories, preferences);
+    const normalizedCategory = summarizeTags(a.category);
+    const tagDetails = describeTagWeights(normalizedCategory, preferences);
+    const multiplier = computeTagMultiplier(normalizedCategory, preferences);
     // rawScore: weighted linear combination of components -> scaled to 0..100
     // weights: urgency 35%, importance 25%, context 15%, streak 10%, diversity 5%, effort penalty -20%
     const rawScore = clamp(100 * (0.35 * U + 0.25 * I + 0.15 * C + 0.1 * S + 0.05 * V + 0.05 * eps - 0.2 * E), 0, 100);
@@ -106,7 +110,7 @@ export function scoreActivities(activities, profile = {}) {
       score,
       window,
       reason,
-      categories: summarizeTags(a.categories),
+      category: normalizedCategory,
       tagDetails,
     });
   }

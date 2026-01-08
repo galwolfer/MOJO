@@ -7,7 +7,7 @@ const TAG_BLUEPRINTS = [
   {
     tag: "work",
     weight: 1.2,
-    keywords: ["meeting", "project", "client", "report", "presentation", "deadline", "sprint"],
+    keywords: ["meeting", "project", "client", "report", "presentation", "deadline", "sprint", "job", "application", "apply", "resume", "interview", "hiring", "candidate", "career"],
   },
   {
     tag: "study",
@@ -77,7 +77,7 @@ const TAG_BLUEPRINTS = [
   {
     tag: "explore",
     weight: 0.95,
-    keywords: ["explore", "exploration", "discover", "trip", "travel", "adventure"],
+    keywords: ["explore", "exploration", "discover", "trip", "travel", "adventure", "vacation", "hotel", "hotels", "flight", "booking", "paris"],
   },
   {
     tag: "household",
@@ -85,7 +85,7 @@ const TAG_BLUEPRINTS = [
     keywords: ["clean", "laundry", "dishes", "cook", "groceries", "repair", "chores"],
   },
   {
-    tag: "misc",
+    tag: "uncategorized",
     weight: 0.9,
     keywords: [],
   },
@@ -123,10 +123,10 @@ const TAG_TO_CATEGORY = {
   goals: "goals",
   recovery: "recovery",
   explore: "exploration",
-  misc: "uncategorized",
+  uncategorized: "uncategorized",
 };
 
-const DEFAULT_TAG = "misc";
+const DEFAULT_TAG = "uncategorized";
 
 // Extract lowercased tokens from free-form text
 const normalizeTokens = (text = "") =>
@@ -138,87 +138,94 @@ const normalizeTokens = (text = "") =>
 
 // normalizeTokens: produce keyword tokens from title/description
 
-export function detectTags({ title = "", description = "", categories = [] } = {}) {
-  const base = Array.isArray(categories) ? categories.filter(Boolean) : [];
+export function detectTags({ title = "", description = "", category = "" } = {}) {
   const tokens = [...normalizeTokens(title), ...normalizeTokens(description)];
 
-  const found = new Set(base.map((t) => t.toLowerCase()));
+  const found = new Set();
+  
+  // If there's already a category, keep it unless it's empty
+  if (category && typeof category === "string" && category.trim()) {
+    found.add(category.toLowerCase().trim());
+  }
+  
+  // Add tags detected from text
   tokens.forEach((token) => {
     if (KEYWORD_MAP.has(token)) {
       found.add(KEYWORD_MAP.get(token));
     }
   });
 
+  // If no tags found, use default
   if (found.size === 0) {
-    found.add(DEFAULT_TAG);
+    return TAG_TO_CATEGORY[DEFAULT_TAG] || "uncategorized";
   }
 
-  return [...found];
+  // Return the first detected tag mapped to its category
+  const firstTag = [...found][0];
+  return TAG_TO_CATEGORY[firstTag] || firstTag;
 }
 
-// detectTags: infer tags from text + any provided tags (fall back to 'misc')
+// detectTags: infer single category from text + any provided category (fall back to default)
 
 const preferenceToFactor = (value) => {
   const safe = Number.isFinite(value) ? value : 3;
   return 1 + (safe - 3) * 0.2;
 };
 
-export const categoryForTag = (tag) => TAG_TO_CATEGORY[tag] || "misc";
+export const categoryForTag = (tag) => TAG_TO_CATEGORY[tag] || "uncategorized";
 
 // categoryForTag: map a tag to a higher-level category for user prefs
 
 const hasPreferences = (preferences) =>
   preferences && Object.values(preferences).some((v) => Number.isFinite(v));
 
-export function computeTagMultiplier(taskCategories = [], preferences = {}) {
-  const tags = Array.isArray(taskCategories) && taskCategories.length ? taskCategories : [DEFAULT_TAG];
-  let multiplier = 0;
-  let weightSum = 0;
+export function computeTagMultiplier(taskCategory = "", preferences = {}) {
+  const normalized = taskCategory ? String(taskCategory).toLowerCase() : DEFAULT_TAG;
   const usePreferences = hasPreferences(preferences);
-
-  tags.forEach((tag) => {
-    const normalized = String(tag || "").toLowerCase();
-    const category = categoryForTag(normalized);
-    let weight;
-    if (usePreferences && preferences && preferences[category] != null) {
-      weight = preferenceToFactor(preferences[category]);
-    } else {
-      weight = TAG_WEIGHTS[normalized] ?? TAG_WEIGHTS[DEFAULT_TAG];
-    }
-    multiplier += weight;
-    weightSum += 1;
-  });
-
-  if (!weightSum) return TAG_WEIGHTS[DEFAULT_TAG];
-  return multiplier / weightSum;
+  
+  // Map the category to its tag equivalent for weight lookup
+  const tag = Object.keys(TAG_TO_CATEGORY).find(t => TAG_TO_CATEGORY[t] === normalized) || normalized;
+  const category = categoryForTag(tag);
+  
+  let weight;
+  if (usePreferences && preferences && preferences[category] != null) {
+    weight = preferenceToFactor(preferences[category]);
+  } else {
+    weight = TAG_WEIGHTS[tag] ?? TAG_WEIGHTS[DEFAULT_TAG];
+  }
+  
+  return weight;
 }
 
-// computeTagMultiplier: average weight for a task's tags, using user preferences when available
+// computeTagMultiplier: get weight for a task's category, using user preferences when available
 
-export function summarizeTags(categories = []) {
-  if (!Array.isArray(categories) || !categories.length) return ["misc"];
-  return categories.map((t) => String(t).toLowerCase());
+export function summarizeTags(category = "") {
+  if (!category || typeof category !== "string" || !category.trim()) return "uncategorized";
+  return String(category).toLowerCase();
 }
 
-// summarizeTags: normalize tag list to lowercase array (fall back to 'misc')
+// summarizeTags: normalize category to lowercase string (fall back to 'uncategorized')
 
 export function getTagBlueprints() {
   return TAG_BLUEPRINTS.map(({ tag, weight }) => ({ tag, weight }));
 }
 
-export function describeTagWeights(categories = [], preferences = {}) {
-  const normalized = summarizeTags(categories);
+export function describeTagWeights(category = "", preferences = {}) {
+  const normalized = summarizeTags(category);
   const usePreferences = hasPreferences(preferences);
-  return normalized.map((tag) => ({
+  const tag = Object.keys(TAG_TO_CATEGORY).find(t => TAG_TO_CATEGORY[t] === normalized) || normalized;
+  const cat = categoryForTag(tag);
+  
+  return {
     tag,
-    category: categoryForTag(tag),
-    source: usePreferences && preferences[categoryForTag(tag)] != null ? "preference" : "baseline",
-    preference: usePreferences ? preferences[categoryForTag(tag)] ?? null : null,
+    category: cat,
+    source: usePreferences && preferences[cat] != null ? "preference" : "baseline",
+    preference: usePreferences ? preferences[cat] ?? null : null,
     weight:
       usePreferences && preferences[categoryForTag(tag)] != null
         ? preferenceToFactor(preferences[categoryForTag(tag)])
         : TAG_WEIGHTS[tag] ?? TAG_WEIGHTS[DEFAULT_TAG],
-  }));
+  };
 }
 
 // describeTagWeights: return per-tag metadata (weight, source) helpful for explanations

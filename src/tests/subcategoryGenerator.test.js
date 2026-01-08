@@ -11,20 +11,20 @@ import {
     console.log('Running subcategoryGenerator unit tests...');
 
     // 1) Study -> AI & Machine Learning (phrase match)
-    let out = await generateSubCategory({ title: 'Study machine learning', categories: ['study_and_education'] });
+    let out = await generateSubCategory({ title: 'Study machine learning', category: 'study_and_education' });
     assert.strictEqual(out.label, 'AI & Machine Learning', `Expected 'AI & Machine Learning', got '${out.label}'`);
     assert.ok(out.confidence > 0 && out.confidence <= 1);
 
     // 2) Family -> Family Call (keyword: call mom)
-    out = await generateSubCategory({ title: 'Call mom', categories: ['family'] });
+    out = await generateSubCategory({ title: 'Call mom', category: 'family' });
     assert.strictEqual(out.label, 'Family Call');
 
     // 3) Workout -> Gym Session (case + punctuation)
-    out = await generateSubCategory({ title: 'GO TO GYM!!!', categories: ['workout'] });
+    out = await generateSubCategory({ title: 'GO TO GYM!!!', category: 'workout' });
     assert.strictEqual(out.label, 'Gym Session');
 
     // 4) Manual override respected
-    out = await generateSubCategory({ title: 'Study math', categories: ['study_and_education'], current: { label: 'Custom Sub', source: 'user', confidence: 0.9 } });
+    out = await generateSubCategory({ title: 'Study math', category: 'study_and_education', current: { label: 'Custom Sub', source: 'user', confidence: 0.9 } });
     assert.strictEqual(out.label, 'Custom Sub');
     assert.strictEqual(out.source, 'user');
 
@@ -34,7 +34,7 @@ import {
     assert.ok(studySubs.includes('AI & Machine Learning'));
 
     // 6) Fallback for uncategorized returns something useful
-    out = await generateSubCategory({ title: 'Random task without hints', categories: ['uncategorized'] });
+    out = await generateSubCategory({ title: 'Random task without hints', category: 'uncategorized' });
     assert.ok(out.label && typeof out.label === 'string');
     assert.ok(out.confidence >= 0 && out.confidence <= 1);
 

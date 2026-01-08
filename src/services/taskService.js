@@ -55,7 +55,7 @@ export async function createTask({
   minMinutes = null,
   maxMinutes = null,
   dueDate = null,
-  categories = [],
+  category = "",
   recurrence = null,
 }) {
   const created = await Task.create({
@@ -73,7 +73,7 @@ export async function createTask({
     minMinutes,
     maxMinutes,
     dueDate,
-    categories,
+    category,
     recurrence,
   });
 
@@ -83,7 +83,7 @@ export async function createTask({
     payload: {
       taskId: created._id.toString(),
       taskname: created.taskname,
-      categories: created.categories || [],
+      category: created.category || "",
       subCategory: created.subCategory || null,
       importance: created.importance,
       effort: created.effort,
@@ -96,7 +96,7 @@ export async function createTask({
   await recordSubCategoryGeneration({
     userId,
     taskId: created._id.toString(),
-    categories: created.categories || [],
+    category: created.category || "",
     subCategory: created.subCategory || null,
     context: "service_create",
   });
@@ -113,8 +113,8 @@ export async function checkSuggestionFollowed({ userId, task, lastSuggestion, wi
   const withinWindow = Date.now() - lastSuggestion.at <= windowMs;
   if (!withinWindow) return false;
 
-  const taskCategories = new Set((task.categories || []).map((tag) => categoryForTag(tag)));
-  if (!taskCategories.has(lastSuggestion.category)) return false; 
+  const taskCategory = categoryForTag(task.category || "");
+  if (taskCategory !== lastSuggestion.category) return false; 
 
   await logEvent({
     type: "suggestion_followed",
@@ -217,7 +217,7 @@ export async function updateTask({ userId, taskId, updates }) {
   const allowedFields = [
     "taskname", "description", "importance", "effort", "estimatedDuration",
     "canSplit", "minChunk", "taskType", "chunkCount", "chunkMinutes",
-    "minMinutes", "maxMinutes", "dueDate", "status", "categories", "actualCompletionMinutes",
+    "minMinutes", "maxMinutes", "dueDate", "status", "category", "actualCompletionMinutes",
   ];
 
   const sanitizedUpdates = {};
