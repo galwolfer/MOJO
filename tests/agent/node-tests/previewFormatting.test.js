@@ -44,4 +44,11 @@ test("preview widget includes shortDescription and categoryDisplay and keeps sum
     "widget should not include 'priority' field"
   );
   assert.ok(typeof widget.data.importance === "number", "importance should be present as numeric value");
+
+  // Confirmation message: ask user to confirm creation or indicate edits (Hebrew)
+  assert.ok(
+    typeof widget.data.confirmationMessage === "string" && widget.data.confirmationMessage.length > 0,
+    "confirmationMessage should be present"
+  );
+  assert.ok(widget.data.confirmationMessage.length < 200, "confirmationMessage should be brief");
 });

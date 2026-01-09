@@ -257,6 +257,9 @@ const previewTaskMission = new GuidedMission({
           estimatedDuration: finalDuration,
           // Short human-readable summary (use before the widget; keep concise)
           shortDescription,
+          // Prompt message asking for confirmation / edits (user-facing; default in English)
+          confirmationMessage:
+            "The task is ready to be created. Would you like to create it now? If you'd like to make any changes, tell me what to change.",
           // Aliases to support different widget consumers
           taskname: taskname,
           deadline: finalDeadline,
