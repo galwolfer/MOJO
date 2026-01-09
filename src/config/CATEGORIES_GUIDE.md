@@ -188,7 +188,7 @@ The following files now use the centralized system:
    - Validates categories at save time
    - Imports validation functions
 
-2. **Categorizing Algorithm** (`src/algorithms/priority/categoriz/categorizing.js`)
+2. **Categorizing Algorithm** (`src/algorithms/priority/categorize/categorizing.js`)
    - Returns valid 18-category values only
    - Guarantees output matches centralized list
 
@@ -233,10 +233,14 @@ When returning tasks in API responses, categories are strings:
   "category": "study_and_education",
   "subCategory": {
     "label": "Machine Learning",
-    "source": "heuristic"
+    "source": "keyword-match",
+    "confidence": 0.85,
+    "updatedAt": "2026-01-09T12:00:00.000Z"
   }
 }
 ```
+
+Note: Users also have their own saved subcategories stored on the `User` document as an array of `{ name: string, category: number }` (category is the numeric index 0-17). The `get_subcategories` tool combines user-saved subcategories and historical task subcategory labels and returns a deduplicated list of names.
 
 Frontend can use the category string directly or import the centralized config for display purposes.
 

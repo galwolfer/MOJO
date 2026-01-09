@@ -76,6 +76,14 @@ const memorySchema = new mongoose.Schema(
   }
 );
 
+const subCategorySchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true, trim: true },
+    category: { type: Number, required: true }, // Index from CATEGORIES config (0-17)
+  },
+  { _id: false }
+);
+
 /**
  * User Schema
  * Enhanced with embedded memories and user-level embedding
@@ -142,6 +150,11 @@ const userSchema = new mongoose.Schema(
     // Embedded memories array
     memories: {
       type: [memorySchema],
+      default: [],
+    },
+    // User specific subcategories
+    subCategories: {
+      type: [subCategorySchema],
       default: [],
     },
     // Lightweight recent sessions summary for quick UI access (keeps last N sessions)

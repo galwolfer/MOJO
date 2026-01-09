@@ -38,17 +38,19 @@ export const widgetRegistry = new WidgetRegistry([
   }),
   new WidgetDefinition({
     type: "task_detail",
-    description: "Display a single task with full details (title, description, due date, priority, tags, status).",
+    description:
+      "Display a single task with full details (title, description, due date, category, subcategory, priority, tags, status).",
     schema: {
-      task: "Task object { id, title, description, status, dueDate, priority, tags }",
+      task: "Task object { id, title, description, status, dueDate, priority, category, subcategory, importance, effort, estimatedDuration, canSplit, tags }",
     },
   }),
   new WidgetDefinition({
     type: "task_list_detailed",
     description:
-      "Display a list of tasks with ALL fields shown (title, description, due date, priority, tags, status). Use this when the user wants to see full details of multiple tasks.",
+      "Display a list of tasks with ALL fields shown (title, description, due date, category, subcategory, priority, importance, effort, tags, status). Use this when the user wants to see full details of multiple tasks.",
     schema: {
-      tasks: "Array of task objects { id, title, description, status, dueDate, priority, tags }",
+      tasks:
+        "Array of task objects { id, title, description, status, dueDate, priority, category, subcategory, importance, effort, estimatedDuration, canSplit, tags }",
     },
   }),
   new WidgetDefinition({
@@ -79,12 +81,14 @@ export const widgetRegistry = new WidgetRegistry([
       title: "Task title",
       status: "Task status (draft)",
       dueDate: "ISO due date",
+      category: "REQUIRED: Primary category (one of 18 standard categories)",
+      subcategory: "REQUIRED: Specific subcategory (from get_subcategories result)",
       importance: "Importance level 1-5",
       effort: "Effort level 1-5",
       estimatedDuration: "Estimated minutes",
       canSplit: "Boolean can be split",
       taskType: "Task splitting strategy (perfect/in_parts/leaky)",
-      category: "Primary category (e.g., work). Use a single category. Legacy: tags array also accepted",
+      priority: "Priority level (high/medium/low) - derived from importance",
       tags: "Legacy tags array (optional)",
       description: "Task description",
       confirmLabel: "Label for confirm button",

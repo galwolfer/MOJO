@@ -63,10 +63,15 @@ export function getTaskFieldInstructions() {
   return `TASK FIELDS:
 - REQUIRED: ${TASK_CONFIG.required_fields.join(", ")}
 - OPTIONAL: ${TASK_CONFIG.optional_fields.join(", ")}
-- AI DECISION: The model MUST choose a category from the 18 provided and SHOULD use the 'get_subcategories' tool to fetch the user's existing subcategories and choose one. If uncertain, ask a short clarifying question instead of guessing.
 - DEFAULTS: duration=${TASK_CONFIG.defaults.duration}m, importance=${TASK_CONFIG.defaults.importance}/5, effort=${
     TASK_CONFIG.defaults.effort
   }/5
 - CATEGORIES: You MUST use one of these 18 categories: ${CATEGORY_STRING_VALUES.join(", ")}.
-- SUBCATEGORIES: Select from the user's existing subcategories for the chosen category (use get_subcategories tool). If none fit, you may propose a new subcategory and confirm with the user.`;
+
+SUBCATEGORY WORKFLOW (IMPORTANT):
+1. After the user chooses or you infer a category, ALWAYS call get_subcategories(category=<category_index>) to see what subcategories the user has saved and historical task labels.
+2. If a matching subcategory exists in the returned list, suggest it to the user for confirmation.
+3. If none match the user's intent, ask them to provide a new subcategory name, then add it.
+4. NEVER skip get_subcategories — it provides both user-saved subcategories AND historical task labels that might apply.
+5. Respect user preferences: if they have saved subcategories, prioritize those over new suggestions.`;
 }

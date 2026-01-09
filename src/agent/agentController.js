@@ -101,7 +101,12 @@ export class AgentController {
       const user = await User.findById(userId);
       console.log(`[AgentController] User found:`, user ? `${user.username} (${user._id})` : "NOT FOUND");
 
-      const userProfile = user?.profile || {};
+      const userProfile = user?.profile ? { ...user.profile } : {}; // Clone to avoid mutation issues
+      // Inject subCategories into profile context
+      if (user && user.subCategories && user.subCategories.length > 0) {
+        userProfile.subCategories = user.subCategories;
+      }
+
       console.log(`[AgentController] User profile:`, {
         name: userProfile.name,
         tone: userProfile.tone,

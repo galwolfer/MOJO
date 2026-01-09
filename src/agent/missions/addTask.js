@@ -8,9 +8,13 @@ const addTaskMission = new GuidedMission({
   name: "add_task",
   group: "task",
   description:
-    "Create a task after explicit user confirmation. Required: taskname, deadline. AI may fill optional fields.",
-  missionInfo: "Create only after explicit confirmation (yes/confirm).",
-  behavior: ["Call only after the user explicitly confirms."],
+    "Create a task after explicit user confirmation. Required: taskname, deadline, category, subcategory. Call get_subcategories before this.",
+  missionInfo: "Create only after user confirms category/subcategory choices.",
+  behavior: [
+    "IMPORTANT: User must first choose/confirm category AND subcategory.",
+    "Call get_subcategories(category=<chosen>) to fetch options BEFORE calling add_task.",
+    "Call only after the user explicitly confirms the task details.",
+  ],
   schema: z.object({
     taskname: z.string().describe("Task title"),
     deadline: z.string().describe("ISO date (YYYY-MM-DD). Convert relative dates before calling"),
@@ -18,8 +22,12 @@ const addTaskMission = new GuidedMission({
     importance: z.number().min(1).max(5).optional().describe("1-5 importance (AI can infer)"),
     effort: z.number().min(1).max(5).optional().describe("1-5 effort (AI can infer)"),
     duration: z.number().optional().describe("Estimated minutes (AI can infer)"),
-    category: z.enum(CATEGORY_STRING_VALUES).optional().describe("One of the 18 standard categories"),
-    subcategory: z.string().optional().describe("Specific subcategory (select from existing or create new)"),
+    category: z.enum(CATEGORY_STRING_VALUES).describe("REQUIRED: One of the 18 standard categories"),
+    subcategory: z
+      .string()
+      .describe(
+        "REQUIRED: Specific subcategory (MUST call get_subcategories first to select from existing or confirm new)"
+      ),
     canSplit: z.boolean().optional().describe("Can be split into chunks?"),
     taskType: z.string().optional().describe("Task splitting strategy"),
     recurrence: z
@@ -72,8 +80,7 @@ const addTaskMission = new GuidedMission({
         estimatedDuration: finalDuration,
         canSplit: finalCanSplit,
         category: finalCategory,
-        subCategory: subCategoryObjCanSplit,
-        tags: finalTags,
+        subCategory: subCategoryObj,
         taskType: taskType || TASK_CONFIG.defaults.taskType,
         dueDate: new Date(deadline),
       };

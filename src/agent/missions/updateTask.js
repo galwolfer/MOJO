@@ -7,15 +7,21 @@ const updateTaskMission = new GuidedMission({
   name: "update_task",
   group: "task",
   description:
-    "Update a task; requires confirm=true. Accepts: taskname, category, subcategory, importance, effort, estimatedDuration, canSplit, taskType, deadline, completed.",
-  missionInfo: "Modify task",
-  behavior: ["Require confirm=true before applying updates."],
+    "Update a task; requires confirm=true. Can update: category, subcategory, importance, effort, estimatedDuration, canSplit, taskType, deadline, completed. Call get_subcategories if changing category.",
+  missionInfo: "Modify task (optionally change category/subcategory)",
+  behavior: [
+    "If changing category: call get_subcategories(category=<new>) first.",
+    "Require confirm=true before applying updates.",
+  ],
   widgets: ["task_detail"],
   schema: z.object({
     taskId: z.string().optional(),
     taskname: z.string().optional().describe("Task title to identify task when taskId is not provided"),
-    category: z.enum(CATEGORY_STRING_VALUES).optional().describe("Update category"),
-    subcategory: z.string().optional().describe("Update subcategory"),
+    category: z
+      .enum(CATEGORY_STRING_VALUES)
+      .optional()
+      .describe("Update category (if changed, call get_subcategories first)"),
+    subcategory: z.string().optional().describe("Update subcategory (should be from get_subcategories result)"),
     importance: z.number().min(1).max(5).optional().describe("Importance 1-5"),
     effort: z.number().min(1).max(5).optional().describe("Effort 1-5"),
     estimatedDuration: z.number().optional().describe("Estimated minutes"),

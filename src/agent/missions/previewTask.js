@@ -88,19 +88,27 @@ const previewTaskMission = new GuidedMission({
   name: "preview_task",
   group: "task",
   description:
-    "Return a task_confirmation widget for approval. Required: taskname, deadline. Optional: description, category (preferred), tags (legacy), importance, effort, estimatedDuration, canSplit, taskType.",
-  missionInfo:
-    "Draft and show a task_confirmation widget. Required fields: taskname, deadline; AI can fill optional fields.",
-  behavior: ["Use when user asks to create a task.", "After confirmation, call add_task."],
+    "Return a task_confirmation widget for approval. Required: taskname, deadline, category, subcategory. Must call get_subcategories first.",
+  missionInfo: "Draft and show a task_confirmation widget. User must choose category/subcategory first.",
+  behavior: [
+    "Use when user asks to create a task.",
+    "STEP 1: Determine category ",
+    "STEP 2: Call get_subcategories(category=<chosen>) to fetch options.",
+    "STEP 3: Show preview_task with confirmed category and subcategory.",
+    "STEP 4: After user confirms, call add_task with final details.",
+  ],
   widgets: ["task_confirmation"],
   schema: z.object({
     taskname: z.string().describe("Task title (required)"),
     deadline: z.string().describe("ISO date (YYYY-MM-DD). Convert relative dates before calling"),
     description: z.string().optional().describe("Optional details"),
+    category: z.string().describe("REQUIRED: Category (one of the 18 standard categories)"),
+    subcategory: z
+      .string()
+      .describe("REQUIRED: Subcategory (MUST be from get_subcategories result or new user-confirmed)"),
     importance: z.number().min(1).max(5).optional().describe("1-5 importance (AI can infer)"),
     effort: z.number().min(1).max(5).optional().describe("1-5 effort (AI can infer)"),
     duration: z.number().optional().describe("Estimated minutes (AI can infer)"),
-    tags: z.array(z.string()).optional().describe("Category tags (AI can suggest)"),
     canSplit: z.boolean().optional().describe("Can the task be split?"),
     taskType: z.string().optional().describe("Task splitting strategy (perfect/in_parts/leaky)"),
     recurrence: z
@@ -113,8 +121,19 @@ const previewTaskMission = new GuidedMission({
       .optional(),
   }),
   execute: async ({ args }) => {
-    const { taskname, deadline, description, importance, effort, duration, tags, canSplit, taskType, recurrence } =
-      args;
+    const {
+      taskname,
+      deadline,
+      description,
+      category,
+      subcategory,
+      importance,
+      effort,
+      duration,
+      canSplit,
+      taskType,
+      recurrence,
+    } = args;
 
     try {
       // Parse relative dates (e.g., "next Thursday", "tomorrow", "in 3 days") to ISO format
@@ -142,7 +161,6 @@ const previewTaskMission = new GuidedMission({
       const finalImportance = importance || inferred.importance;
       const finalEffort = effort || inferred.effort;
       const finalDuration = duration || inferred.duration;
-      const finalTags = tags || inferred.tags;
       const finalCanSplit = canSplit !== undefined ? canSplit : TASK_CONFIG.defaults.splitable;
 
       const widgetJson = {
@@ -153,11 +171,12 @@ const previewTaskMission = new GuidedMission({
           title: taskname,
           status: "draft",
           dueDate: new Date(finalDeadline).toISOString(),
+          category: category || "",
+          subcategory: subcategory || "",
           importance: finalImportance,
           effort: finalEffort,
           estimatedDuration: finalDuration,
           priority: finalImportance >= 4 ? "high" : finalImportance <= 2 ? "low" : "medium",
-          tags: finalTags,
           taskType: taskType || TASK_CONFIG.defaults.taskType,
           description: description || (recurrence ? `Recurrence: ${recurrence.type}` : ""),
           canSplit: finalCanSplit,

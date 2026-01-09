@@ -24,13 +24,48 @@ import cron from "node-cron";
  * Purpose: Business logic for task persistence and expired checks
  */
 import { Task } from "../models/Task.js";
+import { User } from "../models/User.js";
 import { TaskSchedule } from "../models/TaskSchedule.js";
 import { BusyBlock } from "../models/BusyBlock.js";
+import { CATEGORIES, getCategoryIndex } from "../config/categories.js";
 import { logEvent, recordSubCategoryGeneration, recordSubCategoryOverride } from "./telemetryService.js";
 import { mapCategoryToLifecycle } from "../algorithms/priority/categorizing.js";
 import { trainTask } from "./mlPredictionService.js";
 import { logger } from "../utils/logger.js";
 import { startOfDay } from "../utils/dateUtils.js";
+
+// =============================================================================
+// INTERNAL HELPERS
+// =============================================================================
+
+/**
+ * Helper to ensure subcategory is saved to User profile
+ * @param {string} userId - User ID
+ * @param {string} categoryName - Category name (string key)
+ * @param {string|object} subCategory - Subcategory name or object
+ */
+async function _saveUserSubCategory(userId, categoryName, subCategory) {
+  if (!userId || !categoryName || !subCategory) return;
+
+  const subName = typeof subCategory === "string" ? subCategory : subCategory.label || subCategory.name;
+  if (!subName) return;
+
+  try {
+    const idx = getCategoryIndex(categoryName);
+    // Add to user's subCategories set if not exists
+    await User.updateOne(
+      { _id: userId },
+      {
+        $addToSet: {
+          subCategories: { name: subName, category: idx },
+        },
+      }
+    );
+  } catch (err) {
+    // Silent fail if category invalid or user not found, just log warning
+    logger.warn(`Failed to sync subcategory "${subName}" for user ${userId}: ${err.message}`);
+  }
+}
 
 // =============================================================================
 // TASK CRUD OPERATIONS
@@ -79,6 +114,10 @@ export async function createTask({
     subCategory,
     recurrence,
   });
+
+  if (category && subCategory) {
+    await _saveUserSubCategory(userId, category, subCategory);
+  }
 
   await logEvent({
     type: "task_created",
@@ -265,10 +304,18 @@ export async function updateTask({ userId, taskId, updates }) {
 
   // Fetch existing task to detect subcategory changes
   const existing = await Task.findOne({ _id: taskId, userId }).lean();
+  const cat = sanitizedUpdates.category || existing?.category || "";
 
-  // If user provided a subCategory, record generation/override telemetry
+  // If user provided a subCategory, save it to the user profile and record generation/override telemetry
   if (sanitizedUpdates.subCategory) {
     const newSub = sanitizedUpdates.subCategory;
+
+    // Persist to user profile
+    try {
+      await _saveUserSubCategory(userId, cat, newSub);
+    } catch (err) {
+      logger.warn(`Failed to persist subcategory during update: ${err.message}`);
+    }
 
     if (existing && existing.subCategory && existing.subCategory.label && existing.subCategory.label !== newSub.label) {
       // User replaced an existing subcategory

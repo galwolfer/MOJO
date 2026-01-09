@@ -1,6 +1,7 @@
 import { getTaskFieldInstructions } from "./taskRules.js";
 import { WIDGETS } from "./widgets/registry.js";
 import { missionRegistry } from "./missions/registry.js";
+import { getCategoryKey } from "../config/categories.js";
 
 /**
  * Centralized Agent Configuration & Strings
@@ -48,7 +49,7 @@ const PERSONALITY_SECTION = `PERSONALITY TOOLS:\n- set_tone: Change how you comm
 
 const TASK_SECTION = missionRegistry.getPromptSection("task", { title: "TASK TOOLS" });
 
-export const TOOL_MANIFEST = `${MEMORY_SECTION}\n\n${PERSONALITY_SECTION}\n\n${TASK_SECTION}\n\nDATES: Convert relative dates (e.g., "tomorrow", "in two weeks", or natural language expressions) to ISO format before calling tools.\n- Recognize relative date expressions in any language and convert them to ISO dates.\n\nRECUR EXAMPLES: "daily" -> {type:"daily",interval:1} | "weekly" -> {type:"weekly",interval:1}\n\nREFERENCE RESOLUTION:\n- When user says "this task", "that task", "it", or similar, resolve to the MOST RECENT task from RECENT ENTITIES.\n- When user says "delete this" or "update it", resolve to the last mentioned entity and use its ID.\n- The RECENT ENTITIES section shows recently discussed items with their IDs - use these for operations.\n- When users use equivalents in other languages, resolve to the most recently mentioned entity.`;
+export const TOOL_MANIFEST = `${MEMORY_SECTION}\n\n${PERSONALITY_SECTION}\n\n${TASK_SECTION}\n\nDATES: Convert relative dates (e.g., "tomorrow", "in two weeks", or natural language expressions) to ISO format before calling tools.\n- Recognize relative date expressions in any language and convert them to ISO dates.\n\nRECUR EXAMPLES: "daily" -> {type:"daily",interval:1} | "weekly" -> {type:"weekly",interval:1}\n\nREFERENCE RESOLUTION:\n- When user says "this task", "that task", "it", or similar, resolve to the MOST RECENT task from RECENT ENTITIES.\n- When user says "delete this" or "update it", resolve to the last mentioned entity and use its ID.\n- The RECENT ENTITIES section shows recently discussed items with their IDs - use these for operations.\n- When users use equivalents in other languages, resolve to the most recently mentioned entity.\n\nSUBCATEGORY WORKFLOW:\n- When creating/updating a task, ALWAYS call get_subcategories with the chosen category to see user's saved subcategories.\n- This tool shows both user-saved AND historical task subcategories (merged/deduped).\n- Use the results to suggest or confirm a subcategory with the user before final task creation.`;
 
 // Short descriptions for tools. Use these for LLM-facing description fields so they can be adjusted in one place.
 export const TOOL_DESCRIPTIONS = missionRegistry.getToolDescriptions();
@@ -114,6 +115,31 @@ export function buildSystemPromptWithUserContext(
 
   prompt += `\nUser:${userId}`;
   if (userProfile?.name) prompt += `(${userProfile.name})`;
+
+  // Inject User Subcategories
+  if (userProfile?.subCategories && Array.isArray(userProfile.subCategories) && userProfile.subCategories.length > 0) {
+    prompt += `\n\nUSER SUBCATEGORIES:`;
+    try {
+      const grouped = {};
+      // Group by category for cleaner prompting
+      userProfile.subCategories.forEach((sub) => {
+        try {
+          const catKey = getCategoryKey(sub.category);
+          if (!grouped[catKey]) grouped[catKey] = [];
+          grouped[catKey].push(sub.name);
+        } catch (e) {
+          // ignore invalid categories
+        }
+      });
+
+      for (const [cat, subs] of Object.entries(grouped)) {
+        prompt += `\n- ${cat}: ${subs.join(", ")}`;
+      }
+    } catch (err) {
+      console.error("Error formatting subcategories for prompt:", err);
+    }
+  }
+
   if (memoryContext?.trim()) prompt += `\n${memoryContext}`;
 
   return prompt;
