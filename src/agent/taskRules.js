@@ -101,7 +101,6 @@ export function inferSplittingParams(taskType, duration) {
   return { minChunk: null, chunkCount: null, chunkMinutes: null, minMinutes: null, maxMinutes: null };
 }
 
-
 /**
  * Helper to generate system prompt instructions regarding task fields
  */

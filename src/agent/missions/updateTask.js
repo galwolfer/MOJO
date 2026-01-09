@@ -217,7 +217,11 @@ const updateTaskMission = new GuidedMission({
             chunkMinutes: task.chunkMinutes !== undefined ? task.chunkMinutes : null,
             minMinutes: task.minMinutes !== undefined ? task.minMinutes : null,
             maxMinutes: task.maxMinutes !== undefined ? task.maxMinutes : null,
-            earliestStart: task.earliestStart ? (task.earliestStart instanceof Date ? task.earliestStart.toISOString().split("T")[0] : task.earliestStart) : null,
+            earliestStart: task.earliestStart
+              ? task.earliestStart instanceof Date
+                ? task.earliestStart.toISOString().split("T")[0]
+                : task.earliestStart
+              : null,
             subCategory: task.subCategory || null,
             category: task.category,
             canSplit: task.canSplit,

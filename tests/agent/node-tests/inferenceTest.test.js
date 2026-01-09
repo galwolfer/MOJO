@@ -38,10 +38,7 @@ test("splitting fields are intelligently inferred based on taskType and duration
   // Check that leaky bounds were inferred (not null)
   assert.ok(widget1.data.minMinutes !== null && widget1.data.minMinutes > 0, "minMinutes should be inferred");
   assert.ok(widget1.data.maxMinutes !== null && widget1.data.maxMinutes > 0, "maxMinutes should be inferred");
-  assert.ok(
-    widget1.data.minMinutes < widget1.data.maxMinutes,
-    "minMinutes should be less than maxMinutes"
-  );
+  assert.ok(widget1.data.minMinutes < widget1.data.maxMinutes, "minMinutes should be less than maxMinutes");
   // For 240 min leaky: expect minMinutes ≈ 24 (240/10), maxMinutes ≈ 96 (240/2.5)
   assert.ok(widget1.data.minMinutes >= 15 && widget1.data.minMinutes <= 30, "minMinutes should be 15-30");
   assert.ok(widget1.data.maxMinutes >= 80 && widget1.data.maxMinutes <= 120, "maxMinutes should be 80-120");

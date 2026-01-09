@@ -144,11 +144,12 @@ const addTaskMission = new GuidedMission({
 
       // Infer splitting params if not explicitly provided for this taskType
       const inferredParams = inferSplittingParams(finalTaskType, finalDuration);
-      const persistMinChunk = finalTaskType === "in_parts" ? (storedMinChunk || inferredParams.minChunk) : null;
-      const persistChunkCount = finalTaskType === "in_parts" ? (storedChunkCount || inferredParams.chunkCount) : null;
-      const persistChunkMinutes = finalTaskType === "in_parts" ? (storedChunkMinutes || inferredParams.chunkMinutes) : null;
-      const persistMinMinutes = finalTaskType === "leaky" ? (storedMinMinutes || inferredParams.minMinutes) : null;
-      const persistMaxMinutes = finalTaskType === "leaky" ? (storedMaxMinutes || inferredParams.maxMinutes) : null;
+      const persistMinChunk = finalTaskType === "in_parts" ? storedMinChunk || inferredParams.minChunk : null;
+      const persistChunkCount = finalTaskType === "in_parts" ? storedChunkCount || inferredParams.chunkCount : null;
+      const persistChunkMinutes =
+        finalTaskType === "in_parts" ? storedChunkMinutes || inferredParams.chunkMinutes : null;
+      const persistMinMinutes = finalTaskType === "leaky" ? storedMinMinutes || inferredParams.minMinutes : null;
+      const persistMaxMinutes = finalTaskType === "leaky" ? storedMaxMinutes || inferredParams.maxMinutes : null;
 
       const taskData = {
         userId,

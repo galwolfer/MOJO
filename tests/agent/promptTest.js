@@ -41,7 +41,7 @@ if (prompt.includes("CRITICAL: Do NOT provide 'importance' parameter when creati
 console.log("\n✅ All checks passed!");
 console.log("\n--- Relevant prompt section ---");
 const lines = prompt.split("\n");
-const startIdx = lines.findIndex(l => l.includes("USER CATEGORY PRIORITIES"));
+const startIdx = lines.findIndex((l) => l.includes("USER CATEGORY PRIORITIES"));
 if (startIdx !== -1) {
   console.log(lines.slice(startIdx, startIdx + 7).join("\n"));
 }

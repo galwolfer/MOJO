@@ -5,7 +5,7 @@ import { createTestUser, parseResponseId } from "../helpers/testUtils.js";
 import previewMission from "../../../src/agent/missions/previewTask.js";
 import addMission from "../../../src/agent/missions/addTask.js";
 import updateMission from "../../../src/agent/missions/updateTask.js";
-import { Task } from "../../../src/models/Task.js"; 
+import { Task } from "../../../src/models/Task.js";
 
 setupAgentTests();
 
@@ -341,5 +341,4 @@ test("splitting and recurrence reflection & persistence", async () => {
   assert.strictEqual(taskG2.maxMinutes, null);
   assert.strictEqual(taskG2.minChunk, null);
   assert.strictEqual(taskG2.chunkCount, null);
-
 });

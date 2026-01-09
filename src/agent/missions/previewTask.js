@@ -229,11 +229,12 @@ const previewTaskMission = new GuidedMission({
 
       // Infer splitting params if not explicitly provided for this taskType
       const inferredParams = inferSplittingParams(finalTaskType, finalDuration);
-      const displayMinChunk = finalTaskType === "in_parts" ? (previewMinChunk || inferredParams.minChunk) : null;
-      const displayChunkCount = finalTaskType === "in_parts" ? (previewChunkCount || inferredParams.chunkCount) : null;
-      const displayChunkMinutes = finalTaskType === "in_parts" ? (previewChunkMinutes || inferredParams.chunkMinutes) : null;
-      const displayMinMinutes = finalTaskType === "leaky" ? (previewMinMinutes || inferredParams.minMinutes) : null;
-      const displayMaxMinutes = finalTaskType === "leaky" ? (previewMaxMinutes || inferredParams.maxMinutes) : null;
+      const displayMinChunk = finalTaskType === "in_parts" ? previewMinChunk || inferredParams.minChunk : null;
+      const displayChunkCount = finalTaskType === "in_parts" ? previewChunkCount || inferredParams.chunkCount : null;
+      const displayChunkMinutes =
+        finalTaskType === "in_parts" ? previewChunkMinutes || inferredParams.chunkMinutes : null;
+      const displayMinMinutes = finalTaskType === "leaky" ? previewMinMinutes || inferredParams.minMinutes : null;
+      const displayMaxMinutes = finalTaskType === "leaky" ? previewMaxMinutes || inferredParams.maxMinutes : null;
 
       const widgetJson = {
         version: "1.0",

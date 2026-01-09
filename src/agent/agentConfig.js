@@ -121,7 +121,9 @@ export function buildSystemPromptWithUserContext(
 
   // Inject User Category Priorities
   if (userProfile?.priorities && typeof userProfile.priorities === "object") {
-    const prioritiesWithValues = Object.entries(userProfile.priorities).filter(([_, val]) => typeof val === "number" && val >= 1 && val <= 5);
+    const prioritiesWithValues = Object.entries(userProfile.priorities).filter(
+      ([_, val]) => typeof val === "number" && val >= 1 && val <= 5
+    );
     if (prioritiesWithValues.length > 0) {
       prompt += `\n\nUSER CATEGORY PRIORITIES (importance 1-5):`;
       prompt += `\nCRITICAL: Do NOT provide 'importance' parameter when creating tasks in these categories. The system will automatically use the priority below.`;
