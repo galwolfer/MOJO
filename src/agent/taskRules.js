@@ -1,3 +1,5 @@
+import { CATEGORY_STRING_VALUES } from "../../config/categories.js";
+
 /**
  * ========================================
  * TASK RULES & CONFIGURATION
@@ -20,7 +22,8 @@ export const TASK_CONFIG = {
     "importance", // 1-5
     "effort", // 1-5
     "duration", // minutes (estimatedDuration)
-    "tags",
+    "category",
+    "subcategory",
     "recurrence",
     "canSplit", // boolean
   ],
@@ -41,83 +44,15 @@ export const TASK_CONFIG = {
  * This helps auto-fill tags, importance, and effort.
  */
 export function inferTaskProperties(taskName) {
-  const name = taskName.toLowerCase();
-  let tags = [];
-  let importance = TASK_CONFIG.defaults.importance;
-  let effort = TASK_CONFIG.defaults.effort;
-  let duration = TASK_CONFIG.defaults.duration;
-
-  // Tag inference based on keywords
-  if (
-    name.includes("homework") ||
-    name.includes("שיעורי") ||
-    name.includes("study") ||
-    name.includes("למידה") ||
-    name.includes("math") ||
-    name.includes("mathematics") ||
-    name.includes("linear") ||
-    name.includes("ליניארית") ||
-    name.includes("ai") ||
-    name.includes("machine learning") ||
-    name.includes("ml")
-  ) {
-    tags.push("education");
-    importance = 4; // High importance for studies
-    effort = 4; // Hard work
-    duration = 120; // 2 hours for homework
-  }
-
-  if (
-    name.includes("clean") ||
-    name.includes("נקות") ||
-    name.includes("room") ||
-    name.includes("חדר") ||
-    name.includes("house") ||
-    name.includes("בית")
-  ) {
-    tags.push("household");
-    importance = 2; // Low importance
-    effort = 2; // Easy
-    duration = 30; // 30 minutes
-  }
-
-  if (
-    name.includes("work") ||
-    name.includes("job") ||
-    name.includes("project") ||
-    name.includes("עבודה") ||
-    name.includes("פרויקט")
-  ) {
-    tags.push("work");
-    importance = 4; // High importance
-    effort = 4; // Hard work
-    duration = 180; // 3 hours
-  }
-
-  if (name.includes("shopping") || name.includes("buy") || name.includes("קניות") || name.includes("קנה")) {
-    tags.push("shopping");
-    importance = 3; // Medium
-    effort = 2; // Easy
-    duration = 60; // 1 hour
-  }
-
-  if (name.includes("urgent") || name.includes("important") || name.includes("דחוף") || name.includes("חשוב")) {
-    importance = 5; // Critical
-  }
-
-  if (name.includes("easy") || name.includes("simple") || name.includes("קל")) {
-    effort = 1; // Very easy
-  }
-
-  if (name.includes("hard") || name.includes("difficult") || name.includes("קשה")) {
-    effort = 5; // Very hard
-  }
-
+  // Intentionally minimal: DO NOT hardcode category, subcategory, importance, effort, or duration here.
+  // The LLM should *decide* these values or ask clarifying questions when unsure. Returning empty/null
+  // ensures downstream logic does not auto-assign these fields without the LLM's explicit choice.
   return {
-    tags,
-    importance,
-    effort,
-    duration,
+    category: "",
+    subcategory: "",
+    importance: null,
+    effort: null,
+    duration: null,
   };
 }
 
@@ -128,8 +63,10 @@ export function getTaskFieldInstructions() {
   return `TASK FIELDS:
 - REQUIRED: ${TASK_CONFIG.required_fields.join(", ")}
 - OPTIONAL: ${TASK_CONFIG.optional_fields.join(", ")}
-- AI HELP: The model can infer tags, importance, effort, and estimated duration from the title.
+- AI DECISION: The model MUST choose a category from the 18 provided and SHOULD use the 'get_subcategories' tool to fetch the user's existing subcategories and choose one. If uncertain, ask a short clarifying question instead of guessing.
 - DEFAULTS: duration=${TASK_CONFIG.defaults.duration}m, importance=${TASK_CONFIG.defaults.importance}/5, effort=${
     TASK_CONFIG.defaults.effort
-  }/5`;
+  }/5
+- CATEGORIES: You MUST use one of these 18 categories: ${CATEGORY_STRING_VALUES.join(", ")}.
+- SUBCATEGORIES: Select from the user's existing subcategories for the chosen category (use get_subcategories tool). If none fit, you may propose a new subcategory and confirm with the user.`;
 }

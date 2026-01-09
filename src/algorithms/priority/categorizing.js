@@ -211,7 +211,7 @@ const preferenceToFactor = (value) => {
 
 export const mapCategoryToLifecycle = (category) => CATEGORY_TO_LIFECYCLE[category] || "uncategorized";
 
-// mapCategoryToLifecycle: map an internal category to a higher-level lifecycle category for user prefs
+// mapCategoryToLifecycle: map an internal category to a higher-level lifecycle category for user pref
 
 const hasPreferences = (preferences) => preferences && Object.values(preferences).some((v) => Number.isFinite(v));
 

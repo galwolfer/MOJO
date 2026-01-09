@@ -105,7 +105,7 @@ flowchart TD
 Mojo/
 ├── src/
 │   ├── algorithms/
-│   │   ├── priority/     # priority scoring, tagging, suggestions & model helpers
+│   │   ├── priority/     # priority scoring, categorizing, suggestions & model helpers
 │   │   └── binPacking/   # calendar planner + routine/availability utilities
 │   ├── models/           # Database schemas (User, Task, TaskSchedule, BusyBlock)
 │   ├── services/         # Supporting helpers (telemetry, subcategory, CLI glue)
@@ -127,11 +127,11 @@ Tasks are scored based on:
 - **Urgency**: When is it due?
 - **Effort**: How much work? (1-5)
 
-### 🏷️ Auto-Tagging
+### 🏷️ Auto-Categorizing
 Mojo detects categories automatically:
-- "Finish assignment" → `study_and_education` tag
-- "Go to gym" → `health` tag
-- "Fix bug" → `work_and_career` tag
+- "Finish assignment" → `study_and_education` category
+- "Go to gym" → `health` category
+- "Fix bug" → `work_and_career` category
 
 ### 📅 Calendar Planning
 Schedule tasks around:

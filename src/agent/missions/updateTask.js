@@ -1,19 +1,21 @@
 import { z } from "zod";
 import { GuidedMission } from "./GuidedMission.js";
 import * as taskService from "../../services/taskService.js";
+import { CATEGORY_STRING_VALUES } from "../../config/categories.js";
 
 const updateTaskMission = new GuidedMission({
   name: "update_task",
   group: "task",
   description:
-    "Update a task; requires confirm=true. Accepts: taskname, category, tags, importance, effort, estimatedDuration, canSplit, taskType, deadline, completed.",
+    "Update a task; requires confirm=true. Accepts: taskname, category, subcategory, importance, effort, estimatedDuration, canSplit, taskType, deadline, completed.",
   missionInfo: "Modify task",
   behavior: ["Require confirm=true before applying updates."],
   widgets: ["task_detail"],
   schema: z.object({
     taskId: z.string().optional(),
     taskname: z.string().optional().describe("Task title to identify task when taskId is not provided"),
-    tags: z.array(z.string()).optional().describe("Replace tags or provide new tags array"),
+    category: z.enum(CATEGORY_STRING_VALUES).optional().describe("Update category"),
+    subcategory: z.string().optional().describe("Update subcategory"),
     importance: z.number().min(1).max(5).optional().describe("Importance 1-5"),
     effort: z.number().min(1).max(5).optional().describe("Effort 1-5"),
     estimatedDuration: z.number().optional().describe("Estimated minutes"),
@@ -27,7 +29,8 @@ const updateTaskMission = new GuidedMission({
     const {
       taskId,
       taskname,
-      tags,
+      category,
+      subcategory,
       importance,
       effort,
       estimatedDuration,
@@ -61,7 +64,10 @@ const updateTaskMission = new GuidedMission({
       // Build update object with only specified fields
       const updates = {};
       if (taskname !== undefined) updates.taskname = taskname;
-      if (tags !== undefined) updates.tags = tags;
+      if (category !== undefined) updates.category = category;
+      if (subcategory !== undefined) {
+        updates.subCategory = { label: subcategory, source: "user", confidence: 1, updatedAt: new Date() };
+      }
       if (importance !== undefined) updates.importance = importance;
       if (effort !== undefined) updates.effort = effort;
       if (estimatedDuration !== undefined) updates.estimatedDuration = estimatedDuration;
@@ -102,7 +108,7 @@ const updateTaskMission = new GuidedMission({
             priorityScore: task.priorityScore || 0,
             taskType: task.taskType || null,
             subCategory: task.subCategory || null,
-            tags: task.tags,
+            category: task.category,
             estimatedDuration: task.estimatedDuration,
             canSplit: task.canSplit,
           },

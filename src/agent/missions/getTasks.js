@@ -10,18 +10,18 @@ const getTasksMission = new LightMission({
   widgets: ["task_list"],
   schema: z.object({
     search: z.string().optional().describe("Search query to find tasks by name/title"),
-    tag: z.string().optional(),
+    category: z.string().optional().describe("Filter by category"),
     completed: z.boolean().optional(),
     dueBefore: z.string().optional(),
     dueAfter: z.string().optional(),
   }),
   execute: async ({ userId, args }) => {
-    const { search, tag, completed, dueBefore, dueAfter } = args;
+    const { search, category, completed, dueBefore, dueAfter } = args;
     try {
       // Build filter object for database query
       const filters = {};
       if (search) filters.taskname = { $regex: search, $options: "i" };
-      if (tag) filters.tags = tag;
+      if (category) filters.category = category;
       if (completed !== undefined) {
         filters.status = completed ? "done" : { $ne: "done" };
       }

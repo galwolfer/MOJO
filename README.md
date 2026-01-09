@@ -329,7 +329,7 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/tasks" `
 Mojo/
 ├── src/
 │   ├── algorithms/
-│   │   ├── priority/     # priority scoring, tagging, suggestions & model helpers
+│   │   ├── priority/     # priority scoring, categorizing, suggestions & model helpers
 │   │   └── binPacking/   # planner, calendar utilities, routine blocks
 │   ├── models/           # Mongoose schemas (Task, User, TaskSchedule, BusyBlock, etc.)
 │   ├── services/         # lightweight helpers: telemetry, subcategory generation, CLI glue

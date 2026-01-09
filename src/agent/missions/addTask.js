@@ -2,11 +2,13 @@ import { z } from "zod";
 import { GuidedMission } from "./GuidedMission.js";
 import * as taskService from "../../services/taskService.js";
 import { TASK_CONFIG, inferTaskProperties } from "../taskRules.js";
+import { CATEGORY_STRING_VALUES } from "../../config/categories.js";
 
 const addTaskMission = new GuidedMission({
   name: "add_task",
   group: "task",
-  description: "Create a task after explicit user confirmation. Required: taskname, deadline. AI may fill optional fields.",
+  description:
+    "Create a task after explicit user confirmation. Required: taskname, deadline. AI may fill optional fields.",
   missionInfo: "Create only after explicit confirmation (yes/confirm).",
   behavior: ["Call only after the user explicitly confirms."],
   schema: z.object({
@@ -16,7 +18,8 @@ const addTaskMission = new GuidedMission({
     importance: z.number().min(1).max(5).optional().describe("1-5 importance (AI can infer)"),
     effort: z.number().min(1).max(5).optional().describe("1-5 effort (AI can infer)"),
     duration: z.number().optional().describe("Estimated minutes (AI can infer)"),
-    tags: z.array(z.string()).optional().describe("Categories"),
+    category: z.enum(CATEGORY_STRING_VALUES).optional().describe("One of the 18 standard categories"),
+    subcategory: z.string().optional().describe("Specific subcategory (select from existing or create new)"),
     canSplit: z.boolean().optional().describe("Can be split into chunks?"),
     taskType: z.string().optional().describe("Task splitting strategy"),
     recurrence: z
@@ -29,7 +32,19 @@ const addTaskMission = new GuidedMission({
       .optional(),
   }),
   execute: async ({ userId, args }) => {
-    const { taskname, deadline, description, importance, effort, duration, tags, canSplit, taskType, recurrence } = args;
+    const {
+      taskname,
+      deadline,
+      description,
+      importance,
+      effort,
+      duration,
+      category,
+      subcategory,
+      canSplit,
+      taskType,
+      recurrence,
+    } = args;
     try {
       // Infer properties from task title if not provided
       const inferred = inferTaskProperties(taskname);
@@ -38,7 +53,14 @@ const addTaskMission = new GuidedMission({
       const finalImportance = importance || inferred.importance;
       const finalEffort = effort || inferred.effort;
       const finalDuration = duration || inferred.duration;
-      const finalTags = tags || inferred.tags;
+      const finalCategory = category || inferred.category || "";
+      const finalSubcategory = subcategory || inferred.subcategory || "";
+
+      // Construct subCategory object if provided
+      const subCategoryObj = finalSubcategory
+        ? { label: finalSubcategory, source: "user", confidence: 1, updatedAt: new Date() }
+        : null;
+
       const finalCanSplit = canSplit !== undefined ? canSplit : TASK_CONFIG.defaults.splitable;
 
       const taskData = {
@@ -49,6 +71,8 @@ const addTaskMission = new GuidedMission({
         effort: finalEffort,
         estimatedDuration: finalDuration,
         canSplit: finalCanSplit,
+        category: finalCategory,
+        subCategory: subCategoryObjCanSplit,
         tags: finalTags,
         taskType: taskType || TASK_CONFIG.defaults.taskType,
         dueDate: new Date(deadline),

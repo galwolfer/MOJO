@@ -18,7 +18,7 @@ import { logger } from "../utils/logger.js";
 export async function createTask(req, res) {
   try {
     const userId = req.user.userId;
-    const { name, taskname, tag, tags, deadline, recurrence } = req.body;
+    const { name, taskname, category, subcategory, deadline, recurrence } = req.body;
 
     const title = (taskname || name || "").trim();
 
@@ -58,7 +58,8 @@ export async function createTask(req, res) {
     const task = await taskService.createTask({
       userId,
       taskname: title,
-      tags: tags || (tag ? [tag.trim()] : []),
+      category: category || "",
+      subCategory: subcategory ? { label: subcategory, source: "user", confidence: 1, updatedAt: new Date() } : null,
       dueDate: deadline ? new Date(deadline) : null,
       recurrence,
     });
@@ -178,14 +179,15 @@ export async function updateTask(req, res) {
     if (raw.taskname !== undefined || raw.name !== undefined)
       updates.taskname =
         typeof (raw.taskname || raw.name) === "string" ? (raw.taskname || raw.name).trim() : raw.taskname || raw.name;
-    if (raw.tags !== undefined) updates.tags = Array.isArray(raw.tags) ? raw.tags : [];
-    if (raw.tag !== undefined) updates.tags = raw.tag ? [String(raw.tag).trim()] : [];
+    if (raw.category !== undefined) updates.category = raw.category;
+    if (raw.subcategory !== undefined) {
+      updates.subCategory = { label: raw.subcategory, source: "user", confidence: 1, updatedAt: new Date() };
+    }
     if (raw.importance !== undefined) updates.importance = Number(raw.importance);
     if (raw.effort !== undefined) updates.effort = Number(raw.effort);
     if (raw.estimatedDuration !== undefined) updates.estimatedDuration = Number(raw.estimatedDuration);
     if (raw.canSplit !== undefined) updates.canSplit = Boolean(raw.canSplit);
     if (raw.taskType !== undefined) updates.taskType = raw.taskType;
-    if (raw.subCategory !== undefined) updates.subCategory = raw.subCategory;
     if (raw.completed !== undefined) updates.status = raw.completed ? "done" : "todo";
 
     // Validate and map deadline if provided

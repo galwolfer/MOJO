@@ -26,7 +26,7 @@ import cron from "node-cron";
 import { Task } from "../models/Task.js";
 import { TaskSchedule } from "../models/TaskSchedule.js";
 import { BusyBlock } from "../models/BusyBlock.js";
-import { logEvent, recordSubCategoryGeneration } from "./telemetryService.js";
+import { logEvent, recordSubCategoryGeneration, recordSubCategoryOverride } from "./telemetryService.js";
 import { mapCategoryToLifecycle } from "../algorithms/priority/categorizing.js";
 import { trainTask } from "./mlPredictionService.js";
 import { logger } from "../utils/logger.js";
@@ -57,6 +57,7 @@ export async function createTask({
   maxMinutes = null,
   dueDate = null,
   category = "",
+  subCategory = null,
   recurrence = null,
 }) {
   const created = await Task.create({
@@ -75,6 +76,7 @@ export async function createTask({
     maxMinutes,
     dueDate,
     category,
+    subCategory,
     recurrence,
   });
 
@@ -143,7 +145,8 @@ export async function getTasksForUser(userId, filter = {}) {
  */
 export async function getTasks(userId, filters = {}) {
   const q = { userId };
-  if (filters.tag) q.tags = filters.tag;
+  if (filters.tag) q.category = filters.tag; // Map tag filter to category
+  if (filters.category) q.category = filters.category;
   if (filters.completed !== undefined) q.status = filters.completed ? "done" : { $ne: "done" };
   if (filters.dueBefore) q.dueDate = { ...q.dueDate, $lte: new Date(filters.dueBefore) };
   if (filters.dueAfter) q.dueDate = { ...q.dueDate, $gte: new Date(filters.dueAfter) };
@@ -245,6 +248,7 @@ export async function updateTask({ userId, taskId, updates }) {
     "dueDate",
     "status",
     "category",
+    "subCategory",
     "actualCompletionMinutes",
   ];
 
@@ -257,6 +261,34 @@ export async function updateTask({ userId, taskId, updates }) {
 
   if (Object.keys(sanitizedUpdates).length === 0) {
     return { success: false, error: "No valid fields to update." };
+  }
+
+  // Fetch existing task to detect subcategory changes
+  const existing = await Task.findOne({ _id: taskId, userId }).lean();
+
+  // If user provided a subCategory, record generation/override telemetry
+  if (sanitizedUpdates.subCategory) {
+    const newSub = sanitizedUpdates.subCategory;
+
+    if (existing && existing.subCategory && existing.subCategory.label && existing.subCategory.label !== newSub.label) {
+      // User replaced an existing subcategory
+      await recordSubCategoryOverride({
+        userId,
+        taskId: taskId.toString(),
+        previous: existing.subCategory,
+        replacement: newSub,
+        context: "service_update",
+      });
+    } else {
+      // New subcategory created for this user/task
+      await recordSubCategoryGeneration({
+        userId,
+        taskId: taskId.toString(),
+        categories: [sanitizedUpdates.category || existing?.category || ""],
+        subCategory: newSub,
+        context: "service_update",
+      });
+    }
   }
 
   const updated = await Task.findByIdAndUpdate(taskId, { $set: sanitizedUpdates }, { new: true }).lean();

@@ -94,7 +94,7 @@ generateSubCategory() → Maps category to subcategories
 Task saved
 ```
 
-#### 4. **Category Detection** (`src/algorithms/priority/tagging.js`)
+#### 4. **Category Detection** (`src/algorithms/priority/categorizing.js`)
 
 The `detectTags()` function:
 - Analyzes task title and description
@@ -188,7 +188,7 @@ The following files now use the centralized system:
    - Validates categories at save time
    - Imports validation functions
 
-2. **Tagging Algorithm** (`src/algorithms/priority/tagging.js`)
+2. **Categorizing Algorithm** (`src/algorithms/priority/categoriz/categorizing.js`)
    - Returns valid 18-category values only
    - Guarantees output matches centralized list
 
