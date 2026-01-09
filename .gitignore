@@ -38,6 +38,10 @@ mongodump-
 /data/
 *.env
 
+# ML Model files (per-user models)
+src/predict_model/user_models/
+src/predict_model/model.pkl
+
 # Authentication tokens (CLI)
 scripts/.token
 

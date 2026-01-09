@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { updateAllScores } from "../scripts/updateScores.js";
 import { detectTags } from "../algorithms/priority/tagging.js";
 import { generateSubCategory } from "../services/ml/subcategoryGenerator.js";
+import { predictTask } from "../services/mlPredictionService.js";
 
 const taskSchema = new mongoose.Schema(
   {
@@ -12,7 +13,7 @@ const taskSchema = new mongoose.Schema(
     status: { type: String, enum: ["todo", "in_progress", "done"], default: "todo" },
     importance: { type: Number, min: 1, max: 5, default: 3 }, // 1=low, 5=high
     effort: { type: Number, min: 1, max: 5, default: 3 }, // 1=small, 5=big
-    tags: { type: [String], default: [] },
+    category: { type: String, default: "", trim: true },
     estimatedDuration: { type: Number, min: 15, default: 60 }, // minutes
     canSplit: { type: Boolean, default: true },
     minChunk: { type: Number, min: 15, default: 30 }, // minimum chunk length in minutes when splitting
@@ -38,6 +39,10 @@ const taskSchema = new mongoose.Schema(
     // Cached score so we can sort quickly (optional)
     // add field: user's behaviour default value ineffective
     priorityScore: { type: Number, default: 0 },
+    // ML Prediction fields
+    predictedCompletionCategory: { type: Number, min: 1, max: 5 }, // 1=very quick, 5=won't complete
+    predictionScore: { type: Number, min: 0, max: 1 }, // confidence score (0-1)
+    actualCompletionMinutes: { type: Number }, // minutes taken when task completes (for reward calculation)
     subCategory: {
       label: { type: String, default: "", trim: true },
       source: { type: String, default: "heuristic", trim: true },
@@ -63,38 +68,88 @@ taskSchema.post("remove", async function () {
 });
 
 taskSchema.pre("save", async function () {
-  const shouldRefreshTags =
-    !this.tags?.length || this.isNew || this.isModified("taskname") || this.isModified("description");
+  const shouldRefreshCategory =
+    !this.category || this.isNew || this.isModified("taskname") || this.isModified("description");
 
-  if (shouldRefreshTags) {
-    const autoTags = detectTags({
+  if (shouldRefreshCategory) {
+    const autoCategory = detectTags({
       title: this.taskname,
       description: this.description,
-      tags: this.tags,
+      category: this.category,
     });
-    this.tags = autoTags;
+    this.category = autoCategory;
   }
 
   const hasManualSubCategory = this.subCategory?.label && this.subCategory?.source === "user";
-  const shouldRefreshSubCategory = (shouldRefreshTags || !this.subCategory?.label) && !hasManualSubCategory;
+  const shouldRefreshSubCategory = (shouldRefreshCategory || !this.subCategory?.label) && !hasManualSubCategory;
 
   if (shouldRefreshSubCategory) {
     this.subCategory = await generateSubCategory({
       userId: this.userId,
       title: this.taskname,
       description: this.description,
-      tags: this.tags,
+      category: this.category,
       current: this.subCategory,
       TaskModel: this.constructor,
     });
+  }
+
+  // ========================================================================
+  // ML PREDICTION: Auto-predict task difficulty on creation/modification
+  // ========================================================================
+  // Triggers when:
+  // - New task created
+  // - Key fields modified (importance, effort, estimatedDuration, dueDate, category)
+  //
+  // Process:
+  // 1. Convert task to ML input (5 fields → 28 engineered features)
+  // 2. Call Python ML service (loads user's model or creates new one)
+  // 3. Get prediction: score (0-1 confidence) + category (1-5 difficulty)
+  // 4. Store in predictionScore and predictedCompletionCategory fields
+  //
+  // Result: Every task gets instant ML predictions at save time
+  const shouldPredict =
+    this.isNew ||
+    this.isModified("importance") ||
+    this.isModified("effort") ||
+    this.isModified("estimatedDuration") ||
+    this.isModified("dueDate") ||
+    this.isModified("category");
+
+  if (shouldPredict) {
+    try {
+      // Get ML prediction for this task
+      const prediction = await predictTask(this);
+
+      // Validate prediction response
+      if (!prediction || typeof prediction.score !== "number" || !prediction.category) {
+        console.error("⚠️  ML Prediction returned invalid data:", prediction);
+        // Leave prediction fields undefined - task will save without predictions
+        return;
+      }
+
+      // Populate prediction fields (stored in MongoDB for priority calculations)
+      this.predictionScore = prediction.score;
+      this.predictedCompletionCategory = prediction.category;
+
+      console.log(`🤖 ML Prediction: score=${prediction.score.toFixed(3)}, category=${prediction.category}`);
+    } catch (error) {
+      // Don't break task save if ML prediction fails
+      console.error("⚠️  ML Prediction failed (task will save without predictions):", {
+        taskId: this._id,
+        userId: this.userId,
+        error: error.message,
+        stack: error.stack?.split("\n")[0], // First line of stack for debugging
+      });
+      // Leave prediction fields undefined - they'll remain empty in DB
+    }
   }
 });
 
 // Compound indexes for efficient queries
 taskSchema.index({ userId: 1, dueDate: 1 });
-// Index tags array and status for common queries
-taskSchema.index({ userId: 1, tags: 1 });
-taskSchema.index({ userId: 1, status: 1 });
+taskSchema.index({ userId: 1, tag: 1 });
+taskSchema.index({ userId: 1, completed: 1 });
 
 // Methods
 taskSchema.methods.markComplete = function () {

@@ -91,13 +91,15 @@ export async function createTask(req, res) {
 export async function getTasks(req, res) {
   try {
     const userId = req.user.userId;
-    const { tag, completed, dueBefore, dueAfter } = req.query;
+    const { tag, category, completed, dueBefore, dueAfter } = req.query;
 
     // Build filters
     const filters = {};
 
-    if (tag) {
-      filters.tag = tag;
+    if (category) {
+      filters.category = category;
+    } else if (tag) {
+      filters.category = tag;
     }
 
     if (completed !== undefined) {
@@ -342,6 +344,40 @@ export async function toggleTaskCompletion(req, res) {
     return res.status(500).json({
       success: false,
       error: "Failed to toggle task completion",
+    });
+  }
+}
+
+/**
+ * Complete a task (with ML training)
+ * POST /api/tasks/:id/complete
+ */
+export async function completeTask(req, res) {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+
+    const result = await taskService.completeTask({ taskId: id, userId });
+
+    if (!result || result.success === false) {
+      return res.status(404).json({
+        success: false,
+        error: result?.error || "Task not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      task: result.task,
+      actualCompletionMinutes: result.actualCompletionMinutes,
+      message: "Task completed successfully",
+    });
+  } catch (error) {
+    logger.error("Error in completeTask controller:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: "Failed to complete task",
     });
   }
 }

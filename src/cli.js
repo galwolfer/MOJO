@@ -562,7 +562,7 @@ async function listTasks() {
 
   console.log(theme.accent(`\n${currentUser.username}'s tasks:`));
   tasks.forEach((task, index) => {
-    const tags = Array.isArray(task.tags) && task.tags.length ? task.tags.join(", ") : "misc";
+    const category = task.category || "uncategorized";
     const subCategory = task.subCategory?.label || null;
     const displayName = task.taskname || task.title || "(no title)";
     const detailParts = [
@@ -577,7 +577,7 @@ async function listTasks() {
     }
 
     detailParts.push(`score ${task.priorityScore ?? 0}`);
-    detailParts.push(`tags: ${tags}`);
+    detailParts.push(`category: ${category}`);
     if (subCategory) detailParts.push(`sub: ${subCategory}`);
 
     const line = `${index + 1}. ${paint(displayName, ansi.bold)}  ${theme.muted(`(${detailParts.join(", ")})`)}`;
@@ -762,7 +762,7 @@ async function recommendTask() {
   console.log(theme.accent("\n✨ Recommended next task"));
   console.log(`${theme.title(top.title)} - score ${paint(top.score.toFixed(2), ansi.bold, ansi.yellow)}`);
   if (top.reason) console.log(theme.muted(`Reason: ${top.reason}`));
-  if (top.tags?.length) console.log(theme.muted(`Tags: ${top.tags.join(", ")}`));
+  if (top.category) console.log(theme.muted(`Category: ${top.category}`));
   if (top.window) console.log(theme.muted(`Suggested slot: ${top.window.start} -> ${top.window.end}`));
 }
 

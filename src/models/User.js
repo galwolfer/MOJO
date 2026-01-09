@@ -123,8 +123,8 @@ const userSchema = new mongoose.Schema(
         default: {},
       },
       priorities: {
-        work: { type: Number, min: 1, max: 5, default: 3 },
-        study: { type: Number, min: 1, max: 5, default: 3 },
+        work_and_career: { type: Number, min: 1, max: 5, default: 3 },
+        study_and_education: { type: Number, min: 1, max: 5, default: 3 },
         health: { type: Number, min: 1, max: 5, default: 3 },
         social: { type: Number, min: 1, max: 5, default: 3 },
         finance: { type: Number, min: 1, max: 5, default: 3 },

@@ -93,7 +93,7 @@ router.get("/expired", async (req, res, next) => {
         importance: task.importance,
         status: task.status,
         estimatedDuration: task.estimatedDuration,
-        tags: task.tags,
+        category: task.category,
       };
     });
 
@@ -272,5 +272,8 @@ router.delete("/:id", taskController.deleteTask);
 
 // Toggle task completion status
 router.post("/:id/toggle", taskController.toggleTaskCompletion);
+
+// Complete a task (with ML training)
+router.post("/:id/complete", taskController.completeTask);
 
 export default router;

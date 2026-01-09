@@ -5,7 +5,7 @@ import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 
-const CATEGORY_ORDER = ["work", "study", "health", "social", "finance", "household", "creative", "misc"];
+const CATEGORY_ORDER = ["work", "study", "health", "social", "finance", "household", "creative", "uncategorized"];
 // CATEGORY_ORDER: ordered list of categories used to one-hot encode labels
 const MODEL_PREFIX = "model_logreg_";
 const DEFAULT_MODEL_DIR = "data";
@@ -40,7 +40,7 @@ const timeFeatures = (timestamp) => {
 // timeFeatures: normalized hour + time-of-day + weekend flag used by model
 
 export function buildFeatureVector({ category, priorities = {}, recentCounts = {}, timestamp = new Date() }) {
-  const normalizedCategory = CATEGORY_ORDER.includes(category) ? category : "misc";
+  const normalizedCategory = CATEGORY_ORDER.includes(category) ? category : "uncategorized";
   const priority = Number(priorities[normalizedCategory] ?? 3);
   const count = Number(recentCounts[normalizedCategory] ?? 0);
   const ratio = priority / (count + 1);

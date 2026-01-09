@@ -28,6 +28,7 @@ import { TaskSchedule } from "../models/TaskSchedule.js";
 import { BusyBlock } from "../models/BusyBlock.js";
 import { logEvent, recordSubCategoryGeneration } from "./telemetryService.js";
 import { categoryForTag } from "../algorithms/priority/tagging.js";
+import { trainTask } from "./mlPredictionService.js";
 import { logger } from "../utils/logger.js";
 import { startOfDay } from "../utils/dateUtils.js";
 
@@ -55,7 +56,7 @@ export async function createTask({
   minMinutes = null,
   maxMinutes = null,
   dueDate = null,
-  tags = [],
+  category = "",
   recurrence = null,
 }) {
   const created = await Task.create({
@@ -73,7 +74,7 @@ export async function createTask({
     minMinutes,
     maxMinutes,
     dueDate,
-    tags,
+    category,
     recurrence,
   });
 
@@ -83,7 +84,7 @@ export async function createTask({
     payload: {
       taskId: created._id.toString(),
       taskname: created.taskname,
-      tags: created.tags || [],
+      category: created.category || "",
       subCategory: created.subCategory || null,
       importance: created.importance,
       effort: created.effort,
@@ -96,7 +97,7 @@ export async function createTask({
   await recordSubCategoryGeneration({
     userId,
     taskId: created._id.toString(),
-    tags: created.tags || [],
+    category: created.category || "",
     subCategory: created.subCategory || null,
     context: "service_create",
   });
@@ -113,8 +114,8 @@ export async function checkSuggestionFollowed({ userId, task, lastSuggestion, wi
   const withinWindow = Date.now() - lastSuggestion.at <= windowMs;
   if (!withinWindow) return false;
 
-  const taskCategories = new Set((task.tags || []).map((tag) => categoryForTag(tag)));
-  if (!taskCategories.has(lastSuggestion.category)) return false;
+  const taskCategory = categoryForTag(task.category || "");
+  if (taskCategory !== lastSuggestion.category) return false; 
 
   await logEvent({
     type: "suggestion_followed",
@@ -229,23 +230,9 @@ export async function updateTask({ userId, taskId, updates }) {
   }
 
   const allowedFields = [
-    "taskname",
-    "description",
-    "importance",
-    "effort",
-    "estimatedDuration",
-    "canSplit",
-    "minChunk",
-    "taskType",
-    "chunkCount",
-    "chunkMinutes",
-    "minMinutes",
-    "maxMinutes",
-    "dueDate",
-    "status",
-    "tags",
-    "recurrence",
-    "subCategory",
+    "taskname", "description", "importance", "effort", "estimatedDuration",
+    "canSplit", "minChunk", "taskType", "chunkCount", "chunkMinutes",
+    "minMinutes", "maxMinutes", "dueDate", "status", "category", "actualCompletionMinutes",
   ];
 
   const sanitizedUpdates = {};
@@ -353,6 +340,117 @@ export async function deleteTask({ taskId, userId }) {
     });
 
     return { success: true, taskname };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Mark a task as complete and trigger ML model training
+ * 
+ * ⭐ CRITICAL FUNCTION FOR ML LEARNING ⭐
+ * 
+ * This is where the ML model learns from actual user behavior:
+ * 1. Calculates actual work time from completed TaskSchedule sessions
+ * 2. Saves actualCompletionMinutes to the task
+ * 3. Triggers ML model training with reward based on estimation accuracy
+ * 
+ * The ML model learns:
+ * - How accurate the user's time estimates were (reward calculation)
+ * - Task characteristics (importance, effort, category, deadline pressure)
+ * - User-specific patterns across similar tasks (per-user models)
+ * 
+ * @param {object} params - { taskId, userId }
+ * @returns {Promise<object>} { success, task, actualCompletionMinutes }
+ */
+export async function completeTask({ taskId, userId }) {
+  if (!taskId) {
+    return { success: false, error: "Task ID is required." };
+  }
+
+  try {
+    const task = await Task.findOne({ _id: taskId, userId });
+
+    if (!task) {
+      return { success: false, error: "Task not found or you don't have permission." };
+    }
+
+    // Calculate actual completion time by summing all completed work sessions
+    const completedSessions = await TaskSchedule.find({ 
+      taskId, 
+      status: "completed" 
+    }).lean();
+    
+    const actualCompletionMinutes = completedSessions.reduce(
+      (total, session) => total + (session.minutes || 0), 
+      0
+    );
+
+    // ========================================================================
+    // VALIDATION: Warn if no work sessions tracked (edge case)
+    // ========================================================================
+    if (actualCompletionMinutes === 0) {
+      console.warn(`⚠️  Task completed with 0 minutes tracked:`, {
+        taskId: taskId.toString(),
+        taskname: task.taskname,
+        estimatedDuration: task.estimatedDuration,
+        sessionCount: completedSessions.length,
+      });
+      // Still proceed - user might have completed task without tracking sessions
+    }
+
+    const updated = await Task.findByIdAndUpdate(
+      taskId,
+      {
+        $set: {
+          status: "done",
+          actualCompletionMinutes,
+        },
+      },
+      { new: true }
+    ).lean(); // Get plain object directly
+
+    await logEvent({
+      type: "task_completed",
+      userId,
+      payload: {
+        taskId: taskId.toString(),
+        taskname: task.taskname,
+        actualCompletionMinutes,
+        estimatedDuration: task.estimatedDuration,
+      },
+    });
+
+    // ========================================================================
+    // ML TRAINING: Train with completion data (with comprehensive error handling)
+    // ========================================================================
+    try {
+      console.log(`🎯 Training ML model for completed task: ${task.taskname}`);
+      
+      const trainingResult = await trainTask(updated);
+      
+      if (trainingResult.success) {
+        console.log(`✅ ML model trained successfully (reward: ${trainingResult.reward?.toFixed(3)})`);
+      } else {
+        console.error(`❌ ML training failed:`, {
+          taskId: taskId.toString(),
+          taskname: task.taskname,
+          error: trainingResult.error,
+          actualMinutes: actualCompletionMinutes,
+          estimatedMinutes: task.estimatedDuration,
+        });
+      }
+    } catch (mlError) {
+      // Don't fail task completion if ML training fails
+      console.error(`❌ ML training error (task still completed):`, {
+        taskId: taskId.toString(),
+        taskname: task.taskname,
+        error: mlError.message,
+        stack: mlError.stack?.split('\n')[0],
+      });
+    }
+
+    return { success: true, task: updated, actualCompletionMinutes };
   } catch (error) {
     return { success: false, error: error.message };
   }

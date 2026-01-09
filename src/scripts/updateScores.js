@@ -21,7 +21,7 @@ const toActivity = (task) => ({
   status: mapStatus(task.status),
   deadline: task.dueDate ? new Date(task.dueDate).toISOString() : null,
   required_context: { timeOfDay: task.timeOfDay || "any" },
-  tags: Array.isArray(task.tags) ? task.tags : [],
+  category: task.category || "",
 });
 // toActivity: translate DB Task -> scorer activity shape (fields used by scoreActivities)
 
@@ -42,7 +42,7 @@ export async function updateAllScores() {
         effort: 1,
         dueDate: 1,
         status: 1,
-        tags: 1,
+        category: 1,
         duration_min: 1,
         recurrence: 1,
         timeOfDay: 1,

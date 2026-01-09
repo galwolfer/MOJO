@@ -129,9 +129,9 @@ Tasks are scored based on:
 
 ### 🏷️ Auto-Tagging
 Mojo detects categories automatically:
-- "Finish assignment" → `study` tag
+- "Finish assignment" → `study_and_education` tag
 - "Go to gym" → `health` tag
-- "Fix bug" → `work` tag
+- "Fix bug" → `work_and_career` tag
 
 ### 📅 Calendar Planning
 Schedule tasks around:

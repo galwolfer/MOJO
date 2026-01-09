@@ -89,7 +89,7 @@ npm run dev
 
 1. **Prepare data** – make sure MongoDB is running (`sudo service mongod start`) and run `scripts/migrateTitleToTaskname.js` once if you haven’t yet renamed `taskname`. This ensures existing tasks will surface the new field.
 2. **Run the CLI** – execute `npm run cli`, add a few tasks with different wording, and verify that each new task prints an `Auto sub-category:` line showing the inferred label. The label should be stable for similar wording and fall back to tag-based summaries when the title is too vague.
-3. **Trigger scoring** – if you change tags or priorities while testing, run `node src/scripts/updateScores.js` (or let the server/CLI run continuously) so `priorityScore` and telemetry stay consistent.
+3. **Trigger scoring** – if you change categories or priorities while testing, run `node src/scripts/updateScores.js` (or let the server/CLI run continuously) so `priorityScore` and telemetry stay consistent.
 4. **Check telemetry** – confirmed suggestions (option 6) and overrides generate `sub_category_generated` and `sub_category_corrected` events (see console logs or your telemetry storage). This helps you validate that manual overrides influence future history-based suggestions.
 
 ## Directory layout
