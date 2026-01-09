@@ -1,86 +1,71 @@
 /**
  * ML Input Converter Utilities
- * 
+ *
  * Converts Task objects to ML model input format and handles
  * feature engineering for the LinUCB model
  */
 
-// Standard categories used by the ML model (expanded to 18)
-// Must match categories expected by multi_feature_linucb.py
-const ML_CATEGORIES = {
-  STUDY_AND_EDUCATION: 0,
-  SKILL_BUILDING: 1,
-  WORKOUT: 2,
-  REFLECTION: 3,
-  HOME_AND_CHORES: 4,
-  FAMILY: 5,
-  LIFE_MANAGEMENT: 6,
-  WORK_AND_CAREER: 7,
-  CREATIVE_PROJECTS: 8,
-  HOBBIES: 9,
-  RELATIONSHIP: 10,
-  GOALS: 11,
-  MINDFULNESS: 12,
-  HEALTH: 13,
-  SOCIAL_ACTIVITY: 14,
-  RECOVERY: 15,
-  EXPLORATION: 16,
-  UNCATEGORIZED: 17,
-};
+import { CATEGORIES, CATEGORY_INDEX_TO_KEY } from "../config/categories.js";
 
-// Reverse mapping for readability (index -> canonical category key)
-const CATEGORY_NAMES = {
-  0: 'study_and_education',
-  1: 'skill_building',
-  2: 'workout',
-  3: 'reflection',
-  4: 'home_and_chores',
-  5: 'family',
-  6: 'life_management',
-  7: 'work_and_career',
-  8: 'creative_projects',
-  9: 'hobbies',
-  10: 'relationship',
-  11: 'goals',
-  12: 'mindfulness',
-  13: 'health',
-  14: 'social_activity',
-  15: 'recovery',
-  16: 'exploration',
-  17: 'uncategorized',
-};
+// Re-export categories for backward compatibility with existing imports
+const ML_CATEGORIES = CATEGORIES;
+const CATEGORY_NAMES = CATEGORY_INDEX_TO_KEY;
 
 /**
  * Normalize subCategory label and category to standard ML category (0-17)
- * 
+ *
  * @param {string} subCategoryLabel - The subCategory.label from Task model
  * @param {string} category - Single category from Task model
  * @returns {number} Normalized category 0-17
  */
-function categoryNormalizer(subCategoryLabel = '', category = '') {
-  const label = (subCategoryLabel || '').toLowerCase().trim();
-  const normalizedCategory = (category || '').toLowerCase().trim();
+function categoryNormalizer(subCategoryLabel = "", category = "") {
+  const label = (subCategoryLabel || "").toLowerCase().trim();
+  const normalizedCategory = (category || "").toLowerCase().trim();
   const allText = `${label} ${normalizedCategory}`;
 
   // Respect explicit category first (category should override noisy labels)
   if (normalizedCategory) {
-    if (normalizedCategory.includes('health')) return ML_CATEGORIES.HEALTH;
-    if (normalizedCategory.includes('workout') || normalizedCategory.includes('sports') || normalizedCategory.includes('gym')) return ML_CATEGORIES.WORKOUT;
-    if (normalizedCategory.includes('study') || normalizedCategory.includes('education') || normalizedCategory.includes('course')) return ML_CATEGORIES.STUDY_AND_EDUCATION; 
-    if (normalizedCategory.includes('chore') || normalizedCategory.includes('home')) return ML_CATEGORIES.HOME_AND_CHORES;
-    if (normalizedCategory.includes('work') || normalizedCategory.includes('career') || normalizedCategory.includes('meeting') || normalizedCategory.includes('project')) return ML_CATEGORIES.WORK_AND_CAREER; 
-    if (normalizedCategory.includes('vacation') || normalizedCategory.includes('travel') || normalizedCategory.includes('exploration')) return ML_CATEGORIES.EXPLORATION;
-    if (normalizedCategory.includes('skill')) return ML_CATEGORIES.SKILL_BUILDING;
-    if (normalizedCategory.includes('reflection')) return ML_CATEGORIES.REFLECTION;
-    if (normalizedCategory.includes('family')) return ML_CATEGORIES.FAMILY;
-    if (normalizedCategory.includes('life') || normalizedCategory.includes('management')) return ML_CATEGORIES.LIFE_MANAGEMENT;
-    if (normalizedCategory.includes('creative') || normalizedCategory.includes('project')) return ML_CATEGORIES.CREATIVE_PROJECTS;
-    if (normalizedCategory.includes('hobby') || normalizedCategory.includes('hobbies')) return ML_CATEGORIES.HOBBIES;
-    if (normalizedCategory.includes('relationship')) return ML_CATEGORIES.RELATIONSHIP;
-    if (normalizedCategory.includes('goal')) return ML_CATEGORIES.GOALS;
-    if (normalizedCategory.includes('mindful')) return ML_CATEGORIES.MINDFULNESS;
-    if (normalizedCategory.includes('social')) return ML_CATEGORIES.SOCIAL_ACTIVITY;
-    if (normalizedCategory.includes('recovery')) return ML_CATEGORIES.RECOVERY;
+    if (normalizedCategory.includes("health")) return ML_CATEGORIES.HEALTH;
+    if (
+      normalizedCategory.includes("workout") ||
+      normalizedCategory.includes("sports") ||
+      normalizedCategory.includes("gym")
+    )
+      return ML_CATEGORIES.WORKOUT;
+    if (
+      normalizedCategory.includes("study") ||
+      normalizedCategory.includes("education") ||
+      normalizedCategory.includes("course")
+    )
+      return ML_CATEGORIES.STUDY_AND_EDUCATION;
+    if (normalizedCategory.includes("chore") || normalizedCategory.includes("home"))
+      return ML_CATEGORIES.HOME_AND_CHORES;
+    if (
+      normalizedCategory.includes("work") ||
+      normalizedCategory.includes("career") ||
+      normalizedCategory.includes("meeting") ||
+      normalizedCategory.includes("project")
+    )
+      return ML_CATEGORIES.WORK_AND_CAREER;
+    if (
+      normalizedCategory.includes("vacation") ||
+      normalizedCategory.includes("travel") ||
+      normalizedCategory.includes("exploration")
+    )
+      return ML_CATEGORIES.EXPLORATION;
+    if (normalizedCategory.includes("skill")) return ML_CATEGORIES.SKILL_BUILDING;
+    if (normalizedCategory.includes("reflection")) return ML_CATEGORIES.REFLECTION;
+    if (normalizedCategory.includes("family")) return ML_CATEGORIES.FAMILY;
+    if (normalizedCategory.includes("life") || normalizedCategory.includes("management"))
+      return ML_CATEGORIES.LIFE_MANAGEMENT;
+    if (normalizedCategory.includes("creative") || normalizedCategory.includes("project"))
+      return ML_CATEGORIES.CREATIVE_PROJECTS;
+    if (normalizedCategory.includes("hobby") || normalizedCategory.includes("hobbies")) return ML_CATEGORIES.HOBBIES;
+    if (normalizedCategory.includes("relationship")) return ML_CATEGORIES.RELATIONSHIP;
+    if (normalizedCategory.includes("goal")) return ML_CATEGORIES.GOALS;
+    if (normalizedCategory.includes("mindful")) return ML_CATEGORIES.MINDFULNESS;
+    if (normalizedCategory.includes("social")) return ML_CATEGORIES.SOCIAL_ACTIVITY;
+    if (normalizedCategory.includes("recovery")) return ML_CATEGORIES.RECOVERY;
   }
 
   // Study & Education (fallback to label matching)
@@ -119,7 +104,9 @@ function categoryNormalizer(subCategoryLabel = '', category = '') {
   }
 
   // Work & Career
-  if (allText.match(/work|career|job|office|project|meeting|deadline|professional|client|report|presentation|sprint/i)) {
+  if (
+    allText.match(/work|career|job|office|project|meeting|deadline|professional|client|report|presentation|sprint/i)
+  ) {
     return ML_CATEGORIES.WORK_AND_CAREER;
   }
 
@@ -174,14 +161,14 @@ function categoryNormalizer(subCategoryLabel = '', category = '') {
 
 /**
  * Convert Task object to ML model input format
- * 
+ *
  * Maps Task fields to the 5 features expected by multi_feature_linucb.py:
  * 1. motivation (1-5, from importance field)
  * 2. duration (estimated minutes)
  * 3. difficulty (1-5, from effort field)
  * 4. delta_hours (time until dueDate in hours, 0 if no deadline)
  * 5. category (0-17, normalized from subCategory + category)
- * 
+ *
  * @param {Object} task - MongoDB Task document with all fields
  * @returns {Object} Input object with structure {motivation, duration, difficulty, delta_hours, category}
  * @throws {Error} If required fields are missing or invalid
@@ -189,35 +176,34 @@ function categoryNormalizer(subCategoryLabel = '', category = '') {
 function taskToMLInput(task) {
   // Validate task object exists
   if (!task) {
-    throw new Error('Task object is required for ML input conversion');
+    throw new Error("Task object is required for ML input conversion");
   }
 
   // Validate required fields with detailed error messages
   if (!task.userId) {
     throw new Error(`Task missing userId field (taskId: ${task._id})`);
   }
-  
-  if (typeof task.importance !== 'number' || task.importance < 1 || task.importance > 5) {
+
+  if (typeof task.importance !== "number" || task.importance < 1 || task.importance > 5) {
     console.warn(`⚠️  Task has invalid importance: ${task.importance}, defaulting to 3`);
   }
-  
-  if (typeof task.effort !== 'number' || task.effort < 1 || task.effort > 5) {
+
+  if (typeof task.effort !== "number" || task.effort < 1 || task.effort > 5) {
     console.warn(`⚠️  Task has invalid effort: ${task.effort}, defaulting to 3`);
   }
-  
-  if (typeof task.estimatedDuration !== 'number' || task.estimatedDuration <= 0) {
+
+  if (typeof task.estimatedDuration !== "number" || task.estimatedDuration <= 0) {
     throw new Error(`Task has invalid estimatedDuration: ${task.estimatedDuration} (taskId: ${task._id})`);
   }
 
   // Extract and validate required fields with safe defaults
-  const importance = (typeof task.importance === 'number' && task.importance >= 1 && task.importance <= 5) 
-    ? task.importance 
-    : 3; // Default to 3 if invalid
+  const importance =
+    typeof task.importance === "number" && task.importance >= 1 && task.importance <= 5 ? task.importance : 3; // Default to 3 if invalid
   const effort = task.effort || 3; // 1-5, default 3
   const estimatedDuration = task.estimatedDuration || 60; // minutes, default 60
   const dueDate = task.dueDate;
-  const subCategoryLabel = task.subCategory?.label || '';
-  const category = task.category || '';
+  const subCategoryLabel = task.subCategory?.label || "";
+  const category = task.category || "";
 
   // Calculate delta_hours: time remaining until deadline in hours
   // If no deadline, use 0 (will be handled by model)
@@ -232,29 +218,29 @@ function taskToMLInput(task) {
   const normalizedCategory = categoryNormalizer(subCategoryLabel, category);
 
   return {
-    motivation: importance,           // 1-5: user's importance rating
-    duration: estimatedDuration,      // minutes: user's estimated time
-    difficulty: effort,               // 1-5: user's effort estimate
-    delta_hours: deltaHours,          // hours: time until deadline
-    category: normalizedCategory,     // 0-17: normalized category
+    motivation: importance, // 1-5: user's importance rating
+    duration: estimatedDuration, // minutes: user's estimated time
+    difficulty: effort, // 1-5: user's effort estimate
+    delta_hours: deltaHours, // hours: time until deadline
+    category: normalizedCategory, // 0-17: normalized category
   };
 }
 
 /**
  * Calculate reward signal for model training (0-1 scale)
- * 
+ *
  * Reward reflects completion accuracy:
  * - 1.0 = completed at estimated time (perfect prediction)
  * - 0.5 = took 2x or 0.5x estimated time (acceptable)
  * - 0.0 = took 5x or 0.2x estimated time (very inaccurate)
- * 
+ *
  * Formula: 1.0 / (1.0 + 2.0 * |log(actual/estimated)|)
  * This heavily penalizes large over/underestimates while rewarding accuracy
- * 
+ *
  * @param {number} estimatedMinutes - Original user estimate in minutes
  * @param {number} actualMinutes - Actual time taken in minutes
  * @returns {number} Reward signal 0-1 (undefined if inputs invalid)
- * 
+ *
  * @example
  * calculateReward(60, 60) // ~1.0 (perfect)
  * calculateReward(60, 120) // ~0.5 (2x over)

@@ -2,7 +2,7 @@
 // Suggest new tasks by blending model scores with heuristic fallbacks.
 
 import crypto from "crypto";
-import { summarizeTags, categoryForTag } from "./tagging.js";
+import { normalizeCategory, mapCategoryToLifecycle } from "./categorizing.js";
 import { loadSuggestionModel, scoreCategory } from "./modelScorer.js";
 
 const SUGGESTION_LIBRARY = {
@@ -122,9 +122,10 @@ export async function suggestTaskFromProfile(profile = {}, tasks = []) {
       }
     }
     const score = modelScore ?? priority / (count + 1);
-    const reason = modelScore != null
-      ? buildModelReason({ category, priority, count, modelScore })
-      : buildHeuristicReason({ category, priority, count });
+    const reason =
+      modelScore != null
+        ? buildModelReason({ category, priority, count, modelScore })
+        : buildHeuristicReason({ category, priority, count });
     return { category, priority, count, score, modelScore, reason };
   });
 
@@ -151,13 +152,13 @@ export async function suggestTaskFromProfile(profile = {}, tasks = []) {
 function countTasksByCategory(tasks) {
   const counts = {};
   tasks.forEach((task) => {
-    const tags = summarizeTags(task.categories);
-    const categoriesForTask = new Set(tags.map((tag) => categoryForTag(tag)));
+    const category = normalizeCategory(task.categories);
+    const categoriesForTask = new Set([mapCategoryToLifecycle(category)]);
     if (!categoriesForTask.size) {
       categoriesForTask.add("uncategorized");
     }
-    categoriesForTask.forEach((category) => {
-      counts[category] = (counts[category] || 0) + 1;
+    categoriesForTask.forEach((lifecycleCategory) => {
+      counts[lifecycleCategory] = (counts[lifecycleCategory] || 0) + 1;
     });
   });
   return counts;

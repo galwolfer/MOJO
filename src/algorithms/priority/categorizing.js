@@ -1,13 +1,13 @@
-// src/algorithms/priority/tagging.js
-// Lightweight tag detection and weighting so tasks can be categorized
+// src/algorithms/priority/categorizing.js
+// Lightweight category detection and weighting so tasks can be categorized
 // automatically and their priority adjusted accordingly.
 
 import { CATEGORY_STRING_VALUES } from "../../config/categories.js";
 
-// Ordered tag definitions with multipliers and keywords
-const TAG_BLUEPRINTS = [
+// Ordered category definitions with multipliers and keywords
+const CATEGORY_BLUEPRINTS = [
   {
-    tag: "work",
+    category: "work",
     weight: 1.2,
     keywords: [
       "meeting",
@@ -28,72 +28,72 @@ const TAG_BLUEPRINTS = [
     ],
   },
   {
-    tag: "study",
+    category: "study",
     weight: 1.15,
     keywords: ["study", "exam", "homework", "lecture", "course", "learn", "reading", "assignment"],
   },
   {
-    tag: "skill",
+    category: "skill",
     weight: 1.1,
     keywords: ["skill", "practice", "exercise", "skill-building", "tutorial", "workshop"],
   },
   {
-    tag: "workout",
+    category: "workout",
     weight: 1.12,
     keywords: ["workout", "gym", "run", "exercise", "yoga", "training", "fitness"],
   },
   {
-    tag: "health",
+    category: "health",
     weight: 1.18,
     keywords: ["doctor", "dentist", "medication", "checkup", "diet", "sleep", "wellness", "symptom"],
   },
   {
-    tag: "finance",
+    category: "finance",
     weight: 1.12,
     keywords: ["invoice", "budget", "tax", "payment", "bank", "expense", "billing", "bills"],
   },
   {
-    tag: "family",
+    category: "family",
     weight: 1.1,
     keywords: ["family", "kids", "children", "parent", "birthday", "anniversary", "school"],
   },
   {
-    tag: "social",
+    category: "social",
     weight: 1.05,
     keywords: ["call", "meet", "hangout", "coffee", "friend", "party", "network", "dinner"],
   },
   {
-    tag: "creative",
+    category: "creative",
     weight: 1.05,
     keywords: ["design", "paint", "write", "compose", "draw", "sketch", "photo", "video"],
   },
   {
-    tag: "hobby",
+    category: "hobby",
     weight: 0.95,
     keywords: ["hobby", "hobbies", "gardening", "gaming", "craft", "collect", "model"],
   },
   {
-    tag: "reflection",
+    category: "reflection",
     weight: 0.9,
     keywords: ["reflect", "journal", "reflection", "review", "retrospective"],
   },
   {
-    tag: "mindfulness",
+    category: "mindfulness",
     weight: 0.95,
     keywords: ["mindful", "mindfulness", "meditation", "breath", "breathing", "awareness"],
   },
   {
-    tag: "goals",
+    category: "goals",
     weight: 1.05,
     keywords: ["goal", "goals", "milestone", "objective", "target"],
   },
   {
-    tag: "recovery",
+    category: "recovery",
     weight: 0.9,
     keywords: ["recovery", "rest", "rehab", "therapy", "recover"],
   },
   {
-    tag: "explore",
+    category: "explore",
     weight: 0.95,
     keywords: [
       "explore",
@@ -111,38 +111,38 @@ const TAG_BLUEPRINTS = [
     ],
   },
   {
-    tag: "relationship",
+    category: "relationship",
     weight: 1.0,
     keywords: ["relationship", "date", "partner", "spouse", "couple", "romance", "dating", "boyfriend", "girlfriend"],
   },
   {
-    tag: "household",
+    category: "household",
     weight: 0.95,
     keywords: ["clean", "laundry", "dishes", "cook", "groceries", "repair", "chores"],
   },
   {
-    tag: "uncategorized",
+    category: "uncategorized",
     weight: 0.9,
     keywords: [],
   },
 ];
 
-// Fast lookup from keyword -> tag
-const KEYWORD_MAP = TAG_BLUEPRINTS.reduce((acc, { tag, keywords }) => {
-  keywords.forEach((kw) => acc.set(kw.toLowerCase(), tag));
+// Fast lookup from keyword -> category
+const KEYWORD_MAP = CATEGORY_BLUEPRINTS.reduce((acc, { category, keywords }) => {
+  keywords.forEach((kw) => acc.set(kw.toLowerCase(), category));
   return acc;
 }, new Map());
-// KEYWORD_MAP: maps token -> canonical tag for quick detection
+// KEYWORD_MAP: maps token -> canonical category for quick detection
 
-// Direct tag -> weight mapping to reuse later
-const TAG_WEIGHTS = TAG_BLUEPRINTS.reduce((acc, { tag, weight }) => {
-  acc[tag] = weight;
+// Direct category -> weight mapping to reuse later
+const CATEGORY_WEIGHTS = CATEGORY_BLUEPRINTS.reduce((acc, { category, weight }) => {
+  acc[category] = weight;
   return acc;
 }, {});
-// TAG_WEIGHTS: baseline multipliers per tag used when no user preference exists
+// CATEGORY_WEIGHTS: baseline multipliers per category used when no user preference exists
 
-// Map tags to broader life categories for user preferences
-const TAG_TO_CATEGORY = {
+// Map internal categories to broader life categories for user preferences
+const CATEGORY_TO_LIFECYCLE = {
   work: "work_and_career",
   study: "study_and_education",
   skill: "skill_building",
@@ -163,7 +163,7 @@ const TAG_TO_CATEGORY = {
   uncategorized: "uncategorized",
 };
 
-const DEFAULT_TAG = "uncategorized";
+const DEFAULT_CATEGORY = "uncategorized";
 
 // Extract lowercased tokens from free-form text
 const normalizeTokens = (text = "") =>
@@ -175,7 +175,7 @@ const normalizeTokens = (text = "") =>
 
 // normalizeTokens: produce keyword tokens from title/description
 
-export function detectTags({ title = "", description = "", category = "" } = {}) {
+export function detectCategory({ title = "", description = "", category = "" } = {}) {
   const tokens = [...normalizeTokens(title), ...normalizeTokens(description)];
 
   const found = new Set();
@@ -185,83 +185,85 @@ export function detectTags({ title = "", description = "", category = "" } = {})
     found.add(category.toLowerCase().trim());
   }
 
-  // Add tags detected from text
+  // Add categories detected from text
   tokens.forEach((token) => {
     if (KEYWORD_MAP.has(token)) {
       found.add(KEYWORD_MAP.get(token));
     }
   });
 
-  // If no tags found, use default
+  // If no categories found, use default
   if (found.size === 0) {
-    return TAG_TO_CATEGORY[DEFAULT_TAG] || "uncategorized";
+    return CATEGORY_TO_LIFECYCLE[DEFAULT_CATEGORY] || "uncategorized";
   }
 
-  // Return the first detected tag mapped to its category
-  const firstTag = [...found][0];
-  return TAG_TO_CATEGORY[firstTag] || firstTag;
+  // Return the first detected category mapped to its lifecycle category
+  const firstCategory = [...found][0];
+  return CATEGORY_TO_LIFECYCLE[firstCategory] || firstCategory;
 }
 
-// detectTags: infer single category from text + any provided category (fall back to default)
+// detectCategory: infer single category from text + any provided category (fall back to default)
 
 const preferenceToFactor = (value) => {
   const safe = Number.isFinite(value) ? value : 3;
   return 1 + (safe - 3) * 0.2;
 };
 
-export const categoryForTag = (tag) => TAG_TO_CATEGORY[tag] || "uncategorized";
+export const mapCategoryToLifecycle = (category) => CATEGORY_TO_LIFECYCLE[category] || "uncategorized";
 
-// categoryForTag: map a tag to a higher-level category for user prefs
+// mapCategoryToLifecycle: map an internal category to a higher-level lifecycle category for user prefs
 
 const hasPreferences = (preferences) => preferences && Object.values(preferences).some((v) => Number.isFinite(v));
 
-export function computeTagMultiplier(taskCategory = "", preferences = {}) {
-  const normalized = taskCategory ? String(taskCategory).toLowerCase() : DEFAULT_TAG;
+export function computeCategoryWeight(taskCategory = "", preferences = {}) {
+  const normalized = taskCategory ? String(taskCategory).toLowerCase() : DEFAULT_CATEGORY;
   const usePreferences = hasPreferences(preferences);
 
-  // Map the category to its tag equivalent for weight lookup
-  const tag = Object.keys(TAG_TO_CATEGORY).find((t) => TAG_TO_CATEGORY[t] === normalized) || normalized;
-  const category = categoryForTag(tag);
+  // Map the category to its internal category equivalent for weight lookup
+  const internalCategory =
+    Object.keys(CATEGORY_TO_LIFECYCLE).find((c) => CATEGORY_TO_LIFECYCLE[c] === normalized) || normalized;
+  const lifecycleCategory = mapCategoryToLifecycle(internalCategory);
 
   let weight;
-  if (usePreferences && preferences && preferences[category] != null) {
-    weight = preferenceToFactor(preferences[category]);
+  if (usePreferences && preferences && preferences[lifecycleCategory] != null) {
+    weight = preferenceToFactor(preferences[lifecycleCategory]);
   } else {
-    weight = TAG_WEIGHTS[tag] ?? TAG_WEIGHTS[DEFAULT_TAG];
+    weight = CATEGORY_WEIGHTS[internalCategory] ?? CATEGORY_WEIGHTS[DEFAULT_CATEGORY];
   }
 
   return weight;
 }
 
-// computeTagMultiplier: get weight for a task's category, using user preferences when available
+// computeCategoryWeight: get weight for a task's category, using user preferences when available
 
-export function summarizeTags(category = "") {
+export function normalizeCategory(category = "") {
   if (!category || typeof category !== "string" || !category.trim()) return "uncategorized";
   return String(category).toLowerCase();
 }
 
-// summarizeTags: normalize category to lowercase string (fall back to 'uncategorized')
+// normalizeCategory: normalize category to lowercase string (fall back to 'uncategorized')
 
-export function getTagBlueprints() {
-  return TAG_BLUEPRINTS.map(({ tag, weight }) => ({ tag, weight }));
+export function getCategoryBlueprints() {
+  return CATEGORY_BLUEPRINTS.map(({ category, weight }) => ({ category, weight }));
 }
 
-export function describeTagWeights(category = "", preferences = {}) {
-  const normalized = summarizeTags(category);
+export function describeCategoryWeight(category = "", preferences = {}) {
+  const normalized = normalizeCategory(category);
   const usePreferences = hasPreferences(preferences);
-  const tag = Object.keys(TAG_TO_CATEGORY).find((t) => TAG_TO_CATEGORY[t] === normalized) || normalized;
-  const cat = categoryForTag(tag);
+  const internalCategory =
+    Object.keys(CATEGORY_TO_LIFECYCLE).find((c) => CATEGORY_TO_LIFECYCLE[c] === normalized) || normalized;
+  const lifecycleCategory = mapCategoryToLifecycle(internalCategory);
 
   return {
-    tag,
-    category: cat,
-    source: usePreferences && preferences[cat] != null ? "preference" : "baseline",
-    preference: usePreferences ? preferences[cat] ?? null : null,
+    category: internalCategory,
+    lifecycleCategory: lifecycleCategory,
+    source: usePreferences && preferences[lifecycleCategory] != null ? "preference" : "baseline",
+    preference: usePreferences ? preferences[lifecycleCategory] ?? null : null,
     weight:
-      usePreferences && preferences[categoryForTag(tag)] != null
-        ? preferenceToFactor(preferences[categoryForTag(tag)])
-        : TAG_WEIGHTS[tag] ?? TAG_WEIGHTS[DEFAULT_TAG],
+      usePreferences && preferences[mapCategoryToLifecycle(internalCategory)] != null
+        ? preferenceToFactor(preferences[mapCategoryToLifecycle(internalCategory)])
+        : CATEGORY_WEIGHTS[internalCategory] ?? CATEGORY_WEIGHTS[DEFAULT_CATEGORY],
   };
 }
 
-// describeTagWeights: return per-tag metadata (weight, source) helpful for explanations
+// describeCategoryWeight: return per-category metadata (weight, source) helpful for explanations

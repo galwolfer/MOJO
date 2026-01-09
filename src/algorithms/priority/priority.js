@@ -1,5 +1,5 @@
 // src/algorithms/priority/priority.js
-import { computeTagMultiplier, describeTagWeights, summarizeTags } from "./tagging.js";
+import { computeCategoryWeight, describeCategoryWeight, normalizeCategory } from "./categorizing.js";
 
 export function scoreActivities(activities, profile = {}) {
   const now = new Date();
@@ -46,14 +46,14 @@ export function scoreActivities(activities, profile = {}) {
   // buildReason: human-readable explanation based on component thresholds
   const capitalize = (s = "") => s.charAt(0).toUpperCase() + s.slice(1);
 
-  const buildReason = ({ U, I, C, S, E, ML_confidence, ML_category, tagInfo }) => {
+  const buildReason = ({ U, I, C, S, E, ML_confidence, ML_category, categoryInfo }) => {
     const parts = [];
     if (U > 0.6) parts.push("Urgent");
     if (I > 0.6) parts.push("Important");
     if (S > 0.5) parts.push("Maintains streak");
     if (C < 0.4) parts.push("Poor timing");
     if (E > 0.6) parts.push("High effort required");
-    
+
     // ML prediction influence
     if (ML_confidence !== undefined && ML_category !== undefined) {
       if (ML_category === 1 && ML_confidence > 0.7) {
@@ -64,23 +64,23 @@ export function scoreActivities(activities, profile = {}) {
         parts.push("May be challenging");
       }
     }
-    
-    // tagInfo is now a single object, not an array
-    if (tagInfo) {
-      const isBoosted = tagInfo.source === "preference" && tagInfo.weight > 1.05;
-      const isLowered = tagInfo.source === "preference" && tagInfo.weight < 0.95;
-      const isBaselineBoosted = tagInfo.source === "baseline" && tagInfo.weight > 1.05;
-      const isBaselineLowered = tagInfo.source === "baseline" && tagInfo.weight < 0.95;
-      
+
+    // categoryInfo is now a single object, not an array
+    if (categoryInfo) {
+      const isBoosted = categoryInfo.source === "preference" && categoryInfo.weight > 1.05;
+      const isLowered = categoryInfo.source === "preference" && categoryInfo.weight < 0.95;
+      const isBaselineBoosted = categoryInfo.source === "baseline" && categoryInfo.weight > 1.05;
+      const isBaselineLowered = categoryInfo.source === "baseline" && categoryInfo.weight < 0.95;
+
       if (isBoosted || isBaselineBoosted) {
-        const label = tagInfo.source === "preference" ? tagInfo.category : tagInfo.tag;
+        const label = categoryInfo.source === "preference" ? categoryInfo.lifecycleCategory : categoryInfo.category;
         parts.push(`Boosted by ${capitalize(label)}`);
       } else if (isLowered || isBaselineLowered) {
-        const label = tagInfo.source === "preference" ? tagInfo.category : tagInfo.tag;
+        const label = categoryInfo.source === "preference" ? categoryInfo.lifecycleCategory : categoryInfo.category;
         parts.push(`Lower priority (${capitalize(label)})`);
       }
     }
-    
+
     return parts.join(" · ") || "Good overall match";
   };
 
@@ -108,36 +108,44 @@ export function scoreActivities(activities, profile = {}) {
     // ML Prediction Integration (Option 3: Combined Approach)
     const ML_confidence = a.predictionScore ?? 0.5; // 0-1, default neutral
     const ML_category = a.predictedCompletionCategory ?? 3; // 1-5, default neutral
-    
+
     // Category influences weight of ML confidence
     // High confidence predictions (cat 1-2) = trust ML more
     // Low confidence predictions (cat 4-5) = barely use ML
     const categoryWeight = {
-      1: 0.15,  // Very confident → trust ML more
-      2: 0.10,  // Somewhat confident → moderate trust
-      3: 0.05,  // Neutral → minimal influence
-      4: 0.02,  // Low confidence → barely use
-      5: 0.00   // Very uncertain → ignore
+      1: 0.15, // Very confident → trust ML more
+      2: 0.1, // Somewhat confident → moderate trust
+      3: 0.05, // Neutral → minimal influence
+      4: 0.02, // Low confidence → barely use
+      5: 0.0, // Very uncertain → ignore
     };
-    
+
     const ML_weight = categoryWeight[ML_category] || 0.05;
     const ML_component = ML_confidence * ML_weight;
     // ML_component: 0..0.15 depending on model confidence and predicted difficulty
 
-    const normalizedCategory = summarizeTags(a.category);
-    const tagDetails = describeTagWeights(normalizedCategory, preferences);
-    const multiplier = computeTagMultiplier(normalizedCategory, preferences);
+    const normalizedCategory = normalizeCategory(a.category);
+    const categoryDetails = describeCategoryWeight(normalizedCategory, preferences);
+    const multiplier = computeCategoryWeight(normalizedCategory, preferences);
     // rawScore: weighted linear combination of components -> scaled to 0..100
     // weights: urgency 30%, importance 25%, context 15%, streak 10%, ML up to 15%, effort penalty -20%
-    const rawScore = clamp(100 * (0.30 * U + 0.25 * I + 0.15 * C + 0.10 * S + ML_component + 0.05 * V + 0.05 * eps - 0.20 * E), 0, 100);
+    const rawScore = clamp(
+      100 * (0.3 * U + 0.25 * I + 0.15 * C + 0.1 * S + ML_component + 0.05 * V + 0.05 * eps - 0.2 * E),
+      0,
+      100
+    );
     const score = clamp(rawScore * multiplier, 0, 100);
     // apply category-based multiplier (preferences or category boosts/penalties)
     const window = nextFreeSlot(a.duration_min);
-    const reason = buildReason({ 
-      U, I, C, S, E, 
-      ML_confidence, 
-      ML_category, 
-      tagInfo: tagDetails 
+    const reason = buildReason({
+      U,
+      I,
+      C,
+      S,
+      E,
+      ML_confidence,
+      ML_category,
+      categoryInfo: categoryDetails,
     });
     out.push({
       activityId: a.id,
@@ -146,12 +154,14 @@ export function scoreActivities(activities, profile = {}) {
       window,
       reason,
       category: normalizedCategory,
-      tagDetails,
-      mlPrediction: a.predictionScore ? {
-        confidence: ML_confidence,
-        category: ML_category,
-        weight: ML_weight
-      } : null,
+      categoryDetails,
+      mlPrediction: a.predictionScore
+        ? {
+            confidence: ML_confidence,
+            category: ML_category,
+            weight: ML_weight,
+          }
+        : null,
     });
   }
 

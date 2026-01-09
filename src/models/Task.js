@@ -1,8 +1,9 @@
 import mongoose from "mongoose";
 import { updateAllScores } from "../scripts/updateScores.js";
-import { detectTags } from "../algorithms/priority/tagging.js";
+import { detectCategory } from "../algorithms/priority/categorizing.js";
 import { generateSubCategory } from "../services/ml/subcategoryGenerator.js";
 import { predictTask } from "../services/mlPredictionService.js";
+import { CATEGORY_STRING_VALUES, isValidCategory } from "../config/categories.js";
 
 const taskSchema = new mongoose.Schema(
   {
@@ -13,7 +14,19 @@ const taskSchema = new mongoose.Schema(
     status: { type: String, enum: ["todo", "in_progress", "done"], default: "todo" },
     importance: { type: Number, min: 1, max: 5, default: 3 }, // 1=low, 5=high
     effort: { type: Number, min: 1, max: 5, default: 3 }, // 1=small, 5=big
-    category: { type: String, default: "", trim: true },
+    category: {
+      type: String,
+      enum: CATEGORY_STRING_VALUES,
+      validate: {
+        validator: function (value) {
+          return isValidCategory(value) || value === "";
+        },
+        message: `Invalid category. Must be one of: ${CATEGORY_STRING_VALUES.join(", ")}`,
+      },
+      default: "",
+      trim: true,
+      lowercase: true,
+    },
     estimatedDuration: { type: Number, min: 15, default: 60 }, // minutes
     canSplit: { type: Boolean, default: true },
     minChunk: { type: Number, min: 15, default: 30 }, // minimum chunk length in minutes when splitting
@@ -72,7 +85,7 @@ taskSchema.pre("save", async function () {
     !this.category || this.isNew || this.isModified("taskname") || this.isModified("description");
 
   if (shouldRefreshCategory) {
-    const autoCategory = detectTags({
+    const autoCategory = detectCategory({
       title: this.taskname,
       description: this.description,
       category: this.category,
