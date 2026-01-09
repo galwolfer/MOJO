@@ -1,4 +1,4 @@
-import { CATEGORY_STRING_VALUES } from "../../config/categories.js";
+import { CATEGORY_STRING_VALUES } from "../config/categories.js";
 
 /**
  * ========================================
