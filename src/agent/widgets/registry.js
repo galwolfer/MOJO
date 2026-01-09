@@ -33,7 +33,7 @@ export const widgetRegistry = new WidgetRegistry([
     type: "task_list",
     description: "Display a list of tasks with checkboxes and details.",
     schema: {
-      tasks: "Array of task objects { id, title, status, dueDate, priority }",
+      tasks: "Array of task objects { id, title, status, dueDate, importance }",
     },
   }),
   new WidgetDefinition({
@@ -41,7 +41,7 @@ export const widgetRegistry = new WidgetRegistry([
     description:
       "Display a single task with full details (title, description, due date, category, subcategory, priority, tags, status).",
     schema: {
-      task: "Task object { id, title, description, status, dueDate, priority, category, subcategory, importance, effort, estimatedDuration, canSplit, tags }",
+      task: "Task object { id, title, description, status, dueDate, category, subcategory, importance, effort, estimatedDuration, canSplit, tags }",
     },
   }),
   new WidgetDefinition({
@@ -50,7 +50,7 @@ export const widgetRegistry = new WidgetRegistry([
       "Display a list of tasks with ALL fields shown (title, description, due date, category, subcategory, priority, importance, effort, tags, status). Use this when the user wants to see full details of multiple tasks.",
     schema: {
       tasks:
-        "Array of task objects { id, title, description, status, dueDate, priority, category, subcategory, importance, effort, estimatedDuration, canSplit, tags }",
+        "Array of task objects { id, title, description, status, dueDate, importance, effort, estimatedDuration, canSplit, tags }",
     },
   }),
   new WidgetDefinition({
@@ -88,7 +88,6 @@ export const widgetRegistry = new WidgetRegistry([
       estimatedDuration: "Estimated minutes",
       canSplit: "Boolean can be split",
       taskType: "Task splitting strategy (perfect/in_parts/leaky)",
-      priority: "Priority level (high/medium/low) - derived from importance",
       tags: "Legacy tags array (optional)",
       description: "Task description",
       confirmLabel: "Label for confirm button",

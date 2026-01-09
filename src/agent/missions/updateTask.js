@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { GuidedMission } from "./GuidedMission.js";
 import * as taskService from "../../services/taskService.js";
-import { CATEGORY_STRING_VALUES } from "../../config/categories.js";
+import { CATEGORY_STRING_VALUES, getDisplayName } from "../../config/categories.js";
 import { TASK_CONFIG } from "../taskRules.js";
 
 const updateTaskMission = new GuidedMission({
@@ -224,6 +224,8 @@ const updateTaskMission = new GuidedMission({
               : null,
             subCategory: task.subCategory || null,
             category: task.category,
+            categoryDisplay: getDisplayName(task.category),
+            subcategoryDisplay: task.subCategory ? task.subCategory.label : null,
             canSplit: task.canSplit,
           },
         },

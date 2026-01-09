@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { GuidedMission } from "./GuidedMission.js";
 import { TASK_CONFIG, inferTaskProperties, inferSplittingParams } from "../taskRules.js";
+import { getDisplayName } from "../../config/categories.js";
 
 /**
  * Parse relative date strings like "next Thursday", "tomorrow", "in 3 days"
@@ -236,6 +237,9 @@ const previewTaskMission = new GuidedMission({
       const displayMinMinutes = finalTaskType === "leaky" ? previewMinMinutes || inferredParams.minMinutes : null;
       const displayMaxMinutes = finalTaskType === "leaky" ? previewMaxMinutes || inferredParams.maxMinutes : null;
 
+      const categoryDisplay = getDisplayName(category || inferred.category || "");
+      const shortDescription = `${taskname} — ${categoryDisplay} • due ${finalDeadline}`;
+
       const widgetJson = {
         version: "1.0",
         widget_type: "task_confirmation",
@@ -245,15 +249,18 @@ const previewTaskMission = new GuidedMission({
           status: "draft",
           dueDate: new Date(finalDeadline).toISOString(),
           category: category || "",
+          categoryDisplay,
           subcategory: subcategory || "",
+          subcategoryDisplay: subcategory || "",
           importance: finalImportance,
           effort: finalEffort,
           estimatedDuration: finalDuration,
+          // Short human-readable summary (use before the widget; keep concise)
+          shortDescription,
           // Aliases to support different widget consumers
           taskname: taskname,
           deadline: finalDeadline,
           duration: finalDuration,
-          priority: finalImportance >= 4 ? "high" : finalImportance <= 2 ? "low" : "medium",
           taskType: finalTaskType,
           minChunk: displayMinChunk,
           chunkCount: displayChunkCount,
