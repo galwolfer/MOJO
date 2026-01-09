@@ -88,7 +88,7 @@ const previewTaskMission = new GuidedMission({
   name: "preview_task",
   group: "task",
   description:
-    "Return a task_confirmation widget for approval. Required: taskname, deadline, category, subcategory. Must call get_subcategories first.",
+    "Return a task_confirmation widget for approval. Required: taskname, deadline, estimatedDuration, category, subcategory. Must call get_subcategories first.",
   missionInfo: "Draft and show a task_confirmation widget. User must choose category/subcategory first.",
   behavior: [
     "Use when user asks to create a task.",
@@ -108,7 +108,7 @@ const previewTaskMission = new GuidedMission({
       .describe("REQUIRED: Subcategory (MUST be from get_subcategories result or new user-confirmed)"),
     importance: z.number().min(1).max(5).optional().describe("1-5 importance (AI can infer)"),
     effort: z.number().min(1).max(5).optional().describe("1-5 effort (AI can infer)"),
-    duration: z.number().optional().describe("Estimated minutes (AI can infer)"),
+    duration: z.number().describe("REQUIRED: Estimated minutes to complete the task (user must specify)"),
     canSplit: z.boolean().optional().describe("Can the task be split?"),
     taskType: z.string().optional().describe("Task splitting strategy (perfect/in_parts/leaky)"),
     recurrence: z
@@ -157,11 +157,27 @@ const previewTaskMission = new GuidedMission({
       // Infer properties from task name if not provided
       const inferred = inferTaskProperties(taskname);
 
-      // Apply defaults and inference
-      const finalImportance = importance || inferred.importance;
-      const finalEffort = effort || inferred.effort;
-      const finalDuration = duration || inferred.duration;
+      // Apply defaults and inference (LLM must supply effort explicitly)
+      const finalImportance = importance || inferred.importance || TASK_CONFIG.defaults.importance;
+      const finalEffort = effort !== undefined && effort !== null ? effort : inferred.effort ?? null;
+      const finalDuration = duration !== undefined && duration !== null ? duration : inferred.duration ?? null;
       const finalCanSplit = canSplit !== undefined ? canSplit : TASK_CONFIG.defaults.splitable;
+
+      // If duration isn't provided, request it from the user
+      if (!finalDuration || typeof finalDuration !== "number" || isNaN(finalDuration) || finalDuration <= 0) {
+        return `ok=false\nerr="duration_required"\nmsg="Please ask the user: 'How many minutes will this task take?'"`;
+      }
+
+      // Enforce effort must be provided by the assistant (LLM) — pick integer 1-5 based on duration/category
+      if (
+        finalEffort === null ||
+        finalEffort === undefined ||
+        !Number.isInteger(finalEffort) ||
+        finalEffort < 1 ||
+        finalEffort > 5
+      ) {
+        return `ok=false\nerr="effort_required"\nmsg="Assistant must select an effort (integer 1-5) based on task duration, category, and complexity, and include it in the preview_task call."`;
+      }
 
       const widgetJson = {
         version: "1.0",

@@ -7,7 +7,7 @@ const updateTaskMission = new GuidedMission({
   name: "update_task",
   group: "task",
   description:
-    "Update a task; requires confirm=true. Can update: category, subcategory, importance, effort, estimatedDuration, canSplit, taskType, deadline, completed. Call get_subcategories if changing category.",
+    "Update a task; requires confirm=true. Can update: taskname, deadline, estimatedDuration, category, subcategory, importance, effort, canSplit, taskType, completed. Call get_subcategories if changing category.",
   missionInfo: "Modify task (optionally change category/subcategory)",
   behavior: [
     "If changing category: call get_subcategories(category=<new>) first.",

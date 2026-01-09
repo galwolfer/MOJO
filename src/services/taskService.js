@@ -293,13 +293,29 @@ export async function updateTask({ userId, taskId, updates }) {
 
   const sanitizedUpdates = {};
   for (const field of allowedFields) {
-    if (updates[field] !== undefined) {
+    // Ignore undefined or null to avoid clearing fields unintentionally
+    if (updates[field] !== undefined && updates[field] !== null) {
       sanitizedUpdates[field] = updates[field];
     }
   }
 
   if (Object.keys(sanitizedUpdates).length === 0) {
     return { success: false, error: "No valid fields to update." };
+  }
+
+  // Validate numeric fields when provided
+  if (sanitizedUpdates.estimatedDuration !== undefined) {
+    const d = sanitizedUpdates.estimatedDuration;
+    if (typeof d !== "number" || isNaN(d) || d <= 0) {
+      return { success: false, error: "Invalid estimatedDuration. Provide minutes as a positive number." };
+    }
+  }
+
+  if (sanitizedUpdates.effort !== undefined) {
+    const e = sanitizedUpdates.effort;
+    if (!Number.isInteger(e) || e < 1 || e > 5) {
+      return { success: false, error: "Effort must be an integer between 1 and 5." };
+    }
   }
 
   // Fetch existing task to detect subcategory changes

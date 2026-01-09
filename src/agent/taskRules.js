@@ -14,14 +14,13 @@ import { CATEGORY_STRING_VALUES } from "../config/categories.js";
 export const TASK_CONFIG = {
   // Fields that the LLM MUST obtain from the user.
   // If these are missing, the LLM should ask the user instead of guessing.
-  required_fields: ["taskname", "deadline"],
+  required_fields: ["taskname", "deadline", "estimatedDuration"],
 
   // Fields that the LLM can infer from context or leave to defaults.
   optional_fields: [
     "description",
     "importance", // 1-5
     "effort", // 1-5
-    "duration", // minutes (estimatedDuration)
     "category",
     "subcategory",
     "recurrence",
@@ -63,9 +62,9 @@ export function getTaskFieldInstructions() {
   return `TASK FIELDS:
 - REQUIRED: ${TASK_CONFIG.required_fields.join(", ")}
 - OPTIONAL: ${TASK_CONFIG.optional_fields.join(", ")}
-- DEFAULTS: duration=${TASK_CONFIG.defaults.duration}m, importance=${TASK_CONFIG.defaults.importance}/5, effort=${
+- DEFAULTS: importance=${TASK_CONFIG.defaults.importance}/5, effort=${
     TASK_CONFIG.defaults.effort
-  }/5
+  }/5 (estimatedDuration must be provided by the user)
 - CATEGORIES: You MUST use one of these 18 categories: ${CATEGORY_STRING_VALUES.join(", ")}.
 
 SUBCATEGORY WORKFLOW (IMPORTANT):
@@ -73,5 +72,11 @@ SUBCATEGORY WORKFLOW (IMPORTANT):
 2. If a matching subcategory exists in the returned list, suggest it to the user for confirmation.
 3. If none match the user's intent, ask them to provide a new subcategory name, then add it.
 4. NEVER skip get_subcategories — it provides both user-saved subcategories AND historical task labels that might apply.
-5. Respect user preferences: if they have saved subcategories, prioritize those over new suggestions.`;
+5. Respect user preferences: if they have saved subcategories, prioritize those over new suggestions.
+
+DURATION RULE (REQUIRED):
+- If the user does NOT provide 'estimatedDuration', ask them directly: "How many minutes will this take?" and wait for an explicit numeric reply. Do NOT infer or guess the duration; do not proceed without it.
+
+EFFORT RULE:
+- If the user does not provide 'effort', the assistant (LLM) MUST choose and include a value (integer 1-5) based on task length, category, and complexity. The assistant should NOT rely on hardcoded defaults; include the selected effort when calling preview_task or add_task. NEVER leave 'effort' empty or null.`;
 }

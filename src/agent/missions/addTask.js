@@ -8,7 +8,7 @@ const addTaskMission = new GuidedMission({
   name: "add_task",
   group: "task",
   description:
-    "Create a task after explicit user confirmation. Required: taskname, deadline, category, subcategory. Call get_subcategories before this.",
+    "Create a task after explicit user confirmation. Required: taskname, deadline, estimatedDuration, category, subcategory. Call get_subcategories before this.",
   missionInfo: "Create only after user confirms category/subcategory choices.",
   behavior: [
     "IMPORTANT: User must first choose/confirm category AND subcategory.",
@@ -21,7 +21,7 @@ const addTaskMission = new GuidedMission({
     description: z.string().optional().describe("Additional details"),
     importance: z.number().min(1).max(5).optional().describe("1-5 importance (AI can infer)"),
     effort: z.number().min(1).max(5).optional().describe("1-5 effort (AI can infer)"),
-    duration: z.number().optional().describe("Estimated minutes (AI can infer)"),
+    duration: z.number().describe("REQUIRED: Estimated minutes to complete the task (user must specify)"),
     category: z.enum(CATEGORY_STRING_VALUES).describe("REQUIRED: One of the 18 standard categories"),
     subcategory: z
       .string()
@@ -57,12 +57,28 @@ const addTaskMission = new GuidedMission({
       // Infer properties from task title if not provided
       const inferred = inferTaskProperties(taskname);
 
-      // Apply defaults and inference
-      const finalImportance = importance || inferred.importance;
-      const finalEffort = effort || inferred.effort;
-      const finalDuration = duration || inferred.duration;
+      // Apply defaults and inference (do NOT hardcode effort; LLM should pick effort based on task info)
+      const finalImportance = importance || inferred.importance || TASK_CONFIG.defaults.importance;
+      const finalEffort = effort !== undefined && effort !== null ? effort : inferred.effort ?? null;
+      const finalDuration = duration !== undefined && duration !== null ? duration : inferred.duration ?? null;
       const finalCategory = category || inferred.category || "";
       const finalSubcategory = subcategory || inferred.subcategory || "";
+
+      // Enforce estimatedDuration must be provided by the user; if missing, ask explicitly
+      if (!finalDuration || typeof finalDuration !== "number" || isNaN(finalDuration) || finalDuration <= 0) {
+        return `ok=false\nerr="duration_required"\nmsg="Please ask the user: 'How many minutes will this task take?'"`;
+      }
+
+      // Enforce effort must be explicitly set by the LLM (1-5). If missing, instruct LLM to pick one.
+      if (
+        finalEffort === null ||
+        finalEffort === undefined ||
+        !Number.isInteger(finalEffort) ||
+        finalEffort < 1 ||
+        finalEffort > 5
+      ) {
+        return `ok=false\nerr="effort_required"\nmsg="Assistant must select an effort (integer 1-5) based on task duration, category, and complexity, and include it in the mission call."`;
+      }
 
       // Construct subCategory object if provided
       const subCategoryObj = finalSubcategory
