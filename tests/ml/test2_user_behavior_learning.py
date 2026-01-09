@@ -23,7 +23,8 @@ Run with: python test_user_behavior_learning.py
 import numpy as np
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from src.predict_model.multi_feature_linucb import MultiFeatureLinUCB, extract_features
 

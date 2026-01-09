@@ -1,11 +1,12 @@
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from src.predict_model.single_feature_linucb_model import SingleFeatureLinUCB
 
 
-#python test_linucb.py
+# python test_linucb.py
 
 
 # Initialize the LinUCB model
@@ -34,8 +35,7 @@ print("score after update:", score_after)
 print("new theta:", model.theta)
 
 
-
-#presume the user performed very quickly → reward = 1
+# presume the user performed very quickly → reward = 1
 reward = 1
 model.update(x, reward)
 
@@ -112,7 +112,6 @@ model.update(x, reward)
 model.update(x, reward)
 model.update(x, reward)
 model.update(x, reward)
-
 
 
 # prediction after model update
