@@ -1,18 +1,18 @@
 /**
  * @fileoverview Telemetry Service
  * @module services/telemetryService
- * 
+ *
  * Consolidated analytics service for capturing user actions and system events.
  * Provides minimal, non-blocking logging for application-wide telemetry.
- * 
+ *
  * Key responsibilities:
  * - Log user actions (task creation, completion, etc.)
  * - Capture system events (scheduling, predictions, errors)
  * - Track subcategory generation and user interactions
  * - Store events in EventLog collection for analysis
- * 
+ *
  * Event structure: { type, userId, payload, context, timestamp }
- * 
+ *
  * @requires models/EventLog - Event storage model
  */
 
@@ -70,19 +70,13 @@ export async function recordSubCategoryGeneration({
     },
     context,
   });
-} 
+}
 
 /**
  * Record when a user overrides a suggested subcategory.
  * @param {{ userId: string, taskId: string, previous?: object, replacement?: object, context?: string }} params
  */
-export async function recordSubCategoryOverride({
-  userId,
-  taskId,
-  previous = null,
-  replacement = null,
-  context = "",
-}) {
+export async function recordSubCategoryOverride({ userId, taskId, previous = null, replacement = null, context = "" }) {
   if (!userId || !taskId || !replacement?.label) return;
   await logEvent({
     type: "sub_category_corrected",
