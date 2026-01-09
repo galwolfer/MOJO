@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { GuidedMission } from "./GuidedMission.js";
 import * as taskService from "../../services/taskService.js";
-import { TASK_CONFIG, inferTaskProperties } from "../taskRules.js";
+import { TASK_CONFIG, inferTaskProperties, inferSplittingParams } from "../taskRules.js";
 import { CATEGORY_STRING_VALUES } from "../../config/categories.js";
 
 const addTaskMission = new GuidedMission({
@@ -70,7 +70,14 @@ const addTaskMission = new GuidedMission({
       const inferred = inferTaskProperties(taskname);
 
       // Apply defaults and inference (do NOT hardcode effort; LLM should pick effort based on task info)
-      let finalImportance = importance !== undefined && importance !== null ? importance : inferred.importance ?? 3;
+      // For importance: if caller provided it explicitly, use it; otherwise query user's category preference
+      let finalImportance;
+      if (importance !== undefined && importance !== null) {
+        finalImportance = importance;
+      } else {
+        // Will fetch user's category priority below after we have finalCategory
+        finalImportance = null; // placeholder, will be set after category priority lookup
+      }
       const finalEffort = effort !== undefined && effort !== null ? effort : inferred.effort ?? null;
       const finalDuration = duration !== undefined && duration !== null ? duration : inferred.duration ?? null;
       const finalCategory = category || inferred.category || "";
@@ -92,11 +99,11 @@ const addTaskMission = new GuidedMission({
         return `ok=false\nerr="effort_required"\nmsg="Assistant must select an effort (integer 1-5) based on task duration, category, and complexity, and include it in the mission call."`;
       }
 
-      // If importance was not explicitly provided by the caller, use user's per-category priority mapping (#categorise entity)
-      if (importance === undefined || importance === null) {
+      // If importance was not explicitly provided by the caller, use user's per-category priority mapping
+      if (finalImportance === null) {
         try {
           const { getUserCategoryImportance } = await import("../../services/userPreferenceService.js");
-          finalImportance = await getUserCategoryImportance(userId, finalCategory || category);
+          finalImportance = await getUserCategoryImportance(userId, finalCategory);
         } catch (err) {
           finalImportance = TASK_CONFIG.defaults.importance;
         }
@@ -117,6 +124,32 @@ const addTaskMission = new GuidedMission({
       const finalMaxMinutes = typeof maxMinutes === "number" && maxMinutes > 0 ? maxMinutes : null;
       const finalEarliestStart = earliestStart || null;
 
+      // Determine final taskType based on explicit value or which splitting fields were provided
+      let finalTaskType;
+      if (taskType) {
+        finalTaskType = taskType;
+      } else if (minMinutes !== undefined || maxMinutes !== undefined) {
+        finalTaskType = "leaky";
+      } else if (chunkCount !== undefined || chunkMinutes !== undefined) {
+        finalTaskType = "in_parts";
+      } else {
+        finalTaskType = finalCanSplit ? "in_parts" : TASK_CONFIG.defaults.taskType;
+      }
+
+      const storedMinChunk = finalTaskType === "in_parts" ? finalMinChunk : null;
+      const storedChunkCount = finalTaskType === "in_parts" ? finalChunkCount : null;
+      const storedChunkMinutes = finalTaskType === "in_parts" ? finalChunkMinutes : null;
+      const storedMinMinutes = finalTaskType === "leaky" ? finalMinMinutes : null;
+      const storedMaxMinutes = finalTaskType === "leaky" ? finalMaxMinutes : null;
+
+      // Infer splitting params if not explicitly provided for this taskType
+      const inferredParams = inferSplittingParams(finalTaskType, finalDuration);
+      const persistMinChunk = finalTaskType === "in_parts" ? (storedMinChunk || inferredParams.minChunk) : null;
+      const persistChunkCount = finalTaskType === "in_parts" ? (storedChunkCount || inferredParams.chunkCount) : null;
+      const persistChunkMinutes = finalTaskType === "in_parts" ? (storedChunkMinutes || inferredParams.chunkMinutes) : null;
+      const persistMinMinutes = finalTaskType === "leaky" ? (storedMinMinutes || inferredParams.minMinutes) : null;
+      const persistMaxMinutes = finalTaskType === "leaky" ? (storedMaxMinutes || inferredParams.maxMinutes) : null;
+
       const taskData = {
         userId,
         taskname: taskname,
@@ -125,16 +158,16 @@ const addTaskMission = new GuidedMission({
         effort: finalEffort,
         estimatedDuration: finalDuration,
         canSplit: finalCanSplit,
-        minChunk: finalMinChunk,
-        chunkCount: finalChunkCount,
-        chunkMinutes: finalChunkMinutes,
-        minMinutes: finalMinMinutes,
-        maxMinutes: finalMaxMinutes,
+        minChunk: persistMinChunk,
+        chunkCount: persistChunkCount,
+        chunkMinutes: persistChunkMinutes,
+        minMinutes: persistMinMinutes,
+        maxMinutes: persistMaxMinutes,
         earliestStart: finalEarliestStart,
         category: finalCategory,
         subCategory: subCategoryObj,
         // If canSplit is true and taskType not provided, default to 'in_parts' so that 'פרוס' is respected
-        taskType: taskType || (finalCanSplit ? "in_parts" : TASK_CONFIG.defaults.taskType),
+        taskType: finalTaskType,
         dueDate: new Date(deadline),
         recurrence: recurrence || null,
       };

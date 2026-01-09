@@ -134,7 +134,27 @@ const updateTaskMission = new GuidedMission({
       if (earliestStart !== undefined) updates.earliestStart = earliestStart;
 
       // taskType: respect explicit value even if canSplit=false
-      if (taskType !== undefined) updates.taskType = taskType;
+      if (taskType !== undefined) {
+        updates.taskType = taskType;
+
+        // Null-out fields that do not apply to the selected taskType
+        if (taskType === "perfect") {
+          updates.minChunk = null;
+          updates.chunkCount = null;
+          updates.chunkMinutes = null;
+          updates.minMinutes = null;
+          updates.maxMinutes = null;
+        } else if (taskType === "in_parts") {
+          // in_parts: keep minChunk/chunkCount/chunkMinutes, clear leaky bounds
+          updates.minMinutes = null;
+          updates.maxMinutes = null;
+        } else if (taskType === "leaky") {
+          // leaky: keep minMinutes/maxMinutes, clear in_parts-specific fields
+          updates.minChunk = null;
+          updates.chunkCount = null;
+          updates.chunkMinutes = null;
+        }
+      }
 
       if (deadline !== undefined) {
         const d = new Date(deadline);
@@ -184,12 +204,22 @@ const updateTaskMission = new GuidedMission({
             description: task.description,
             status: task.status,
             dueDate: task.dueDate ? new Date(task.dueDate).toISOString() : null,
+            // Provide aliases and full splitting fields so widgets can display everything
+            taskname: task.taskname,
+            deadline: task.dueDate ? new Date(task.dueDate).toISOString().split("T")[0] : null,
+            estimatedDuration: task.estimatedDuration,
+            duration: task.estimatedDuration,
             importance: task.importance,
             priorityScore: task.priorityScore || 0,
             taskType: task.taskType || null,
+            minChunk: task.minChunk !== undefined ? task.minChunk : null,
+            chunkCount: task.chunkCount !== undefined ? task.chunkCount : null,
+            chunkMinutes: task.chunkMinutes !== undefined ? task.chunkMinutes : null,
+            minMinutes: task.minMinutes !== undefined ? task.minMinutes : null,
+            maxMinutes: task.maxMinutes !== undefined ? task.maxMinutes : null,
+            earliestStart: task.earliestStart ? (task.earliestStart instanceof Date ? task.earliestStart.toISOString().split("T")[0] : task.earliestStart) : null,
             subCategory: task.subCategory || null,
             category: task.category,
-            estimatedDuration: task.estimatedDuration,
             canSplit: task.canSplit,
           },
         },

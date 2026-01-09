@@ -56,6 +56,53 @@ export function inferTaskProperties(taskName) {
 }
 
 /**
+ * Infer splitting parameters based on taskType and duration.
+ * Called when taskType is determined but specific split params are not provided.
+ * Ensures leaky/in_parts tasks have sensible defaults for minMinutes/maxMinutes or chunkCount.
+ */
+export function inferSplittingParams(taskType, duration) {
+  if (taskType === "perfect") {
+    return { minChunk: null, chunkCount: null, chunkMinutes: null, minMinutes: null, maxMinutes: null };
+  }
+
+  if (taskType === "in_parts") {
+    // For in_parts, infer chunk count based on duration
+    // e.g., 240 min → 4 chunks of 60 min each; 120 min → 2-3 chunks
+    let inferredChunkCount = Math.ceil(duration / 60);
+    if (inferredChunkCount > 5) inferredChunkCount = 5; // Cap at 5 chunks
+    if (inferredChunkCount < 2) inferredChunkCount = 2;
+
+    return {
+      minChunk: TASK_CONFIG.defaults.minChunk, // 30 min min chunk
+      chunkCount: inferredChunkCount,
+      chunkMinutes: null, // Let count determine sizes
+      minMinutes: null,
+      maxMinutes: null,
+    };
+  }
+
+  if (taskType === "leaky") {
+    // For leaky, infer min/max bounds based on duration
+    // e.g., 240 min → minMinutes: 25, maxMinutes: 80 (flexible 3-10 sessions)
+    // e.g., 120 min → minMinutes: 20, maxMinutes: 60 (flexible 2-6 sessions)
+    const minMinutes = Math.max(15, Math.floor(duration / 10)); // Min: ~10% of duration, floor at 15
+    const maxMinutes = Math.min(120, Math.ceil(duration / 2.5)); // Max: ~40% of duration, cap at 120
+
+    return {
+      minChunk: null,
+      chunkCount: null,
+      chunkMinutes: null,
+      minMinutes,
+      maxMinutes,
+    };
+  }
+
+  // Fallback
+  return { minChunk: null, chunkCount: null, chunkMinutes: null, minMinutes: null, maxMinutes: null };
+}
+
+
+/**
  * Helper to generate system prompt instructions regarding task fields
  */
 export function getTaskFieldInstructions() {

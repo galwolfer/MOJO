@@ -106,6 +106,9 @@ test("taskType inference and explicit persistence", async () => {
       effort: 4,
       canSplit: true,
       taskType: "leaky",
+      minMinutes: 20,
+      maxMinutes: 60,
+      // If caller mistakenly includes in_parts fields, they should be cleared
       chunkCount: 3,
       chunkMinutes: 15,
     },
@@ -114,6 +117,8 @@ test("taskType inference and explicit persistence", async () => {
   const id6 = parseResponseId(res6);
   const task6 = await Task.findById(id6).lean();
   assert.strictEqual(task6.taskType, "leaky");
-  assert.strictEqual(task6.chunkCount, 3);
-  assert.strictEqual(task6.chunkMinutes, 15);
+  assert.strictEqual(task6.minMinutes, 20);
+  assert.strictEqual(task6.maxMinutes, 60);
+  assert.strictEqual(task6.chunkCount, null);
+  assert.strictEqual(task6.chunkMinutes, null);
 });

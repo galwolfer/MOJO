@@ -52,7 +52,7 @@ const TASK_SECTION = missionRegistry.getPromptSection("task", { title: "TASK TOO
 export const TOOL_MANIFEST = `${MEMORY_SECTION}\n\n${PERSONALITY_SECTION}\n\n${TASK_SECTION}\n\nDATES: Convert relative dates (e.g., "tomorrow", "in two weeks", or natural language expressions) to ISO format before calling tools.\n- Recognize relative date expressions in any language and convert them to ISO dates.\n\nRECUR EXAMPLES: "daily" -> {type:"daily",interval:1} | "weekly" -> {type:"weekly",interval:1}\n\nREFERENCE RESOLUTION:\n- When user says "this task", "that task", "it", or similar, resolve to the MOST RECENT task from RECENT ENTITIES.\n- When user says "delete this" or "update it", resolve to the last mentioned entity and use its ID.\n- The RECENT ENTITIES section shows recently discussed items with their IDs - use these for operations.\n- When users use equivalents in other languages, resolve to the most recently mentioned entity.\n\nSUBCATEGORY WORKFLOW:\n- When creating/updating a task, ALWAYS call get_subcategories with the chosen category to see user's saved subcategories.\n- This tool shows both user-saved AND historical task subcategories (merged/deduped).\n- Use the results to suggest or confirm a subcategory with the user before final task creation.\n\nDURATION RULE:\n- If estimated duration is not provided by the user, ask: "How many minutes will this take?" and wait for an explicit numeric reply; do not proceed without it.\n\nEFFORT RULE:\n- If effort is not provided, you MUST pick a value (1-5) based on duration/category/complexity and include it in the mission call; never leave it empty.
 
 SPLITTING & RECURRENCE RULES:
-- When user indicates splitting or long work, consider and (if relevant) ask the user to confirm: `canSplit`, `minChunk`, `taskType` (`perfect`/`in_parts`/`leaky`), `chunkCount`/`chunkMinutes`, `earliestStart`, and `recurrence` (type/interval/endDate/count). Include these fields in `task_confirmation` and persist them on task creation when confirmed.`;
+- When user indicates splitting or long work, consider and (if relevant) ask the user to confirm: 'canSplit', 'minChunk', 'taskType' ('perfect'/'in_parts'/'leaky'), 'chunkCount'/'chunkMinutes', 'earliestStart', and 'recurrence' (type/interval/endDate/count). Include these fields in 'task_confirmation' and persist them on task creation when confirmed.`;
 
 // Short descriptions for tools. Use these for LLM-facing description fields so they can be adjusted in one place.
 export const TOOL_DESCRIPTIONS = missionRegistry.getToolDescriptions();
@@ -118,6 +118,18 @@ export function buildSystemPromptWithUserContext(
 
   prompt += `\nUser:${userId}`;
   if (userProfile?.name) prompt += `(${userProfile.name})`;
+
+  // Inject User Category Priorities
+  if (userProfile?.priorities && typeof userProfile.priorities === "object") {
+    const prioritiesWithValues = Object.entries(userProfile.priorities).filter(([_, val]) => typeof val === "number" && val >= 1 && val <= 5);
+    if (prioritiesWithValues.length > 0) {
+      prompt += `\n\nUSER CATEGORY PRIORITIES (importance 1-5):`;
+      prompt += `\nCRITICAL: Do NOT provide 'importance' parameter when creating tasks in these categories. The system will automatically use the priority below.`;
+      prioritiesWithValues.forEach(([cat, val]) => {
+        prompt += `\n- ${cat}: ${val}`;
+      });
+    }
+  }
 
   // Inject User Subcategories
   if (userProfile?.subCategories && Array.isArray(userProfile.subCategories) && userProfile.subCategories.length > 0) {

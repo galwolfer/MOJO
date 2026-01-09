@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { GuidedMission } from "./GuidedMission.js";
-import { TASK_CONFIG, inferTaskProperties } from "../taskRules.js";
+import { TASK_CONFIG, inferTaskProperties, inferSplittingParams } from "../taskRules.js";
 
 /**
  * Parse relative date strings like "next Thursday", "tomorrow", "in 3 days"
@@ -209,6 +209,32 @@ const previewTaskMission = new GuidedMission({
       const finalMaxMinutes = typeof maxMinutes === "number" && maxMinutes > 0 ? maxMinutes : null;
       const finalEarliestStart = earliestStart || null;
 
+      // Determine final taskType based on explicit value or which splitting fields were provided
+      let finalTaskType;
+      if (taskType) {
+        finalTaskType = taskType;
+      } else if (minMinutes !== undefined || maxMinutes !== undefined) {
+        finalTaskType = "leaky";
+      } else if (chunkCount !== undefined || chunkMinutes !== undefined) {
+        finalTaskType = "in_parts";
+      } else {
+        finalTaskType = finalCanSplit ? "in_parts" : TASK_CONFIG.defaults.taskType;
+      }
+
+      const previewMinChunk = finalTaskType === "in_parts" ? finalMinChunk : null;
+      const previewChunkCount = finalTaskType === "in_parts" ? finalChunkCount : null;
+      const previewChunkMinutes = finalTaskType === "in_parts" ? finalChunkMinutes : null;
+      const previewMinMinutes = finalTaskType === "leaky" ? finalMinMinutes : null;
+      const previewMaxMinutes = finalTaskType === "leaky" ? finalMaxMinutes : null;
+
+      // Infer splitting params if not explicitly provided for this taskType
+      const inferredParams = inferSplittingParams(finalTaskType, finalDuration);
+      const displayMinChunk = finalTaskType === "in_parts" ? (previewMinChunk || inferredParams.minChunk) : null;
+      const displayChunkCount = finalTaskType === "in_parts" ? (previewChunkCount || inferredParams.chunkCount) : null;
+      const displayChunkMinutes = finalTaskType === "in_parts" ? (previewChunkMinutes || inferredParams.chunkMinutes) : null;
+      const displayMinMinutes = finalTaskType === "leaky" ? (previewMinMinutes || inferredParams.minMinutes) : null;
+      const displayMaxMinutes = finalTaskType === "leaky" ? (previewMaxMinutes || inferredParams.maxMinutes) : null;
+
       const widgetJson = {
         version: "1.0",
         widget_type: "task_confirmation",
@@ -222,14 +248,17 @@ const previewTaskMission = new GuidedMission({
           importance: finalImportance,
           effort: finalEffort,
           estimatedDuration: finalDuration,
+          // Aliases to support different widget consumers
+          taskname: taskname,
+          deadline: finalDeadline,
+          duration: finalDuration,
           priority: finalImportance >= 4 ? "high" : finalImportance <= 2 ? "low" : "medium",
-          // If taskType not provided but canSplit is true (user said "פרוס"), default to 'in_parts'
-          taskType: taskType || (finalCanSplit ? "in_parts" : TASK_CONFIG.defaults.taskType),
-          minChunk: finalMinChunk,
-          chunkCount: finalChunkCount,
-          chunkMinutes: finalChunkMinutes,
-          minMinutes: finalMinMinutes,
-          maxMinutes: finalMaxMinutes,
+          taskType: finalTaskType,
+          minChunk: displayMinChunk,
+          chunkCount: displayChunkCount,
+          chunkMinutes: displayChunkMinutes,
+          minMinutes: displayMinMinutes,
+          maxMinutes: displayMaxMinutes,
           earliestStart: finalEarliestStart,
           recurrence: recurrence || null,
           description: description || (recurrence ? `Recurrence: ${recurrence.type}` : ""),

@@ -294,9 +294,14 @@ export async function updateTask({ userId, taskId, updates }) {
 
   const sanitizedUpdates = {};
   for (const field of allowedFields) {
-    // Ignore undefined or null to avoid clearing fields unintentionally
+    // Ignore undefined to avoid clearing fields unintentionally
     if (updates[field] !== undefined && updates[field] !== null) {
       sanitizedUpdates[field] = updates[field];
+    } else if (Object.prototype.hasOwnProperty.call(updates, field) && updates[field] === null) {
+      // Allow explicit null for splitting-related fields so updates can intentionally clear them
+      if (["minChunk", "chunkCount", "chunkMinutes", "minMinutes", "maxMinutes"].includes(field)) {
+        sanitizedUpdates[field] = null;
+      }
     }
   }
 
