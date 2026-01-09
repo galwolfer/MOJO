@@ -14,14 +14,14 @@
  */
 
 import mongoose from "mongoose";
-import { User } from "../src/models/User.js";
-import { Task } from "../src/models/Task.js";
-import { TaskSchedule } from "../src/models/TaskSchedule.js";
-import { completeTask } from "../src/services/taskService.js";
-import { predictTask, trainTask, checkHealth } from "../src/services/mlPredictionService.js";
-import { scoreActivities } from "../src/algorithms/priority/priority.js";
-import { taskToMLInput, calculateReward } from "../src/utils/mlInputConverter.js";
-import { env } from "../src/config/env.js";
+import { User } from "../../src/models/User.js";
+import { Task } from "../../src/models/Task.js";
+import { TaskSchedule } from "../../src/models/TaskSchedule.js";
+import { completeTask } from "../../src/services/taskService.js";
+import { predictTask, trainTask, checkHealth } from "../../src/services/mlPredictionService.js";
+import { scoreActivities } from "../../src/algorithms/priority/priority.js";
+import { taskToMLInput, calculateReward } from "../../src/utils/mlInputConverter.js";
+import { env } from "../../src/config/env.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";

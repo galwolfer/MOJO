@@ -1,6 +1,6 @@
 import assert from "assert";
-import { AgentController } from "../src/agent/agentController.js";
-import { memoryStore } from "../src/services/memoryService.js";
+import { AgentController } from "../../src/agent/agentController.js";
+import { memoryStore } from "../../src/services/memoryService.js";
 
 async function run() {
   console.log("Running security integration tests...");
@@ -26,13 +26,16 @@ async function run() {
   memoryStore.getMessageCount = async (sessionId, userId) => 1;
 
   // Stub User.findById so processMessage doesn't try to query MongoDB
-  const { User } = await import("../src/models/index.js");
+  const { User } = await import("../../src/models/index.js");
   User.findById = async (userId) => {
-    return {
+    const user = {
       _id: userId,
       username: `test-${userId}`,
       profile: { name: "Tester", tone: "friendly", persona: "assistant" },
     };
+    // Add lean method for Mongoose compatibility
+    user.lean = () => user;
+    return user;
   };
 
   // Helper to create a fake LLM with queued responses

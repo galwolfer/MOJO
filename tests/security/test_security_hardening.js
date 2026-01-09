@@ -1,6 +1,6 @@
 import assert from "assert";
-import { validateToolCall, validateWidgetPayload, POLICY_ANCHOR } from "../src/agent/security.js";
-import { buildSystemPromptWithUserContext } from "../src/agent/prompts.js";
+import { validateToolCall, validateWidgetPayload, POLICY_ANCHOR } from "../../src/agent/security.js";
+import { buildSystemPromptWithUserContext } from "../../src/agent/prompts.js";
 import { z } from "zod";
 
 function run() {

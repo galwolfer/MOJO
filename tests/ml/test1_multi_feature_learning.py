@@ -12,7 +12,11 @@ This test file demonstrates:
    - Task category feature (sport, study, work, etc.)
 """
 
-from multi_feature_linucb import MultiFeatureLinUCB, extract_features
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+
+from src.predict_model.multi_feature_linucb import MultiFeatureLinUCB, extract_features
 import numpy as np
 
 

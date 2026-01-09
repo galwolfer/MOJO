@@ -1,4 +1,8 @@
-from single_feature_linucb_model import SingleFeatureLinUCB
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+
+from src.predict_model.single_feature_linucb_model import SingleFeatureLinUCB
 
 
 #python test_linucb.py

@@ -13,7 +13,11 @@ Feature vector layout (16 features with 6 categories):
   [10-15] = category (sport, study, work, home, health, habits) - one-hot
 """
 
-from multi_feature_linucb import MultiFeatureLinUCB, extract_features
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+
+from src.predict_model.multi_feature_linucb import MultiFeatureLinUCB, extract_features
 import numpy as np
 
 CATEGORIES = ["sport", "study", "work", "home", "health", "habits"]
