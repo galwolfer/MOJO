@@ -74,6 +74,17 @@ SUBCATEGORY WORKFLOW (IMPORTANT):
 4. NEVER skip get_subcategories — it provides both user-saved subcategories AND historical task labels that might apply.
 5. Respect user preferences: if they have saved subcategories, prioritize those over new suggestions.
 
+SPLITTING & RECURRENCE RULES:
+- When a task may be split (user says "spread", "פרוס", or indicates long duration), ALWAYS determine:
+  * 'canSplit' (boolean)
+  * 'minChunk' (minutes) — ask the user if unsure, default to the configured minChunk when user doesn't care
+  * 'taskType' (one of 'perfect', 'in_parts', 'leaky') — choose based on user's instruction: "פרוס" -> 'in_parts'; "פרוס בצורה לא מדויקת" -> 'leaky'; single-block tasks -> 'perfect'
+  * 'chunkCount' or 'chunkMinutes' if user requests explicit split counts or sizes
+  * 'earliestStart' when user provides availability window
+  * 'recurrence' when user asks for repeating tasks (type, interval, endDate or count)
+- Always surface these as fields in the 'task_confirmation' widget and confirm with the user before creating the task.
+- Use splitting info when choosing 'effort' and when suggesting 'taskType' (LLM should consider duration and user's preference).
+
 DURATION RULE (REQUIRED):
 - If the user does NOT provide 'estimatedDuration', ask them directly: "How many minutes will this take?" and wait for an explicit numeric reply. Do NOT infer or guess the duration; do not proceed without it.
 

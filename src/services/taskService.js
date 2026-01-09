@@ -284,6 +284,7 @@ export async function updateTask({ userId, taskId, updates }) {
     "chunkMinutes",
     "minMinutes",
     "maxMinutes",
+    "recurrence",
     "dueDate",
     "status",
     "category",

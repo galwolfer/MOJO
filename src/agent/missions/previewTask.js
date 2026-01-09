@@ -110,6 +110,12 @@ const previewTaskMission = new GuidedMission({
     effort: z.number().min(1).max(5).optional().describe("1-5 effort (AI can infer)"),
     duration: z.number().describe("REQUIRED: Estimated minutes to complete the task (user must specify)"),
     canSplit: z.boolean().optional().describe("Can the task be split?"),
+    minChunk: z.number().optional().describe("Minimum chunk size in minutes when splitting"),
+    chunkCount: z.number().optional().describe("Optional: number of chunks to split into"),
+    chunkMinutes: z.number().optional().describe("Optional: minutes per chunk if specified"),
+    minMinutes: z.number().optional().describe("Minimum minutes for a split chunk"),
+    maxMinutes: z.number().optional().describe("Maximum minutes for a split chunk"),
+    earliestStart: z.string().optional().describe("Optional earliest start date/time for the task"),
     taskType: z.string().optional().describe("Task splitting strategy (perfect/in_parts/leaky)"),
     recurrence: z
       .object({
@@ -120,7 +126,7 @@ const previewTaskMission = new GuidedMission({
       })
       .optional(),
   }),
-  execute: async ({ args }) => {
+  execute: async ({ userId, args }) => {
     const {
       taskname,
       deadline,
@@ -131,6 +137,12 @@ const previewTaskMission = new GuidedMission({
       effort,
       duration,
       canSplit,
+      minChunk,
+      chunkCount,
+      chunkMinutes,
+      minMinutes,
+      maxMinutes,
+      earliestStart,
       taskType,
       recurrence,
     } = args;
@@ -157,8 +169,8 @@ const previewTaskMission = new GuidedMission({
       // Infer properties from task name if not provided
       const inferred = inferTaskProperties(taskname);
 
-      // Apply defaults and inference (LLM must supply effort explicitly)
-      const finalImportance = importance || inferred.importance || TASK_CONFIG.defaults.importance;
+      // Apply defaults and inference
+      let finalImportance = importance !== undefined && importance !== null ? importance : null;
       const finalEffort = effort !== undefined && effort !== null ? effort : inferred.effort ?? null;
       const finalDuration = duration !== undefined && duration !== null ? duration : inferred.duration ?? null;
       const finalCanSplit = canSplit !== undefined ? canSplit : TASK_CONFIG.defaults.splitable;
@@ -179,6 +191,24 @@ const previewTaskMission = new GuidedMission({
         return `ok=false\nerr="effort_required"\nmsg="Assistant must select an effort (integer 1-5) based on task duration, category, and complexity, and include it in the preview_task call."`;
       }
 
+      // If importance was not explicitly provided by the caller, use user's per-category priority mapping (#categorise entity)
+      if (importance === undefined || importance === null) {
+        try {
+          const { getUserCategoryImportance } = await import("../../services/userPreferenceService.js");
+          finalImportance = await getUserCategoryImportance(userId, category || inferred.category || "");
+        } catch (err) {
+          finalImportance = TASK_CONFIG.defaults.importance;
+        }
+      }
+
+      // Compute defaults for splitting-related fields
+      const finalMinChunk = typeof minChunk === "number" && minChunk > 0 ? minChunk : TASK_CONFIG.defaults.minChunk;
+      const finalChunkCount = typeof chunkCount === "number" && chunkCount > 0 ? chunkCount : null;
+      const finalChunkMinutes = typeof chunkMinutes === "number" && chunkMinutes > 0 ? chunkMinutes : null;
+      const finalMinMinutes = typeof minMinutes === "number" && minMinutes > 0 ? minMinutes : null;
+      const finalMaxMinutes = typeof maxMinutes === "number" && maxMinutes > 0 ? maxMinutes : null;
+      const finalEarliestStart = earliestStart || null;
+
       const widgetJson = {
         version: "1.0",
         widget_type: "task_confirmation",
@@ -193,7 +223,15 @@ const previewTaskMission = new GuidedMission({
           effort: finalEffort,
           estimatedDuration: finalDuration,
           priority: finalImportance >= 4 ? "high" : finalImportance <= 2 ? "low" : "medium",
-          taskType: taskType || TASK_CONFIG.defaults.taskType,
+          // If taskType not provided but canSplit is true (user said "פרוס"), default to 'in_parts'
+          taskType: taskType || (finalCanSplit ? "in_parts" : TASK_CONFIG.defaults.taskType),
+          minChunk: finalMinChunk,
+          chunkCount: finalChunkCount,
+          chunkMinutes: finalChunkMinutes,
+          minMinutes: finalMinMinutes,
+          maxMinutes: finalMaxMinutes,
+          earliestStart: finalEarliestStart,
+          recurrence: recurrence || null,
           description: description || (recurrence ? `Recurrence: ${recurrence.type}` : ""),
           canSplit: finalCanSplit,
           confirmLabel: "Create Task",

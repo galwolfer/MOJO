@@ -2,6 +2,7 @@ import { z } from "zod";
 import { GuidedMission } from "./GuidedMission.js";
 import * as taskService from "../../services/taskService.js";
 import { CATEGORY_STRING_VALUES } from "../../config/categories.js";
+import { TASK_CONFIG } from "../taskRules.js";
 
 const updateTaskMission = new GuidedMission({
   name: "update_task",
@@ -26,8 +27,22 @@ const updateTaskMission = new GuidedMission({
     effort: z.number().min(1).max(5).optional().describe("Effort 1-5"),
     estimatedDuration: z.number().optional().describe("Estimated minutes"),
     canSplit: z.boolean().optional().describe("Can be split?"),
+    minChunk: z.number().optional().describe("Minimum chunk size in minutes when splitting"),
+    chunkCount: z.number().optional().describe("Optional: number of chunks to split into"),
+    chunkMinutes: z.number().optional().describe("Optional: minutes per chunk if specified"),
+    minMinutes: z.number().optional().describe("Minimum minutes for a split chunk"),
+    maxMinutes: z.number().optional().describe("Maximum minutes for a split chunk"),
+    earliestStart: z.string().optional().describe("Optional earliest start date/time for the task"),
     taskType: z.string().optional().describe("Task splitting strategy"),
     deadline: z.string().optional(),
+    recurrence: z
+      .object({
+        type: z.enum(["daily", "weekly", "monthly", "yearly"]),
+        interval: z.number().optional().default(1),
+        endDate: z.string().optional(),
+        count: z.number().optional(),
+      })
+      .optional(),
     completed: z.boolean().optional(),
     confirm: z.boolean().optional().describe("Must be true to perform the update"),
   }),
@@ -41,10 +56,17 @@ const updateTaskMission = new GuidedMission({
       effort,
       estimatedDuration,
       canSplit,
+      minChunk,
+      chunkCount,
+      chunkMinutes,
+      minMinutes,
+      maxMinutes,
+      earliestStart,
       taskType,
       deadline,
       completed,
       confirm,
+      recurrence,
     } = args;
     try {
       let resolvedTaskId = taskId;
@@ -76,8 +98,42 @@ const updateTaskMission = new GuidedMission({
       }
       if (importance !== undefined) updates.importance = importance;
       if (effort !== undefined) updates.effort = effort;
-      if (estimatedDuration !== undefined) updates.estimatedDuration = estimatedDuration;
+      // Validate and normalize numeric and splitting-related fields similar to add_task behavior
+      if (estimatedDuration !== undefined) {
+        if (typeof estimatedDuration !== "number" || isNaN(estimatedDuration) || estimatedDuration <= 0) {
+          return `ok=false\nerr="Invalid estimatedDuration. Provide minutes as a positive number."`;
+        }
+        updates.estimatedDuration = estimatedDuration;
+      }
+
       if (canSplit !== undefined) updates.canSplit = canSplit;
+
+      // minChunk fallback to default when provided invalidly
+      if (minChunk !== undefined) {
+        const finalMin = typeof minChunk === "number" && minChunk > 0 ? minChunk : TASK_CONFIG.defaults.minChunk;
+        updates.minChunk = finalMin;
+      }
+
+      if (chunkCount !== undefined) {
+        if (typeof chunkCount === "number" && chunkCount > 0) updates.chunkCount = chunkCount;
+        // else ignore invalid chunkCount (do not clear existing value)
+      }
+
+      if (chunkMinutes !== undefined) {
+        if (typeof chunkMinutes === "number" && chunkMinutes > 0) updates.chunkMinutes = chunkMinutes;
+      }
+
+      if (minMinutes !== undefined) {
+        if (typeof minMinutes === "number" && minMinutes > 0) updates.minMinutes = minMinutes;
+      }
+
+      if (maxMinutes !== undefined) {
+        if (typeof maxMinutes === "number" && maxMinutes > 0) updates.maxMinutes = maxMinutes;
+      }
+
+      if (earliestStart !== undefined) updates.earliestStart = earliestStart;
+
+      // taskType: respect explicit value even if canSplit=false
       if (taskType !== undefined) updates.taskType = taskType;
 
       if (deadline !== undefined) {
@@ -86,6 +142,24 @@ const updateTaskMission = new GuidedMission({
           return `ok=false\nerr="Invalid date format. Use ISO 8601 (YYYY-MM-DD)."`;
         }
         updates.dueDate = d;
+      }
+
+      if (recurrence !== undefined) {
+        // Normalize recurrence values and parse endDate to Date if provided
+        const rec = {
+          type: recurrence.type,
+          interval: recurrence.interval || 1,
+          endDate: recurrence.endDate ? new Date(recurrence.endDate) : null,
+          count: recurrence.count || null,
+          completedDates: [],
+        };
+
+        // Validate endDate if provided
+        if (rec.endDate && isNaN(rec.endDate.getTime())) {
+          return `ok=false\nerr="Invalid recurrence.endDate. Use ISO 8601 (YYYY-MM-DD)."`;
+        }
+
+        updates.recurrence = rec;
       }
 
       if (completed !== undefined) updates.status = completed ? "done" : "todo";

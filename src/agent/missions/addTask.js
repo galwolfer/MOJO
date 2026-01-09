@@ -29,6 +29,12 @@ const addTaskMission = new GuidedMission({
         "REQUIRED: Specific subcategory (MUST call get_subcategories first to select from existing or confirm new)"
       ),
     canSplit: z.boolean().optional().describe("Can be split into chunks?"),
+    minChunk: z.number().optional().describe("Minimum chunk size in minutes when splitting"),
+    chunkCount: z.number().optional().describe("Optional: number of chunks to split into"),
+    chunkMinutes: z.number().optional().describe("Optional: minutes per chunk if specified"),
+    minMinutes: z.number().optional().describe("Minimum minutes for a split chunk"),
+    maxMinutes: z.number().optional().describe("Maximum minutes for a split chunk"),
+    earliestStart: z.string().optional().describe("Optional earliest start date/time for the task"),
     taskType: z.string().optional().describe("Task splitting strategy"),
     recurrence: z
       .object({
@@ -50,6 +56,12 @@ const addTaskMission = new GuidedMission({
       category,
       subcategory,
       canSplit,
+      minChunk,
+      chunkCount,
+      chunkMinutes,
+      minMinutes,
+      maxMinutes,
+      earliestStart,
       taskType,
       recurrence,
     } = args;
@@ -58,7 +70,7 @@ const addTaskMission = new GuidedMission({
       const inferred = inferTaskProperties(taskname);
 
       // Apply defaults and inference (do NOT hardcode effort; LLM should pick effort based on task info)
-      const finalImportance = importance || inferred.importance || TASK_CONFIG.defaults.importance;
+      let finalImportance = importance !== undefined && importance !== null ? importance : inferred.importance ?? 3;
       const finalEffort = effort !== undefined && effort !== null ? effort : inferred.effort ?? null;
       const finalDuration = duration !== undefined && duration !== null ? duration : inferred.duration ?? null;
       const finalCategory = category || inferred.category || "";
@@ -80,12 +92,30 @@ const addTaskMission = new GuidedMission({
         return `ok=false\nerr="effort_required"\nmsg="Assistant must select an effort (integer 1-5) based on task duration, category, and complexity, and include it in the mission call."`;
       }
 
+      // If importance was not explicitly provided by the caller, use user's per-category priority mapping (#categorise entity)
+      if (importance === undefined || importance === null) {
+        try {
+          const { getUserCategoryImportance } = await import("../../services/userPreferenceService.js");
+          finalImportance = await getUserCategoryImportance(userId, finalCategory || category);
+        } catch (err) {
+          finalImportance = TASK_CONFIG.defaults.importance;
+        }
+      }
+
       // Construct subCategory object if provided
       const subCategoryObj = finalSubcategory
         ? { label: finalSubcategory, source: "user", confidence: 1, updatedAt: new Date() }
         : null;
 
       const finalCanSplit = canSplit !== undefined ? canSplit : TASK_CONFIG.defaults.splitable;
+
+      // Compute splitting defaults and validation
+      const finalMinChunk = typeof minChunk === "number" && minChunk > 0 ? minChunk : TASK_CONFIG.defaults.minChunk;
+      const finalChunkCount = typeof chunkCount === "number" && chunkCount > 0 ? chunkCount : null;
+      const finalChunkMinutes = typeof chunkMinutes === "number" && chunkMinutes > 0 ? chunkMinutes : null;
+      const finalMinMinutes = typeof minMinutes === "number" && minMinutes > 0 ? minMinutes : null;
+      const finalMaxMinutes = typeof maxMinutes === "number" && maxMinutes > 0 ? maxMinutes : null;
+      const finalEarliestStart = earliestStart || null;
 
       const taskData = {
         userId,
@@ -95,10 +125,18 @@ const addTaskMission = new GuidedMission({
         effort: finalEffort,
         estimatedDuration: finalDuration,
         canSplit: finalCanSplit,
+        minChunk: finalMinChunk,
+        chunkCount: finalChunkCount,
+        chunkMinutes: finalChunkMinutes,
+        minMinutes: finalMinMinutes,
+        maxMinutes: finalMaxMinutes,
+        earliestStart: finalEarliestStart,
         category: finalCategory,
         subCategory: subCategoryObj,
-        taskType: taskType || TASK_CONFIG.defaults.taskType,
+        // If canSplit is true and taskType not provided, default to 'in_parts' so that 'פרוס' is respected
+        taskType: taskType || (finalCanSplit ? "in_parts" : TASK_CONFIG.defaults.taskType),
         dueDate: new Date(deadline),
+        recurrence: recurrence || null,
       };
 
       // Add recurrence pattern if specified
