@@ -1,36 +1,41 @@
 """
-Backward Compatibility Shim
-===========================
+LinUCB Contextual Bandit Package
+================================
 
-This module re-exports all symbols from the new ``linucb`` package
-for backward compatibility with existing code that imports from
-``multi_feature_linucb``.
+A multi-feature LinUCB implementation for task completion prediction.
 
-.. deprecated::
-    Import directly from ``src.predict_model.linucb`` instead.
+This package provides:
+- Feature extraction utilities for task attributes
+- A configurable LinUCB model with support for priors
+- Dynamic subcategory management
 
-Example (old way - still works):
-    >>> from src.predict_model.multi_feature_linucb import MultiFeatureLinUCB
+Quick Start
+-----------
+>>> from src.predict_model.linucb import MultiFeatureLinUCB, extract_features
+>>>
+>>> # Create model with sensible priors (recommended)
+>>> model = MultiFeatureLinUCB.create_with_priors(
+...     categories=["sport", "study", "work", "home", "health", "habits"],
+...     motivation_weight=1.0,
+...     difficulty_weights=(0.3, 0.0, -0.3),
+... )
+>>>
+>>> # Extract features and predict
+>>> x = model.extract_features_with_subcategory(
+...     motivation=4, duration=45, difficulty=3,
+...     delta_hours=30, category="study"
+... )
+>>> predicted_category = model.predict_category(x)
 
-Example (new way - preferred):
-    >>> from src.predict_model.linucb import MultiFeatureLinUCB
+See Also
+--------
+- :mod:`.model` : The main LinUCB model class
+- :mod:`.features` : Feature extraction utilities
+- :mod:`.constants` : Configuration constants
 """
 
-import warnings
-
-# Issue a deprecation warning (optional - uncomment to enable)
-# warnings.warn(
-#     "Importing from 'multi_feature_linucb' is deprecated. "
-#     "Use 'from src.predict_model.linucb import ...' instead.",
-#     DeprecationWarning,
-#     stacklevel=2,
-# )
-
-# Re-export everything from the new package
-from .linucb import (
-    # Model
-    MultiFeatureLinUCB,
-    # Feature extraction functions
+from .model import MultiFeatureLinUCB
+from .features import (
     extract_features,
     extract_motivation_feature,
     extract_duration_features,
@@ -41,28 +46,32 @@ from .linucb import (
     extract_category_difficulty_interactions,
     extract_category_pressure_interactions,
     get_feature_count,
-    # Constants
+)
+from .constants import (
+    # Feature indices
     MOTIVATION_INDEX,
     DURATION_START_INDEX,
     DIFFICULTY_START_INDEX,
     PRESSURE_START_INDEX,
     CATEGORY_START_INDEX,
+    # Feature counts
     NUM_MOTIVATION_FEATURES,
     NUM_DURATION_FEATURES,
     NUM_DIFFICULTY_FEATURES,
     NUM_PRESSURE_FEATURES,
     BASE_FEATURE_COUNT,
+    # Default thresholds
     DEFAULT_THRESHOLDS,
+    # Pressure thresholds (hours)
     PRESSURE_NO_THRESHOLD,
     PRESSURE_MILD_THRESHOLD,
     PRESSURE_STRONG_THRESHOLD,
 )
 
-# Also export helper functions that some tests may use
-from .linucb.features import get_subcategory_global_index
-
 __all__ = [
+    # Model
     "MultiFeatureLinUCB",
+    # Feature extraction
     "extract_features",
     "extract_motivation_feature",
     "extract_duration_features",
@@ -73,7 +82,7 @@ __all__ = [
     "extract_category_difficulty_interactions",
     "extract_category_pressure_interactions",
     "get_feature_count",
-    "get_subcategory_global_index",
+    # Constants
     "MOTIVATION_INDEX",
     "DURATION_START_INDEX",
     "DIFFICULTY_START_INDEX",
@@ -89,3 +98,5 @@ __all__ = [
     "PRESSURE_MILD_THRESHOLD",
     "PRESSURE_STRONG_THRESHOLD",
 ]
+
+__version__ = "1.0.0"

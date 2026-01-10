@@ -3,7 +3,7 @@ import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from src.predict_model.multi_feature_linucb import extract_features
+from src.predict_model.linucb import extract_features
 
 categories = ['sport', 'study', 'work']
 

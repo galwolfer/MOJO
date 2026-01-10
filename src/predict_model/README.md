@@ -1,106 +1,177 @@
-# predict_model — Models & Tests 🔍
+# predict_model — LinUCB Package 🔍
 
-A brief, practical guide to the files in `src/predict_model` and how to use them.
-
----
-
-## What’s in this folder
-
-- **`single_feature_linucb_model.py`** 🔧
-  - Simple, minimal LinUCB implementation for a single feature (user motivation 1–5).
-  - Exposes `SingleFeatureLinUCB` with `predict_score`, `predict_category`, and `update`.
-  - Purpose: baseline / educational model and quick experiments.
-
-- **`multi_feature_linucb.py`** 🔬
-  - Full LinUCB implementation with many interpretable features and optional interactions.
-  - Feature helpers: `extract_motivation_feature`, `extract_duration_features`, `extract_difficulty_features`, `extract_pressure_features`, `extract_category_features`, `extract_category_*_interactions` and `extract_features(...)`.
-  - Model class: `MultiFeatureLinUCB` (supports priors, `alpha`, `learn_rate`, and Sherman–Morrison updates).
-  - Purpose: production-like contextual bandit model handling categories, priors and interaction features.
-
-- **`test_single_feature_linucb.py`** 🧪
-  - Small demo script that shows predictions and how updates change `SingleFeatureLinUCB` behavior.
-
-- **`test1_multi_feature_learning.py`** 🧩
-  - Step-by-step tests that exercise each feature (motivation, duration, difficulty, pressure, category) and combined learning behavior.
-
-- **`test2_user_behavior_learning.py`** 👥
-  - Simulates different user types (high performer, procrastinator, pressure performer, improving/declining users, etc.) to verify adaptation.
-
-- **`test3_motivation_difficulty_prior.py`** 🧭
-  - Demonstrates using `init_theta` + `prior_strength` to encode prior beliefs (motivation and difficulty) and how learning interacts with priors.
-
-- **`test4_category_specific_behavior.py`** 🏷️
-  - Extensive scenarios to train category-specific behaviors, test unseen categories, and demonstrate exception handling via interaction features.
+A modular implementation of the LinUCB contextual bandit algorithm for task completion prediction.
 
 ---
 
-## Quick usage examples
+## Package Structure
 
-- Multi-feature model (recommended for realistic tasks):
+```
+predict_model/
+├── linucb/                    # Main LinUCB package
+│   ├── __init__.py           # Public API exports
+│   ├── model.py              # MultiFeatureLinUCB class
+│   ├── features.py           # Feature extraction functions
+│   └── constants.py          # Configuration constants
+├── multi_feature_linucb.py   # Backward-compatible shim
+├── single_feature_linucb_model.py  # Legacy single-feature model
+├── model_service.py          # Flask service wrapper
+└── README.md                 # This file
+```
+
+---
+
+## Quick Start
+
+### Option 1: Create model WITH priors (recommended)
 
 ```python
-from predict_model.multi_feature_linucb import MultiFeatureLinUCB, extract_features
+from src.predict_model.linucb import MultiFeatureLinUCB
 
-CATEGORIES = [
-    "study_and_education",
-    "skill_building",
-    "workout",
-    "reflection",
-    "home_and_chores",
-    "family",
-    "life_management",
-    "work_and_career",
-    "creative_projects",
-    "hobbies",
-    "relationship",
-    "goals",
-    "mindfulness",
-    "health",
-    "social_activity",
-    "recovery",
-    "exploration",
-    "uncategorized",
-]
+CATEGORIES = ["sport", "study", "work", "home", "health", "habits"]
 
-# Create model
-n_features = 1 + 2 + 3 + 4 + len(CATEGORIES)
-model = MultiFeatureLinUCB(n_features=n_features, alpha=0.1)
+# Create model with sensible priors
+model = MultiFeatureLinUCB.create_with_priors(
+    categories=CATEGORIES,
+    motivation_weight=1.0,              # High motivation → better completion
+    difficulty_weights=(0.3, 0.0, -0.3), # Easy → better, hard → worse
+    prior_strength=5.0,                 # Prior worth ~5 observations
+    learn_rate=0.5,                     # Smooth adaptation
+)
 
-# Build features for a task
-x = extract_features(motivation=4, duration=30, difficulty=3, delta_hours=24, category="study", categories=CATEGORIES)
+# Extract features and predict
+x = model.extract_features_with_subcategory(
+    motivation=4,
+    duration=30,
+    difficulty=3,
+    delta_hours=24,
+    category="study",
+)
 
-# Predict and update
+pred_cat = model.predict_category(x)  # Returns 1-5
+model.update(x, reward=0.75)          # Learn from outcome
+```
+
+### Option 2: Create model WITHOUT priors
+
+```python
+from src.predict_model.linucb import MultiFeatureLinUCB, extract_features, get_feature_count
+
+CATEGORIES = ["sport", "study", "work", "home", "health", "habits"]
+
+n_features = get_feature_count(num_categories=len(CATEGORIES))
+model = MultiFeatureLinUCB(
+    n_features=n_features,
+    categories=CATEGORIES,
+    alpha=0.1,
+)
+
+x = extract_features(
+    motivation=4, duration=30, difficulty=3, delta_hours=24,
+    category="study", categories=CATEGORIES,
+)
 pred_cat = model.predict_category(x)
-model.update(x, reward=0.75)
 ```
 
-- Single-feature quick test:
+---
 
+## Feature Vector Layout
+
+| Index | Feature    | Description                              |
+|-------|------------|------------------------------------------|
+| 0     | Motivation | Normalized motivation (0-1 from 1-5)     |
+| 1-2   | Duration   | [shortness, longness] (complementary)    |
+| 3-5   | Difficulty | One-hot [easy, medium, hard]             |
+| 6-9   | Pressure   | One-hot [no, mild, strong, urgent]       |
+| 10+   | Categories | One-hot encoding of task categories      |
+| ...   | Subcategories | Dynamic one-hot (if configured)       |
+| ...   | Interactions | Optional category×difficulty/pressure |
+
+---
+
+## Key Features
+
+### 🎯 Prior-Based Initialization
+The `create_with_priors()` factory method sets up the model with domain knowledge:
+- High motivation → better task completion
+- Easy tasks → better completion
+- Hard tasks → worse completion
+
+### 📊 Dynamic Subcategories
+Add/remove subcategories at runtime:
 ```python
-from predict_model.single_feature_linucb_model import SingleFeatureLinUCB
-model = SingleFeatureLinUCB(alpha=0.1)
-category = model.predict_category(5)  # motivation=5
-model.update(5, reward=1.0)
+model.add_subcategory("sport", "football")
+model.add_subcategory("sport", "basketball")
+model.remove_subcategory("sport", "basketball")
 ```
 
-- Run the test suites (examples):
+### ⚡ Efficient Updates
+Uses Sherman-Morrison formula for O(n²) rank-1 updates instead of O(n³) matrix inversion.
 
-```
-python src/predict_model/test1_multi_feature_learning.py
-python src/predict_model/test2_user_behavior_learning.py
+### 🔧 Configurable Parameters
+- `alpha`: Exploration bonus (higher = more exploration)
+- `prior_strength`: How strongly to hold initial beliefs
+- `learn_rate`: How fast to adapt to new data
+- `thresholds`: Score-to-category mapping
+
+---
+
+## API Reference
+
+### `MultiFeatureLinUCB`
+
+**Factory Methods:**
+- `create_with_priors(categories, ...)` — Create model with priors
+
+**Prediction:**
+- `predict_score(x)` → float — UCB score
+- `predict_category(x)` → int — Category 1-5
+
+**Learning:**
+- `update(x, reward)` — Update with observation
+
+**Feature Extraction:**
+- `extract_features_with_subcategory(...)` → ndarray
+
+**Category Info:**
+- `get_category_weight(category)` → float
+- `get_category_weights_map()` → Dict[str, float]
+- `get_category_info(category)` → Dict
+
+**Subcategory Management:**
+- `add_subcategory(category, subcategory)` → Tuple[bool, str]
+- `remove_subcategory(category, subcategory)` → Tuple[bool, str]
+- `get_subcategories(category)` → List[str]
+- `has_subcategory(category, subcategory)` → bool
+
+---
+
+## Tests
+
+Located in `tests/ml/`:
+- `test0_quickstart_model_usage.py` — Quick start demo
+- `test1_multi_feature_learning.py` — Feature-by-feature tests
+- `test2_user_behavior_learning.py` — User type simulations
+- `test3_motivation_difficulty_prior.py` — Prior behavior tests
+- `test4_category_specific_behavior.py` — Category learning tests
+- `test5_unknown_category.py` — Error handling tests
+- `test6_subcategory_learning.py` — Subcategory tests
+
+Run all tests:
+```bash
+python -m pytest tests/ml/
 ```
 
 ---
 
-## Tips & notes 💡
+## Migration from Old Import
 
-- Enable `use_interactions=True` in `extract_features(...)` to learn category-specific exceptions (requires larger feature vectors).
-- Use `init_theta` + `prior_strength` to inject prior beliefs (e.g., "motivation is good").
-- Tune `alpha` (exploration), `prior_strength`, and `learn_rate` to control exploration vs. stability.
-- `MultiFeatureLinUCB.update` uses Sherman–Morrison to maintain `A_inv` efficiently—avoid manual matrix inversion.
+**Old (still works via shim):**
+```python
+from src.predict_model.multi_feature_linucb import MultiFeatureLinUCB
+```
 
----
-
-If you want, I can:
-- Add a short example script that simulates a user and plots score progression, or
-- Add docstrings or type annotations to specific functions. Tell me which option you'd prefer. ✅
+**New (preferred):**
+```python
+from src.predict_model.linucb import MultiFeatureLinUCB
+```

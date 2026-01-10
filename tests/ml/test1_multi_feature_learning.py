@@ -17,7 +17,7 @@ import os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from src.predict_model.multi_feature_linucb import MultiFeatureLinUCB, extract_features
+from src.predict_model.linucb import MultiFeatureLinUCB, extract_features
 import numpy as np
 
 

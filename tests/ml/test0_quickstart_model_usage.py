@@ -22,7 +22,7 @@ import os
 # Make repository root importable so `src.*` modules resolve when running directly
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from src.predict_model.multi_feature_linucb import (
+from src.predict_model.linucb import (
     MultiFeatureLinUCB,
     extract_features,
     get_feature_count,

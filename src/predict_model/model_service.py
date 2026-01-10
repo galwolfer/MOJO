@@ -30,8 +30,8 @@ import pickle
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple
 
-# Import the model and feature extractor from predict_model
-from multi_feature_linucb import MultiFeatureLinUCB, extract_features
+# Import the model and feature extractor from the linucb package
+from linucb import MultiFeatureLinUCB, extract_features
 
 
 class ModelService:
