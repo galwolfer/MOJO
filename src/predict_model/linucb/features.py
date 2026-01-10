@@ -212,6 +212,7 @@ def extract_pressure_features(delta_hours: float) -> List[float]:
 def extract_category_features(
     category: str,
     categories: Sequence[str],
+    excluded_categories: Optional[Sequence[str]] = None,
 ) -> List[float]:
     """One-hot encode the task category.
 
@@ -221,11 +222,15 @@ def extract_category_features(
         The category name of the current task.
     categories : Sequence[str]
         The list of all possible category names.
+    excluded_categories : Sequence[str], optional
+        Categories to exclude from learning. If the category is in this
+        list, returns all zeros so the model won't learn from it.
 
     Returns
     -------
     List[float]
         A one-hot encoded list of length len(categories).
+        All zeros if the category is excluded.
 
     Raises
     ------
@@ -236,6 +241,8 @@ def extract_category_features(
     --------
     >>> extract_category_features("study", ["sport", "study", "work"])
     [0.0, 1.0, 0.0]
+    >>> extract_category_features("other", ["sport", "other"], excluded_categories=["other"])
+    [0.0, 0.0]  # Excluded category returns zeros
     """
     vec = [0.0] * len(categories)
     if not categories:
@@ -248,6 +255,10 @@ def extract_category_features(
             f"Unknown category '{category}'. "
             f"Valid categories are: {', '.join(categories)}"
         )
+
+    # If category is excluded, return zeros (no learning for this category)
+    if excluded_categories and category in excluded_categories:
+        return vec
 
     vec[idx] = 1.0
     return vec
@@ -530,6 +541,7 @@ def extract_features(
     use_interactions: bool = False,
     subcategory: Optional[str] = None,
     subcategory_map: Optional[Dict[str, List[str]]] = None,
+    excluded_categories: Optional[Sequence[str]] = None,
 ) -> np.ndarray:
     """Assemble all feature components into a single numpy vector.
 
@@ -561,6 +573,10 @@ def extract_features(
     subcategory_map : Optional[Dict[str, List[str]]], optional
         A mapping from category names to lists of subcategory names.
         Default is None.
+    excluded_categories : Optional[Sequence[str]], optional
+        Categories to exclude from learning. If the task's category is
+        in this list, the category feature will be all zeros.
+        Default is None.
 
     Returns
     -------
@@ -589,8 +605,8 @@ def extract_features(
     features.extend(extract_difficulty_features(difficulty))
     features.extend(extract_pressure_features(delta_hours))
 
-    # Category features
-    features.extend(extract_category_features(category, categories))
+    # Category features (excluded categories get zeros)
+    features.extend(extract_category_features(category, categories, excluded_categories))
 
     # Subcategory features (if provided)
     if subcategory_map:

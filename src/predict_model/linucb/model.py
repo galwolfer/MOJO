@@ -119,6 +119,7 @@ class MultiFeatureLinUCB:
     init_theta: Optional[Sequence[float]] = None
     categories: Optional[Sequence[str]] = None
     subcategory_map: Dict[str, List[str]] = field(default_factory=dict)
+    excluded_categories: Optional[Sequence[str]] = None
     prior_strength: float = 0.0
     learn_rate: float = 1.0
 
@@ -186,6 +187,7 @@ class MultiFeatureLinUCB:
         thresholds: Optional[Sequence[float]] = None,
         use_interactions: bool = False,
         subcategory_map: Optional[Dict[str, List[str]]] = None,
+        excluded_categories: Optional[Sequence[str]] = None,
     ) -> MultiFeatureLinUCB:
         """Create a model with motivation and difficulty priors pre-configured.
 
@@ -218,6 +220,12 @@ class MultiFeatureLinUCB:
             Whether to include interaction features. Default is False.
         subcategory_map : Dict[str, List[str]], optional
             Initial subcategory mapping. Default is None.
+        excluded_categories : Sequence[str], optional
+            Categories to exclude from learning. These categories will
+            have their feature always set to 0, so the model won't learn
+            any weight for them. Useful for catch-all categories like
+            "other" that contain diverse unrelated tasks. Excluded
+            categories cannot have subcategories. Default is None.
 
         Returns
         -------
@@ -227,7 +235,8 @@ class MultiFeatureLinUCB:
         Examples
         --------
         >>> model = MultiFeatureLinUCB.create_with_priors(
-        ...     categories=["sport", "study", "work"],
+        ...     categories=["sport", "study", "work", "other"],
+        ...     excluded_categories=["other"],  # "other" won't be learned
         ...     motivation_weight=1.0,
         ...     difficulty_weights=(0.3, 0.0, -0.3),
         ...     prior_strength=5.0,
@@ -266,9 +275,43 @@ class MultiFeatureLinUCB:
             init_theta=init_theta,
             categories=list(categories),
             subcategory_map=subcategory_map,
+            excluded_categories=list(excluded_categories) if excluded_categories else None,
             prior_strength=prior_strength,
             learn_rate=learn_rate,
         )
+
+    # =========================================================================
+    # Excluded Category Methods
+    # =========================================================================
+
+    def is_excluded_category(self, category: str) -> bool:
+        """Check if a category is excluded from learning.
+
+        Parameters
+        ----------
+        category : str
+            The category name to check.
+
+        Returns
+        -------
+        bool
+            True if the category is in the excluded list.
+        """
+        if self.excluded_categories is None:
+            return False
+        return category in self.excluded_categories
+
+    def get_excluded_categories(self) -> List[str]:
+        """Get the list of excluded categories.
+
+        Returns
+        -------
+        List[str]
+            List of excluded category names, or empty list if none.
+        """
+        if self.excluded_categories is None:
+            return []
+        return list(self.excluded_categories)
 
     # =========================================================================
     # Prediction Methods
@@ -431,6 +474,7 @@ class MultiFeatureLinUCB:
             use_interactions=use_interactions,
             subcategory=subcategory,
             subcategory_map=self.subcategory_map if self.subcategory_map else None,
+            excluded_categories=self.excluded_categories,
         )
 
     # =========================================================================
@@ -591,6 +635,13 @@ class MultiFeatureLinUCB:
         # Validate category
         if self.categories is not None and category not in self.categories:
             return (False, f"Category '{category}' is not a valid category")
+
+        # Block excluded categories from having subcategories
+        if self.is_excluded_category(category):
+            return (
+                False,
+                f"Category '{category}' is excluded from learning and cannot have subcategories",
+            )
 
         # Check for duplicates
         if category in self.subcategory_map:
