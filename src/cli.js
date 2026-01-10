@@ -18,6 +18,8 @@ import {
   checkSuggestionFollowed, 
   updateScheduleEntryStatus, 
   updateTask,
+  getSubTasksForTask,
+  updateSubTask,
   extendTaskDeadline as extendTaskDeadlineService,
   deleteTask as deleteTaskService,
   createBusyBlock,
@@ -585,6 +587,51 @@ async function listTasks() {
   });
 }
 
+async function recommendTask() {
+  if (!ensureLoggedIn()) return;
+
+  const { top, ranked = [], reasons = [] } = await coacherAlgorithm.computeFromDb(
+    currentUser._id,
+    currentUser.profile || {}
+  );
+
+  if (!top) {
+    console.log(theme.info("🤷 Nothing to recommend right now."));
+    if (reasons.length) console.log(theme.muted(`Hints: ${reasons.join(" | ")}`));
+    if (!ranked.length) console.log(theme.muted("Try adding a few open tasks first."));
+    return;
+  }
+
+  console.log(theme.accent("\n✨ Recommended next task"));
+  console.log(`${theme.title(top.title)} - score ${paint(top.score.toFixed(2), ansi.bold, ansi.yellow)}`);
+  if (top.reason) console.log(theme.muted(`Reason: ${top.reason}`));
+  if (top.category) console.log(theme.muted(`Category: ${top.category}`));
+  if (top.window) console.log(theme.muted(`Suggested slot: ${top.window.start} -> ${top.window.end}`));
+}
+
+async function suggestNewTask() {
+  if (!ensureLoggedIn()) return;
+
+  const freshUser = await getUserById(currentUser._id);
+  if (freshUser) currentUser = freshUser;
+  const profile = currentUser.profile || {};
+
+  const tasks = await getTasksForUser(currentUser._id, { status: { $in: ["todo", "in_progress"] } });
+  const suggestion = await suggestTaskFromProfile(profile, tasks);
+
+  console.log(theme.accent("\n🆕 Suggested new task idea"));
+  console.log(`${theme.title(suggestion.title)} (${suggestion.category})`);
+  console.log(theme.muted(`Why: ${suggestion.reason}`));
+  if (suggestion.algorithm === "logreg" && typeof suggestion.modelScore === "number") {
+    console.log(theme.muted(`Model confidence: ${(suggestion.modelScore * 100).toFixed(1)}%`));
+  }
+  if (suggestion.description) console.log(theme.muted(`Idea: ${suggestion.description}`));
+  console.log(theme.muted("Add it via option 3 to include it in your queue."));
+
+  lastSuggestion = { ...suggestion, at: Date.now() };
+  await logEvent({ type: "suggestion_shown", userId: currentUser._id, payload: suggestion });
+}
+
 // =============================================================================
 // EDIT TASK
 // =============================================================================
@@ -622,7 +669,41 @@ async function editTaskOption() {
   }
 
   const taskToEdit = tasks[taskIndex];
-  await editTaskFields(taskToEdit);
+  await editTaskMenu(taskToEdit);
+}
+
+async function editTaskMenu(task) {
+  while (true) {
+    console.log(theme.muted("\n═════════════════════════════════════"));
+    console.log(theme.title(` Editing: ${task.taskname || task.title}`));
+    console.log(theme.muted("═════════════════════════════════════"));
+    console.log(theme.subtitle("What would you like to edit?"));
+    console.log(`${theme.option("1)")} Task fields (name, importance, effort, duration, etc.)`);
+    console.log(`${theme.option("2)")} SubTasks (for tasks split into parts)`);
+    console.log(`${theme.option("0)")} Back`);
+
+    const choice = (await ask("\nChoose an option ➤ ")).trim();
+
+    if (choice === "0" || !choice) {
+      return;
+    }
+
+    if (choice === "1") {
+      await editTaskFields(task);
+      // Refresh task data after edit
+      const refreshed = await getTasksForUser(currentUser._id);
+      const updated = refreshed.find(t => t._id.toString() === task._id.toString());
+      if (updated) task = updated;
+    } else if (choice === "2") {
+      await editSubTasksOption(task);
+      // Refresh task data after subtask edits
+      const refreshed = await getTasksForUser(currentUser._id);
+      const updated = refreshed.find(t => t._id.toString() === task._id.toString());
+      if (updated) task = updated;
+    } else {
+      console.log(theme.warning("Invalid option. Please choose 1, 2, or 0."));
+    }
+  }
 }
 
 async function editTaskFields(task) {
@@ -632,7 +713,7 @@ async function editTaskFields(task) {
   };
 
   console.log(theme.muted("\n═════════════════════════════════════"));
-  console.log(theme.title(` Editing: ${task.taskname || task.title}`));
+  console.log(theme.title(` Editing Task Fields`));
   console.log(theme.muted("═════════════════════════════════════"));
   console.log(theme.subtitle("Press Enter to keep current value, or type a new value.\n"));
 
@@ -680,6 +761,27 @@ async function editTaskFields(task) {
     const newDuration = toNumber(newDurationRaw, currentDuration);
     if (newDuration >= 15 && newDuration !== currentDuration) {
       updates.estimatedDuration = Math.round(newDuration);
+    }
+  }
+
+  // Task Type
+  const currentTaskType = task.taskType || "perfect";
+  console.log(theme.muted(`\nCurrent task type: ${currentTaskType}`));
+  console.log(theme.subtitle("Task type options: perfect, in_parts, leaky"));
+  const newTaskTypeRaw = (await ask(`New task type [${currentTaskType}]: `)).trim().toLowerCase();
+  if (newTaskTypeRaw && ["perfect", "in_parts", "leaky"].includes(newTaskTypeRaw) && newTaskTypeRaw !== currentTaskType) {
+    updates.taskType = newTaskTypeRaw;
+  }
+
+  // Chunk Count (if applicable)
+  if (task.taskType === "in_parts" || task.taskType === "leaky" || updates.taskType === "in_parts" || updates.taskType === "leaky") {
+    const currentChunkCount = task.chunkCount || 1;
+    const newChunkCountRaw = (await ask(`Chunk count [${currentChunkCount}]: `)).trim();
+    if (newChunkCountRaw) {
+      const newChunkCount = toNumber(newChunkCountRaw, currentChunkCount);
+      if (newChunkCount >= 1 && newChunkCount !== currentChunkCount) {
+        updates.chunkCount = Math.round(newChunkCount);
+      }
     }
   }
 
@@ -744,49 +846,119 @@ async function editTaskFields(task) {
   }
 }
 
-async function recommendTask() {
-  if (!ensureLoggedIn()) return;
-
-  const { top, ranked = [], reasons = [] } = await coacherAlgorithm.computeFromDb(
-    currentUser._id,
-    currentUser.profile || {}
-  );
-
-  if (!top) {
-    console.log(theme.info("🤷 Nothing to recommend right now."));
-    if (reasons.length) console.log(theme.muted(`Hints: ${reasons.join(" | ")}`));
-    if (!ranked.length) console.log(theme.muted("Try adding a few open tasks first."));
+async function editSubTasksOption(task) {
+  if (!["in_parts", "leaky"].includes(task.taskType)) {
+    console.log(theme.warning("\n⚠️  This task is not split into parts."));
+    console.log(theme.muted("Change task type to 'in_parts' or 'leaky' to enable subtasks."));
     return;
   }
 
-  console.log(theme.accent("\n✨ Recommended next task"));
-  console.log(`${theme.title(top.title)} - score ${paint(top.score.toFixed(2), ansi.bold, ansi.yellow)}`);
-  if (top.reason) console.log(theme.muted(`Reason: ${top.reason}`));
-  if (top.category) console.log(theme.muted(`Category: ${top.category}`));
-  if (top.window) console.log(theme.muted(`Suggested slot: ${top.window.start} -> ${top.window.end}`));
+  const subtasks = await getSubTasksForTask({ userId: currentUser._id, taskId: task._id });
+  
+  if (!subtasks || subtasks.length === 0) {
+    console.log(theme.warning("\n⚠️  No subtasks found for this task."));
+    console.log(theme.muted("Subtasks should be created automatically. Try updating the task's chunk count."));
+    return;
+  }
+
+  while (true) {
+    console.log(theme.muted("\n═════════════════════════════════════"));
+    console.log(theme.title(` SubTasks for: ${task.taskname || task.title}`));
+    console.log(theme.muted("═════════════════════════════════════"));
+    
+    subtasks.forEach((sub, index) => {
+      const statusIcon = sub.status === "done" ? "✓" : "○";
+      const titleDisplay = sub.title || `Part ${sub.index}`;
+      const descDisplay = sub.description ? ` - ${sub.description}` : "";
+      console.log(`${theme.option(`${index + 1})`)} [${statusIcon}] ${titleDisplay}${theme.muted(descDisplay)}`);
+    });
+    console.log(`${theme.option("0)")} Back`);
+
+    const choice = (await ask("\nSelect subtask to edit (or 0 to go back) ➤ ")).trim();
+
+    if (choice === "0" || !choice) {
+      return;
+    }
+
+    const subIndex = parseInt(choice, 10) - 1;
+    if (isNaN(subIndex) || subIndex < 0 || subIndex >= subtasks.length) {
+      console.log(theme.warning("Invalid selection."));
+      continue;
+    }
+
+    const subtaskToEdit = subtasks[subIndex];
+    await editSubTaskFields(subtaskToEdit);
+    
+    // Refresh subtask list
+    const refreshed = await getSubTasksForTask({ userId: currentUser._id, taskId: task._id });
+    if (refreshed && refreshed.length) {
+      subtasks.length = 0;
+      subtasks.push(...refreshed);
+    }
+  }
 }
 
-async function suggestNewTask() {
-  if (!ensureLoggedIn()) return;
+async function editSubTaskFields(subtask) {
+  console.log(theme.muted("\n─────────────────────────────────────"));
+  console.log(theme.title(` Editing SubTask: ${subtask.title || `Part ${subtask.index}`}`));
+  console.log(theme.muted("─────────────────────────────────────"));
 
-  const freshUser = await getUserById(currentUser._id);
-  if (freshUser) currentUser = freshUser;
-  const profile = currentUser.profile || {};
+  const updates = {};
 
-  const tasks = await getTasksForUser(currentUser._id, { status: { $in: ["todo", "in_progress"] } });
-  const suggestion = await suggestTaskFromProfile(profile, tasks);
-
-  console.log(theme.accent("\n🆕 Suggested new task idea"));
-  console.log(`${theme.title(suggestion.title)} (${suggestion.category})`);
-  console.log(theme.muted(`Why: ${suggestion.reason}`));
-  if (suggestion.algorithm === "logreg" && typeof suggestion.modelScore === "number") {
-    console.log(theme.muted(`Model confidence: ${(suggestion.modelScore * 100).toFixed(1)}%`));
+  // Title
+  const currentTitle = subtask.title || "";
+  const newTitle = (await ask(`Title [${currentTitle}]: `)).trim();
+  if (newTitle && newTitle !== currentTitle) {
+    updates.title = newTitle;
   }
-  if (suggestion.description) console.log(theme.muted(`Idea: ${suggestion.description}`));
-  console.log(theme.muted("Add it via option 3 to include it in your queue."));
 
-  lastSuggestion = { ...suggestion, at: Date.now() };
-  await logEvent({ type: "suggestion_shown", userId: currentUser._id, payload: suggestion });
+  // Description
+  const currentDesc = subtask.description || "";
+  const descPrompt = currentDesc ? `Description [${currentDesc}]: ` : "Description (optional): ";
+  const newDesc = (await ask(descPrompt)).trim();
+  if (newDesc !== "" && newDesc !== currentDesc) {
+    updates.description = newDesc;
+  }
+
+  // Status
+  const currentStatus = subtask.status || "todo";
+  console.log(theme.muted(`\nCurrent status: ${currentStatus}`));
+  console.log(theme.subtitle("Status: todo, done"));
+  const newStatusRaw = (await ask(`Status [${currentStatus}]: `)).trim().toLowerCase();
+  if (newStatusRaw && ["todo", "done"].includes(newStatusRaw) && newStatusRaw !== currentStatus) {
+    updates.status = newStatusRaw;
+  }
+
+  // Check if any updates
+  if (Object.keys(updates).length === 0) {
+    console.log(theme.info("\n📝 No changes made."));
+    return;
+  }
+
+  // Confirm changes
+  console.log(theme.subtitle("\nChanges to apply:"));
+  for (const [field, value] of Object.entries(updates)) {
+    console.log(theme.muted(`  • ${field}: ${value}`));
+  }
+
+  const confirm = (await ask("\nApply these changes? (Y/n): ")).trim().toLowerCase();
+  if (confirm === "n" || confirm === "no") {
+    console.log(theme.muted("Edit cancelled."));
+    return;
+  }
+
+  // Apply updates
+  const result = await updateSubTask({
+    userId: currentUser._id,
+    subTaskId: subtask._id,
+    updates,
+  });
+
+  if (result.success) {
+    console.log(theme.success("\n✅ SubTask updated successfully!"));
+  } else {
+    console.log(theme.error(`\n❌ Failed to update subtask: ${result.error}`));
+  }
 }
 
 async function planTasksOption() {

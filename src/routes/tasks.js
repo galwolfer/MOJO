@@ -31,6 +31,15 @@ const router = Router();
     PATCH  /:id           Update a task
     DELETE /:id           Delete a task
     POST   /:id/toggle    Toggle completion
+    POST   /:id/complete  Complete task (triggers ML training)
+
+  SUBTASK Operations
+    GET    /:id/subtasks                    Get all subtasks for a task
+    GET    /:taskId/subtasks/:subId         Get single subtask
+    PATCH  /:taskId/subtasks/:subId         Update subtask fields
+    POST   /:taskId/subtasks/:subId/complete   Mark subtask complete
+    POST   /:taskId/subtasks/:subId/todo       Mark subtask as todo
+    PATCH  /:taskId/subtasks/:subId/status     Update subtask status
 
   FILTERED QUERIES
     GET    /upcoming/:days?   Tasks due within N days
@@ -264,8 +273,23 @@ router.get("/", taskController.getTasks);
 // Get subtasks for a task
 router.get("/:id/subtasks", taskController.getSubTasksForTask);
 
+// Get a single subtask by ID
+router.get("/:taskId/subtasks/:subId", taskController.getSubTaskById);
+
 // Update a single subtask for a task (mark complete / update title)
 router.patch("/:taskId/subtasks/:subId", taskController.updateSubTask);
+
+// Mark subtask as complete (shortcut)
+router.post("/:taskId/subtasks/:subId/complete", taskController.markSubTaskComplete);
+
+// Mark subtask as todo (shortcut)
+router.post("/:taskId/subtasks/:subId/todo", taskController.markSubTaskTodo);
+
+// Update subtask status directly
+router.patch("/:taskId/subtasks/:subId/status", taskController.updateSubTaskStatus);
+
+// Bulk update task with subtasks in one call
+router.patch("/:id/full", taskController.bulkUpdateTaskWithSubtasks);
 
 // Get a single task by ID
 router.get("/:id", taskController.getTaskById);
