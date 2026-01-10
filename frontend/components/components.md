@@ -45,6 +45,16 @@ Update this file whenever you add, remove, or change a component.
    - Reusable animated wrapper for groups of buttons or action elements. Supports optional vertical stacking, container entrance animation (fade + translateY), and per-child staggered entrance. Useful for onboarding and chat-bubble action groups where buttons should appear sequentially.
    - Props: `entranceEnabled`, `vertical`, `staggerChildren`, `staggerDelay`, `containerDelay`, `gap`, `paddingTop`, `paddingBottom`.
 
+- `Widget.tsx` — `frontend/components/special/Widget.tsx`
+   - A compact surfaced container (uses `COLORS.white3`) with a configurable entrance animation (fade + translateY). Use to group small forms and controls within chat bubbles or card surfaces.
+   - Props: `entranceEnabled?: boolean`, `entranceDelay?: number`, `entranceDuration?: number`, `style?: StyleProp<ViewStyle>`.
+   - Example:
+```tsx
+<Widget entranceEnabled={typingDone} entranceDelay={100} entranceDuration={200}>
+  <Input label="Email" placeholder="you@example.com" />
+</Widget>
+```
+
 - `ConicGradientBubble.tsx` — `frontend/components/special/ConicGradientBubble.tsx`
    - Animated gradient bubble component using Skia for visual effects.
 
@@ -102,6 +112,7 @@ Update this file whenever you add, remove, or change a component.
    - Any notable cross-platform differences (web vs native)
    - The file path
 
-2. When updating a component, update this file with the change summary and date.
+2. When updating a component, update this file with the change summary and date. Example:
+   - `2026-01-11` — Added `AnimatedButtonsContainer` (`common`) and `Widget` (`special`); refactored auth steps to use `AnimatedButtonsContainer` and added Welcome screen stagger behaviour.
 
 3. Keep `components/index.ts` in sync so imports across the app can use `import { Box } from './components'`.

@@ -40,6 +40,7 @@
   - `components/common/NavBar.tsx` — JSDoc and cleanup of unused imports.
   - `components/common/TextBouble.tsx` — typewriter explained and well-documented (complex, keep as-is).
   - `components/common/AnimatedButtonsContainer.tsx` — new reusable animated wrapper for button groups. Supports vertical stacking and per-child staggered entrance; ideal for onboarding and chat bubble action layouts.
+  - `components/special/Widget.tsx` — surfaced widget container with entrance animation (fade + translateY). Documented usage and recommended for embedding form fields inside `TextBouble`.
   - `components/inputs/Input.tsx` — documented, simplified dropdown handling, web caret support explained.
   - `components/layout/Box.tsx` & `BoxContainer.tsx` — typed and better documented.
   - `components/special/PriorityList.tsx` — web drag-and-drop list (documented).
