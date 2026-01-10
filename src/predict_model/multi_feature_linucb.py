@@ -46,21 +46,32 @@ Example usage:
     categories = ["sport", "study", "work", "home", "health", "habits"]
 
     # create a model with appropriate number of features
-    model = MultiFeatureLinUCB(num_motivation_features=1,
-                               num_duration_features=2,
-                               num_difficulty_features=3,
-                               num_pressure_features=4,
-                               num_category_features=len(categories),
+    model = MultiFeatureLinUCB(n_features=16,  # 10 base + 6 categories
+                               categories=categories,
                                alpha=0.1)
 
-    # extract feature vector for a new task
-    x = extract_features(motivation=4,               # user motivation 1..5
-                         duration=45,               # task length in minutes
-                         difficulty=3,              # difficulty rating 1..5
-                         delta_hours=30,            # hours until deadline
-                         category="study",         # task category
-                         categories=categories,     # known categories
-                         max_duration=120)          # max duration for normalisation
+    # Add subcategories dynamically after model creation
+    model.add_subcategory("sport", "football")
+    model.add_subcategory("sport", "basketball")
+    model.add_subcategory("study", "math")
+    # n_features is now 19 (16 + 3 subcategories)
+
+    # extract feature vector for a new task with subcategory
+    x = model.extract_features_with_subcategory(
+        motivation=4,               # user motivation 1..5
+        duration=45,               # task length in minutes
+        difficulty=3,              # difficulty rating 1..5
+        delta_hours=30,            # hours until deadline
+        category="sport",          # task category
+        subcategory="football",    # optional subcategory
+        max_duration=120           # max duration for normalisation
+    )
+
+    # Or without subcategory (subcategory features will be zeros)
+    x_no_sub = model.extract_features_with_subcategory(
+        motivation=4, duration=45, difficulty=3,
+        delta_hours=30, category="study"
+    )
 
     # predict and update the model after observing behaviour
     predicted_category = model.predict_category(x)
@@ -68,14 +79,18 @@ Example usage:
     observed_reward = 0.5  # e.g. user completed slightly late
     model.update(x, reward=observed_reward)
 
+    # Remove a subcategory when no longer needed
+    model.remove_subcategory("sport", "basketball")
+
 The LinUCB model learns online from each task.  Each reward
 reinforces or discourages the current association between the task
 features and the user's performance.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Sequence
+from typing import List, Dict, Sequence, Optional, Tuple
 import numpy as np
+import copy
 
 
 def extract_motivation_feature(motivation: float) -> List[float]:
@@ -232,6 +247,96 @@ def extract_category_features(category: str, categories: Sequence[str]) -> List[
     return vec
 
 
+def extract_subcategory_features(
+    category: str,
+    subcategory: Optional[str],
+    subcategory_map: Dict[str, List[str]]
+) -> List[float]:
+    """One-hot encode the subcategory based on a mapping of subcategories per category.
+
+    If subcategory is None or empty, returns a zero vector.
+    If the subcategory exists under the given category, returns a one-hot vector.
+
+    Parameters
+    ----------
+    category : str
+        The main category name.
+    subcategory : Optional[str]
+        The subcategory name, or None if not specified.
+    subcategory_map : Dict[str, List[str]]
+        A mapping from category names to lists of subcategory names.
+
+    Returns
+    -------
+    List[float]
+        A one-hot encoded vector of total subcategories length.
+        All zeros if subcategory is None or not found.
+    """
+    # Calculate total subcategories across all categories
+    total_subcategories = sum(len(subs) for subs in subcategory_map.values())
+    vec = [0.0] * total_subcategories
+    
+    if not subcategory or not subcategory_map:
+        return vec
+    
+    # Check if category exists in the map
+    if category not in subcategory_map:
+        return vec
+    
+    # Check if subcategory exists under this category
+    if subcategory not in subcategory_map[category]:
+        return vec
+    
+    # Calculate the global index for this subcategory
+    global_idx = 0
+    for cat in sorted(subcategory_map.keys()):
+        if cat == category:
+            # Found the category, now find subcategory index within it
+            sub_idx = subcategory_map[cat].index(subcategory)
+            global_idx += sub_idx
+            break
+        else:
+            global_idx += len(subcategory_map[cat])
+    
+    vec[global_idx] = 1.0
+    return vec
+
+
+def get_subcategory_global_index(
+    category: str,
+    subcategory: str,
+    subcategory_map: Dict[str, List[str]]
+) -> int:
+    """Get the global feature index for a subcategory.
+
+    Parameters
+    ----------
+    category : str
+        The main category name.
+    subcategory : str
+        The subcategory name.
+    subcategory_map : Dict[str, List[str]]
+        A mapping from category names to lists of subcategory names.
+
+    Returns
+    -------
+    int
+        The global index for the subcategory, or -1 if not found.
+    """
+    if category not in subcategory_map:
+        return -1
+    if subcategory not in subcategory_map[category]:
+        return -1
+    
+    global_idx = 0
+    for cat in sorted(subcategory_map.keys()):
+        if cat == category:
+            sub_idx = subcategory_map[cat].index(subcategory)
+            return global_idx + sub_idx
+        global_idx += len(subcategory_map[cat])
+    return -1
+
+
 def extract_category_difficulty_interactions(
     category: str, difficulty: int, categories: Sequence[str]
 ) -> List[float]:
@@ -352,7 +457,11 @@ def extract_category_pressure_interactions(
     return vec
 
 
-def get_feature_count(num_categories: int, use_interactions: bool = False) -> int:
+def get_feature_count(
+    num_categories: int,
+    use_interactions: bool = False,
+    num_subcategories: int = 0
+) -> int:
     """Calculate the total number of features for a given configuration.
 
     Parameters
@@ -361,17 +470,19 @@ def get_feature_count(num_categories: int, use_interactions: bool = False) -> in
         The number of task categories.
     use_interactions : bool, optional
         Whether to include interaction features. Default is False.
+    num_subcategories : int, optional
+        Total number of subcategories across all categories. Default is 0.
 
     Returns
     -------
     int
         Total feature count:
         - Base: 1 (motivation) + 2 (duration) + 3 (difficulty) + 4 (pressure)
-                + num_categories = 10 + num_categories
+                + num_categories + num_subcategories = 10 + num_categories + num_subcategories
         - With interactions: base + num_categories*3 (cat×diff)
                             + num_categories*4 (cat×pressure)
     """
-    base_features = 1 + 2 + 3 + 4 + num_categories  # 10 + num_categories
+    base_features = 1 + 2 + 3 + 4 + num_categories + num_subcategories  # 10 + num_categories + subcategories
     if use_interactions:
         interaction_features = num_categories * 3 + num_categories * 4  # cat×diff + cat×pressure
         return base_features + interaction_features
@@ -387,6 +498,8 @@ def extract_features(
     categories: Sequence[str],
     max_duration: float = 120.0,
     use_interactions: bool = False,
+    subcategory: Optional[str] = None,
+    subcategory_map: Optional[Dict[str, List[str]]] = None,
 ) -> np.ndarray:
     """Assemble all feature components into a single numpy vector.
 
@@ -412,13 +525,19 @@ def extract_features(
         interaction features. This enables the model to learn
         category-specific exceptions (e.g., "work is bad except for
         hard+urgent tasks"). Default is False.
+    subcategory : Optional[str], optional
+        The subcategory name within the main category. If None,
+        the subcategory features will be all zeros. Default is None.
+    subcategory_map : Optional[Dict[str, List[str]]], optional
+        A mapping from category names to lists of subcategory names.
+        Required if subcategory is provided. Default is None.
 
     Returns
     -------
     numpy.ndarray
         A 1D array representing the complete feature vector for the task.
-        Length is 10 + len(categories) without interactions, or
-        10 + len(categories) + 7*len(categories) with interactions.
+        Length is 10 + len(categories) + num_subcategories without interactions, or
+        10 + len(categories) + num_subcategories + 7*len(categories) with interactions.
     """
     features = []
     # Motivation (1 feature)
@@ -431,6 +550,11 @@ def extract_features(
     features.extend(extract_pressure_features(delta_hours))
     # Category one-hot (len(categories) features)
     features.extend(extract_category_features(category, categories))
+    
+    # Subcategory one-hot (total subcategories features)
+    # If no subcategory_map, add zero features
+    if subcategory_map:
+        features.extend(extract_subcategory_features(category, subcategory, subcategory_map))
 
     # Optional interaction features for category-specific learning
     if use_interactions:
@@ -482,6 +606,10 @@ class MultiFeatureLinUCB:
         The list of task category names used for feature encoding.
         Saved for reference to identify which category index corresponds
         to which category name. Default is None.
+    subcategory_map : Dict[str, List[str]], optional
+        A mapping from category names to lists of subcategory names.
+        Subcategories can be added/removed dynamically after model creation.
+        Default is an empty dict.
     """
 
     n_features: int
@@ -491,6 +619,7 @@ class MultiFeatureLinUCB:
     )
     init_theta: Sequence[float] = None
     categories: Sequence[str] = None
+    subcategory_map: Dict[str, List[str]] = field(default_factory=dict)
     # Strength of the Bayesian prior encoded by init_theta.
     # If > 0, we initialise A=λI, A_inv=(1/λ)I and b=λ·init_theta so that
     # theta starts at init_theta and decays smoothly as data arrives.
@@ -725,3 +854,422 @@ class MultiFeatureLinUCB:
             "feature_index": feature_idx,
             "weight": float(self.theta[feature_idx])
         }
+
+    # ========================
+    # Subcategory Management
+    # ========================
+
+    def get_total_subcategories(self) -> int:
+        """Get the total number of subcategories across all categories.
+
+        Returns
+        -------
+        int
+            Total count of subcategories.
+        """
+        return sum(len(subs) for subs in self.subcategory_map.values())
+
+    def get_subcategories(self, category: str) -> List[str]:
+        """Get the list of subcategories for a specific category.
+
+        Parameters
+        ----------
+        category : str
+            The main category name.
+
+        Returns
+        -------
+        List[str]
+            List of subcategory names, or empty list if category not found.
+        """
+        return list(self.subcategory_map.get(category, []))
+
+    def get_all_subcategories(self) -> Dict[str, List[str]]:
+        """Get a copy of the entire subcategory map.
+
+        Returns
+        -------
+        Dict[str, List[str]]
+            A deep copy of the subcategory_map.
+        """
+        return copy.deepcopy(self.subcategory_map)
+
+    def has_subcategory(self, category: str, subcategory: str) -> bool:
+        """Check if a subcategory exists under a category.
+
+        Parameters
+        ----------
+        category : str
+            The main category name.
+        subcategory : str
+            The subcategory name to check.
+
+        Returns
+        -------
+        bool
+            True if subcategory exists under the category.
+        """
+        if category not in self.subcategory_map:
+            return False
+        return subcategory in self.subcategory_map[category]
+
+    def add_subcategory(self, category: str, subcategory: str) -> Tuple[bool, str]:
+        """Add a new subcategory under a main category.
+
+        This method expands the model's feature space to accommodate
+        the new subcategory. The matrices A, A_inv, b and theta are
+        expanded with a new dimension initialized to identity/zeros.
+
+        Parameters
+        ----------
+        category : str
+            The main category name (must exist in self.categories).
+        subcategory : str
+            The new subcategory name to add.
+
+        Returns
+        -------
+        Tuple[bool, str]
+            (success, message) tuple. Success is True if subcategory was
+            added, False if it already exists or category is invalid.
+
+        Example
+        -------
+        >>> model.add_subcategory("sport", "football")
+        (True, "Subcategory 'football' added under 'sport'")
+        >>> model.add_subcategory("sport", "football")
+        (False, "Subcategory 'football' already exists under 'sport'")
+        """
+        # Validate category
+        if self.categories is not None and category not in self.categories:
+            return (False, f"Category '{category}' is not a valid category")
+
+        # Check if subcategory already exists (before adding to map)
+        if category in self.subcategory_map and subcategory in self.subcategory_map[category]:
+            return (False, f"Subcategory '{subcategory}' already exists under '{category}'")
+
+        # Find where to insert the new feature
+        # Subcategories start after: 10 base + num_categories
+        base_offset = 10 + (len(self.categories) if self.categories else 0)
+        
+        # Calculate position within subcategories (sorted by category)
+        insert_idx = base_offset
+        
+        # Get all categories that already have subcategories, sorted
+        existing_cats = sorted(self.subcategory_map.keys())
+        
+        # Determine where this category falls in sorted order
+        found_category = False
+        for cat in existing_cats:
+            if cat == category:
+                # Category exists in map, insert at end of its subcategories
+                insert_idx += len(self.subcategory_map[cat])
+                found_category = True
+                break
+            elif cat > category:
+                # This category should come before 'cat' in sorted order
+                # Insert at current position
+                found_category = True
+                break
+            else:
+                # This category comes after 'cat', skip past its subcategories
+                insert_idx += len(self.subcategory_map[cat])
+        
+        # If not found, this category is new and comes after all existing categories
+        # insert_idx is already at the correct position (after all existing subcategories)
+
+        # Initialize category in map if needed (BEFORE expanding)
+        if category not in self.subcategory_map:
+            self.subcategory_map[category] = []
+
+        # Expand matrices
+        self._expand_feature_space(insert_idx)
+
+        # Add subcategory to map
+        self.subcategory_map[category].append(subcategory)
+
+        return (True, f"Subcategory '{subcategory}' added under '{category}'")
+
+    def remove_subcategory(self, category: str, subcategory: str) -> Tuple[bool, str]:
+        """Remove a subcategory from under a main category.
+
+        This method shrinks the model's feature space by removing
+        the subcategory's dimension from matrices A, A_inv, b and theta.
+
+        Parameters
+        ----------
+        category : str
+            The main category name.
+        subcategory : str
+            The subcategory name to remove.
+
+        Returns
+        -------
+        Tuple[bool, str]
+            (success, message) tuple. Success is True if subcategory was
+            removed, False if it doesn't exist.
+
+        Example
+        -------
+        >>> model.remove_subcategory("sport", "football")
+        (True, "Subcategory 'football' removed from 'sport'")
+        """
+        # Check if subcategory exists
+        if category not in self.subcategory_map:
+            return (False, f"Category '{category}' has no subcategories")
+
+        if subcategory not in self.subcategory_map[category]:
+            return (False, f"Subcategory '{subcategory}' does not exist under '{category}'")
+
+        # Find the feature index to remove
+        base_offset = 10 + (len(self.categories) if self.categories else 0)
+        
+        remove_idx = base_offset
+        for cat in sorted(self.subcategory_map.keys()):
+            if cat == category:
+                sub_idx = self.subcategory_map[cat].index(subcategory)
+                remove_idx += sub_idx
+                break
+            else:
+                remove_idx += len(self.subcategory_map[cat])
+
+        # Shrink matrices
+        self._shrink_feature_space(remove_idx)
+
+        # Remove subcategory from map
+        self.subcategory_map[category].remove(subcategory)
+
+        # Clean up empty category entries
+        if len(self.subcategory_map[category]) == 0:
+            del self.subcategory_map[category]
+
+        return (True, f"Subcategory '{subcategory}' removed from '{category}'")
+
+    def _expand_feature_space(self, insert_idx: int) -> None:
+        """Expand the feature space by inserting a new dimension.
+
+        Internal method that handles the matrix expansion when adding
+        a new subcategory.
+
+        Parameters
+        ----------
+        insert_idx : int
+            The index at which to insert the new feature dimension.
+        """
+        n = self.n_features
+
+        # Expand A matrix - insert row and column at insert_idx
+        # First insert a row of zeros
+        new_A = np.insert(self.A, insert_idx, 0, axis=0)
+        # Then insert a column of zeros, and set diagonal to 1
+        new_A = np.insert(new_A, insert_idx, 0, axis=1)
+        new_A[insert_idx, insert_idx] = 1.0
+        self.A = new_A
+
+        # Expand A_inv matrix similarly
+        new_A_inv = np.insert(self.A_inv, insert_idx, 0, axis=0)
+        new_A_inv = np.insert(new_A_inv, insert_idx, 0, axis=1)
+        new_A_inv[insert_idx, insert_idx] = 1.0
+        self.A_inv = new_A_inv
+
+        # Expand b vector - insert 0 at insert_idx
+        self.b = np.insert(self.b, insert_idx, 0)
+
+        # Expand theta vector - insert 0 at insert_idx
+        self.theta = np.insert(self.theta, insert_idx, 0)
+
+        # Update n_features
+        self.n_features = n + 1
+
+    def _shrink_feature_space(self, remove_idx: int) -> None:
+        """Shrink the feature space by removing a dimension.
+
+        Internal method that handles the matrix shrinking when removing
+        a subcategory.
+
+        Parameters
+        ----------
+        remove_idx : int
+            The index of the feature dimension to remove.
+        """
+        n = self.n_features
+
+        # Remove row and column from A
+        self.A = np.delete(np.delete(self.A, remove_idx, axis=0), remove_idx, axis=1)
+
+        # Remove row and column from A_inv
+        self.A_inv = np.delete(np.delete(self.A_inv, remove_idx, axis=0), remove_idx, axis=1)
+
+        # Remove element from b
+        self.b = np.delete(self.b, remove_idx)
+
+        # Remove element from theta
+        self.theta = np.delete(self.theta, remove_idx)
+
+        # Update n_features
+        self.n_features = n - 1
+
+    def get_subcategory_feature_index(self, category: str, subcategory: str) -> int:
+        """Get the feature index for a specific subcategory.
+
+        Parameters
+        ----------
+        category : str
+            The main category name.
+        subcategory : str
+            The subcategory name.
+
+        Returns
+        -------
+        int
+            The feature index, or -1 if not found.
+        """
+        if not self.has_subcategory(category, subcategory):
+            return -1
+
+        base_offset = 10 + (len(self.categories) if self.categories else 0)
+        
+        idx = base_offset
+        for cat in sorted(self.subcategory_map.keys()):
+            if cat == category:
+                sub_idx = self.subcategory_map[cat].index(subcategory)
+                return idx + sub_idx
+            idx += len(self.subcategory_map[cat])
+        return -1
+
+    def get_subcategory_weight(self, category: str, subcategory: str) -> Optional[float]:
+        """Get the learned weight for a specific subcategory.
+
+        Parameters
+        ----------
+        category : str
+            The main category name.
+        subcategory : str
+            The subcategory name.
+
+        Returns
+        -------
+        Optional[float]
+            The learned weight, or None if subcategory not found.
+        """
+        feature_idx = self.get_subcategory_feature_index(category, subcategory)
+        if feature_idx == -1:
+            return None
+        return float(self.theta[feature_idx])
+
+    def get_subcategory_weights_map(self) -> Dict[str, Dict[str, float]]:
+        """Get a mapping of all subcategories to their learned weights.
+
+        Returns
+        -------
+        Dict[str, Dict[str, float]]
+            Nested dict: {category: {subcategory: weight}}
+
+        Example
+        -------
+        >>> weights = model.get_subcategory_weights_map()
+        >>> print(weights)
+        >>> # {'sport': {'football': 0.12, 'basketball': -0.05}, 'study': {'math': 0.23}}
+        """
+        result = {}
+        for category, subcategories in self.subcategory_map.items():
+            result[category] = {}
+            for subcategory in subcategories:
+                weight = self.get_subcategory_weight(category, subcategory)
+                if weight is not None:
+                    result[category][subcategory] = weight
+        return result
+
+    def get_subcategory_info(self, category: str, subcategory: str) -> Dict[str, any]:
+        """Get comprehensive information about a specific subcategory.
+
+        Parameters
+        ----------
+        category : str
+            The main category name.
+        subcategory : str
+            The subcategory name.
+
+        Returns
+        -------
+        Dict[str, any]
+            A dictionary containing:
+            - 'category': the main category name
+            - 'subcategory': the subcategory name
+            - 'feature_index': the index in the feature vector
+            - 'weight': the learned weight (theta value)
+            - 'found': whether the subcategory exists
+        """
+        if not self.has_subcategory(category, subcategory):
+            return {
+                "category": category,
+                "subcategory": subcategory,
+                "found": False,
+                "feature_index": None,
+                "weight": None
+            }
+
+        feature_idx = self.get_subcategory_feature_index(category, subcategory)
+        return {
+            "category": category,
+            "subcategory": subcategory,
+            "found": True,
+            "feature_index": feature_idx,
+            "weight": float(self.theta[feature_idx])
+        }
+
+    def extract_features_with_subcategory(
+        self,
+        motivation: float,
+        duration: float,
+        difficulty: int,
+        delta_hours: float,
+        category: str,
+        max_duration: float = 120.0,
+        use_interactions: bool = False,
+        subcategory: Optional[str] = None,
+    ) -> np.ndarray:
+        """Extract features using the model's categories and subcategory_map.
+
+        Convenience method that uses the model's internal categories
+        and subcategory_map for feature extraction.
+
+        Parameters
+        ----------
+        motivation : float
+            User's motivation rating (1–5).
+        duration : float
+            Duration of the task in minutes.
+        difficulty : int
+            Difficulty rating (1–5).
+        delta_hours : float
+            Hours remaining until deadline.
+        category : str
+            The task category.
+        max_duration : float, optional
+            Maximum duration for normalization. Default is 120.0.
+        use_interactions : bool, optional
+            Whether to include interaction features. Default is False.
+        subcategory : Optional[str], optional
+            The subcategory name. If None, subcategory features are zeros.
+
+        Returns
+        -------
+        np.ndarray
+            The feature vector for this task.
+        """
+        if self.categories is None:
+            raise ValueError("Categories not set during initialization")
+
+        return extract_features(
+            motivation=motivation,
+            duration=duration,
+            difficulty=difficulty,
+            delta_hours=delta_hours,
+            category=category,
+            categories=self.categories,
+            max_duration=max_duration,
+            use_interactions=use_interactions,
+            subcategory=subcategory,
+            subcategory_map=self.subcategory_map if self.subcategory_map else None,
+        )
