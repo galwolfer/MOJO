@@ -193,6 +193,20 @@ x = model.extract_features_with_subcategory(
 
 ---
 
+## Tuning Time-Based Features
+
+- **Pressure thresholds** — set in [src/predict_model/linucb/constants.py](src/predict_model/linucb/constants.py). The one-hot pressure feature uses three cutoffs (hours until deadline):
+    - `PRESSURE_NO_THRESHOLD` (default 72): > threshold → no pressure
+    - `PRESSURE_MILD_THRESHOLD` (default 24): (mild, strong, urgent depend on this and the next)
+    - `PRESSURE_STRONG_THRESHOLD` (default 6): > strong → strong; ≤ strong → urgent
+    Adjust these values to change when tasks flip between no/mild/strong/urgent. The extractor [src/predict_model/linucb/features.py](src/predict_model/linucb/features.py) uses only these constants—no other code changes needed.
+
+- **Duration scaling** — the shortness/longness pair is normalized by `max_duration` (default `DEFAULT_MAX_DURATION` in [src/predict_model/linucb/constants.py](src/predict_model/linucb/constants.py)).
+    - To change globally, edit `DEFAULT_MAX_DURATION` (minutes by default).
+    - To change per-call, pass `max_duration` into `extract_duration_features` or via model feature extraction helpers; larger `max_duration` makes the same task look “shorter”, smaller makes it look “longer”.
+
+---
+
 ## Prediction & Learning
 
 ### Making Predictions
