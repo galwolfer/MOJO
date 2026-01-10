@@ -1,9 +1,11 @@
-import React from "react";
-import { View } from "react-native";
+﻿import React, { useState } from "react";
+import { View, Animated, Easing } from "react-native";
 import AppText from "../../components/common/AppText";
 import AppButton from "../../components/common/AppButton";
 import TextBouble from "../../components/chat/TextBouble";
+import Widget from "../../components/special/Widget";
 import Input from "../../components/inputs/Input";
+import AnimatedButtonsContainer from "../../components/common/AnimatedButtonsContainer";
 import { SPACING } from "../../theme";
 
 interface Props {
@@ -25,43 +27,37 @@ const LoginStep: React.FC<Props> = ({
   onBack,
   onLogin,
 }) => {
+  const [typingDone, setTypingDone] = useState(false);
+
   return (
-    <TextBouble mode="agent" playOnceKey="auth:login">
-      <AppText variant="bodyText" style={{ marginBottom: SPACING.md }}>
-        {"Welcome back 👋\nLet’s pick up where you left off."}
-      </AppText>
-      {loginError ? (
-        <AppText variant="errorText" style={{ marginBottom: SPACING.md }}>
-          {loginError}
+    <View style={{ width: "100%" }}>
+      <TextBouble mode="agent" playOnceKey="auth:login" onTypingDone={() => setTypingDone(true)}>
+        <AppText variant="bodyText" style={{ marginBottom: SPACING.sm }}>
+          {"Welcome back \nLet's pick up where you left off."}
         </AppText>
-      ) : null}
+        {loginError ? (
+          <AppText variant="errorText" style={{ marginBottom: SPACING.md }}>
+            {loginError}
+          </AppText>
+        ) : null}
 
-      <View style={{ width: "100%" }}>
-        <Input label="Username" placeholder="Your username" value={loginUsername} onChangeText={setLoginUsername} />
-        <Input
-          label="Password"
-          placeholder="Your password"
-          value={loginPassword}
-          onChangeText={setLoginPassword}
-          type="password"
-        />
-      </View>
+        <Widget entranceEnabled={typingDone} entranceDelay={100} entranceDuration={200}>
+          <Input label="Username" placeholder="Your username" value={loginUsername} onChangeText={setLoginUsername} />
+          <Input
+            label="Password"
+            placeholder="Your password"
+            value={loginPassword}
+            onChangeText={setLoginPassword}
+            type="password"
+          />
+        </Widget>
 
-      <View
-        style={{
-          display: "flex",
-          flexDirection: "row",
-          justifyContent: "center",
-          alignItems: "center",
-          gap: SPACING.md,
-          paddingTop: SPACING.lg,
-          width: "100%",
-        }}
-      >
-        <AppButton title="Back" icon="left" iconPosition="left" mode="light" onPress={onBack} />
-        <AppButton title="Log In" icon="right" iconPosition="right" onPress={onLogin} color="primary6" />
-      </View>
-    </TextBouble>
+        <AnimatedButtonsContainer entranceEnabled={typingDone}>
+          <AppButton title="Back" icon="left" iconPosition="left" mode="light" onPress={onBack} />
+          <AppButton title="Log In" icon="right" iconPosition="right" onPress={onLogin} color="primary6" />
+        </AnimatedButtonsContainer>
+      </TextBouble>
+    </View>
   );
 };
 

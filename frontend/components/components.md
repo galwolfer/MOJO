@@ -41,6 +41,10 @@ Update this file whenever you add, remove, or change a component.
 - `AppButton` — `frontend/components/common/AppButton.tsx`
    - Reusable button component that supports an icon (choose any key from `frontend/components/icons/icons.tsx`) placed on the left or right via the `iconPosition` prop. Two visual modes are available: `filled` (solid background) and `light` (transparent background with border). Color can be selected from `COLORS` in `frontend/theme.ts` by passing the color key (e.g. `primary1`) or a CSS color string. Uses `SHADOWS.card` for consistent surface shadowing across platforms.
 
+- `AnimatedButtonsContainer.tsx` — `frontend/components/common/AnimatedButtonsContainer.tsx`
+   - Reusable animated wrapper for groups of buttons or action elements. Supports optional vertical stacking, container entrance animation (fade + translateY), and per-child staggered entrance. Useful for onboarding and chat-bubble action groups where buttons should appear sequentially.
+   - Props: `entranceEnabled`, `vertical`, `staggerChildren`, `staggerDelay`, `containerDelay`, `gap`, `paddingTop`, `paddingBottom`.
+
 - `ConicGradientBubble.tsx` — `frontend/components/special/ConicGradientBubble.tsx`
    - Animated gradient bubble component using Skia for visual effects.
 
@@ -58,6 +62,15 @@ Update this file whenever you add, remove, or change a component.
 ```tsx
 <AppButton title="Save" onPress={save} icon="check" mode="filled" color="primary6" />
 ```
+
+### AnimatedButtonsContainer
+```tsx
+<AnimatedButtonsContainer entranceEnabled={typingDone} vertical staggerChildren staggerDelay={120}>
+  <AppButton title="Primary action" width="100%" color="primary6" />
+  <AppButton title="Secondary" mode="light" width="100%" />
+</AnimatedButtonsContainer>
+```
+
 
 ### Input
 ```tsx

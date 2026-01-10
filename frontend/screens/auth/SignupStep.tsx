@@ -1,9 +1,11 @@
-import React from "react";
-import { View } from "react-native";
+﻿import React, { useState } from "react";
+import { View, Animated, Easing } from "react-native";
 import AppText from "../../components/common/AppText";
 import AppButton from "../../components/common/AppButton";
 import TextBouble from "../../components/chat/TextBouble";
+import Widget from "../../components/special/Widget";
 import Input from "../../components/inputs/Input";
+import AnimatedButtonsContainer from "../../components/common/AnimatedButtonsContainer";
 import { SPACING } from "../../theme";
 
 interface Props {
@@ -18,7 +20,6 @@ interface Props {
   signupError?: string | null;
   onBack: () => void;
   onSignup: () => void;
-  // Display name entered in previous step
   displayName?: string;
 }
 
@@ -36,54 +37,56 @@ const SignupStep: React.FC<Props> = ({
   onSignup,
   displayName,
 }) => {
+  const [typingDone, setTypingDone] = useState(false);
+
   return (
-    <TextBouble mode="agent" playOnceKey="auth:signup">
-      <AppText variant="bodyText" style={{ marginBottom: SPACING.md }}>
-        {`Great to meet you${displayName ? ", " + displayName : ""}! \nLet's create your account.`}
-      </AppText>
-      <View style={{ width: "100%" }}>
+    <View style={{ width: "100%" }}>
+      <TextBouble mode="agent" playOnceKey="auth:signup" onTypingDone={() => setTypingDone(true)}>
+        <AppText variant="bodyText" style={{ marginBottom: SPACING.sm }}>
+          {`Great to meet you${displayName ? ", " + displayName : ""}! \nLet's create your account.`}
+        </AppText>
         {signupError ? (
           <AppText variant="errorText" style={{ marginBottom: SPACING.md }}>
             {signupError}
           </AppText>
         ) : null}
-        <Input
-          label="Username"
-          placeholder="Choose a username"
-          value={signupUsername}
-          onChangeText={setSignupUsername}
-        />
-        <Input label="Email" placeholder="Your email" value={signupEmail} onChangeText={setSignupEmail} type="email" />
-        <Input
-          label="Password"
-          placeholder="Password"
-          value={signupPassword}
-          onChangeText={setSignupPassword}
-          type="password"
-        />
-        <Input
-          label="Confirm"
-          placeholder="Confirm password"
-          value={signupConfirm}
-          onChangeText={setSignupConfirm}
-          type="password"
-        />
-      </View>
-      <View
-        style={{
-          display: "flex",
-          flexDirection: "row",
-          justifyContent: "center",
-          alignItems: "center",
-          gap: SPACING.md,
-          paddingTop: SPACING.lg,
-          width: "100%",
-        }}
-      >
-        <AppButton title="Back" icon="left" iconPosition="left" mode="light" onPress={onBack} />
-        <AppButton title="Next" icon="right" iconPosition="right" onPress={onSignup} color="primary6" />
-      </View>
-    </TextBouble>
+
+        <Widget entranceEnabled={typingDone} entranceDelay={100} entranceDuration={200}>
+          <Input
+            label="Username"
+            placeholder="Choose a username"
+            value={signupUsername}
+            onChangeText={setSignupUsername}
+          />
+          <Input
+            label="Email"
+            placeholder="Your email"
+            value={signupEmail}
+            onChangeText={setSignupEmail}
+            type="email"
+          />
+          <Input
+            label="Password"
+            placeholder="Password"
+            value={signupPassword}
+            onChangeText={setSignupPassword}
+            type="password"
+          />
+          <Input
+            label="Confirm"
+            placeholder="Confirm password"
+            value={signupConfirm}
+            onChangeText={setSignupConfirm}
+            type="password"
+          />
+        </Widget>
+
+        <AnimatedButtonsContainer entranceEnabled={typingDone}>
+          <AppButton title="Back" icon="left" iconPosition="left" mode="light" onPress={onBack} />
+          <AppButton title="Next" icon="right" iconPosition="right" onPress={onSignup} color="primary6" />
+        </AnimatedButtonsContainer>
+      </TextBouble>
+    </View>
   );
 };
 

@@ -10,7 +10,9 @@ export type { ScrollableContentRef } from "./layout/ScrollableContent";
 export { default as Input } from "./inputs/Input";
 export { default as Slider } from "./inputs/Slider";
 export { default as PriorityList } from "./special/PriorityList";
+export { default as Widget } from "./special/Widget";
 export { default as AppButton } from "./common/AppButton";
+export { default as AnimatedButtonsContainer } from "./common/AnimatedButtonsContainer";
 export { default as TextBouble } from "./chat/TextBouble";
 export type { TextBoubleMode } from "./chat/TextBouble";
 
