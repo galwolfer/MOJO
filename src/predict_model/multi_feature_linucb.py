@@ -45,10 +45,30 @@ Example usage:
     # elsewhere in your application)
     categories = ["sport", "study", "work", "home", "health", "habits"]
 
-    # create a model with appropriate number of features
-    model = MultiFeatureLinUCB(n_features=16,  # 10 base + 6 categories
-                               categories=categories,
-                               alpha=0.1)
+    # =====================================================================
+    # Option 1: Create model WITH priors (recommended for new users)
+    # =====================================================================
+    # This initializes the model with sensible prior beliefs:
+    # - High motivation → better task completion
+    # - Easy tasks → better completion, Hard tasks → worse completion
+    
+    model = MultiFeatureLinUCB.create_with_priors(
+        categories=categories,
+        motivation_weight=1.0,              # motivation contributes up to 1.0
+        difficulty_weights=(0.3, 0.0, -0.3), # (easy, medium, hard) boosts/penalties
+        alpha=0.1,                          # exploration parameter
+        prior_strength=5.0,                 # prior worth ~5 observations
+        learn_rate=0.5,                     # smooth adaptation
+    )
+    
+    # =====================================================================
+    # Option 2: Create model WITHOUT priors (starts from scratch)
+    # =====================================================================
+    model_no_prior = MultiFeatureLinUCB(
+        n_features=16,  # 10 base + 6 categories
+        categories=categories,
+        alpha=0.1
+    )
 
     # Add subcategories dynamically after model creation
     model.add_subcategory("sport", "football")
@@ -659,6 +679,119 @@ class MultiFeatureLinUCB:
             else:
                 # No prior; keep identity A and zero b
                 self.theta = theta0
+
+    @classmethod
+    def create_with_priors(
+        cls,
+        categories: Sequence[str],
+        motivation_weight: float = 1.0,
+        difficulty_weights: Tuple[float, float, float] = (0.3, 0.0, -0.3),
+        alpha: float = 0.1,
+        prior_strength: float = 5.0,
+        learn_rate: float = 0.5,
+        thresholds: Sequence[float] = None,
+        use_interactions: bool = False,
+        subcategory_map: Dict[str, List[str]] = None,
+    ) -> "MultiFeatureLinUCB":
+        """Create a model with motivation and difficulty priors pre-configured.
+
+        This factory method provides a convenient way to initialize a LinUCB
+        model with sensible priors that encode domain knowledge:
+        - High motivation → better task completion
+        - Easy tasks → better completion, Hard tasks → worse completion
+
+        Parameters
+        ----------
+        categories : Sequence[str]
+            The list of task category names (e.g., ["sport", "study", "work"]).
+        motivation_weight : float, optional
+            Weight for the motivation feature. Higher values mean motivation
+            has stronger influence on predictions. Default is 1.0.
+        difficulty_weights : Tuple[float, float, float], optional
+            Weights for (easy, medium, hard) difficulty levels.
+            Positive = boost score, negative = reduce score.
+            Default is (0.3, 0.0, -0.3).
+        alpha : float, optional
+            Exploration parameter for UCB. Default is 0.1.
+        prior_strength : float, optional
+            How strongly the prior beliefs are held (equivalent to number
+            of virtual observations). Higher = slower adaptation.
+            Default is 5.0.
+        learn_rate : float, optional
+            Learning rate for updates (0-1]. Lower = smoother adaptation.
+            Default is 0.5.
+        thresholds : Sequence[float], optional
+            Score thresholds for category prediction. Must be 4 values in
+            decreasing order. Default is [0.85, 0.65, 0.45, 0.25].
+        use_interactions : bool, optional
+            Whether to include category×difficulty and category×pressure
+            interaction features. Default is False.
+        subcategory_map : Dict[str, List[str]], optional
+            Initial subcategory mapping. Default is None (empty).
+
+        Returns
+        -------
+        MultiFeatureLinUCB
+            A configured model instance with priors set.
+
+        Example
+        -------
+        >>> categories = ["sport", "study", "work", "home", "health", "habits"]
+        >>> model = MultiFeatureLinUCB.create_with_priors(
+        ...     categories=categories,
+        ...     motivation_weight=1.0,
+        ...     difficulty_weights=(0.3, 0.0, -0.3),
+        ...     prior_strength=5.0,
+        ...     learn_rate=0.5
+        ... )
+        >>> # Model is ready with priors - high motivation and easy tasks
+        >>> # will have higher initial scores
+        """
+        if thresholds is None:
+            thresholds = [0.85, 0.65, 0.45, 0.25]
+        
+        if subcategory_map is None:
+            subcategory_map = {}
+        
+        # Calculate number of subcategories
+        num_subcategories = sum(len(subs) for subs in subcategory_map.values())
+        
+        # Calculate total features
+        n_features = get_feature_count(
+            num_categories=len(categories),
+            use_interactions=use_interactions,
+            num_subcategories=num_subcategories
+        )
+        
+        # Build init_theta with priors
+        init_theta = np.zeros(n_features)
+        
+        # Feature layout:
+        # [0]     = motivation
+        # [1-2]   = duration (shortness, longness)
+        # [3-5]   = difficulty (easy, medium, hard)
+        # [6-9]   = pressure (no, mild, strong, urgent)
+        # [10+]   = categories, then subcategories, then interactions
+        
+        # Set motivation prior (index 0)
+        init_theta[0] = motivation_weight
+        
+        # Set difficulty priors (indices 3, 4, 5)
+        easy_weight, medium_weight, hard_weight = difficulty_weights
+        init_theta[3] = easy_weight
+        init_theta[4] = medium_weight
+        init_theta[5] = hard_weight
+        
+        return cls(
+            n_features=n_features,
+            alpha=alpha,
+            thresholds=thresholds,
+            init_theta=init_theta,
+            categories=categories,
+            subcategory_map=subcategory_map,
+            prior_strength=prior_strength,
+            learn_rate=learn_rate,
+        )
 
     def predict_score(self, x: np.ndarray) -> float:
         """Compute the UCB score for a given feature vector.

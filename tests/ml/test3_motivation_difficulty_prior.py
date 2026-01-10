@@ -39,29 +39,18 @@ def create_model_with_motivation_difficulty_prior():
     - Easy tasks → better completion (positive weight)
     - Hard tasks → worse completion (negative weight)
     """
-    n_features = 1 + 2 + 3 + 4 + len(CATEGORIES)  # 16 features
-
-    init_theta = np.zeros(n_features)
-
-    # Motivation prior: index 0
-    # Weight of 1.0 means motivation contributes up to 1.0 to score
-    # (since motivation is normalized to [0,1])
-    init_theta[0] = 1.0
-
-    # Difficulty priors: indices 3, 4, 5 (easy, medium, hard)
-    init_theta[3] = 0.3  # Easy tasks: boost score
-    init_theta[4] = 0.0  # Medium tasks: neutral
-    init_theta[5] = -0.3  # Hard tasks: reduce score
-
-    # Create model with prior_strength to preserve these beliefs
-    model = MultiFeatureLinUCB(
-        n_features=n_features,
+    # Use the new factory method for convenient initialization
+    model = MultiFeatureLinUCB.create_with_priors(
+        categories=CATEGORIES,
+        motivation_weight=1.0,
+        difficulty_weights=(0.3, 0.0, -0.3),  # (easy, medium, hard)
         alpha=0.1,
-        init_theta=init_theta,
         prior_strength=5.0,  # Prior worth ~5 observations
         learn_rate=0.5,  # Smooth adaptation
-        categories=CATEGORIES,
     )
+
+    # Return init_theta for display purposes
+    init_theta = model.theta.copy()
 
     return model, init_theta
 
