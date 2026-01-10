@@ -64,7 +64,7 @@ export const FONTS = {
 };
 
 export const FONT_SIZES = {
-  sm: moderateScale(14),
+  sm: moderateScale(12),
   base: moderateScale(16),
   md: moderateScale(20),
   lg: moderateScale(24),

@@ -219,3 +219,61 @@ export async function updateProfile(req, res, next) {
     next(error);
   }
 }
+
+/**
+ * Update user category priorities
+ * POST /api/auth/category-priorities
+ * Body: { priorities: { category_key: priority_value, ... } }
+ */
+export async function updateCategoryPriorities(req, res, next) {
+  try {
+    const { priorities } = req.body;
+    const userId = req.user.userId;
+
+    // Validation
+    if (!priorities || typeof priorities !== "object") {
+      return res.status(400).json({
+        success: false,
+        error: "Priorities object is required",
+      });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: "User not found",
+      });
+    }
+
+    // Validate and set priorities (must be 1-5)
+    const validatedPriorities = {};
+    for (const [key, value] of Object.entries(priorities)) {
+      const numValue = parseInt(value, 10);
+      if (isNaN(numValue) || numValue < 1 || numValue > 5) {
+        return res.status(400).json({
+          success: false,
+          error: `Priority for ${key} must be a number between 1 and 5`,
+        });
+      }
+      validatedPriorities[key] = numValue;
+    }
+
+    // Update priorities
+    user.profile.priorities = {
+      ...user.profile.priorities,
+      ...validatedPriorities,
+    };
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "Category priorities updated successfully",
+      priorities: user.profile.priorities,
+    });
+  } catch (error) {
+    next(error);
+  }
+}

@@ -79,7 +79,7 @@ const ThemeShowcase: React.FC<ThemeShowcaseProps> = ({
 
       <TextBouble mode="agent">
         <AppText variant="bodyText">
-          User bubble (p1 background), with the normal shadow and top-left corner not xlg.{" "}
+          User bubble (p1 background), with the normal shadow and top-left corner not xlg.
         </AppText>
       </TextBouble>
 

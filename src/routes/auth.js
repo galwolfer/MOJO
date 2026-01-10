@@ -4,7 +4,7 @@
  */
 
 import express from "express";
-import { register, login, getMe, updateProfile } from "../controllers/authController.js";
+import { register, login, getMe, updateProfile, updateCategoryPriorities } from "../controllers/authController.js";
 import { requireAuth } from "../middlewares/auth.js";
 
 const router = express.Router();
@@ -24,5 +24,8 @@ router.get("/me", requireAuth, getMe);
 
 // Update user profile (protected)
 router.patch("/profile", requireAuth, updateProfile);
+
+// Update category priorities (protected)
+router.post("/category-priorities", requireAuth, updateCategoryPriorities);
 
 export default router;

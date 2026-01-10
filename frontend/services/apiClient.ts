@@ -10,6 +10,7 @@ export { setAuthToken };
 // Types
 export type LoginRequest = { username: string; password: string };
 export type RegisterRequest = { username: string; email: string; password: string; displayName?: string };
+export type CategoryPrioritiesRequest = { priorities: Record<string, number> };
 
 export type AuthResponse = {
   success: boolean;
@@ -38,4 +39,12 @@ export async function register(payload: RegisterRequest): Promise<AuthResponse> 
   return post<AuthResponse>("/auth/register", payload);
 }
 
-export default { setApiBase, setAuthToken, login, register };
+/**
+ * Update user category priorities
+ * POST /api/auth/category-priorities
+ */
+export async function updateCategoryPriorities(payload: CategoryPrioritiesRequest): Promise<any> {
+  return post<any>("/auth/category-priorities", payload);
+}
+
+export default { setApiBase, setAuthToken, login, register, updateCategoryPriorities };
