@@ -38,13 +38,29 @@ const LoginStep: React.FC<Props> = ({
 
       <View style={{ width: "100%" }}>
         <Input label="Username" placeholder="Your username" value={loginUsername} onChangeText={setLoginUsername} />
-        <Input label="Password" placeholder="Your password" value={loginPassword} onChangeText={setLoginPassword} type="password" />
+        <Input
+          label="Password"
+          placeholder="Your password"
+          value={loginPassword}
+          onChangeText={setLoginPassword}
+          type="password"
+        />
       </View>
 
-      <View style={{ display: "flex", flexDirection: "row", justifyContent: "center", alignItems: "center", gap: SPACING.md, paddingTop: SPACING.lg, width: "100%" }}>
+      <View
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          justifyContent: "center",
+          alignItems: "center",
+          gap: SPACING.md,
+          paddingTop: SPACING.lg,
+          width: "100%",
+        }}
+      >
         <AppButton title="Back" icon="left" iconPosition="left" mode="light" onPress={onBack} />
         <AppButton title="Log In" icon="right" iconPosition="right" onPress={onLogin} color="primary6" />
-      </View> 
+      </View>
     </TextBouble>
   );
 };

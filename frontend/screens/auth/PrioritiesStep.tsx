@@ -63,7 +63,17 @@ const PrioritiesStep: React.FC<Props> = ({
         />
       </View>
 
-      <View style={{ display: "flex", flexDirection: "row", justifyContent: "center", alignItems: "center", gap: SPACING.md, paddingTop: SPACING.xlg, width: "100%" }}>
+      <View
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          justifyContent: "center",
+          alignItems: "center",
+          gap: SPACING.md,
+          paddingTop: SPACING.xlg,
+          width: "100%",
+        }}
+      >
         <AppButton
           title="Next"
           icon="right"

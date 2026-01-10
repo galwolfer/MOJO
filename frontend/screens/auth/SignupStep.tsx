@@ -47,12 +47,39 @@ const SignupStep: React.FC<Props> = ({
             {signupError}
           </AppText>
         ) : null}
-        <Input label="Username" placeholder="Choose a username" value={signupUsername} onChangeText={setSignupUsername} />
+        <Input
+          label="Username"
+          placeholder="Choose a username"
+          value={signupUsername}
+          onChangeText={setSignupUsername}
+        />
         <Input label="Email" placeholder="Your email" value={signupEmail} onChangeText={setSignupEmail} type="email" />
-        <Input label="Password" placeholder="Password" value={signupPassword} onChangeText={setSignupPassword} type="password" />
-        <Input label="Confirm" placeholder="Confirm password" value={signupConfirm} onChangeText={setSignupConfirm} type="password" />
+        <Input
+          label="Password"
+          placeholder="Password"
+          value={signupPassword}
+          onChangeText={setSignupPassword}
+          type="password"
+        />
+        <Input
+          label="Confirm"
+          placeholder="Confirm password"
+          value={signupConfirm}
+          onChangeText={setSignupConfirm}
+          type="password"
+        />
       </View>
-      <View style={{ display: "flex", flexDirection: "row", justifyContent: "center", alignItems: "center", gap: SPACING.md, paddingTop: SPACING.lg, width: "100%" }}>
+      <View
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          justifyContent: "center",
+          alignItems: "center",
+          gap: SPACING.md,
+          paddingTop: SPACING.lg,
+          width: "100%",
+        }}
+      >
         <AppButton title="Back" icon="left" iconPosition="left" mode="light" onPress={onBack} />
         <AppButton title="Next" icon="right" iconPosition="right" onPress={onSignup} color="primary6" />
       </View>

@@ -86,10 +86,26 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
         Animated.delay(delay),
         Animated.parallel([
           Animated.timing(scale, { toValue: 1, duration, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-          Animated.timing(iconOpacity, { toValue: 1, duration: Math.max(120, duration - 50), easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-          Animated.timing(textOpacity, { toValue: 1, duration: Math.max(120, duration - 50), delay: 40, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+          Animated.timing(iconOpacity, {
+            toValue: 1,
+            duration: Math.max(120, duration - 50),
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(textOpacity, {
+            toValue: 1,
+            duration: Math.max(120, duration - 50),
+            delay: 40,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
         ]),
-        Animated.timing(scale, { toValue: 1.06, duration: 120, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(scale, {
+          toValue: 1.06,
+          duration: 120,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
         Animated.timing(scale, { toValue: 1, duration: 160, easing: Easing.out(Easing.quad), useNativeDriver: true }),
       ]).start();
     }, [enabled, baseDelay, stagger, duration, rowIndex, colIndex, scale, textOpacity, iconOpacity]);
@@ -140,7 +156,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
         </AnimatedAppText>
       </Pressable>
     );
-  };  // Build rows of 3 items so we can insert the priority Box right after
+  }; // Build rows of 3 items so we can insert the priority Box right after
   const cols = 3;
   const rows: CategoryKey[][] = [];
   for (let i = 0; i < CATEGORY_KEYS.length; i += cols) rows.push(CATEGORY_KEYS.slice(i, i + cols) as CategoryKey[]);
@@ -153,8 +169,20 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
       if (!enabled) return;
       const delay = baseDelay + (rowIndex + 1) * stagger + 40;
       Animated.parallel([
-        Animated.timing(boxOpacity, { toValue: 1, duration: Math.max(180, duration), delay, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-        Animated.timing(translateY, { toValue: 0, duration: Math.max(180, duration), delay, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(boxOpacity, {
+          toValue: 1,
+          duration: Math.max(180, duration),
+          delay,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: Math.max(180, duration),
+          delay,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
       ]).start();
     }, [enabled, baseDelay, rowIndex, stagger, duration, boxOpacity, translateY]);
 

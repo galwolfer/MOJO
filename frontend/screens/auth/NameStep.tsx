@@ -20,7 +20,17 @@ const NameStep: React.FC<Props> = ({ displayName, setDisplayName, onBack, onNext
       <View style={{ width: "100%" }}>
         <Input label="Your name" placeholder="Your name" value={displayName} onChangeText={setDisplayName} />
       </View>
-      <View style={{ display: "flex", flexDirection: "row", justifyContent: "center", alignItems: "center", gap: SPACING.md, paddingTop: SPACING.lg, width: "100%" }}>
+      <View
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          justifyContent: "center",
+          alignItems: "center",
+          gap: SPACING.md,
+          paddingTop: SPACING.lg,
+          width: "100%",
+        }}
+      >
         <AppButton title="Back" icon="left" iconPosition="left" mode="light" onPress={onBack} />
         <AppButton title="Next" icon="right" iconPosition="right" color="primary6" onPress={onNext} />
       </View>
