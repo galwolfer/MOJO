@@ -261,6 +261,12 @@ router.post("/", taskController.createTask);
 // Get all tasks (supports filters: tag, completed, dueBefore, dueAfter)
 router.get("/", taskController.getTasks);
 
+// Get subtasks for a task
+router.get("/:id/subtasks", taskController.getSubTasksForTask);
+
+// Update a single subtask for a task (mark complete / update title)
+router.patch("/:taskId/subtasks/:subId", taskController.updateSubTask);
+
 // Get a single task by ID
 router.get("/:id", taskController.getTaskById);
 

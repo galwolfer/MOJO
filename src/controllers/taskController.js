@@ -351,6 +351,47 @@ export async function toggleTaskCompletion(req, res) {
 }
 
 /**
+ * Get subtasks for a task
+ * GET /api/tasks/:id/subtasks
+ */
+export async function getSubTasksForTask(req, res) {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params; // task id
+
+    const subs = await taskService.getSubTasksForTask({ userId, taskId: id });
+
+    return res.status(200).json({ success: true, count: subs.length, subtasks: subs });
+  } catch (error) {
+    logger.error("Error in getSubTasksForTask controller:", error);
+    return res.status(500).json({ success: false, error: "Failed to get subtasks" });
+  }
+}
+
+/**
+ * Update a subtask (e.g., mark complete)
+ * PATCH /api/tasks/:taskId/subtasks/:subId
+ */
+export async function updateSubTask(req, res) {
+  try {
+    const userId = req.user.userId;
+    const { subId } = req.params;
+    const updates = req.body || {};
+
+    const result = await taskService.updateSubTask({ userId, subTaskId: subId, updates });
+
+    if (!result || result.success === false) {
+      return res.status(404).json({ success: false, error: result ? result.error : "Subtask not found" });
+    }
+
+    return res.status(200).json({ success: true, subtask: result.subtask });
+  } catch (error) {
+    logger.error("Error in updateSubTask controller:", error);
+    return res.status(500).json({ success: false, error: "Failed to update subtask" });
+  }
+}
+
+/**
  * Complete a task (with ML training)
  * POST /api/tasks/:id/complete
  */
