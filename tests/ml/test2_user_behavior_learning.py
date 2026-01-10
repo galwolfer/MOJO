@@ -41,7 +41,7 @@ def create_model(
     init_theta = None
     if motivation_bias > 0:
         init_theta = [motivation_bias] + [0.0] * (n_features - 1)
-    return MultiFeatureLinUCB(n_features=n_features, alpha=alpha, init_theta=init_theta)
+    return MultiFeatureLinUCB(n_features=n_features, alpha=alpha, init_theta=init_theta, categories=CATEGORIES)
 
 
 def get_features(

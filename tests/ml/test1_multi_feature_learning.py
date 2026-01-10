@@ -75,7 +75,7 @@ def test_initial_predictions():
     # Create initial theta with strong weight on motivation (position 0)
     init_theta = np.zeros(n_features)
     init_theta[0] = 2.0  # Strong initial bias toward motivation
-    model = MultiFeatureLinUCB(n_features=n_features, alpha=0.1, init_theta=init_theta)
+    model = MultiFeatureLinUCB(n_features=n_features, alpha=0.1, init_theta=init_theta, categories=CATEGORIES)
 
     print(f"\nModel initialized with MOTIVATION BIAS:")
     print(f"  Features: {n_features}")
@@ -182,6 +182,7 @@ def test_motivation_feature_learning():
         init_theta=init_theta,
         prior_strength=5.0,
         learn_rate=0.5,
+        categories=CATEGORIES,
     )
     x_low = extract_features(
         motivation=1,
@@ -214,6 +215,7 @@ def test_motivation_feature_learning():
         init_theta=init_theta,
         prior_strength=5.0,
         learn_rate=0.5,
+        categories=CATEGORIES,
     )
     x_high = extract_features(
         motivation=5,
@@ -265,7 +267,7 @@ def test_duration_feature_learning():
     init_theta = np.zeros(n_features)
     init_theta[0] = 2.0
     model_short = MultiFeatureLinUCB(
-        n_features=n_features, alpha=0.1, init_theta=init_theta
+        n_features=n_features, alpha=0.1, init_theta=init_theta, categories=CATEGORIES
     )
     x_short = extract_features(
         motivation=3,
@@ -293,7 +295,7 @@ def test_duration_feature_learning():
     init_theta = np.zeros(n_features)
     init_theta[0] = 2.0
     model_long = MultiFeatureLinUCB(
-        n_features=n_features, alpha=0.1, init_theta=init_theta
+        n_features=n_features, alpha=0.1, init_theta=init_theta, categories=CATEGORIES
     )
     x_long = extract_features(
         motivation=3,
@@ -346,7 +348,7 @@ def test_difficulty_feature_learning():
     init_theta = np.zeros(n_features)
     init_theta[0] = 2.0
     model_easy = MultiFeatureLinUCB(
-        n_features=n_features, alpha=0.1, init_theta=init_theta
+        n_features=n_features, alpha=0.1, init_theta=init_theta, categories=CATEGORIES
     )
     x_easy = extract_features(
         motivation=4,
@@ -374,7 +376,7 @@ def test_difficulty_feature_learning():
     init_theta = np.zeros(n_features)
     init_theta[0] = 2.0
     model_med = MultiFeatureLinUCB(
-        n_features=n_features, alpha=0.1, init_theta=init_theta
+        n_features=n_features, alpha=0.1, init_theta=init_theta, categories=CATEGORIES
     )
     x_med = extract_features(
         motivation=4,
@@ -402,7 +404,7 @@ def test_difficulty_feature_learning():
     init_theta = np.zeros(n_features)
     init_theta[0] = 2.0
     model_hard = MultiFeatureLinUCB(
-        n_features=n_features, alpha=0.1, init_theta=init_theta
+        n_features=n_features, alpha=0.1, init_theta=init_theta, categories=CATEGORIES
     )
     x_hard = extract_features(
         motivation=4,
@@ -451,7 +453,7 @@ def test_pressure_feature_learning():
     init_theta = np.zeros(n_features)
     init_theta[0] = 2.0
     model_no = MultiFeatureLinUCB(
-        n_features=n_features, alpha=0.1, init_theta=init_theta
+        n_features=n_features, alpha=0.1, init_theta=init_theta, categories=CATEGORIES
     )
     x_no_pressure = extract_features(
         motivation=4,
@@ -477,7 +479,7 @@ def test_pressure_feature_learning():
     init_theta = np.zeros(n_features)
     init_theta[0] = 2.0
     model_urgent = MultiFeatureLinUCB(
-        n_features=n_features, alpha=0.1, init_theta=init_theta
+        n_features=n_features, alpha=0.1, init_theta=init_theta, categories=CATEGORIES
     )
     x_urgent = extract_features(
         motivation=4,
@@ -528,7 +530,7 @@ def test_category_feature_learning():
     init_theta = np.zeros(n_features)
     init_theta[0] = 2.0
     model_sport = MultiFeatureLinUCB(
-        n_features=n_features, alpha=0.1, init_theta=init_theta
+        n_features=n_features, alpha=0.1, init_theta=init_theta, categories=CATEGORIES
     )
     x_sport = extract_features(
         motivation=4,
@@ -553,7 +555,7 @@ def test_category_feature_learning():
     init_theta = np.zeros(n_features)
     init_theta[0] = 2.0
     model_study = MultiFeatureLinUCB(
-        n_features=n_features, alpha=0.1, init_theta=init_theta
+        n_features=n_features, alpha=0.1, init_theta=init_theta, categories=CATEGORIES
     )
     x_study = extract_features(
         motivation=4,
@@ -578,7 +580,7 @@ def test_category_feature_learning():
     init_theta = np.zeros(n_features)
     init_theta[0] = 2.0
     model_work = MultiFeatureLinUCB(
-        n_features=n_features, alpha=0.1, init_theta=init_theta
+        n_features=n_features, alpha=0.1, init_theta=init_theta, categories=CATEGORIES
     )
     x_work = extract_features(
         motivation=4,
@@ -817,7 +819,7 @@ def test_user_behavior_progression():
     n_features = 1 + 2 + 3 + 4 + len(CATEGORIES)
     init_theta = np.zeros(n_features)
     init_theta[0] = 2.0  # Strong initial bias toward motivation
-    model = MultiFeatureLinUCB(n_features=n_features, alpha=0.1, init_theta=init_theta)
+    model = MultiFeatureLinUCB(n_features=n_features, alpha=0.1, init_theta=init_theta, categories=CATEGORIES)
 
     print(
         "\nScenario: Single user learning and improving their task completion behavior"

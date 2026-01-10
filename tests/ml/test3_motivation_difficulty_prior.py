@@ -60,6 +60,7 @@ def create_model_with_motivation_difficulty_prior():
         init_theta=init_theta,
         prior_strength=5.0,  # Prior worth ~5 observations
         learn_rate=0.5,  # Smooth adaptation
+        categories=CATEGORIES,
     )
 
     return model, init_theta

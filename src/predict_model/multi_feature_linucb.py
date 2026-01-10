@@ -211,9 +211,12 @@ def extract_category_features(category: str, categories: Sequence[str]) -> List[
     Returns
     -------
     List[float]
-        A one-hot encoded list of length len(categories).  If the
-        provided category is not in the list, the last element is used
-        to represent "other".
+        A one-hot encoded list of length len(categories).
+        
+    Raises
+    ------
+    ValueError
+        If the provided category is not in the list of known categories.
     """
     vec = [0.0] * len(categories)
     if not categories:
@@ -221,8 +224,10 @@ def extract_category_features(category: str, categories: Sequence[str]) -> List[
     try:
         idx = categories.index(category)
     except ValueError:
-        # unknown category → map to last
-        idx = len(categories) - 1
+        raise ValueError(
+            f"Unknown category '{category}'. "
+            f"Valid categories are: {', '.join(categories)}"
+        )
     vec[idx] = 1.0
     return vec
 
@@ -249,6 +254,11 @@ def extract_category_difficulty_interactions(
     List[float]
         A one-hot encoded list of length len(categories) * 3.
         Only one element is 1.0 (the specific category-difficulty combo).
+        
+    Raises
+    ------
+    ValueError
+        If the provided category is not in the list of known categories.
     """
     n_cats = len(categories)
     n_diffs = 3  # easy, medium, hard
@@ -260,7 +270,10 @@ def extract_category_difficulty_interactions(
     try:
         cat_idx = categories.index(category)
     except ValueError:
-        cat_idx = n_cats - 1
+        raise ValueError(
+            f"Unknown category '{category}'. "
+            f"Valid categories are: {', '.join(categories)}"
+        )
 
     # Get difficulty index (same logic as extract_difficulty_features)
     diff = int(difficulty)
@@ -302,6 +315,11 @@ def extract_category_pressure_interactions(
     List[float]
         A one-hot encoded list of length len(categories) * 4.
         Only one element is 1.0 (the specific category-pressure combo).
+        
+    Raises
+    ------
+    ValueError
+        If the provided category is not in the list of known categories.
     """
     n_cats = len(categories)
     n_pressures = 4  # no, mild, strong, urgent
@@ -313,7 +331,10 @@ def extract_category_pressure_interactions(
     try:
         cat_idx = categories.index(category)
     except ValueError:
-        cat_idx = n_cats - 1
+        raise ValueError(
+            f"Unknown category '{category}'. "
+            f"Valid categories are: {', '.join(categories)}"
+        )
 
     # Get pressure index (same logic as extract_pressure_features)
     h = float(delta_hours)
@@ -457,6 +478,10 @@ class MultiFeatureLinUCB:
         An optional initial guess for the weight vector ``theta``.  Must
         have length n_features.  If not supplied, the model starts with
         theta = 0.
+    categories : Sequence[str], optional
+        The list of task category names used for feature encoding.
+        Saved for reference to identify which category index corresponds
+        to which category name. Default is None.
     """
 
     n_features: int
@@ -465,6 +490,7 @@ class MultiFeatureLinUCB:
         default_factory=lambda: [0.85, 0.65, 0.45, 0.25]
     )
     init_theta: Sequence[float] = None
+    categories: Sequence[str] = None
     # Strength of the Bayesian prior encoded by init_theta.
     # If > 0, we initialise A=λI, A_inv=(1/λ)I and b=λ·init_theta so that
     # theta starts at init_theta and decays smoothly as data arrives.
@@ -579,3 +605,123 @@ class MultiFeatureLinUCB:
         self.b += eta * reward * x.ravel()
         # Update theta
         self.theta = np.dot(self.A_inv, self.b)
+
+    def get_category_feature_index(self, category: str) -> int:
+        """Get the feature index for a specific category.
+
+        The category feature index is located after the base features
+        (1 motivation + 2 duration + 3 difficulty + 4 pressure = 10).
+
+        Parameters
+        ----------
+        category : str
+            The category name to look up.
+
+        Returns
+        -------
+        int
+            The feature index corresponding to the category, or -1 if
+            category is not found or categories are not set.
+
+        Raises
+        ------
+        ValueError
+            If categories have not been set during initialization.
+        """
+        if self.categories is None:
+            raise ValueError("Categories not set during initialization")
+        try:
+            cat_idx = self.categories.index(category)
+            # Feature index = base features (10) + category index
+            return 10 + cat_idx
+        except ValueError:
+            return -1
+
+    def get_category_weight(self, category: str) -> float:
+        """Get the learned weight for a specific category.
+
+        This returns the theta value (learned weight) that corresponds
+        to the given category feature.
+
+        Parameters
+        ----------
+        category : str
+            The category name to look up.
+
+        Returns
+        -------
+        float
+            The learned weight for this category, or None if category
+            is not found or categories are not set.
+
+        Raises
+        ------
+        ValueError
+            If categories have not been set during initialization.
+        """
+        if self.categories is None:
+            raise ValueError("Categories not set during initialization")
+        feature_idx = self.get_category_feature_index(category)
+        if feature_idx == -1:
+            return None
+        return float(self.theta[feature_idx])
+
+    def get_category_weights_map(self) -> Dict[str, float]:
+        """Get a mapping of all category names to their learned weights.
+
+        Returns
+        -------
+        Dict[str, float]
+            A dictionary mapping each category name to its learned weight
+            in theta. Empty dict if categories are not set.
+
+        Example
+        -------
+        >>> model = MultiFeatureLinUCB(n_features=13, 
+        ...                            categories=["work", "study", "health"])
+        >>> weights = model.get_category_weights_map()
+        >>> print(weights)  # {'work': 0.45, 'study': 0.32, 'health': -0.12}
+        """
+        if self.categories is None:
+            return {}
+        return {
+            category: self.get_category_weight(category)
+            for category in self.categories
+        }
+
+    def get_category_info(self, category: str) -> Dict[str, any]:
+        """Get comprehensive information about a specific category.
+
+        Parameters
+        ----------
+        category : str
+            The category name to look up.
+
+        Returns
+        -------
+        Dict[str, any]
+            A dictionary containing:
+            - 'name': the category name
+            - 'feature_index': the index in the feature vector
+            - 'weight': the learned weight (theta value)
+            - 'found': whether the category exists
+
+        Example
+        -------
+        >>> info = model.get_category_info("work")
+        >>> print(info)
+        >>> # {'name': 'work', 'feature_index': 10, 'weight': 0.45, 'found': True}
+        """
+        if self.categories is None:
+            return {"name": category, "found": False, "feature_index": None, "weight": None}
+        
+        feature_idx = self.get_category_feature_index(category)
+        if feature_idx == -1:
+            return {"name": category, "found": False, "feature_index": None, "weight": None}
+        
+        return {
+            "name": category,
+            "found": True,
+            "feature_index": feature_idx,
+            "weight": float(self.theta[feature_idx])
+        }
