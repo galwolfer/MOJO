@@ -22,6 +22,7 @@
 
 - **File order (required):** Every component file should follow this ordering: **1) helper functions & types, 2) main component/function (JSX), 3) styles (`StyleSheet.create`)**. This matches the "Function > HTML > CSS" format requested.
 - **JSDoc required:** Add a short JSDoc block for each exported component and for helpers that are not obvious. Include parameter descriptions and a short usage example when useful.
+- **Widget-style components:** For small, reusable UI blocks (e.g., photo pickers, small card-like controls), prefer implementing a thin "widget" component that composes `Widget` + internal inputs. This keeps the look-and-feel consistent and simplifies reuse (see `ProfilePhotoWidget.tsx` as an example).
 - **Type-safety:** Prefer `StyleProp<ViewStyle>`/`StyleProp<TextStyle>` for `style` props and explicit `React.ComponentType<{ size?: number; color?: string }>` for icon props.
 - **Central exports:** Add reusable component exports to `components/index.ts` (we keep the index up to date).
 - **Remove dead code:** Remove unused helper functions and unused styles found during development. Run `npx tsc --noEmit --skipLibCheck` before committing to catch type issues.
@@ -41,6 +42,7 @@
   - `components/common/TextBouble.tsx` — typewriter explained and well-documented (complex, keep as-is).
   - `components/common/AnimatedButtonsContainer.tsx` — new reusable animated wrapper for button groups. Supports vertical stacking and per-child staggered entrance; ideal for onboarding and chat bubble action layouts.
   - `components/special/Widget.tsx` — surfaced widget container with entrance animation (fade + translateY). Documented usage and recommended for embedding form fields inside `TextBouble`.
+  - `components/special/ProfilePhotoWidget.tsx` — new, documented widget for profile photo selection. Wraps `ProfileImagePicker` and provides title/subtitle for consistent look-and-feel with other widgets. Use this wherever a compact, card-like photo uploader is needed (e.g., signup form).
   - `components/inputs/Input.tsx` — documented, simplified dropdown handling, web caret support explained.
   - `components/layout/Box.tsx` & `BoxContainer.tsx` — typed and better documented.
   - `components/special/PriorityList.tsx` — web drag-and-drop list (documented).

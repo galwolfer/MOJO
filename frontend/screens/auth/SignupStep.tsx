@@ -5,7 +5,7 @@ import AppButton from "../../components/common/AppButton";
 import TextBouble from "../../components/chat/TextBouble";
 import Widget from "../../components/special/Widget";
 import Input from "../../components/inputs/Input";
-import ProfileImagePicker from "../../components/inputs/ProfileImagePicker";
+import ProfilePhotoWidget from "../../components/special/ProfilePhotoWidget";
 import AnimatedButtonsContainer from "../../components/common/AnimatedButtonsContainer";
 import { SPACING } from "../../theme";
 
@@ -85,12 +85,13 @@ const SignupStep: React.FC<Props> = ({
             </AppText>
           ) : null}
 
-          <View style={{ alignItems: "center", marginTop: SPACING.sm }}>
-            <AppText variant="notes" style={{ marginBottom: SPACING.sm }}>
-              Profile Photo (Optional)
-            </AppText>
-            <ProfileImagePicker imageUri={profileImage} onImageSelected={setProfileImage} size={80} />
-          </View>
+          <ProfilePhotoWidget
+            imageUri={profileImage}
+            onImageSelected={setProfileImage}
+            size={80}
+            title="Profile Photo (Optional)"
+            subtitle="Tap to select or change your avatar"
+          />
         </Widget>
 
         <AnimatedButtonsContainer entranceEnabled={typingDone}>
