@@ -9,30 +9,30 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
  * to persist the authenticated user via `AuthProvider`.
  */
 import { View, StyleSheet, ScrollView, Platform } from "react-native";
-import AppText from "../components/common/AppText";
-import CategoryGrid from "../components/categories/CategoryGrid";
-import { CATEGORY_KEYS, getCategoryMeta, type CategoryKey } from "../config/categoryMeta";
-import AppButton from "../components/common/AppButton";
-import Input from "../components/inputs/Input";
-import TextBouble from "../components/chat/TextBouble";
-import { ICONS } from "../components/icons/icons";
-import { COLORS, SPACING } from "../theme";
-import { Box } from "../components";
-import { useAuth } from "../context/AuthContext";
-import { useKeyboard } from "../hooks";
+import AppText from "../../components/common/AppText";
+import CategoryGrid from "../../components/categories/CategoryGrid";
+import { CATEGORY_KEYS, getCategoryMeta, type CategoryKey } from "../../config/categoryMeta";
+import AppButton from "../../components/common/AppButton";
+import Input from "../../components/inputs/Input";
+import TextBouble from "../chat/components/TextBouble";
+import { ICONS } from "../../components/icons/icons";
+import { COLORS, SPACING } from "../../theme";
+import { Box } from "../../components";
+import { useAuth } from "../../context/AuthContext";
+import { useKeyboard } from "../../hooks";
 
-import WelcomeStep from "./auth/WelcomeStep";
-import NameStep from "./auth/NameStep";
-import LoginStep from "./auth/LoginStep";
-import SignupStep from "./auth/SignupStep";
-import PrioritiesStep from "./auth/PrioritiesStep";
+import WelcomeStep from "./components/WelcomeStep";
+import NameStep from "./components/NameStep";
+import LoginStep from "./components/LoginStep";
+import SignupStep from "./components/SignupStep";
+import PrioritiesStep from "./components/PrioritiesStep";
 
 import {
   login as apiLogin,
   register as apiRegister,
   updateCategoryPriorities,
   setAuthToken,
-} from "../services/apiClient";
+} from "../../services/apiClient";
 
 export default function AuthScreen() {
   const { signIn } = useAuth();
@@ -169,7 +169,9 @@ export default function AuthScreen() {
               return;
             }
 
-            const uploadResp = await (await import("../services/apiClient")).uploadProfileImage(profileImage as File);
+            const uploadResp = await (
+              await import("../../services/apiClient")
+            ).uploadProfileImage(profileImage as File);
             if (uploadResp && uploadResp.url) {
               profileImageUrl = uploadResp.url;
             } else {
@@ -193,7 +195,9 @@ export default function AuthScreen() {
               return;
             }
 
-            const uploadResp = await (await import("../services/apiClient")).uploadProfileImage(profileImage as string);
+            const uploadResp = await (
+              await import("../../services/apiClient")
+            ).uploadProfileImage(profileImage as string);
             if (uploadResp && uploadResp.url) {
               profileImageUrl = uploadResp.url;
             } else {

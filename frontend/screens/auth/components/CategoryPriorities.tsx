@@ -9,13 +9,13 @@
  */
 import React, { useState } from "react";
 import { View, StyleSheet, ScrollView } from "react-native";
-import AppText from "../components/common/AppText";
-import AppButton from "../components/common/AppButton";
-import Box from "../components/layout/Box";
-import CategoryGrid from "../components/categories/CategoryGrid";
-import SliderComponent from "../components/inputs/Slider";
-import { CATEGORY_KEYS, getCategoryMeta, CategoryKey } from "../config/categoryMeta";
-import { COLORS, SPACING } from "../theme";
+import AppText from "../../../components/common/AppText";
+import AppButton from "../../../components/common/AppButton";
+import Box from "../../../components/layout/Box";
+import CategoryGrid from "../../../components/categories/CategoryGrid";
+import SliderComponent from "../../../components/inputs/Slider";
+import { CATEGORY_KEYS, getCategoryMeta, CategoryKey } from "../../../config/categoryMeta";
+import { COLORS, SPACING } from "../../../theme";
 
 type CategoryPrioritiesScreenProps = {
   onComplete: (priorities: Record<string, number>) => void;

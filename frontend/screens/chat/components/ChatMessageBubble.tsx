@@ -7,9 +7,9 @@ import { View, StyleSheet, TouchableOpacity } from "react-native";
  * Renders a single chat message with different presentation for the user vs assistant.
  * Handles simple heuristics for error content and provides hooks for retrying failed messages.
  */
-import AppText from "../common/AppText";
+import AppText from "../../../components/common/AppText";
 import TextBouble from "./TextBouble";
-import { COLORS, SPACING } from "../../theme";
+import { COLORS, SPACING } from "../../../theme";
 
 interface ChatMessageBubbleProps {
   role: "user" | "assistant";

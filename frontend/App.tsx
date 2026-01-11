@@ -5,7 +5,7 @@ import { StyleSheet, View, useWindowDimensions, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
-import AuthScreen from "./screens/Auth";
+import AuthScreen from "./screens/auth/Auth";
 import { COLORS } from "./theme";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { NavigationProvider } from "./context/NavigationContext";
