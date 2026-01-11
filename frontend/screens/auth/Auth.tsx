@@ -1,16 +1,19 @@
-import React, { useState, useEffect } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
 /**
  * AuthScreen
  *
- * Small onboarding and authentication screen that supports a lightweight
- * multi-step flow: welcome -> name -> login/signup -> priorities. Uses `useAuth`
- * to persist the authenticated user via `AuthProvider`.
+ * Entry-point screen for onboarding and authentication. Implements a
+ * compact multi-step flow (welcome → name → login/signup → priorities)
+ * while keeping each step modular and testable. Shared auth helpers like
+ * `AuthStep` and `AuthButtonsGroup` are used to ensure consistent UI.
+ *
+ * Notes:
+ * - For signup flow, profile image upload is handled at the parent screen.
+ * - Pending auth tokens are persisted in AsyncStorage until priorities are set.
  */
+import React, { useState, useEffect } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { View, StyleSheet, ScrollView, Platform } from "react-native";
 import AppText from "../../components/common/AppText";
-import CategoryGrid from "../../components/categories/CategoryGrid";
 import { CATEGORY_KEYS, getCategoryMeta, type CategoryKey } from "../../config/categoryMeta";
 import AppButton from "../../components/common/AppButton";
 import Input from "../../components/inputs/Input";

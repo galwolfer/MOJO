@@ -1,3 +1,13 @@
+/**
+ * WelcomeStep
+ *
+ * Small, welcoming onboarding step used at the start of the auth flow.
+ * Renders a short greeting inside a `TextBouble` and two large primary
+ * action buttons for starting a new account or entering an existing one.
+ *
+ * Usage:
+ * <WelcomeStep onStartNew={...} onHaveAccount={...} />
+ */
 import React from "react";
 import { View } from "react-native";
 import AppText from "../../../components/common/AppText";
@@ -14,7 +24,7 @@ const WelcomeStep: React.FC<Props> = ({ onStartNew, onHaveAccount }) => {
   return (
     <View style={{ alignItems: "center", gap: SPACING.lg }}>
       <AuthStep playOnceKey="auth:welcome">
-        {(typingDone) => (
+        {(typingDone: boolean) => (
           <>
             <AppText variant="bodyText">
               {"Hi, I’m "}

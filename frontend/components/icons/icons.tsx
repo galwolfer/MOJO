@@ -1,3 +1,16 @@
+/**
+ * Icon registry
+ *
+ * Centralized icon creation & registry used across the app. Icons are created
+ * from SVG files and rendered using `react-native-svg` on native and an
+ * inlined data URI `<img>` on web. The `ICONS` map provides a convenient
+ * lookup by key (e.g., `ICONS.send`).
+ *
+ * Notes:
+ * - SVGs are colorized by replacing `currentColor` in the SVG payload with
+ *   the requested color.
+ * - On web we build a colored data URI and render an `<img>` for simplicity.
+ */
 import React from "react";
 import { Platform, Text, View } from "react-native";
 import { SvgXml, type SvgProps } from "react-native-svg";

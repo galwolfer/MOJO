@@ -1,4 +1,16 @@
-// #file:TextBouble.tsx
+/**
+ * TextBouble
+ *
+ * Text bubble for chat UI. Renders typed text with a performant typewriter
+ * animation for assistant messages and fades non-text children in when
+ * preceding text finishes. Designed for high performance in long chat lists.
+ *
+ * Usage:
+ * <TextBouble mode="agent" playOnceKey="chat:msg-id">
+ *   <AppText>Message text</AppText>
+ *   <Widget>...</Widget>
+ * </TextBouble>
+ */
 import React, { useEffect, useMemo, useRef, useState, memo } from "react";
 import { Animated, Easing, Platform, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { COLORS, SHADOWS, SPACING } from "../../../theme";

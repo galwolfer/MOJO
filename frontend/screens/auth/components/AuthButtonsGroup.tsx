@@ -22,6 +22,13 @@ interface Props {
   containerDelay?: number;
 }
 
+/**
+ * AuthButtonsGroup
+ *
+ * Small helper to render paired action buttons for auth steps. Uses
+ * `AnimatedButtonsContainer` so entrance animations remain consistent across
+ * all steps.
+ */
 const AuthButtonsGroup: React.FC<Props> = ({ left, right, vertical, entranceEnabled, containerDelay }) => {
   return (
     <AnimatedButtonsContainer

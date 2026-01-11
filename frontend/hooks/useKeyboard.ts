@@ -1,3 +1,12 @@
+/**
+ * useKeyboard
+ *
+ * Cross-platform helper hook that tracks keyboard visibility and height. Handles
+ * platform differences (iOS will animate frame changes; Android uses didShow/didHide events).
+ *
+ * Usage:
+ * const { visible, height } = useKeyboard();
+ */
 import { useEffect, useState } from "react";
 import { Keyboard, KeyboardEvent, Platform } from "react-native";
 
@@ -5,10 +14,6 @@ type KeyboardState = {
   visible: boolean;
   height: number;
 };
-
-/**
- * Tracks keyboard visibility and height, including interactive frame changes on iOS.
- */
 export default function useKeyboard(): KeyboardState {
   const [state, setState] = useState<KeyboardState>({ visible: false, height: 0 });
 

@@ -12,7 +12,7 @@ import { View, StyleSheet, ScrollView } from "react-native";
 import AppText from "../../../components/common/AppText";
 import AppButton from "../../../components/common/AppButton";
 import Box from "../../../components/layout/Box";
-import CategoryGrid from "../../../components/categories/CategoryGrid";
+import CategoryGrid from "./CategoryGrid";
 import SliderComponent from "../../../components/inputs/Slider";
 import { CATEGORY_KEYS, getCategoryMeta, CategoryKey } from "../../../config/categoryMeta";
 import { COLORS, SPACING } from "../../../theme";

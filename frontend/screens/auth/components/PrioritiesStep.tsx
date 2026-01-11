@@ -1,4 +1,10 @@
-import React from "react";
+/**
+ * PrioritiesStep
+ *
+ * Asks the user to set priorities for their top goals via `CategoryGrid` and
+ * an inline priority slider. The selected values are passed back to the
+ * parent `Auth` screen via `onFinish`.
+ */ import React from "react";
 import { View } from "react-native";
 import AppText from "../../../components/common/AppText";
 import AuthStep from "./AuthStep";
@@ -37,7 +43,7 @@ const PrioritiesStep: React.FC<Props> = ({
 }) => {
   return (
     <AuthStep playOnceKey="auth:priorities">
-      {(typingDone) => (
+      {(typingDone: boolean) => (
         <>
           <AppText variant="bodyText" style={{ marginBottom: SPACING.md }}>
             {`Great! now after we are over that, lets talk about why are you here.... Your Goals. lets talk about what you want to achieve.`}

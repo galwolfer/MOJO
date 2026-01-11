@@ -1,10 +1,16 @@
-import { useEffect, useState, useCallback } from "react";
-
 /**
  * useChatSessions
  *
- * Loads sessions with caching and merges local optimistic messages with server-provided data.
+ * Hook responsible for loading and maintaining a user's chat sessions.
+ * Features:
+ * - Fast startup via cached sessions
+ * - API pagination and merge logic to preserve local optimistic messages
+ * - Helpers to load more sessions and update a session from other hooks
+ *
+ * Usage:
+ * const { sessions, isLoadingSessions, loadMoreSessions, updateSession } = useChatSessions();
  */
+import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { listChatSessions, getChatUserSessions, ChatSessionSummary, ChatMessage } from "../services/chatService";
 import { loadCachedSessions, saveCachedSessions } from "../services/chatSessionCache";

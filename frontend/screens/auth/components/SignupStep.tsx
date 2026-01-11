@@ -1,6 +1,16 @@
-﻿import React from "react";
+﻿/**
+ * SignupStep
+ *
+ * Collects registration details (username, email, password) and optional
+ * profile photo. Shows client-side `signupError` when validation fails.
+ *
+ * Note: image upload handling happens at the parent `Auth` screen — this
+ * component only collects the selected image/URI and displays the widget.
+ */
+import React from "react";
 import { View } from "react-native";
 import AppText from "../../../components/common/AppText";
+import ErrorText from "../../../components/common/ErrorText";
 import AuthStep from "./AuthStep";
 import AuthButtonsGroup from "./AuthButtonsGroup";
 import Widget from "../../../components/special/Widget";
@@ -44,7 +54,7 @@ const SignupStep: React.FC<Props> = ({
   return (
     <View style={{ width: "100%" }}>
       <AuthStep playOnceKey="auth:signup">
-        {(typingDone) => (
+        {(typingDone: boolean) => (
           <>
             <AppText variant="bodyText" style={{ marginBottom: SPACING.sm }}>
               {`Great to meet you${displayName ? ", " + displayName : ""}! \nLet's create your account.`}
@@ -79,9 +89,7 @@ const SignupStep: React.FC<Props> = ({
               />
 
               {signupError ? (
-                <AppText variant="errorText" style={{ marginTop: SPACING.md, marginBottom: SPACING.md }}>
-                  {signupError}
-                </AppText>
+                <ErrorText style={{ marginTop: SPACING.md, marginBottom: SPACING.md }}>{signupError}</ErrorText>
               ) : null}
 
               <ProfilePhotoWidget

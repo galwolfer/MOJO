@@ -11,6 +11,13 @@ interface Props {
   children?: ReactNode | ((typingDone: boolean) => ReactNode);
 }
 
+/**
+ * AuthStep
+ *
+ * Wrapper used by auth flow steps to centralize the message bubble and typing
+ * state. Accepts children either as React nodes or as a function that receives
+ * `typingDone` boolean so children can react to the typing animation.
+ */
 const AuthStep: React.FC<Props> = ({ playOnceKey, mode = "agent", children }) => {
   const [typingDone, setTypingDone] = useState(false);
 

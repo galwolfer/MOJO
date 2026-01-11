@@ -16,12 +16,11 @@ export { default as Widget } from "./special/Widget";
 export { default as AppButton } from "./common/AppButton";
 export { default as AnimatedButtonsContainer } from "./common/AnimatedButtonsContainer";
 export { default as AuthStep } from "../screens/auth/components/AuthStep";
-export { default as AuthButtonsGroup } from "../screens/auth/components/AuthButtonsGroup";
 export { default as TextBouble } from "../screens/chat/components/TextBouble";
 export type { TextBoubleMode } from "../screens/chat/components/TextBouble";
 
 // Category components
-export { default as CategoryGrid } from "./categories/CategoryGrid";
+export { default as CategoryGrid } from "../screens/auth/components/CategoryGrid";
 
 // Chat components
 /** Chat components */

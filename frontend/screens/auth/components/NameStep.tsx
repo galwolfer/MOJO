@@ -1,4 +1,13 @@
-﻿import React from "react";
+﻿/**
+ * NameStep
+ *
+ * Simple single-field step used to ask the user's display name before signup.
+ * Uses `AuthStep` to receive typing/entrance state and `Widget` to reveal the
+ * input when the assistant text finishes typing.
+ *
+ * Props: `displayName`, `setDisplayName`, `onBack`, `onNext`
+ */
+import React from "react";
 import { View } from "react-native";
 import AppText from "../../../components/common/AppText";
 import AuthStep from "./AuthStep";
@@ -18,7 +27,7 @@ const NameStep: React.FC<Props> = ({ displayName, setDisplayName, onBack, onNext
   return (
     <View style={{ width: "100%" }}>
       <AuthStep playOnceKey="auth:name">
-        {(typingDone) => (
+        {(typingDone: boolean) => (
           <>
             <AppText variant="bodyText">{`Let's begin  \nFirst, what should I call you?`}</AppText>
 

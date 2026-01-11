@@ -1,6 +1,13 @@
-﻿import React from "react";
+﻿/**
+ * LoginStep
+ *
+ * Presents a username/password form inside the auth message flow. Handles
+ * client-side display of `loginError` and exposes `onLogin` / `onBack` actions.
+ */
+import React from "react";
 import { View } from "react-native";
 import AppText from "../../../components/common/AppText";
+import ErrorText from "../../../components/common/ErrorText";
 import AuthStep from "./AuthStep";
 import AuthButtonsGroup from "./AuthButtonsGroup";
 import Widget from "../../../components/special/Widget";
@@ -29,16 +36,12 @@ const LoginStep: React.FC<Props> = ({
   return (
     <View style={{ width: "100%" }}>
       <AuthStep playOnceKey="auth:login">
-        {(typingDone) => (
+        {(typingDone: boolean) => (
           <>
             <AppText variant="bodyText" style={{ marginBottom: SPACING.sm }}>
               {"Welcome back \nLet's pick up where you left off."}
             </AppText>
-            {loginError ? (
-              <AppText variant="errorText" style={{ marginBottom: SPACING.md }}>
-                {loginError}
-              </AppText>
-            ) : null}
+            {loginError ? <ErrorText style={{ marginBottom: SPACING.md }}>{loginError}</ErrorText> : null}
 
             <Widget entranceEnabled={typingDone} entranceDelay={100} entranceDuration={200}>
               <Input

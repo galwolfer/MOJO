@@ -1,3 +1,21 @@
+/**
+ * ChatScreen
+ *
+ * Main chat UI for interacting with Mojo. Responsibilities:
+ * - Render timeline of messages and session dividers (virtualized FlatList)
+ * - Provide message composer in the shared NavBar (Input + send button)
+ * - Handle auto-scroll behavior, keyboard offset adjustments, and session restoration
+ * - Integrate with `useChatSessions` and `useChatMessages` for fetching/sending
+ *
+ * Usage:
+ * <ChatScreen /> (registered in app navigation)
+ *
+ * Notes:
+ * - The timeline uses `TimelineItem` for rendering message/divider entries and
+ *   `ChatMessageBubble` for per-message presentation.
+ * - Scrolling/restore logic is intentionally conservative to avoid jank on
+ *   low-end devices (uses InteractionManager and measured offsets).
+ */
 import React, { useEffect, useMemo, useRef, useCallback, useState } from "react";
 import {
   View,
@@ -21,7 +39,7 @@ import { useKeyboard, useContentInsets } from "../hooks";
 import GlassSurface from "../components/common/GlassSurface";
 import { useChatSessions, useChatMessages } from "../hooks";
 import { TimelineItem, buildTimelineItems } from "../utils/chatUtils";
-import TimelineItemComponent from "../components/chat/TimelineItem";
+import TimelineItemComponent from "./chat/components/TimelineItem";
 import type { ChatSessionSummary } from "../services/chatService";
 
 export default function ChatScreen() {

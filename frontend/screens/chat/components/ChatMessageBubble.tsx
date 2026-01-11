@@ -1,13 +1,17 @@
-import React from "react";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
-
 /**
  * ChatMessageBubble
  *
  * Renders a single chat message with different presentation for the user vs assistant.
  * Handles simple heuristics for error content and provides hooks for retrying failed messages.
+ *
+ * Usage:
+ * <ChatMessageBubble role="assistant" content={text} isLastMessage playOnceKey={id} />
  */
+import React from "react";
+import { View, StyleSheet, TouchableOpacity } from "react-native";
+
 import AppText from "../../../components/common/AppText";
+import ErrorText from "../../../components/common/ErrorText";
 import TextBouble from "./TextBouble";
 import { COLORS, SPACING } from "../../../theme";
 
@@ -45,7 +49,7 @@ function ChatMessageBubble({
   if (isErrorContent) {
     return (
       <View style={[styles.messageRow, styles.errorRow]}>
-        <AppText variant="errorText">{content.endsWith("\n") ? content.slice(0, -1) : content}</AppText>
+        <ErrorText>{content.endsWith("\n") ? content.slice(0, -1) : content}</ErrorText>
       </View>
     );
   }
@@ -63,9 +67,7 @@ function ChatMessageBubble({
       </TextBouble>
       {isUser && status === "failed" && onRetry ? (
         <TouchableOpacity onPress={onRetry} style={styles.retryRow} activeOpacity={0.7}>
-          <AppText variant="errorText" style={styles.pendingText}>
-            Try again
-          </AppText>
+          <ErrorText style={styles.pendingText}>Try again</ErrorText>
         </TouchableOpacity>
       ) : null}
       {isUser && status === "pending" ? (

@@ -21,7 +21,7 @@ import Input from "./components/inputs/Input";
 import Tag from "./components/inputs/tag";
 import PriorityList, { PriorityListItem } from "./components/special/PriorityList";
 import { useState } from "react";
-import TextBouble from "./components/chat/TextBouble";
+import TextBouble from "./screens/chat/components/TextBouble";
 import { AppButton } from "./components";
 
 const ColorSwatch = ({ name, hex }: { name: string; hex: string }) => (

@@ -1,3 +1,18 @@
+/**
+ * GlassSurface
+ *
+ * Lightweight surface component that provides a consistent "glass" visual across
+ * platforms. Uses native blur where available (`BlurView`) and falls back to a
+ * translucent overlay + linear gradient gloss for platforms without native blur.
+ *
+ * Props:
+ * - `intensity` (number): blur intensity (0-100) when native blur is available.
+ * - `pointerEvents` (string): forwarded to the surface element.
+ * - `style` (StyleProp<ViewStyle>): additional container styles.
+ *
+ * Usage:
+ * <GlassSurface intensity={50}><Content /></GlassSurface>
+ */
 import React from "react";
 import { StyleProp, View, ViewStyle, StyleSheet, Platform } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
