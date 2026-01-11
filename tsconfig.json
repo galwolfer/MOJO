@@ -1,4 +1,19 @@
 {
-  "compilerOptions": {},
-  "extends": "expo/tsconfig.base"
+  "compilerOptions": {
+    "noEmit": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "ignoreDeprecations": "6.0",
+    "resolveJsonModule": true,
+    "lib": ["esnext"]
+  },
+  "include": [
+    "frontend/**/*",
+    "src/**/*",
+    "scripts/**/*"
+  ],
+  "exclude": ["node_modules", "dist"]
 }
