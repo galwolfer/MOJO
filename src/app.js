@@ -6,6 +6,8 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
+import path from "path";
+import fs from "fs";
 import routes from "./routes/index.js";
 import usersRouter from "./routes/Users.js";
 import { expiredTaskBlocker } from "./middlewares/expiredTaskBlocker.js";
@@ -13,10 +15,17 @@ import { notFound, errorHandler } from "./middlewares/error.js";
 
 const app = express();
 
+// Ensure uploads directory exists and serve it statically
+const uploadsDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use("/uploads", express.static(uploadsDir));
+
 // Core middlewares
 app.use(helmet()); // Secure headers
 app.use(cors()); // CORS
-app.use(express.json()); // JSON body parsing
+app.use(express.json({ limit: "100kb" })); // JSON body parsing (keep small for safety)
 app.use(morgan("dev")); // HTTP logging
 
 // Routes that are NOT blocked by expired tasks

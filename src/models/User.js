@@ -116,6 +116,10 @@ const userSchema = new mongoose.Schema(
         trim: true,
         default: "",
       },
+      profileImage: {
+        type: String,
+        default: null,
+      },
       tone: {
         type: String,
         enum: ["friendly", "professional", "casual", "formal", "enthusiastic"],

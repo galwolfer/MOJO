@@ -5,6 +5,7 @@ import AppButton from "../../components/common/AppButton";
 import TextBouble from "../../components/chat/TextBouble";
 import Widget from "../../components/special/Widget";
 import Input from "../../components/inputs/Input";
+import ProfileImagePicker from "../../components/inputs/ProfileImagePicker";
 import AnimatedButtonsContainer from "../../components/common/AnimatedButtonsContainer";
 import { SPACING } from "../../theme";
 
@@ -13,10 +14,12 @@ interface Props {
   signupEmail: string;
   signupPassword: string;
   signupConfirm: string;
+  profileImage: string | File | null;
   setSignupUsername: (v: string) => void;
   setSignupEmail: (v: string) => void;
   setSignupPassword: (v: string) => void;
   setSignupConfirm: (v: string) => void;
+  setProfileImage: (v: string | File | null) => void;
   signupError?: string | null;
   onBack: () => void;
   onSignup: () => void;
@@ -28,10 +31,12 @@ const SignupStep: React.FC<Props> = ({
   signupEmail,
   signupPassword,
   signupConfirm,
+  profileImage,
   setSignupUsername,
   setSignupEmail,
   setSignupPassword,
   setSignupConfirm,
+  setProfileImage,
   signupError,
   onBack,
   onSignup,
@@ -45,13 +50,7 @@ const SignupStep: React.FC<Props> = ({
         <AppText variant="bodyText" style={{ marginBottom: SPACING.sm }}>
           {`Great to meet you${displayName ? ", " + displayName : ""}! \nLet's create your account.`}
         </AppText>
-        {signupError ? (
-          <AppText variant="errorText" style={{ marginBottom: SPACING.md }}>
-            {signupError}
-          </AppText>
-        ) : null}
-
-        <Widget entranceEnabled={typingDone} entranceDelay={100} entranceDuration={200}>
+        <Widget entranceEnabled={typingDone} entranceDelay={0} entranceDuration={150}>
           <Input
             label="Username"
             placeholder="Choose a username"
@@ -79,6 +78,19 @@ const SignupStep: React.FC<Props> = ({
             onChangeText={setSignupConfirm}
             type="password"
           />
+
+          {signupError ? (
+            <AppText variant="errorText" style={{ marginTop: SPACING.md, marginBottom: SPACING.md }}>
+              {signupError}
+            </AppText>
+          ) : null}
+
+          <View style={{ alignItems: "center", marginTop: SPACING.sm }}>
+            <AppText variant="notes" style={{ marginBottom: SPACING.sm }}>
+              Profile Photo (Optional)
+            </AppText>
+            <ProfileImagePicker imageUri={profileImage} onImageSelected={setProfileImage} size={80} />
+          </View>
         </Widget>
 
         <AnimatedButtonsContainer entranceEnabled={typingDone}>

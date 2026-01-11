@@ -17,7 +17,7 @@ const JWT_EXPIRES_IN = "7d"; // Token valid for 7 days
  */
 export async function register(req, res, next) {
   try {
-    const { username, email, password } = req.body;
+    const { username, email, password, profileImage } = req.body;
 
     // Validation
     if (!username || !email || !password) {
@@ -55,6 +55,7 @@ export async function register(req, res, next) {
       email,
       passwordHash,
       profile: {
+        profileImage: profileImage || null,
         tone: "friendly",
         persona: "assistant",
         settings: {},
@@ -188,7 +189,7 @@ export async function getMe(req, res, next) {
  */
 export async function updateProfile(req, res, next) {
   try {
-    const { name, tone, persona, settings } = req.body;
+    const { name, tone, persona, settings, profileImage } = req.body;
     const userId = req.user.userId;
 
     const user = await User.findById(userId);
@@ -202,6 +203,7 @@ export async function updateProfile(req, res, next) {
 
     // Update profile fields
     if (name !== undefined) user.profile.name = name;
+    if (profileImage !== undefined) user.profile.profileImage = profileImage;
     if (tone) user.profile.tone = tone;
     if (persona) user.profile.persona = persona;
     if (settings) {

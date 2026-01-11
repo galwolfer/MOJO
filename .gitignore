@@ -27,6 +27,7 @@ md
 .env
 /scripts/.token
 /md
+/uploads/
 
 # Backups and DB dumps
 /backups/

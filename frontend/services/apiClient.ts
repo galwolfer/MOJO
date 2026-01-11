@@ -9,7 +9,13 @@ export { setAuthToken };
 
 // Types
 export type LoginRequest = { username: string; password: string };
-export type RegisterRequest = { username: string; email: string; password: string; displayName?: string };
+export type RegisterRequest = {
+  username: string;
+  email: string;
+  password: string;
+  displayName?: string;
+  profileImage?: string | null;
+};
 export type CategoryPrioritiesRequest = { priorities: Record<string, number> };
 
 export type AuthResponse = {
@@ -47,4 +53,47 @@ export async function updateCategoryPriorities(payload: CategoryPrioritiesReques
   return post<any>("/auth/category-priorities", payload);
 }
 
-export default { setApiBase, setAuthToken, login, register, updateCategoryPriorities };
+/**
+ * Upload profile image file (multipart/form-data)
+ * Expects the server to return { success: true, url }
+ */
+export async function uploadProfileImage(fileOrUri: string | File): Promise<{ success: boolean; url?: string }> {
+  const apiBase = getApiBase();
+  const url = `${apiBase}/auth/upload-avatar`;
+
+  const form = new FormData();
+
+  if (typeof fileOrUri === "string") {
+    // Extract filename from URI
+    const nameMatch = fileOrUri.match(/[^\/]+$/);
+    const filename = nameMatch ? nameMatch[0] : `avatar-${Date.now()}.jpg`;
+
+    // Type: assume jpeg for now
+    const file: any = {
+      uri: fileOrUri,
+      name: filename,
+      type: "image/jpeg",
+    };
+
+    form.append("avatar", file as any);
+  } else {
+    // Browser File object
+    form.append("avatar", fileOrUri as any);
+  }
+
+  const res = await fetch(url, {
+    method: "POST",
+    body: form,
+    // Note: do NOT set Content-Type; fetch will set proper multipart boundary
+  });
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(data?.error || data?.message || res.statusText || "Upload failed");
+  }
+
+  return data as { success: boolean; url?: string };
+}
+
+export default { setApiBase, setAuthToken, login, register, updateCategoryPriorities, uploadProfileImage };

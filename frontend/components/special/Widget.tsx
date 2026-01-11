@@ -42,11 +42,26 @@ const Widget: React.FC<WidgetProps> = ({
   entranceDelay = 100,
   entranceDuration = 200,
 }) => {
-  const opacity = useRef(new Animated.Value(entranceEnabled ? 0 : 1)).current;
-  const translateY = useRef(new Animated.Value(entranceEnabled ? 8 : 0)).current;
+  // Don't render until entrance is requested to avoid showing content early.
+  const [mounted, setMounted] = React.useState<boolean>(entranceEnabled);
 
   useEffect(() => {
-    if (!entranceEnabled) return;
+    if (entranceEnabled) setMounted(true);
+  }, [entranceEnabled]);
+
+  // If not mounted yet, render nothing (prevents early flash / layout shift)
+  if (!mounted) return null;
+
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(8)).current;
+
+  useEffect(() => {
+    if (!entranceEnabled) {
+      // If entrance is not enabled but we are mounted (someone forced mount), make it visible immediately
+      opacity.setValue(1);
+      translateY.setValue(0);
+      return;
+    }
 
     Animated.parallel([
       Animated.timing(opacity, {

@@ -8,7 +8,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
  * multi-step flow: welcome -> name -> login/signup -> priorities. Uses `useAuth`
  * to persist the authenticated user via `AuthProvider`.
  */
-import { View, StyleSheet, ScrollView } from "react-native";
+import { View, StyleSheet, ScrollView, Platform } from "react-native";
 import AppText from "../components/common/AppText";
 import CategoryGrid from "../components/categories/CategoryGrid";
 import { CATEGORY_KEYS, getCategoryMeta, type CategoryKey } from "../config/categoryMeta";
@@ -46,6 +46,7 @@ export default function AuthScreen() {
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirm, setSignupConfirm] = useState("");
+  const [profileImage, setProfileImage] = useState<string | File | null>(null);
   // Pre-signup display name (asked before the signup form)
   const [displayName, setDisplayName] = useState("");
 
@@ -155,11 +156,64 @@ export default function AuthScreen() {
         return;
       }
 
+      console.log("Signing up with profileImage:", profileImage ? "image provided" : "no image");
+
+      // If we have a profile image (File on web or URI on native), check size and upload to obtain hosted URL
+      let profileImageUrl: string | null = null;
+      if (profileImage) {
+        try {
+          // Web: profileImage is a File
+          if (typeof profileImage !== "string") {
+            if ((profileImage as File).size && (profileImage as File).size > 400 * 1024) {
+              setSignupError("Profile image too large. Please choose a smaller image.");
+              return;
+            }
+
+            const uploadResp = await (await import("../services/apiClient")).uploadProfileImage(profileImage as File);
+            if (uploadResp && uploadResp.url) {
+              profileImageUrl = uploadResp.url;
+            } else {
+              setSignupError("Failed to upload profile image. Please try again.");
+              return;
+            }
+          } else {
+            // Native: profileImage is a file URI string
+            // Use legacy expo-file-system API to get actual file size (avoids deprecation warning)
+            const { getInfoAsync } = await import("expo-file-system/legacy");
+            const info = await getInfoAsync(profileImage as string, { size: true } as any);
+            console.log("Selected image file info:", info);
+
+            if (!info.exists) {
+              setSignupError("Selected profile image could not be found. Please re-select the image.");
+              return;
+            }
+
+            if (info.size && info.size > 400 * 1024) {
+              setSignupError("Profile image too large. Please choose a smaller image.");
+              return;
+            }
+
+            const uploadResp = await (await import("../services/apiClient")).uploadProfileImage(profileImage as string);
+            if (uploadResp && uploadResp.url) {
+              profileImageUrl = uploadResp.url;
+            } else {
+              setSignupError("Failed to upload profile image. Please try again.");
+              return;
+            }
+          }
+        } catch (err: any) {
+          console.error("Image upload error:", err);
+          setSignupError(String(err?.message || "Failed to upload image"));
+          return;
+        }
+      }
+
       const data = await apiRegister({
         username: signupUsername,
         email: signupEmail,
         password: signupPassword,
         displayName,
+        profileImage: profileImageUrl,
       });
 
       if (data.token && data.user) {
@@ -172,6 +226,7 @@ export default function AuthScreen() {
       }
     } catch (err: any) {
       const msg = String(err?.message || err || "Signup failed");
+      console.error("Signup error:", msg);
       setSignupError(msg);
     }
   }
@@ -249,6 +304,7 @@ export default function AuthScreen() {
             signupEmail={signupEmail}
             signupPassword={signupPassword}
             signupConfirm={signupConfirm}
+            profileImage={profileImage}
             setSignupUsername={(v) => {
               setSignupUsername(v);
               setSignupError(null);
@@ -265,6 +321,7 @@ export default function AuthScreen() {
               setSignupConfirm(v);
               setSignupError(null);
             }}
+            setProfileImage={setProfileImage}
             signupError={signupError}
             // Back should return to the name step where displayName is edited
             onBack={() => setScreen("name")}
