@@ -7,7 +7,17 @@
  * Displays categories in the order specified in CATEGORY_KEYS from categoryMeta.
  */
 import React, { useEffect, useRef } from "react";
-import { View, StyleSheet, Dimensions, Animated, Pressable, Easing } from "react-native";
+import {
+  View,
+  StyleSheet,
+  Dimensions,
+  Animated,
+  Pressable,
+  Easing,
+  LayoutAnimation,
+  UIManager,
+  Platform,
+} from "react-native";
 import AppText from "../../../components/common/AppText";
 import { CATEGORY_KEYS, getCategoryMeta, CategoryKey } from "../../../config/categoryMeta";
 import { ICONS } from "../../../components/icons/icons";
@@ -55,6 +65,16 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
   const duration = typeof entranceDuration === "number" ? entranceDuration : DEFAULT_ENTRANCE.duration;
   const enabled = entranceEnabled || DEFAULT_ENTRANCE.enabled;
 
+  // Track which items have already run their entrance animation during this session
+  const animatedSetRef = useRef<Set<string>>(new Set());
+
+  // On Android enable LayoutAnimation support if available
+  useEffect(() => {
+    if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+  }, []);
+
   const CategoryItem: React.FC<{
     categoryKey: CategoryKey;
     meta: ReturnType<typeof getCategoryMeta>;
@@ -63,10 +83,11 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
     rowIndex: number;
     colIndex: number;
   }> = ({ categoryKey, meta, IconComponent, isSelected, rowIndex, colIndex }) => {
-    const initialScale = enabled ? 0.8 : 1;
+    const alreadyAnimated = animatedSetRef.current.has(categoryKey);
+    const initialScale = alreadyAnimated ? 1 : enabled ? 0.8 : 1;
     const scale = useRef(new Animated.Value(initialScale)).current;
-    const iconOpacity = useRef(new Animated.Value(enabled ? 0 : 1)).current;
-    const textOpacity = useRef(new Animated.Value(enabled ? 0 : 1)).current;
+    const iconOpacity = useRef(new Animated.Value(alreadyAnimated ? 1 : enabled ? 0 : 1)).current;
+    const textOpacity = useRef(new Animated.Value(alreadyAnimated ? 1 : enabled ? 0 : 1)).current;
     const outline = useRef(new Animated.Value(isSelected ? 3 : 0)).current;
 
     useEffect(() => {
@@ -80,6 +101,14 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
 
     useEffect(() => {
       if (!enabled) return;
+      // If this item already animated, ensure final values & skip
+      if (animatedSetRef.current.has(categoryKey)) {
+        scale.setValue(1);
+        iconOpacity.setValue(1);
+        textOpacity.setValue(1);
+        return;
+      }
+
       const delay = baseDelay + (rowIndex + colIndex) * stagger;
       // Sequence: appear -> small bump -> settle
       Animated.sequence([
@@ -107,8 +136,11 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
           useNativeDriver: true,
         }),
         Animated.timing(scale, { toValue: 1, duration: 160, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-      ]).start();
-    }, [enabled, baseDelay, stagger, duration, rowIndex, colIndex, scale, textOpacity, iconOpacity]);
+      ]).start(() => {
+        // Mark this item as animated so it won't replay on future re-renders
+        animatedSetRef.current.add(categoryKey);
+      });
+    }, [enabled, baseDelay, stagger, duration, rowIndex, colIndex, scale, textOpacity, iconOpacity, categoryKey]);
 
     const onPressIn = () => {
       Animated.parallel([
@@ -172,30 +204,73 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
   const rows: CategoryKey[][] = [];
   for (let i = 0; i < CATEGORY_KEYS.length; i += cols) rows.push(CATEGORY_KEYS.slice(i, i + cols) as CategoryKey[]);
 
-  const RowBox: React.FC<{ rowIndex: number; children: React.ReactNode }> = ({ rowIndex, children }) => {
-    const boxOpacity = useRef(new Animated.Value(enabled ? 0 : 1)).current;
-    const translateY = useRef(new Animated.Value(enabled ? 6 : 0)).current;
+  const RowBox: React.FC<{ rowIndex: number; visible?: boolean; children: React.ReactNode }> = ({
+    rowIndex,
+    visible = false,
+    children,
+  }) => {
+    const boxOpacity = useRef(new Animated.Value(enabled ? 0 : visible ? 1 : 0)).current;
+    const translateY = useRef(new Animated.Value(enabled ? 6 : visible ? 0 : 6)).current;
 
     useEffect(() => {
-      if (!enabled) return;
-      const delay = baseDelay + (rowIndex + 1) * stagger + 40;
-      Animated.parallel([
-        Animated.timing(boxOpacity, {
-          toValue: 1,
-          duration: Math.max(180, duration),
-          delay,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(translateY, {
-          toValue: 0,
-          duration: Math.max(180, duration),
-          delay,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }, [enabled, baseDelay, rowIndex, stagger, duration, boxOpacity, translateY]);
+      // Animate on initial entrance when enabled
+      if (enabled) {
+        const delay = baseDelay + (rowIndex + 1) * stagger + 40;
+        Animated.parallel([
+          Animated.timing(boxOpacity, {
+            toValue: 1,
+            duration: Math.max(180, duration),
+            delay,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(translateY, {
+            toValue: 0,
+            duration: Math.max(180, duration),
+            delay,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+        ]).start();
+        return;
+      }
+
+      // Animate when visibility toggles (selection changes)
+      // Trigger LayoutAnimation for smooth layout shifts
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
+      if (visible) {
+        Animated.parallel([
+          Animated.timing(boxOpacity, {
+            toValue: 1,
+            duration: 220,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(translateY, {
+            toValue: 0,
+            duration: 220,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+        ]).start();
+      } else {
+        Animated.parallel([
+          Animated.timing(boxOpacity, {
+            toValue: 0,
+            duration: 180,
+            easing: Easing.in(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(translateY, {
+            toValue: 6,
+            duration: 180,
+            easing: Easing.in(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
+    }, [enabled, visible, baseDelay, rowIndex, stagger, duration, boxOpacity, translateY]);
 
     return (
       <Animated.View style={[styles.rowBoxWrapper, { opacity: boxOpacity, transform: [{ translateY }] }]}>
@@ -230,40 +305,40 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
               })}
             </View>
 
-            {rowHasSelected && selectedCategory ? (
-              <RowBox rowIndex={rowIndex}>
-                {(() => {
-                  const selMeta = getCategoryMeta(selectedCategory);
-                  const SelIcon = (ICONS[selMeta.icon] as React.FC<any>) || null;
-                  return (
-                    <Box
-                      title={selMeta.displayName?.toUpperCase()}
-                      titleColor={selMeta.color}
-                      titleIcon={SelIcon ? <SelIcon size={FONT_SIZES.md} color={COLORS.colorWhite} /> : undefined}
-                    >
-                      <AppText variant="bodyText" style={{ textAlign: "center", marginBottom: SPACING.md }}>
-                        {`Set how much it important to you. (1 = Low, 5 = High)`}
-                      </AppText>
-                      <SliderComponent
-                        style={{ paddingHorizontal: SPACING.md }}
-                        value={
-                          priorities && typeof priorities[selectedCategory] === "number"
-                            ? priorities[selectedCategory]
-                            : 3
-                        }
-                        onValueChange={(val: number) =>
-                          onPriorityChange && onPriorityChange(selectedCategory as CategoryKey, val)
-                        }
-                        min={1}
-                        max={5}
-                        step={1}
-                        TrackThumbColor={selMeta.color}
-                      />
-                    </Box>
-                  );
-                })()}
-              </RowBox>
-            ) : null}
+            <RowBox rowIndex={rowIndex} visible={rowHasSelected}>
+              {rowHasSelected && selectedCategory
+                ? (() => {
+                    const selMeta = getCategoryMeta(selectedCategory);
+                    const SelIcon = (ICONS[selMeta.icon] as React.FC<any>) || null;
+                    return (
+                      <Box
+                        title={selMeta.displayName?.toUpperCase()}
+                        titleColor={selMeta.color}
+                        titleIcon={SelIcon ? <SelIcon size={FONT_SIZES.md} color={COLORS.colorWhite} /> : undefined}
+                      >
+                        <AppText variant="bodyText" style={{ textAlign: "center", marginBottom: SPACING.md }}>
+                          {`Set how much it important to you. (1 = Low, 5 = High)`}
+                        </AppText>
+                        <SliderComponent
+                          style={{ paddingHorizontal: SPACING.md }}
+                          value={
+                            priorities && typeof priorities[selectedCategory] === "number"
+                              ? priorities[selectedCategory]
+                              : 3
+                          }
+                          onValueChange={(val: number) =>
+                            onPriorityChange && onPriorityChange(selectedCategory as CategoryKey, val)
+                          }
+                          min={1}
+                          max={5}
+                          step={1}
+                          TrackThumbColor={selMeta.color}
+                        />
+                      </Box>
+                    );
+                  })()
+                : null}
+            </RowBox>
           </React.Fragment>
         );
       })}
