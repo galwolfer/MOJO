@@ -9,3 +9,4 @@ export { Session } from "./Session.js";
 // Use User.memories array instead
 export { Memory } from "./Memory.js";
 export { Task } from "./Task.js";
+export { default as OjoType } from "./OjoType.js";

@@ -120,14 +120,10 @@ const userSchema = new mongoose.Schema(
         type: String,
         default: null,
       },
-      tone: {
-        type: String,
-        enum: ["friendly", "professional", "casual", "formal", "enthusiastic"],
-        default: "friendly",
-      },
-      persona: {
-        type: String,
-        default: "assistant",
+      ojoTypeId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "OjoType",
+        default: null,
       },
       gender: {
         type: String,

@@ -97,22 +97,15 @@ export function buildSystemPromptWithUserContext(
     prompt = `${getBaseIdentity()}\n\n${TOOL_MANIFEST}`;
   }
 
-  if (userProfile?.persona || userProfile?.tone) {
+  if (userProfile?.ojoType) {
+    const ojoType = userProfile.ojoType;
     prompt += `\nPERSONALITY:`;
-
-    if (userProfile.persona) {
-      prompt += ` Act as ${userProfile.persona}.`;
-    }
-
-    if (userProfile.tone) {
-      const toneMap = {
-        friendly: "warm, approachable, conversational",
-        professional: "polished, business-like, efficient",
-        casual: "relaxed, informal, laid-back",
-        formal: "respectful, proper, structured",
-        enthusiastic: "energetic, positive, encouraging",
-      };
-      prompt += ` Tone: ${toneMap[userProfile.tone] || userProfile.tone}.`;
+    prompt += ` Act as ${ojoType.persona}.`;
+    
+    // Build tone string from array
+    if (ojoType.tone && Array.isArray(ojoType.tone) && ojoType.tone.length > 0) {
+      const toneString = ojoType.tone.join(", ").toLowerCase();
+      prompt += ` Tone: ${toneString}.`;
     }
   }
 

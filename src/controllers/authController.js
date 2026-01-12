@@ -7,6 +7,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { User } from "../models/index.js";
 import { env } from "../config/env.js";
+import { getDefaultOjoType } from "../utils/ojoTypeUtils.js";
 
 const JWT_SECRET = env.JWT_SECRET || "your-secret-key-change-in-production";
 const JWT_EXPIRES_IN = "7d"; // Token valid for 7 days
@@ -65,6 +66,9 @@ export async function register(req, res, next) {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
+    // Get default OjoType
+    const defaultOjoType = await getDefaultOjoType();
+
     // Create user
     const user = new User({
       username,
@@ -73,8 +77,7 @@ export async function register(req, res, next) {
       profile: {
         name: displayName ? String(displayName).trim() : "",
         profileImage: profileImage || null,
-        tone: "friendly",
-        persona: "assistant",
+        ojoTypeId: defaultOjoType ? defaultOjoType._id : null,
         gender: gender ? String(gender).toLowerCase() : "unspecified",
         settings: {},
       },
@@ -207,7 +210,7 @@ export async function getMe(req, res, next) {
  */
 export async function updateProfile(req, res, next) {
   try {
-    const { name, tone, persona, settings, profileImage, gender } = req.body;
+    const { name, ojoTypeName, settings, profileImage, gender } = req.body;
     const userId = req.user.userId;
 
     const user = await User.findById(userId);
@@ -222,8 +225,19 @@ export async function updateProfile(req, res, next) {
     // Update profile fields
     if (name !== undefined) user.profile.name = name;
     if (profileImage !== undefined) user.profile.profileImage = profileImage;
-    if (tone) user.profile.tone = tone;
-    if (persona) user.profile.persona = persona;
+    if (ojoTypeName) {
+      // Import OjoType here to avoid circular imports
+      const OjoType = (await import("../models/OjoType.js")).default;
+      const ojoType = await OjoType.findOne({ name: ojoTypeName.toLowerCase() });
+      if (ojoType) {
+        user.profile.ojoTypeId = ojoType._id;
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid ojoType name",
+        });
+      }
+    }
     if (gender !== undefined) {
       const g = String(gender).toLowerCase();
       user.profile.gender = g;

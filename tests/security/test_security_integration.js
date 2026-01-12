@@ -31,7 +31,7 @@ async function run() {
     const user = {
       _id: userId,
       username: `test-${userId}`,
-      profile: { name: "Tester", tone: "friendly", persona: "assistant" },
+      profile: { name: "Tester", ojoTypeId: "mentorjo" },
     };
     // Add lean method for Mongoose compatibility
     user.lean = () => user;

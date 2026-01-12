@@ -9,12 +9,16 @@ import { connectDatabase } from "./config/database.js";
 import { logger } from "./utils/logger.js";
 import { startPriorityScheduler } from "./services/schedulingService.js";
 import { startExpiredTaskChecker } from "./services/taskService.js";
+import { initializeOjoTypes } from "./utils/ojoTypeUtils.js";
 
 const server = createServer(app);
 const port = Number(env.PORT ?? 3000);
 
 connectDatabase()
-  .then(() => {
+  .then(async () => {
+    // Initialize OjoTypes in the database
+    await initializeOjoTypes();
+    
     server.listen(port, () => {
       logger.info(`HTTP server listening on http://localhost:${port}`);
       startPriorityScheduler();

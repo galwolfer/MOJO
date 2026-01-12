@@ -2,8 +2,9 @@
  * Memory Service - Memory and conversation management
  * Manages conversation memory, user profiles, and embeddings using MongoDB
  */
-import { User, Session, Memory } from "../models/index.js";
+import { User, Session, Memory, OjoType } from "../models/index.js";
 import { config } from "../config/env.js";
+import { getDefaultOjoType } from "../utils/ojoTypeUtils.js";
 import {
   storePrimaryMemory,
   storeConversationMemory,
@@ -153,30 +154,34 @@ class MongoMemoryStore {
    */
   async getUserProfile(userId) {
     try {
-      const user = await User.findById(userId);
+      const user = await User.findById(userId).populate("profile.ojoTypeId");
 
       if (!user) {
         // Return default profile if user not found
+        const defaultOjoType = await getDefaultOjoType();
         return {
           userId: userId,
-          tone: "friendly",
-          persona: "assistant",
+          ojoTypeId: defaultOjoType ? defaultOjoType._id : null,
+          ojoType: defaultOjoType,
           settings: {},
         };
       }
 
+      const ojoType = user.profile.ojoTypeId || (await getDefaultOjoType());
+
       return {
         userId: user._id.toString(),
-        tone: user.profile.tone,
-        persona: user.profile.persona,
+        ojoTypeId: ojoType ? ojoType._id : null,
+        ojoType: ojoType,
         settings: Object.fromEntries(user.profile.settings || new Map()),
       };
     } catch (error) {
       console.error("Error getting user profile:", error);
+      const defaultOjoType = await getDefaultOjoType();
       return {
         userId: userId,
-        tone: "friendly",
-        persona: "assistant",
+        ojoTypeId: defaultOjoType ? defaultOjoType._id : null,
+        ojoType: defaultOjoType,
         settings: {},
       };
     }
@@ -194,8 +199,12 @@ class MongoMemoryStore {
         return null;
       }
 
-      if (updates.tone) user.profile.tone = updates.tone;
-      if (updates.persona) user.profile.persona = updates.persona;
+      if (updates.ojoTypeName) {
+        const ojoType = await OjoType.findOne({ name: updates.ojoTypeName.toLowerCase() });
+        if (ojoType) {
+          user.profile.ojoTypeId = ojoType._id;
+        }
+      }
       if (updates.settings) {
         user.profile.settings = new Map(Object.entries(updates.settings));
       }

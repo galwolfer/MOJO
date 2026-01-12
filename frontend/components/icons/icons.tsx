@@ -20,6 +20,10 @@ import { COLORS } from "../../theme";
 export type IconProps = SvgProps & { size?: number };
 
 const ICON_FILES: Record<string, string> = {
+  mentorjo: "mentorjo.svg",
+  bestojo: "bestojo.svg",
+  brojo: "brojo.svg",
+  strictojo: "strictojo.svg",
   burger: "burger.svg",
   calendar: "calendar.svg",
   cancel: "cancel.svg",
