@@ -1,6 +1,7 @@
 import { buildSystemPromptWithUserContext } from "../../src/agent/agentConfig.js";
 
 // Mock user profile with priorities
+// Use profile-shaped user object (matches runtime: user.profile)
 const userProfile = {
   name: "Test User",
   priorities: {
@@ -16,9 +17,22 @@ const userId = "test-user-123";
 
 const prompt = buildSystemPromptWithUserContext(userProfile, userId, "", { isFirstTurn: true });
 
-// Check that priorities are in the prompt
+// Gender can come from profile.gender (runtime shape) or top-level 'gender' - test both forms
 const userProfileWithGender = { ...userProfile, profile: { gender: "female" } };
 const promptWithGender = buildSystemPromptWithUserContext(userProfileWithGender, userId, "", {
+  isFirstTurn: true,
+});
+
+// OjoType personality injection - new in the model
+const userProfileWithOjo = {
+  ...userProfile,
+  ojoType: {
+    name: "mentorjo",
+    persona: "A wise mentor who helps you think long-term and grow.",
+    tone: ["Thoughtful", "Professional", "Supportive"],
+  },
+};
+const promptWithOjo = buildSystemPromptWithUserContext(userProfileWithOjo, userId, "", {
   isFirstTurn: true,
 });
 
@@ -55,6 +69,21 @@ if (promptWithGender.includes("PRONOUNS: Use she/her pronouns when referring to 
   console.log("✅ Female pronoun instruction correctly injected");
 } else {
   console.error("❌ Female pronoun instruction NOT found in promptWithGender");
+  process.exit(1);
+}
+
+// Validate personality injection for OjoType
+if (promptWithOjo.includes("PERSONALITY:") && promptWithOjo.includes("Act as A wise mentor")) {
+  console.log("✅ Personality section injected into prompt");
+} else {
+  console.error("❌ Personality injection NOT found in promptWithOjo");
+  process.exit(1);
+}
+
+if (promptWithOjo.includes("Tone: thoughtful, professional, supportive.")) {
+  console.log("✅ Tone string correctly injected and formatted");
+} else {
+  console.error("❌ Tone string NOT found or formatted incorrectly in promptWithOjo");
   process.exit(1);
 }
 

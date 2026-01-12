@@ -15,5 +15,10 @@ export function createTestUser(baseName, testName) {
     username: `${baseName}_node`,
     email: `${baseName}_node_${testName.replace(/\s+/g, "_")}@automated.local`,
     passwordHash: "x",
+    profile: {
+      name: `${baseName} automated`,
+      gender: "unspecified",
+      ojoTypeId: null,
+    },
   });
 }
