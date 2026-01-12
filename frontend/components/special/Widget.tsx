@@ -28,6 +28,7 @@ type WidgetProps = {
   entranceEnabled?: boolean; // enable the widget entrance animation
   entranceDelay?: number; // ms delay before animation starts
   entranceDuration?: number; // ms duration of the fade-in animation
+  skipAnimation?: boolean; // skip animation entirely (e.g., when returning to a screen)
 };
 
 /**
@@ -41,27 +42,47 @@ const Widget: React.FC<WidgetProps> = ({
   entranceEnabled = false,
   entranceDelay = 100,
   entranceDuration = 200,
+  skipAnimation = false,
 }) => {
   // Don't render until entrance is requested to avoid showing content early.
-  const [mounted, setMounted] = React.useState<boolean>(entranceEnabled);
+  const [mounted, setMounted] = React.useState<boolean>(entranceEnabled || skipAnimation);
+  // Track if this is the first time the component is being shown
+  const isFirstMountRef = useRef(true);
 
   useEffect(() => {
-    if (entranceEnabled) setMounted(true);
-  }, [entranceEnabled]);
+    if (entranceEnabled || skipAnimation) setMounted(true);
+  }, [entranceEnabled, skipAnimation]);
 
   // If not mounted yet, render nothing (prevents early flash / layout shift)
   if (!mounted) return null;
 
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(8)).current;
+  const opacity = useRef(new Animated.Value(skipAnimation ? 1 : 0)).current;
+  const translateY = useRef(new Animated.Value(skipAnimation ? 0 : 8)).current;
 
   useEffect(() => {
+    // If skipAnimation is true, show immediately without animation
+    if (skipAnimation) {
+      opacity.setValue(1);
+      translateY.setValue(0);
+      return;
+    }
+
     if (!entranceEnabled) {
       // If entrance is not enabled but we are mounted (someone forced mount), make it visible immediately
       opacity.setValue(1);
       translateY.setValue(0);
       return;
     }
+
+    // Skip animation if this is not the first mount (e.g., returning from navigation)
+    if (!isFirstMountRef.current) {
+      opacity.setValue(1);
+      translateY.setValue(0);
+      return;
+    }
+
+    // Mark that we've done the animation at least once
+    isFirstMountRef.current = false;
 
     Animated.parallel([
       Animated.timing(opacity, {
@@ -79,7 +100,7 @@ const Widget: React.FC<WidgetProps> = ({
         useNativeDriver: true,
       }),
     ]).start();
-  }, [entranceEnabled, entranceDelay, entranceDuration, opacity, translateY]);
+  }, [entranceEnabled, entranceDelay, entranceDuration, skipAnimation, opacity, translateY]);
 
   return (
     <Animated.View

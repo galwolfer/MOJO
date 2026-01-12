@@ -36,14 +36,19 @@ const LoginStep: React.FC<Props> = ({
   return (
     <View style={{ width: "100%" }}>
       <AuthStep playOnceKey="auth:login">
-        {(typingDone: boolean) => (
+        {(typingDone: boolean, skipAnimation: boolean) => (
           <>
             <AppText variant="bodyText" style={{ marginBottom: SPACING.sm }}>
               {"Welcome back \nLet's pick up where you left off."}
             </AppText>
             {loginError ? <ErrorText style={{ marginBottom: SPACING.md }}>{loginError}</ErrorText> : null}
 
-            <Widget entranceEnabled={typingDone} entranceDelay={100} entranceDuration={200}>
+            <Widget
+              entranceEnabled={typingDone}
+              entranceDelay={100}
+              entranceDuration={200}
+              skipAnimation={skipAnimation}
+            >
               <Input
                 label="Username"
                 placeholder="Your username"

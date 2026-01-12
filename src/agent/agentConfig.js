@@ -119,6 +119,27 @@ export function buildSystemPromptWithUserContext(
   prompt += `\nUser:${userId}`;
   if (userProfile?.name) prompt += `(${userProfile.name})`;
 
+  // Pronoun guidance based on user's gender preference. Defaults to he/his if unspecified.
+  try {
+    const genderRaw = (userProfile && (userProfile.profile?.gender || userProfile.gender)) || undefined;
+    const gender = typeof genderRaw === "string" ? genderRaw.toLowerCase() : undefined;
+    let pronounInstruction = "Default pronouns: he/his.";
+    if (gender) {
+      if (gender === "female" || gender === "f")
+        pronounInstruction = "Use she/her pronouns when referring to the user.";
+      else if (gender === "male" || gender === "m")
+        pronounInstruction = "Use he/his pronouns when referring to the user.";
+      else if (gender === "nonbinary" || gender === "non-binary" || gender === "non binary" || gender === "nb")
+        pronounInstruction = "Use they/them pronouns when referring to the user.";
+      else if (gender === "prefer_not_to_say" || gender === "prefer not to say")
+        pronounInstruction = "User prefers not to specify gender; default to he/his unless asked.";
+      else pronounInstruction = `Use ${gender} as the user's gendered descriptor where appropriate.`;
+    }
+    prompt += `\nPRONOUNS: ${pronounInstruction}`;
+  } catch (err) {
+    // non-critical - continue if parsing fails
+  }
+
   // Inject User Category Priorities
   if (userProfile?.priorities && typeof userProfile.priorities === "object") {
     const prioritiesWithValues = Object.entries(userProfile.priorities).filter(

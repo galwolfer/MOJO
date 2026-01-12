@@ -143,12 +143,23 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
               backgroundColor: meta.color,
               transform: [{ scale }],
               opacity: iconOpacity,
-              borderColor: COLORS.white3,
-              borderWidth: outline,
             },
           ]}
         >
-          {IconComponent && <IconComponent size={iconSize * 0.5} color={COLORS.colorWhite} />}
+          <Animated.View
+            style={{
+              flex: 1,
+              justifyContent: "center",
+              alignItems: "center",
+              borderColor: COLORS.white3,
+              borderWidth: outline,
+              borderRadius: iconSize / 2,
+              width: "100%",
+              height: "100%",
+            }}
+          >
+            {IconComponent && <IconComponent size={iconSize * 0.5} color={COLORS.colorWhite} />}
+          </Animated.View>
         </Animated.View>
 
         <AnimatedAppText variant="notes" style={{ textAlign: "center", opacity: textOpacity }} numberOfLines={2}>

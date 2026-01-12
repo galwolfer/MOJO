@@ -80,7 +80,8 @@ const response = await register({
   username: "newuser",
   email: "user@example.com",
   password: "pass123",
-  displayName: "New User"
+  displayName: "New User",
+  gender: "female" // optional: "female" | "male" | "nonbinary" | "prefer_not_to_say" | "other"
 });
 
 // Both return: { success, token, user }

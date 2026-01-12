@@ -45,6 +45,8 @@ const AnimatedButtonsContainer: React.FC<Props> = ({
 }) => {
   const opacityRef = React.useRef(new Animated.Value(entranceEnabled ? 0 : 1));
   const translateYRef = React.useRef(new Animated.Value(entranceEnabled ? 8 : 0));
+  // Track if this is the first time showing the entrance animation
+  const isFirstEntranceRef = React.useRef(true);
 
   const childArray = React.Children.toArray(children);
   const childAnimsRef = React.useRef<
@@ -56,6 +58,20 @@ const AnimatedButtonsContainer: React.FC<Props> = ({
 
   React.useEffect(() => {
     if (!entranceEnabled) return;
+
+    // Skip animation if this is not the first entrance (e.g., returning from navigation)
+    if (!isFirstEntranceRef.current) {
+      opacityRef.current.setValue(1);
+      translateYRef.current.setValue(0);
+      childAnimsRef.current.forEach(({ opacity, translateY }) => {
+        opacity.setValue(1);
+        translateY.setValue(0);
+      });
+      return;
+    }
+
+    // Mark that we've done the animation at least once
+    isFirstEntranceRef.current = false;
 
     const containerAnim = Animated.parallel([
       Animated.timing(opacityRef.current, {

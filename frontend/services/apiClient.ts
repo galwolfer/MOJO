@@ -15,6 +15,7 @@ export type RegisterRequest = {
   password: string;
   displayName?: string;
   profileImage?: string | null;
+  gender?: string;
 };
 export type CategoryPrioritiesRequest = { priorities: Record<string, number> };
 

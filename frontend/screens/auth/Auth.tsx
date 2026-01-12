@@ -50,6 +50,7 @@ export default function AuthScreen() {
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirm, setSignupConfirm] = useState("");
   const [profileImage, setProfileImage] = useState<string | File | null>(null);
+  const [signupGender, setSignupGender] = useState<string | undefined>(undefined);
   // Pre-signup display name (asked before the signup form)
   const [displayName, setDisplayName] = useState("");
 
@@ -221,6 +222,7 @@ export default function AuthScreen() {
         password: signupPassword,
         displayName,
         profileImage: profileImageUrl,
+        gender: signupGender,
       });
 
       if (data.token && data.user) {
@@ -312,6 +314,7 @@ export default function AuthScreen() {
             signupPassword={signupPassword}
             signupConfirm={signupConfirm}
             profileImage={profileImage}
+            signupGender={signupGender}
             setSignupUsername={(v) => {
               setSignupUsername(v);
               setSignupError(null);
@@ -329,6 +332,7 @@ export default function AuthScreen() {
               setSignupError(null);
             }}
             setProfileImage={setProfileImage}
+            setSignupGender={setSignupGender}
             signupError={signupError}
             // Back should return to the name step where displayName is edited
             onBack={() => setScreen("name")}

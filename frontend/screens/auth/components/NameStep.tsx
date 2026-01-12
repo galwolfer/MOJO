@@ -7,9 +7,10 @@
  *
  * Props: `displayName`, `setDisplayName`, `onBack`, `onNext`
  */
-import React from "react";
+import React, { useState } from "react";
 import { View } from "react-native";
 import AppText from "../../../components/common/AppText";
+import ErrorText from "../../../components/common/ErrorText";
 import AuthStep from "./AuthStep";
 import AuthButtonsGroup from "./AuthButtonsGroup";
 import Widget from "../../../components/special/Widget";
@@ -24,21 +25,46 @@ interface Props {
 }
 
 const NameStep: React.FC<Props> = ({ displayName, setDisplayName, onBack, onNext }) => {
+  const [error, setError] = useState<string | null>(null);
+
+  const handleNext = () => {
+    if (!displayName || displayName.trim().length === 0) {
+      setError("Your name is required");
+      return;
+    }
+    setError(null);
+    onNext();
+  };
+
   return (
     <View style={{ width: "100%" }}>
       <AuthStep playOnceKey="auth:name">
-        {(typingDone: boolean) => (
+        {(typingDone: boolean, skipAnimation: boolean) => (
           <>
             <AppText variant="bodyText">{`Let's begin  \nFirst, what should I call you?`}</AppText>
 
-            <Widget entranceEnabled={typingDone} entranceDelay={100} entranceDuration={200}>
-              <Input label="Your name" placeholder="Your name" value={displayName} onChangeText={setDisplayName} />
+            <Widget
+              entranceEnabled={typingDone}
+              entranceDelay={100}
+              entranceDuration={200}
+              skipAnimation={skipAnimation}
+            >
+              <Input
+                label="Your name"
+                placeholder="Your name"
+                value={displayName}
+                onChangeText={(v) => {
+                  setDisplayName(v);
+                  setError(null);
+                }}
+              />
+              {error ? <ErrorText style={{ marginTop: SPACING.md }}>{error}</ErrorText> : null}
             </Widget>
 
             <AuthButtonsGroup
               entranceEnabled={typingDone}
               left={{ title: "Back", onPress: onBack, icon: "left", iconPosition: "left", mode: "light" }}
-              right={{ title: "Next", onPress: onNext, icon: "right", iconPosition: "right", color: "primary6" }}
+              right={{ title: "Next", onPress: handleNext, icon: "right", iconPosition: "right", color: "primary6" }}
             />
           </>
         )}

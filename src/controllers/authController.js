@@ -17,7 +17,7 @@ const JWT_EXPIRES_IN = "7d"; // Token valid for 7 days
  */
 export async function register(req, res, next) {
   try {
-    const { username, email, password, profileImage } = req.body;
+    const { username, email, password, displayName, profileImage, gender } = req.body;
 
     // Validation
     if (!username || !email || !password) {
@@ -25,6 +25,22 @@ export async function register(req, res, next) {
         success: false,
         error: "Username, email, and password are required",
       });
+    }
+
+    if (!displayName || String(displayName).trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Display name is required",
+      });
+    }
+
+    const ALLOWED_GENDERS = ["female", "male", "nonbinary", "prefer_not_to_say", "other", "unspecified"];
+
+    if (gender !== undefined && gender !== null) {
+      const g = String(gender).toLowerCase();
+      if (!ALLOWED_GENDERS.includes(g)) {
+        return res.status(400).json({ success: false, error: "Invalid gender value" });
+      }
     }
 
     if (password.length < 6) {
@@ -55,9 +71,11 @@ export async function register(req, res, next) {
       email,
       passwordHash,
       profile: {
+        name: displayName ? String(displayName).trim() : "",
         profileImage: profileImage || null,
         tone: "friendly",
         persona: "assistant",
+        gender: gender ? String(gender).toLowerCase() : "unspecified",
         settings: {},
       },
     });
@@ -189,7 +207,7 @@ export async function getMe(req, res, next) {
  */
 export async function updateProfile(req, res, next) {
   try {
-    const { name, tone, persona, settings, profileImage } = req.body;
+    const { name, tone, persona, settings, profileImage, gender } = req.body;
     const userId = req.user.userId;
 
     const user = await User.findById(userId);
@@ -206,6 +224,10 @@ export async function updateProfile(req, res, next) {
     if (profileImage !== undefined) user.profile.profileImage = profileImage;
     if (tone) user.profile.tone = tone;
     if (persona) user.profile.persona = persona;
+    if (gender !== undefined) {
+      const g = String(gender).toLowerCase();
+      user.profile.gender = g;
+    }
     if (settings) {
       user.profile.settings = new Map(Object.entries(settings));
     }

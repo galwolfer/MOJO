@@ -6,6 +6,7 @@
  *
  * Note: image upload handling happens at the parent `Auth` screen — this
  * component only collects the selected image/URI and displays the widget.
+ * Supports an optional `Gender` selector (single-choice). The selected value is included in the register payload.
  */
 import React from "react";
 import { View } from "react-native";
@@ -24,11 +25,13 @@ interface Props {
   signupPassword: string;
   signupConfirm: string;
   profileImage: string | File | null;
+  signupGender?: string | undefined;
   setSignupUsername: (v: string) => void;
   setSignupEmail: (v: string) => void;
   setSignupPassword: (v: string) => void;
   setSignupConfirm: (v: string) => void;
   setProfileImage: (v: string | File | null) => void;
+  setSignupGender?: (v: string | undefined) => void;
   signupError?: string | null;
   onBack: () => void;
   onSignup: () => void;
@@ -41,11 +44,13 @@ const SignupStep: React.FC<Props> = ({
   signupPassword,
   signupConfirm,
   profileImage,
+  signupGender,
   setSignupUsername,
   setSignupEmail,
   setSignupPassword,
   setSignupConfirm,
   setProfileImage,
+  setSignupGender,
   signupError,
   onBack,
   onSignup,
@@ -54,12 +59,12 @@ const SignupStep: React.FC<Props> = ({
   return (
     <View style={{ width: "100%" }}>
       <AuthStep playOnceKey="auth:signup">
-        {(typingDone: boolean) => (
+        {(typingDone: boolean, skipAnimation: boolean) => (
           <>
             <AppText variant="bodyText" style={{ marginBottom: SPACING.sm }}>
               {`Great to meet you${displayName ? ", " + displayName : ""}! \nLet's create your account.`}
             </AppText>
-            <Widget entranceEnabled={typingDone} entranceDelay={0} entranceDuration={150}>
+            <Widget entranceEnabled={typingDone} entranceDelay={0} entranceDuration={150} skipAnimation={skipAnimation}>
               <Input
                 label="Username"
                 placeholder="Choose a username"
@@ -91,6 +96,17 @@ const SignupStep: React.FC<Props> = ({
               {signupError ? (
                 <ErrorText style={{ marginTop: SPACING.md, marginBottom: SPACING.md }}>{signupError}</ErrorText>
               ) : null}
+
+              {/* Gender selector */}
+              <View style={{ marginBottom: SPACING.md }}>
+                <Input
+                  label="Gender (optional)"
+                  placeholder="Select your gender"
+                  options={["Female", "Male", "Non-binary", "Prefer not to say", "Other"]}
+                  value={signupGender}
+                  onSelect={(vals: string[]) => setSignupGender?.(vals?.[0])}
+                />
+              </View>
 
               <ProfilePhotoWidget
                 imageUri={profileImage}

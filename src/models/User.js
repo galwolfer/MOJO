@@ -129,6 +129,11 @@ const userSchema = new mongoose.Schema(
         type: String,
         default: "assistant",
       },
+      gender: {
+        type: String,
+        enum: ["female", "male", "nonbinary", "prefer_not_to_say", "other", "unspecified"],
+        default: "unspecified",
+      },
       settings: {
         type: Map,
         of: mongoose.Schema.Types.Mixed,

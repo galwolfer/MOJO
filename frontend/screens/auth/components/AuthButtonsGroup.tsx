@@ -38,7 +38,7 @@ const AuthButtonsGroup: React.FC<Props> = ({ left, right, vertical, entranceEnab
       paddingBottom={0}
       containerDelay={containerDelay}
     >
-      <View style={{ flexDirection: "row", width: "100%" }}>
+      <View style={{ flexDirection: "row", width: "100%", justifyContent: "center" }}>
         {left ? (
           <AppButton
             title={left.title}

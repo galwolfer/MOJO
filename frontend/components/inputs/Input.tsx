@@ -429,19 +429,21 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   label: {
-    marginBottom: SPACING.sm,
+    marginBottom: -SPACING.sm,
+    marginTop: SPACING.sm,
   },
 
   inputWrapper: {
     ...(COMPONENT_STYLES.inputWrapper as ViewStyle),
-    // allow children (TextInput) to stretch vertically so multiline can expand
-    alignItems: "stretch",
+    // Layout children horizontally and center them vertically so icons line up
+    flexDirection: "row",
+    alignItems: "center",
   },
   // Transparent pressable wrapper that covers the input area (no visible styling)
   inputWrapperPressable: {
     ...(COMPONENT_STYLES.inputWrapperPressable as ViewStyle),
-    // ensure the pressable doesn't vertically center content which can hide lines
-    justifyContent: "flex-start",
+    // Center the inner input container vertically for consistent icon alignment
+    justifyContent: "center",
     // Improve tap target: add some vertical padding and a minimum height
     paddingVertical: SPACING.md,
     minHeight: FONT_SIZES.base * 3.5,

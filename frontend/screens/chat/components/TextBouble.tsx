@@ -77,7 +77,7 @@ const TypewriterText = memo<{
     };
   }, [fullText, cps, onDone]);
 
-  if (React.isValidElement(children)) {
+  if (React.isValidElement(children) && (children as any).type !== React.Fragment) {
     return React.cloneElement(
       children as any,
       {
@@ -87,6 +87,8 @@ const TypewriterText = memo<{
     );
   }
 
+  // If a fragment or non-element was passed, render a Text fallback so we never
+  // attach a `style` prop to React.Fragment (fragments only accept key/children).
   return <Text style={textStyle}>{displayText}</Text>;
 });
 
@@ -183,11 +185,20 @@ function cloneChildrenWithTyping(node: React.ReactNode, typedChars: number): Rea
       // array handler wraps non-text elements. For isolated elements here,
       // we show it if typedChars > 0.
       const visible = typedChars > 0;
+      // Avoid adding props to React.Fragment (fragments don't accept props)
+      if ((node as any).type === React.Fragment) {
+        return <NonTextFade visible={visible}>{node}</NonTextFade>;
+      }
       return <NonTextFade visible={visible}>{React.cloneElement(node as any, props)}</NonTextFade>;
     }
 
     // Element contains text: process its children with the available typedChars
     const processedChildren = cloneChildrenWithTyping(children, typedChars);
+    // Fragments cannot accept props; return the processed children directly for fragments
+    if ((node as any).type === React.Fragment) {
+      return <>{processedChildren}</>;
+    }
+
     return React.cloneElement(node as any, { ...props }, processedChildren);
   }
 
@@ -204,7 +215,7 @@ const AnimatedTypingContent: React.FC<{
 }> = ({ children, typedChars, mode }) => {
   const content = cloneChildrenWithTyping(children, typedChars);
 
-  if (React.isValidElement(children)) {
+  if (React.isValidElement(children) && (children as any).type !== React.Fragment) {
     return React.cloneElement(
       children as any,
       {
@@ -507,15 +518,18 @@ const TextBouble: React.FC<Props> = ({
   }, [isTyping, fullText, typingSpeedCps, handleTypingDone]);
 
   // Render full content (used as invisible placeholder during typing to reserve space)
-  const fullContent = React.isValidElement(children) ? (
-    React.cloneElement(children as any, {
-      style: [(children as any).props?.style, mode === "user" ? { color: COLORS.colorWhite } : undefined],
-    })
-  ) : typeof children === "string" ? (
-    <Text style={[styles.text, mode === "user" ? { color: COLORS.colorWhite } : undefined]}>{children}</Text>
-  ) : (
-    children
-  );
+  const fullContent =
+    React.isValidElement(children) && (children as any).type !== React.Fragment ? (
+      React.cloneElement(children as any, {
+        style: [(children as any).props?.style, mode === "user" ? { color: COLORS.colorWhite } : undefined],
+      })
+    ) : typeof children === "string" ? (
+      <Text style={[styles.text, mode === "user" ? { color: COLORS.colorWhite } : undefined]}>{children}</Text>
+    ) : (
+      // If children is a fragment/array (multiple children), do not attempt to clone the fragment
+      // because React.Fragment cannot accept props like `style`. Return children as-is.
+      children
+    );
 
   const shouldShowTypewriter = resolvedTypewriter && mode === "agent" && fullText != null;
 
