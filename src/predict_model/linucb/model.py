@@ -412,6 +412,104 @@ class MultiFeatureLinUCB:
         self.theta = np.dot(self.A_inv, self.b)
 
     # =========================================================================
+    # Reward Calculation
+    # =========================================================================
+
+    @staticmethod
+    def calculate_deadline_reward(
+        completed_at: float,
+        scheduled_at: float,
+        deadline: float,
+    ) -> float:
+        """Calculate reward based on task completion timing relative to deadline.
+
+        The reward function maps completion time to a score in [0, 1]:
+        - Early completion (before scheduled): 0.85 → 1.0
+        - On-time completion (scheduled → deadline): 0.85 → 0.0
+        - Late completion (after deadline): 0.0
+        - Not completed: 0.0
+
+        Parameters
+        ----------
+        completed_at : float
+            The timestamp when the task was completed (Unix timestamp or hours).
+            Use None or float('inf') for uncompleted tasks.
+        scheduled_at : float
+            The scheduled start/execution time (Unix timestamp or hours).
+        deadline : float
+            The deadline timestamp (Unix timestamp or hours).
+            Must be >= scheduled_at.
+
+        Returns
+        -------
+        float
+            Reward score in [0, 1].
+
+        Raises
+        ------
+        ValueError
+            If deadline < scheduled_at.
+
+        Examples
+        --------
+        >>> # Task completed exactly at scheduled time
+        >>> MultiFeatureLinUCB.calculate_deadline_reward(100, 100, 200)
+        0.85
+
+        >>> # Task completed at deadline (last moment)
+        >>> MultiFeatureLinUCB.calculate_deadline_reward(200, 100, 200)
+        0.0
+
+        >>> # Task completed early (before scheduled)
+        >>> MultiFeatureLinUCB.calculate_deadline_reward(50, 100, 200)
+        0.925
+
+        >>> # Task completed late (after deadline)
+        >>> MultiFeatureLinUCB.calculate_deadline_reward(250, 100, 200)
+        0.0
+
+        >>> # Task completed halfway through the window
+        >>> MultiFeatureLinUCB.calculate_deadline_reward(150, 100, 200)
+        0.425
+        """
+        # Validate inputs
+        if deadline < scheduled_at:
+            raise ValueError(
+                f"deadline ({deadline}) must be >= scheduled_at ({scheduled_at})"
+            )
+
+        # Handle uncompleted tasks
+        if completed_at is None or completed_at == float('inf'):
+            return 0.0
+
+        # Late completion: after deadline
+        if completed_at >= deadline:
+            return 0.0
+
+        # Calculate the window size
+        window = deadline - scheduled_at
+
+        # Handle edge case: deadline == scheduled (no window)
+        if window <= 0:
+            # If completed before or at the deadline/scheduled point
+            return 0.85 if completed_at <= deadline else 0.0
+
+        # Early completion: before scheduled time
+        if completed_at <= scheduled_at:
+            # Linear interpolation: 0.85 at scheduled_at → 1.0 at (scheduled - window)
+            early_time = scheduled_at - completed_at
+            # Cap at 1.0 for very early completions
+            early_bonus = min(1.0, early_time / window) * 0.15
+            return 0.85 + early_bonus
+
+        # On-time completion: between scheduled and deadline
+        # Linear interpolation: 0.85 at scheduled_at → 0.0 at deadline
+        progress = (completed_at - scheduled_at) / window
+        reward = 0.85 * (1.0 - progress)
+
+        return reward
+
+    # =========================================================================
     # Feature Extraction Convenience Method
     # =========================================================================
 
