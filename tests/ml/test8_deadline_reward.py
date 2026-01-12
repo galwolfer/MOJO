@@ -12,20 +12,6 @@ Reward Function Design:
 - Late completion (after deadline): 0.0 (hard cutoff)
 - Not Completed: 0.0
 
-Visual Timeline:
-----------------
-    Reward
-      1.0 -----+
-               | <- Very Early (full window before scheduled)
-      0.85 ----+-----+
-               |      \\
-               |       \\  <- On-Time (linear decay)
-               |        \\
-               |         \\
-      0.0 -----+----------+-------------
-               |          |
-             --+----------+-----------> Time
-            scheduled   deadline
 
 Run:
   pytest tests/ml/test8_deadline_reward.py -v
