@@ -101,7 +101,7 @@ export function buildSystemPromptWithUserContext(
     const ojoType = userProfile.ojoType;
     prompt += `\nPERSONALITY:`;
     prompt += ` Act as ${ojoType.persona}.`;
-    
+
     // Build tone string from array
     if (ojoType.tone && Array.isArray(ojoType.tone) && ojoType.tone.length > 0) {
       const toneString = ojoType.tone.join(", ").toLowerCase();

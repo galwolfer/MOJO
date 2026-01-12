@@ -4,14 +4,7 @@
  * This is a reference implementation showing all features
  */
 import React, { useState } from "react";
-import {
-  View,
-  ScrollView,
-  Text,
-  StyleSheet,
-  Alert,
-  SafeAreaView,
-} from "react-native";
+import { View, ScrollView, Text, StyleSheet, Alert, SafeAreaView } from "react-native";
 import { COLORS, FONTS, FONT_SIZES, SPACING } from "../theme";
 import { OjoTypeSelector, OjoTypeBadge } from "../components";
 import { getAllOjoTypes, getOjoType, OjoTypeName } from "../config/ojoTypeConfig";
@@ -45,9 +38,7 @@ export default function OjoTypeShowcase() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>OjoType Showcase</Text>
-          <Text style={styles.subtitle}>
-            Explore all 4 Ojo personalities
-          </Text>
+          <Text style={styles.subtitle}>Explore all 4 Ojo personalities</Text>
         </View>
 
         {/* Section 1: Current Selection Display */}
@@ -63,24 +54,11 @@ export default function OjoTypeShowcase() {
             ]}
           >
             <Text style={styles.emoji}>{selectedConfig.emoji}</Text>
-            <Text
-              style={[
-                styles.displayName,
-                { color: selectedConfig.color },
-              ]}
-            >
-              {selectedConfig.displayName}
-            </Text>
+            <Text style={[styles.displayName, { color: selectedConfig.color }]}>{selectedConfig.displayName}</Text>
             <Text style={styles.persona}>{selectedConfig.persona}</Text>
             <View style={styles.tonesContainer}>
               {selectedConfig.tones.map((tone, idx) => (
-                <View
-                  key={`tone-${idx}`}
-                  style={[
-                    styles.toneBadge,
-                    { backgroundColor: selectedConfig.color },
-                  ]}
-                >
+                <View key={`tone-${idx}`} style={[styles.toneBadge, { backgroundColor: selectedConfig.color }]}>
                   <Text style={styles.toneBadgeText}>{tone}</Text>
                 </View>
               ))}
@@ -91,11 +69,7 @@ export default function OjoTypeShowcase() {
         {/* Section 2: OjoType Selector */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Select Your OjoType</Text>
-          <OjoTypeSelector
-            currentOjoType={selectedOjo}
-            onSelect={handleSelectOjoType}
-            disabled={loading}
-          />
+          <OjoTypeSelector currentOjoType={selectedOjo} onSelect={handleSelectOjoType} disabled={loading} />
         </View>
 
         {/* Section 3: Badge Variants - Small */}
@@ -104,10 +78,7 @@ export default function OjoTypeShowcase() {
           <View style={styles.badgeVariants}>
             {allOjoTypes.map((ojo) => (
               <View key={`badge-small-${ojo.name}`} style={styles.badgeItem}>
-                <OjoTypeBadge
-                  ojoTypeName={ojo.name as OjoTypeName}
-                  size="small"
-                />
+                <OjoTypeBadge ojoTypeName={ojo.name as OjoTypeName} size="small" />
               </View>
             ))}
           </View>
@@ -119,11 +90,7 @@ export default function OjoTypeShowcase() {
           <View style={styles.badgeVariants}>
             {allOjoTypes.map((ojo) => (
               <View key={`badge-medium-${ojo.name}`} style={styles.badgeItem}>
-                <OjoTypeBadge
-                  ojoTypeName={ojo.name as OjoTypeName}
-                  size="medium"
-                  showLabel
-                />
+                <OjoTypeBadge ojoTypeName={ojo.name as OjoTypeName} size="medium" showLabel />
               </View>
             ))}
           </View>
@@ -132,13 +99,7 @@ export default function OjoTypeShowcase() {
         {/* Section 5: Badge Variants - Large with Description */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Large Badge with Description</Text>
-          <OjoTypeBadge
-            ojoTypeName={selectedOjo}
-            size="large"
-            showLabel
-            showDescription
-            style={{ width: "100%" }}
-          />
+          <OjoTypeBadge ojoTypeName={selectedOjo} size="large" showLabel showDescription style={{ width: "100%" }} />
         </View>
 
         {/* Section 6: All OjoTypes Grid */}
@@ -157,30 +118,13 @@ export default function OjoTypeShowcase() {
             >
               <View style={styles.summaryHeader}>
                 <Text style={styles.emoji}>{ojo.emoji}</Text>
-                <Text
-                  style={[
-                    styles.summaryName,
-                    { color: ojo.color },
-                  ]}
-                >
-                  {ojo.displayName}
-                </Text>
-                {ojo.isDefault && (
-                  <Text style={[styles.defaultBadge, { color: ojo.color }]}>
-                    DEFAULT
-                  </Text>
-                )}
+                <Text style={[styles.summaryName, { color: ojo.color }]}>{ojo.displayName}</Text>
+                {ojo.isDefault && <Text style={[styles.defaultBadge, { color: ojo.color }]}>DEFAULT</Text>}
               </View>
               <Text style={styles.summaryPersona}>{ojo.persona}</Text>
               <View style={styles.summaryTones}>
                 {ojo.tones.map((tone, idx) => (
-                  <Text
-                    key={`summary-tone-${idx}`}
-                    style={[
-                      styles.summaryTone,
-                      { color: ojo.color },
-                    ]}
-                  >
+                  <Text key={`summary-tone-${idx}`} style={[styles.summaryTone, { color: ojo.color }]}>
                     {tone}
                     {idx < ojo.tones.length - 1 ? " • " : ""}
                   </Text>
@@ -194,16 +138,8 @@ export default function OjoTypeShowcase() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Color Palette</Text>
           {allOjoTypes.map((ojo) => (
-            <View
-              key={`colors-${ojo.name}`}
-              style={styles.colorRow}
-            >
-              <View
-                style={[
-                  styles.colorBox,
-                  { backgroundColor: ojo.color },
-                ]}
-              />
+            <View key={`colors-${ojo.name}`} style={styles.colorRow}>
+              <View style={[styles.colorBox, { backgroundColor: ojo.color }]} />
               <View style={styles.colorInfo}>
                 <Text style={styles.colorName}>{ojo.displayName}</Text>
                 <Text style={styles.colorValue}>{ojo.color}</Text>
@@ -242,12 +178,8 @@ export default function OjoTypeShowcase() {
           <View style={styles.apiCard}>
             <Text style={styles.apiTitle}>OjoTypeSelector Props</Text>
             <View style={styles.apiContent}>
-              <Text style={styles.apiProp}>
-                • currentOjoType: OjoTypeName (optional)
-              </Text>
-              <Text style={styles.apiProp}>
-                • onSelect: (name) =&gt; Promise&lt;void&gt;
-              </Text>
+              <Text style={styles.apiProp}>• currentOjoType: OjoTypeName (optional)</Text>
+              <Text style={styles.apiProp}>• onSelect: (name) =&gt; Promise&lt;void&gt;</Text>
               <Text style={styles.apiProp}>• disabled: boolean (optional)</Text>
             </View>
           </View>
@@ -256,18 +188,10 @@ export default function OjoTypeShowcase() {
           <View style={styles.apiCard}>
             <Text style={styles.apiTitle}>OjoTypeBadge Props</Text>
             <View style={styles.apiContent}>
-              <Text style={styles.apiProp}>
-                • ojoTypeName: OjoTypeName (required)
-              </Text>
-              <Text style={styles.apiProp}>
-                • size: "small" | "medium" | "large" (optional)
-              </Text>
-              <Text style={styles.apiProp}>
-                • showLabel: boolean (optional)
-              </Text>
-              <Text style={styles.apiProp}>
-                • showDescription: boolean (optional)
-              </Text>
+              <Text style={styles.apiProp}>• ojoTypeName: OjoTypeName (required)</Text>
+              <Text style={styles.apiProp}>• size: "small" | "medium" | "large" (optional)</Text>
+              <Text style={styles.apiProp}>• showLabel: boolean (optional)</Text>
+              <Text style={styles.apiProp}>• showDescription: boolean (optional)</Text>
             </View>
           </View>
 
@@ -275,29 +199,19 @@ export default function OjoTypeShowcase() {
           <View style={styles.apiCard}>
             <Text style={styles.apiTitle}>useOjoType Hook</Text>
             <View style={styles.apiContent}>
-              <Text style={styles.apiProp}>
-                • currentOjoType: OjoTypeName | null
-              </Text>
-              <Text style={styles.apiProp}>
-                • ojoTypeData: OjoTypeData | null
-              </Text>
+              <Text style={styles.apiProp}>• currentOjoType: OjoTypeName | null</Text>
+              <Text style={styles.apiProp}>• ojoTypeData: OjoTypeData | null</Text>
               <Text style={styles.apiProp}>• loading: boolean</Text>
               <Text style={styles.apiProp}>• error: string | null</Text>
-              <Text style={styles.apiProp}>
-                • updateOjoType: (name) =&gt; Promise&lt;void&gt;
-              </Text>
-              <Text style={styles.apiProp}>
-                • refetch: () =&gt; Promise&lt;void&gt;
-              </Text>
+              <Text style={styles.apiProp}>• updateOjoType: (name) =&gt; Promise&lt;void&gt;</Text>
+              <Text style={styles.apiProp}>• refetch: () =&gt; Promise&lt;void&gt;</Text>
             </View>
           </View>
         </View>
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            OjoType System - Complete Frontend Implementation
-          </Text>
+          <Text style={styles.footerText}>OjoType System - Complete Frontend Implementation</Text>
         </View>
       </ScrollView>
     </SafeAreaView>

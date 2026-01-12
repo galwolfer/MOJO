@@ -18,7 +18,7 @@ connectDatabase()
   .then(async () => {
     // Initialize OjoTypes in the database
     await initializeOjoTypes();
-    
+
     server.listen(port, () => {
       logger.info(`HTTP server listening on http://localhost:${port}`);
       startPriorityScheduler();
