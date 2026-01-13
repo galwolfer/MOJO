@@ -11,7 +11,7 @@ import AppText from "../../../components/common/AppText";
 import AuthStep from "./AuthStep";
 import AuthButtonsGroup from "./AuthButtonsGroup";
 import GridEntranceItem from "../../../components/common/animations/GridEntranceItem";
-import { COLORS, SPACING, FONT_SIZES } from "../../../theme";
+import { COLORS, SPACING, FONT_SIZES, SHADOWS } from "../../../theme";
 import { moderateScale } from "react-native-size-matters";
 import { ICONS } from "../../../components/icons/icons";
 import { getAllOjoTypes, type OjoTypeName } from "../../../config/ojoTypeConfig";
@@ -89,9 +89,10 @@ const OjoTypeStep: React.FC<Props> = ({ pendingToken, onNext }) => {
                       style={[
                         styles.card,
                         {
-                          backgroundColor: ojo.backgroundColor,
-                          borderColor: isSelected ? ojo.color : "transparent",
-                          borderWidth: isSelected ? 3 : 0,
+                          backgroundColor: COLORS.white,
+                          borderColor: isSelected ? ojo.color : COLORS.white,
+                          borderWidth: 3,
+                          ...(SHADOWS.card as object),
                         },
                       ]}
                       onPress={() => setSelectedOjo(ojo.name as OjoTypeName)}
@@ -151,6 +152,7 @@ const styles = StyleSheet.create({
     lineHeight: FONT_SIZES.base,
   },
   gridContainer: {
+    width: "100%",
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",

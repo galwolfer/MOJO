@@ -13,7 +13,6 @@ export interface OjoTypeConfig {
   tones: string[];
   icon: string;
   color: string;
-  backgroundColor: string;
   description: string;
   isDefault: boolean;
 }
@@ -30,7 +29,6 @@ export const OJO_TYPES: Record<OjoTypeName, OjoTypeConfig> = {
     tones: ["Thoughtful", "Professional", "Supportive"],
     icon: "mentorjo",
     color: COLORS.primary1, // Blue #4361EE
-    backgroundColor: "#E8EFFE", // Light blue background
     description: "A wise mentor who helps you think long-term and grow.",
     isDefault: true,
   },
@@ -40,20 +38,8 @@ export const OJO_TYPES: Record<OjoTypeName, OjoTypeConfig> = {
     persona: "Your bro, friend who's always got your back.",
     tones: ["Friendly", "Motivating", "Funny"],
     icon: "brojo",
-    color: COLORS.primary2, // Cyan #4CC9F0
-    backgroundColor: "#E0F7FF", // Light cyan background
+    color: COLORS.primary6, // Cyan #4CC9F0
     description: "Your bro, friend who's always got your back.",
-    isDefault: false,
-  },
-  bestojo: {
-    name: "bestojo",
-    displayName: "Bestojo",
-    persona: "A supportive best friend who listens and encourages you.",
-    tones: ["Warm", "Caring", "Positive"],
-    icon: "bestojo",
-    color: COLORS.primary4, // Pink #F72585
-    backgroundColor: "#FFE8F5", // Light pink background
-    description: "A supportive best friend who listens and encourages you.",
     isDefault: false,
   },
   strictojo: {
@@ -63,8 +49,17 @@ export const OJO_TYPES: Record<OjoTypeName, OjoTypeConfig> = {
     tones: ["Firm", "Focused", "Honest"],
     icon: "strictojo",
     color: COLORS.primary7, // Red #F43E3E
-    backgroundColor: "#FFE8E8", // Light red background
     description: "A no-nonsense mentor who holds you accountable and expects results.",
+    isDefault: false,
+  },
+  bestojo: {
+    name: "bestojo",
+    displayName: "Bestojo",
+    persona: "A supportive best friend who listens and encourages you.",
+    tones: ["Warm", "Caring", "Positive"],
+    icon: "bestojo",
+    color: COLORS.primary3, // Pink #F72585
+    description: "A supportive best friend who listens and encourages you.",
     isDefault: false,
   },
 };
@@ -96,14 +91,6 @@ export function getAllOjoTypes(): OjoTypeConfig[] {
 export function getOjoTypeColor(name: OjoTypeName | string): string {
   const ojoType = OJO_TYPES[name as OjoTypeName];
   return ojoType ? ojoType.color : COLORS.primary1;
-}
-
-/**
- * Get OjoType background color by name
- */
-export function getOjoTypeBackgroundColor(name: OjoTypeName | string): string {
-  const ojoType = OJO_TYPES[name as OjoTypeName];
-  return ojoType ? ojoType.backgroundColor : "#E8EFFE";
 }
 
 /**

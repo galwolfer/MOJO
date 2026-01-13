@@ -7,9 +7,8 @@
  * - Flexible styling (track height, thumb size, colors)
  * - Mobile and web compatible
  */
-import React, { useState } from "react";
-import { View, StyleSheet, Platform, StyleProp, ViewStyle } from "react-native";
-import Slider from "@react-native-community/slider";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { PanResponder, Platform, StyleProp, StyleSheet, View, ViewStyle } from "react-native";
 import AppText from "../common/AppText";
 import { COLORS, SPACING, ICON_SIZES } from "../../theme";
 
@@ -18,6 +17,13 @@ const THUMB_SIZE = ICON_SIZES.md; // 24-ish
 const TRACK_HEIGHT = Math.round(THUMB_SIZE / 3); // ~8
 const THUMB_BORDER_WIDTH = 5;
 const WRAPPER_HEIGHT = THUMB_SIZE + SPACING.md * 2;
+const DRAG_THRESHOLD_PX = 4;
+
+const getStepPrecision = (value: number) => {
+  const valueString = value.toString();
+  const decimalIndex = valueString.indexOf(".");
+  return decimalIndex === -1 ? 0 : valueString.length - decimalIndex - 1;
+};
 
 type SliderComponentProps = {
   value: number;
@@ -51,13 +57,127 @@ const SliderComponent: React.FC<SliderComponentProps> = ({
   style,
 }) => {
   const [containerWidth, setContainerWidth] = useState(0);
+  const [internalValue, setInternalValue] = useState(value);
+  const internalValueRef = useRef(value);
+  const pressStartXRef = useRef(0);
+  const lastMoveXRef = useRef<number | null>(null);
+  const isDraggingRef = useRef(false);
 
-  const description = valueDescriptions[value] || "";
+  const stepPrecision = useMemo(() => (step > 0 ? getStepPrecision(step) : 0), [step]);
+
+  const clampValue = useCallback((nextValue: number) => Math.min(max, Math.max(min, nextValue)), [max, min]);
+
+  const normalizeValue = useCallback(
+    (nextValue: number) => {
+      const clampedValue = clampValue(nextValue);
+      if (!step || step <= 0) {
+        return clampedValue;
+      }
+
+      const steppedValue = Math.round((clampedValue - min) / step) * step + min;
+      const roundedValue = stepPrecision > 0 ? Number(steppedValue.toFixed(stepPrecision)) : steppedValue;
+      return clampValue(roundedValue);
+    },
+    [clampValue, min, step, stepPrecision],
+  );
+
+  const updateValue = useCallback(
+    (nextValue: number) => {
+      const normalizedValue = normalizeValue(nextValue);
+      if (normalizedValue === internalValueRef.current) {
+        return;
+      }
+      internalValueRef.current = normalizedValue;
+      setInternalValue(normalizedValue);
+      onValueChange(normalizedValue);
+    },
+    [normalizeValue, onValueChange],
+  );
+
+  useEffect(() => {
+    const normalizedValue = normalizeValue(value);
+    if (normalizedValue !== internalValueRef.current) {
+      internalValueRef.current = normalizedValue;
+      setInternalValue(normalizedValue);
+    }
+  }, [normalizeValue, value]);
+
+  const getValueFromX = useCallback(
+    (x: number) => {
+      if (containerWidth <= 0 || max <= min) {
+        return internalValueRef.current;
+      }
+      const clampedX = Math.min(Math.max(x, 0), containerWidth);
+      const ratio = clampedX / containerWidth;
+      return normalizeValue(min + ratio * (max - min));
+    },
+    [containerWidth, max, min, normalizeValue],
+  );
+
+  const getEventLocationX = useCallback((event: { nativeEvent: { locationX?: number } }) => {
+    const { locationX } = event.nativeEvent;
+    return typeof locationX === "number" ? locationX : null;
+  }, []);
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => containerWidth > 0,
+        onMoveShouldSetPanResponder: (_event, gestureState) =>
+          Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
+        onPanResponderGrant: (event) => {
+          if (containerWidth <= 0) {
+            return;
+          }
+          isDraggingRef.current = true;
+          const startX = getEventLocationX(event) ?? 0;
+          pressStartXRef.current = startX;
+          lastMoveXRef.current = startX;
+          updateValue(getValueFromX(startX));
+        },
+        onPanResponderMove: (event, gestureState) => {
+          if (containerWidth <= 0) {
+            return;
+          }
+          const movedDistance = Math.hypot(gestureState.dx, gestureState.dy);
+          const moveX =
+            getEventLocationX(event) ?? Math.min(Math.max(pressStartXRef.current + gestureState.dx, 0), containerWidth);
+          lastMoveXRef.current = moveX;
+          if (!isDraggingRef.current && movedDistance >= DRAG_THRESHOLD_PX) {
+            isDraggingRef.current = true;
+          }
+          if (isDraggingRef.current) {
+            updateValue(getValueFromX(moveX));
+          }
+        },
+        onPanResponderRelease: (event, gestureState) => {
+          if (containerWidth <= 0) {
+            return;
+          }
+          const movedDistance = Math.hypot(gestureState.dx, gestureState.dy);
+          if (!isDraggingRef.current || movedDistance < DRAG_THRESHOLD_PX) {
+            const releaseX = getEventLocationX(event) ?? lastMoveXRef.current ?? pressStartXRef.current;
+            updateValue(getValueFromX(releaseX));
+          }
+          isDraggingRef.current = false;
+          lastMoveXRef.current = null;
+        },
+        onPanResponderTerminate: () => {
+          isDraggingRef.current = false;
+          lastMoveXRef.current = null;
+        },
+      }),
+    [containerWidth, getEventLocationX, getValueFromX, updateValue],
+  );
+
+  const descriptionKey = step > 0 ? Number(internalValue.toFixed(stepPrecision)) : internalValue;
+  const description = valueDescriptions[descriptionKey] || "";
 
   // Calculate left offset for the description tooltip based on current value
   // Position it so the tooltip center aligns with the thumb
-  const percent = max > min ? (value - min) / (max - min) : 0;
-  const thumbPos = containerWidth * percent;
+  const percent = max > min ? (internalValue - min) / (max - min) : 0;
+  const clampedPercent = Math.min(Math.max(percent, 0), 1);
+  const thumbPos = containerWidth * clampedPercent;
 
   return (
     <View style={[styles.container, { minHeight: WRAPPER_HEIGHT + SPACING.lg }, style]}>
@@ -68,29 +188,12 @@ const SliderComponent: React.FC<SliderComponentProps> = ({
       )}
 
       {/* Slider */}
-      <View style={styles.sliderWrapper} onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}>
-        <Slider
-          style={[styles.slider]}
-          minimumValue={min}
-          maximumValue={max}
-          step={step}
-          value={value}
-          onValueChange={onValueChange}
-          // Hide native visuals — we'll draw our own rounded track and thumb
-          minimumTrackTintColor={"transparent"}
-          maximumTrackTintColor={"transparent"}
-          thumbTintColor={"transparent"}
-          // Web-specific styling (via CSS)
-          {...(Platform.OS === "web" && {
-            style: [
-              styles.slider,
-              {
-                height: Math.max(WRAPPER_HEIGHT + 20, 40),
-                WebkitAppearance: "none",
-              } as any,
-            ],
-          })}
-        />
+      <View
+        style={[styles.sliderWrapper, Platform.OS === "web" && styles.sliderWrapperWeb]}
+        onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
+        accessibilityRole="adjustable"
+        {...panResponder.panHandlers}
+      >
         {/* Custom track and thumb overlay */}
         <View style={styles.trackContainer} pointerEvents="none">
           <View
@@ -104,7 +207,7 @@ const SliderComponent: React.FC<SliderComponentProps> = ({
               styles.customFill,
               {
                 backgroundColor: TrackThumbColor,
-                width: containerWidth * percent,
+                width: containerWidth * clampedPercent,
                 height: TRACK_HEIGHT,
                 borderRadius: TRACK_HEIGHT / 2,
               },
@@ -154,10 +257,9 @@ const styles = StyleSheet.create({
     position: "relative",
     height: WRAPPER_HEIGHT,
   },
-  slider: {
-    width: "100%",
-    height: 40,
+  sliderWrapperWeb: {
     cursor: "pointer",
+    userSelect: "none",
   },
   trackContainer: {
     position: "absolute",
