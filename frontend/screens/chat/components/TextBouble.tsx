@@ -300,14 +300,17 @@ function getContainerBackground(mode: TextBoubleMode) {
   return COLORS.white2;
 }
 
-function getContainerShadow(mode: TextBoubleMode) {
+function getContainerShadow(mode: TextBoubleMode, shadowColor?: string) {
   // "user - normal shadow present"
   if (mode === "user") {
     // Use the glowing message shadow for user too
-    return SHADOWS.glowingMessage as ViewStyle;
+    return SHADOWS.card as ViewStyle;
+  } else {
+    const base = { ...SHADOWS.glowingMessage } as ViewStyle;
+    if (shadowColor) base.shadowColor = shadowColor;
+    else base.shadowColor = COLORS.primary1;
+    return base;
   }
-
-  return SHADOWS.glowingMessage as ViewStyle;
 }
 
 const TextBouble: React.FC<Props> = ({
@@ -481,7 +484,12 @@ const TextBouble: React.FC<Props> = ({
 
   const radii = useMemo(() => getRadii(mode), [mode]);
   const containerBg = useMemo(() => getContainerBackground(mode), [mode]);
-  const containerShadow = useMemo(() => getContainerShadow(mode), [mode]);
+  // Determine shadow color from persona gradient if provided
+  const shadowColor = useMemo(
+    () => (gradientColors && gradientColors.length > 0 ? gradientColors[0] : undefined),
+    [gradientColors]
+  );
+  const containerShadow = useMemo(() => getContainerShadow(mode, shadowColor), [mode, shadowColor]);
 
   // Track typed character count for incremental rendering
   const [typedChars, setTypedChars] = useState(0);
@@ -564,7 +572,7 @@ const TextBouble: React.FC<Props> = ({
 
           {/* Static glowing shadow (visible after typing or when typewriter is off) */}
           <Animated.View pointerEvents="none" style={[styles.shadowLayer, { opacity: glowOpacity }]}>
-            <View style={[styles.glow, radii]} />
+            <View style={[styles.glow, { shadowColor: shadowColor || COLORS.primary4 }, radii]} />
           </Animated.View>
         </>
       )}

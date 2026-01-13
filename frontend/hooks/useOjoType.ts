@@ -42,7 +42,8 @@ export function useOjoType(token?: string): UseOjoTypeReturn {
       setError(null);
 
       try {
-        // Use shared httpClient so Authorization header is included when set        const token = getAuthToken();
+        // Use shared httpClient so Authorization header is included when set
+        const token = getAuthToken();
         console.debug("[useOjoType] httpClient.get('/auth/me') - auth token present:", !!token);
         console.debug("[useOjoType] using httpClient.get('/auth/me')");
         const data = await httpGet<any>("/auth/me");
@@ -100,11 +101,6 @@ export function useOjoType(token?: string): UseOjoTypeReturn {
         } catch (err) {
           console.error("[useOjoType] httpClient.patch('/auth/profile') failed:", err);
           throw err;
-        }
-
-        if (newOjoType) {
-          setCurrentOjoType(newOjoType.name as OjoTypeName);
-          setOjoTypeData(newOjoType);
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Unknown error";
