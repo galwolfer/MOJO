@@ -223,6 +223,7 @@ function taskToMLInput(task) {
     difficulty: effort, // 1-5: user's effort estimate
     delta_hours: deltaHours, // hours: time until deadline
     category: normalizedCategory, // 0-17: normalized category
+    subcategory: subCategoryLabel || null, // User-defined subcategory (optional)
   };
 }
 

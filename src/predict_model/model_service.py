@@ -125,7 +125,7 @@ class ModelService:
         except Exception as e:
             print(f"⚠️  Failed to save model: {e}", file=sys.stderr)
 
-    def predict(self, task_input: Dict[str, Any]) -> Dict[str, Any]:
+    def predict(self, task_input: Dict[str, Any], subcategory_map: Optional[Dict[str, List[str]]] = None) -> Dict[str, Any]:
         """
         Predict completion difficulty and confidence for a task.
 
@@ -136,6 +136,7 @@ class ModelService:
             'difficulty': 1-5,        # Task effort
             'delta_hours': float,     # Hours until deadline (0 if no deadline)
             'category': 0-17,         # Task category (index into CATEGORIES)
+            'subcategory': str,       # Optional subcategory name
         }
 
         Output:
@@ -159,6 +160,7 @@ class ModelService:
                 raise ValueError(f"Missing required fields: {missing}")
 
             # Extract features using the model's feature engineering
+            subcategory = task_input.get('subcategory', None)
             features = extract_features(
                 motivation=task_input['motivation'],
                 duration=task_input['duration'],
@@ -166,7 +168,9 @@ class ModelService:
                 delta_hours=task_input['delta_hours'],
                 category=self.CATEGORIES[task_input['category']],
                 categories=self.CATEGORIES,
-                max_duration=self.MAX_DURATION
+                max_duration=self.MAX_DURATION,
+                subcategory=subcategory,
+                subcategory_map=subcategory_map
             )
 
             # Get predictions from the model
@@ -193,7 +197,7 @@ class ModelService:
                 'error': str(e)
             }
 
-    def train(self, task_input: Dict[str, Any], reward: float) -> Dict[str, Any]:
+    def train(self, task_input: Dict[str, Any], reward: float, subcategory_map: Optional[Dict[str, List[str]]] = None) -> Dict[str, Any]:
         """
         Update the model with observed task completion data.
 
@@ -219,6 +223,7 @@ class ModelService:
                 raise ValueError(f"Reward must be in [0, 1], got {reward}")
 
             # Extract features
+            subcategory = task_input.get('subcategory', None)
             features = extract_features(
                 motivation=task_input['motivation'],
                 duration=task_input['duration'],
@@ -226,7 +231,9 @@ class ModelService:
                 delta_hours=task_input['delta_hours'],
                 category=self.CATEGORIES[task_input['category']],
                 categories=self.CATEGORIES,
-                max_duration=self.MAX_DURATION
+                max_duration=self.MAX_DURATION,
+                subcategory=subcategory,
+                subcategory_map=subcategory_map
             )
 
             # Update model weights
@@ -295,19 +302,23 @@ def main():
     try:
         if command == 'predict':
             if len(sys.argv) < arg_offset + 1:
-                print("❌ predict requires task JSON argument", file=sys.stderr)
+                print("❌ predict requires payload JSON argument", file=sys.stderr)
                 sys.exit(1)
-            task_input = json.loads(sys.argv[arg_offset])
-            result = service.predict(task_input)
+            payload = json.loads(sys.argv[arg_offset])
+            task_input = payload.get('task', payload)  # Support both {task: ..., subcategory_map: ...} and direct task
+            subcategory_map = payload.get('subcategory_map', None)
+            result = service.predict(task_input, subcategory_map)
             print(json.dumps(result))
 
         elif command == 'train':
             if len(sys.argv) < arg_offset + 2:
-                print("❌ train requires task JSON and reward arguments", file=sys.stderr)
+                print("❌ train requires payload JSON and reward arguments", file=sys.stderr)
                 sys.exit(1)
-            task_input = json.loads(sys.argv[arg_offset])
+            payload = json.loads(sys.argv[arg_offset])
+            task_input = payload.get('task', payload)  # Support both formats
+            subcategory_map = payload.get('subcategory_map', None)
             reward = float(sys.argv[arg_offset + 1])
-            result = service.train(task_input, reward)
+            result = service.train(task_input, reward, subcategory_map)
             print(json.dumps(result))
 
         elif command == 'health':
