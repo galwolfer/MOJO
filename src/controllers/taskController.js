@@ -5,11 +5,66 @@
 
 import * as taskService from "../services/taskService.js";
 import { logger } from "../utils/logger.js";
+import { User } from "../models/User.js";
+import { getCategoryIndex, isValidCategory } from "../config/categories.js";
 
 /**
  * Task Controller
  * Handles HTTP requests for task operations
  */
+
+/**
+ * Auto-save subcategory to user profile
+ * Automatically adds new subcategories to user's collection when they create/update tasks
+ * 
+ * @param {string} userId - User ID
+ * @param {string} subcategoryName - Subcategory name
+ * @param {string} categoryKey - Category key (e.g., "work_and_career")
+ */
+async function autoSaveSubcategory(userId, subcategoryName, categoryKey) {
+  try {
+    // Validate inputs
+    if (!subcategoryName || typeof subcategoryName !== "string" || subcategoryName.trim().length === 0) {
+      return; // Skip if invalid
+    }
+
+    if (!categoryKey || !isValidCategory(categoryKey)) {
+      return; // Skip if invalid category
+    }
+
+    const trimmedName = subcategoryName.trim();
+    
+    // Get category index (0-17)
+    const categoryIndex = getCategoryIndex(categoryKey);
+
+    // Find user and check if subcategory already exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return; // User not found, skip silently
+    }
+
+    // Check if this subcategory already exists for this category (case-insensitive)
+    const exists = user.subCategories.some(
+      (sub) => sub.category === categoryIndex && sub.name.toLowerCase() === trimmedName.toLowerCase()
+    );
+
+    if (exists) {
+      return; // Already exists, nothing to do
+    }
+
+    // Add new subcategory to user profile
+    user.subCategories.push({
+      name: trimmedName,
+      category: categoryIndex,
+    });
+
+    await user.save();
+    logger.info(`Auto-saved subcategory "${trimmedName}" to category ${categoryKey} for user ${userId}`);
+  } catch (error) {
+    // Log error but don't fail the task operation
+    logger.error(`Failed to auto-save subcategory: ${error.message}`);
+  }
+}
 
 /**
  * Create a new task
@@ -53,6 +108,11 @@ export async function createTask(req, res) {
           error: "Recurrence count must be at least 1",
         });
       }
+    }
+
+    // Auto-save subcategory to user profile if provided
+    if (subcategory && category) {
+      await autoSaveSubcategory(userId, subcategory, category);
     }
 
     const task = await taskService.createTask({
@@ -224,6 +284,12 @@ export async function updateTask(req, res) {
     // Subcategory
     if (raw.subcategory !== undefined) {
       updates.subCategory = { label: raw.subcategory, source: "user", confidence: 1, updatedAt: new Date() };
+      
+      // Auto-save subcategory to user profile
+      const taskCategory = raw.category || updates.category;
+      if (taskCategory && raw.subcategory) {
+        await autoSaveSubcategory(userId, raw.subcategory, taskCategory);
+      }
     }
     
     // Importance (1-5)
