@@ -4,7 +4,8 @@
  */
 import { useState, useEffect, useCallback } from "react";
 import { OjoTypeName } from "../config/ojoTypeConfig";
-import { get as httpGet, patch as httpPatch, getAuthToken } from "../services/httpClient";
+import { get as httpGet, patch as httpPatch } from "../services/httpClient";
+import { useAuth } from "../context/AuthContext";
 
 export interface OjoTypeData {
   _id: string;
@@ -36,27 +37,40 @@ export function useOjoType(token?: string): UseOjoTypeReturn {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const auth = useAuth();
+
+  // Dedupe in-flight fetches across hook instances so we don't spam requests
+  let inFlightFetch: Promise<void> | null = null;
+
   const fetchCurrentOjoType = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      try {
-        // Use shared httpClient so Authorization header is included when set
-        const token = getAuthToken();
-        console.debug("[useOjoType] httpClient.get('/auth/me') - auth token present:", !!token);
-        console.debug("[useOjoType] using httpClient.get('/auth/me')");
-        const data = await httpGet<any>("/auth/me");
-        const ojoType = data.user?.profile?.ojoType;
-        if (ojoType) {
-          setCurrentOjoType(ojoType.name as OjoTypeName);
-          setOjoTypeData(ojoType);
-        }
-      } catch (err) {
-        // Re-throw to be handled by outer catch; add debug info
-        console.error("[useOjoType] httpClient.get('/auth/me') failed:", err);
-        throw err;
+      // If AuthContext already has user profile with OjoType, use it immediately
+      if ((auth as any)?.user?.profile?.ojoType) {
+        const ojoType = (auth as any).user.profile.ojoType;
+        setCurrentOjoType(ojoType.name as OjoTypeName);
+        setOjoTypeData(ojoType);
+        return;
       }
+
+      // Dedupe concurrent fetches
+      if (inFlightFetch) return await inFlightFetch;
+      inFlightFetch = (async () => {
+        try {
+          const data = await httpGet<any>("/auth/me");
+          const ojoType = data.user?.profile?.ojoType;
+          if (ojoType) {
+            setCurrentOjoType(ojoType.name as OjoTypeName);
+            setOjoTypeData(ojoType);
+          }
+        } finally {
+          inFlightFetch = null;
+        }
+      })();
+
+      await inFlightFetch;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
       // If the server indicates no token/unauthorized, treat as unauthenticated and suppress noisy errors
@@ -82,7 +96,7 @@ export function useOjoType(token?: string): UseOjoTypeReturn {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [auth]);
 
   const updateOjoType = useCallback(
     async (ojoTypeName: OjoTypeName) => {
@@ -90,10 +104,11 @@ export function useOjoType(token?: string): UseOjoTypeReturn {
         setLoading(true);
         setError(null);
 
+        let newOjoType: any = undefined;
         try {
           console.debug("[useOjoType] using httpClient.patch('/auth/profile')");
           const data = await httpPatch<any>("/auth/profile", { ojoTypeName });
-          const newOjoType = data.profile?.ojoType;
+          newOjoType = data.profile?.ojoType;
           if (newOjoType) {
             setCurrentOjoType(newOjoType.name as OjoTypeName);
             setOjoTypeData(newOjoType);
@@ -101,6 +116,25 @@ export function useOjoType(token?: string): UseOjoTypeReturn {
         } catch (err) {
           console.error("[useOjoType] httpClient.patch('/auth/profile') failed:", err);
           throw err;
+        }
+
+        // If auth context exists and has a user, update it so other parts of the app
+        // see the new OjoType immediately.
+        if (newOjoType && auth && (auth as any).user) {
+          try {
+            // Clone existing user and attach updated profile.ojoType
+            const updatedUser = {
+              ...(auth as any).user,
+              profile: { ...(((auth as any).user as any).profile || {}), ojoType: newOjoType },
+            };
+            // Keep the same token (auth.token) when calling signIn
+            if ((auth as any).signIn && (auth as any).token) {
+              await (auth as any).signIn((auth as any).token, updatedUser);
+            }
+          } catch (err) {
+            // Non-fatal if signIn fails — we still update local state below
+            console.warn("[useOjoType] failed to update AuthContext user:", err);
+          }
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Unknown error";
@@ -111,7 +145,7 @@ export function useOjoType(token?: string): UseOjoTypeReturn {
         setLoading(false);
       }
     },
-    [token]
+    [auth]
   );
 
   // Fetch OjoType on mount or when token changes

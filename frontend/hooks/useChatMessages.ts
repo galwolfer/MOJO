@@ -15,7 +15,7 @@
  */
 import { useState, useCallback } from "react";
 import { sendChatMessage, SendMessageResponse, ChatSessionSummary, ChatMessage } from "../services/chatService";
-import { useOjoType } from "../hooks";
+import { useOjoType } from "./useOjoType";
 
 const MAX_CACHED_MESSAGES_PER_SESSION = 50;
 const SEND_TIMEOUT_MS = 15000;
