@@ -110,7 +110,16 @@ export function buildSystemPromptWithUserContext(
   }
 
   prompt += `\nUser:${userId}`;
-  if (userProfile?.name) prompt += `(${userProfile.name})`;
+  // Prefer user's canonical profile name (stored at user.profile.name); fall back to top-level name if present
+  const usersName = userProfile?.profile?.name || userProfile?.name;
+  if (usersName) {
+    prompt += `(${usersName})`;
+    // Explicitly expose a USER_NAME line so the LLM knows the canonical name and will not ask for it
+    prompt += `\nUSER_NAME: ${usersName} - Use this name when addressing the user and do NOT ask the user for their name or say you don't know it.`;
+  } else {
+    // Guidance if name is not available: allow a single request to obtain it and persist
+    prompt += `\nUSER_NAME: (unknown) - If the user has no recorded name, you MAY ask for it once, then save it to memory; otherwise do not repeatedly ask.`;
+  }
 
   // Pronoun guidance based on user's gender preference. Defaults to he/his if unspecified.
   try {
