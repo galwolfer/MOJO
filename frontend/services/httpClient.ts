@@ -40,7 +40,9 @@ async function handleResponse<T>(res: Response): Promise<T> {
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    throw new Error(data?.error || data?.message || res.statusText || "Request failed");
+    const error = new Error(data?.error || data?.message || res.statusText || "Request failed");
+    error.name = "ServerError";
+    throw error;
   }
 
   return data as T;
@@ -85,7 +87,9 @@ async function fetchWithTimeout(url: string, init: RequestInit, options?: Reques
   if (timeoutMs && typeof AbortController === "undefined") {
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     const timeoutPromise = new Promise<Response>((_, reject) => {
-      timeoutId = setTimeout(() => reject(new Error("Request timed out")), timeoutMs);
+      const timeoutError = new Error("Request timed out");
+      timeoutError.name = "NetworkError";
+      timeoutId = setTimeout(() => reject(timeoutError), timeoutMs);
     });
     try {
       const res = await Promise.race([fetch(url, init), timeoutPromise]);
@@ -98,6 +102,10 @@ async function fetchWithTimeout(url: string, init: RequestInit, options?: Reques
   const { signal, cleanup } = buildAbortSignal(options);
   try {
     return await fetch(url, { ...init, signal });
+  } catch (error) {
+    const networkError = new Error(error instanceof Error ? error.message : "Network error");
+    networkError.name = "NetworkError";
+    throw networkError;
   } finally {
     cleanup?.();
   }
@@ -111,8 +119,8 @@ export async function get<T>(endpoint: string, options?: RequestOptions): Promis
   const res = await fetchWithTimeout(
     url,
     {
-    method: "GET",
-    headers: getHeaders(),
+      method: "GET",
+      headers: getHeaders(),
     },
     options
   );

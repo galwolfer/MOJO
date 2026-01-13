@@ -13,7 +13,8 @@ import { View, StyleSheet, TouchableOpacity } from "react-native";
 import AppText from "../../../components/common/AppText";
 import ErrorText from "../../../components/common/ErrorText";
 import TextBouble from "./TextBouble";
-import { COLORS, SPACING } from "../../../theme";
+import { COLORS, FONT_SIZES, SPACING } from "../../../theme";
+import { ICONS } from "../../../components/icons/icons";
 
 interface ChatMessageBubbleProps {
   role: "user" | "assistant";
@@ -44,7 +45,9 @@ function ChatMessageBubble({
       normalized.includes("unable to connect") ||
       normalized.includes("check your connection") ||
       normalized.includes("something went wrong") ||
-      normalized.includes("request failed"));
+      normalized.includes("request failed") ||
+      normalized.includes("couldn't connect") ||
+      normalized.includes("server error"));
 
   if (isErrorContent) {
     return (
@@ -67,7 +70,10 @@ function ChatMessageBubble({
       </TextBouble>
       {isUser && status === "failed" && onRetry ? (
         <TouchableOpacity onPress={onRetry} style={styles.retryRow} activeOpacity={0.7}>
-          <ErrorText style={styles.pendingText}>Try again</ErrorText>
+          <View style={styles.retryContent}>
+            <ErrorText style={styles.retryText}>Try again</ErrorText>
+            <ICONS.repeat size={FONT_SIZES.sm * 0.7} color={COLORS.lightGray} />
+          </View>
         </TouchableOpacity>
       ) : null}
       {isUser && status === "pending" ? (
@@ -118,6 +124,15 @@ const styles = StyleSheet.create({
   pendingText: {
     marginTop: SPACING.sm,
     alignSelf: "flex-end",
+    color: COLORS.lightGray,
+  },
+  retryContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm / 2,
+  },
+  retryText: {
+    marginLeft: SPACING.sm,
     color: COLORS.lightGray,
   },
 });
