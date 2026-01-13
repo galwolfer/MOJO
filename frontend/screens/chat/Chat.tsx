@@ -26,6 +26,8 @@ import { useAuth } from "../../context/AuthContext";
 import { ICONS } from "../../components/icons/icons";
 import { setChatAuthToken } from "../../services/chatService";
 import { useKeyboard, useContentInsets } from "../../hooks";
+import { getOjoType } from "../../config/ojoTypeConfig";
+import * as httpClient from "../../services/httpClient";
 import GlassSurface from "../../components/common/GlassSurface";
 import { useChatSessions, useChatMessages } from "../../hooks";
 import { TimelineItem, buildTimelineItems } from "../../utils/chatUtils";
@@ -52,8 +54,7 @@ export default function ChatScreen() {
   const { sessions, isLoadingSessions, isLoadingMoreSessions, hasMoreSessions, loadMoreSessions, updateSession } =
     useChatSessions();
 
-  const { isLoading, sessionId, setSessionId, sendText, handleRetry } =
-    useChatMessages(updateSession);
+  const { isLoading, sessionId, setSessionId, sendText, handleRetry } = useChatMessages(updateSession);
 
   // Set auth token for chat service
   useEffect(() => {
@@ -62,14 +63,58 @@ export default function ChatScreen() {
     }
   }, [token]);
 
+  const [ojoTypeName, setOjoTypeName] = useState<string | null>(null);
+
+  // Fetch user profile with OjoType from API (GET /auth/me)
   useEffect(() => {
-    // Configure Header
-    setHeaderConfig({
-      title: "Mojo",
-      show: true,
-      icon: ICONS.ojo,
-    });
-  }, []);
+    const fetchUserProfile = async () => {
+      try {
+        const response = await httpClient.get<any>("/auth/me");
+        const ojoType = response?.user?.profile?.ojoType?.name || response?.user?.profile?.ojoType?.name || "mentorjo";
+        setOjoTypeName(ojoType);
+      } catch (error) {
+        console.error("Failed to fetch user profile:", error);
+        setOjoTypeName("mentorjo"); // Fallback to default
+      }
+    };
+
+    if (token) {
+      fetchUserProfile();
+    }
+  }, [token]);
+
+  // Configure Header to use user's OjoType (color + icon) from API
+  useEffect(() => {
+    if (!ojoTypeName) return;
+
+    const ojoConfig = getOjoType(ojoTypeName as any);
+    const OjoIcon = ICONS[ojoConfig.icon as keyof typeof ICONS];
+
+    const leftElement = (
+      <View style={{ flexDirection: "row", alignItems: "center", gap: SPACING.md }}>
+        <View
+          style={{
+            width: SPACING.xlg * 2 - SPACING.sm,
+            height: SPACING.xlg * 2 - SPACING.sm,
+            borderRadius: SPACING.xlg,
+            backgroundColor: ojoConfig.color,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {OjoIcon ? <OjoIcon size={SPACING.xlg * 1.25} color={COLORS.colorWhite} /> : null}
+        </View>
+        <View>
+          <AppText variant="title2" style={{ color: ojoConfig.color }}>
+            {ojoConfig.displayName.toUpperCase()}
+          </AppText>
+          <AppText style={{ color: COLORS.lightGray }}>Available</AppText>
+        </View>
+      </View>
+    );
+
+    setHeaderConfig({ show: true, leftElement });
+  }, [ojoTypeName, setHeaderConfig]);
 
   // Cleanup when leaving screen
   useEffect(() => {
@@ -108,11 +153,11 @@ export default function ChatScreen() {
     (text: string) => {
       const trimmed = text.trim();
       if (!trimmed || isLoading) return;
-    const todaySessionId = getTodaySessionId(sessionsRef.current);
-    const activeSessionId = todaySessionId || sessionId;
-    if (todaySessionId && todaySessionId !== sessionId) {
-      setSessionId(todaySessionId);
-    }
+      const todaySessionId = getTodaySessionId(sessionsRef.current);
+      const activeSessionId = todaySessionId || sessionId;
+      if (todaySessionId && todaySessionId !== sessionId) {
+        setSessionId(todaySessionId);
+      }
       sendText(activeSessionId, trimmed, () => sessionsRef.current);
     },
     [getTodaySessionId, isLoading, sendText, sessionId, setSessionId]
@@ -126,12 +171,7 @@ export default function ChatScreen() {
   );
 
   // Put the chat input back into the shared NavBar (original behavior)
-  const navWidget = useMemo(
-    () => (
-      <ChatComposer isLoading={isLoading} onSend={onSend} />
-    ),
-    [isLoading, onSend]
-  );
+  const navWidget = useMemo(() => <ChatComposer isLoading={isLoading} onSend={onSend} />, [isLoading, onSend]);
 
   useEffect(() => {
     setNavBarConfig({ show: true, widget: navWidget });

@@ -242,6 +242,9 @@ class MongoMemoryStore {
           toolCalls: msg.toolCalls,
           tool_call_id: msg.tool_call_id,
           name: msg.name,
+          // include new OjoType metadata if present
+          ojoTypeName: msg.ojoTypeName,
+          ojoTypeDisplayName: msg.ojoTypeDisplayName,
           timestamp: msg.timestamp,
         }));
 
@@ -343,10 +346,13 @@ class MongoMemoryStore {
   /**
    * Add an assistant message
    */
-  async addAssistantMessage(sessionId, userId, content) {
+  async addAssistantMessage(sessionId, userId, content, options = {}) {
+    // options: { ojoTypeName, ojoTypeDisplayName }
     await this.addMessage(sessionId, userId, {
       role: "assistant",
       content,
+      ojoTypeName: options.ojoTypeName || undefined,
+      ojoTypeDisplayName: options.ojoTypeDisplayName || undefined,
       timestamp: new Date(),
     });
   }
@@ -354,13 +360,15 @@ class MongoMemoryStore {
   /**
    * Add an assistant message with tool calls
    */
-  async addAssistantToolCalls(sessionId, userId, content, toolCalls) {
+  async addAssistantToolCalls(sessionId, userId, content, toolCalls, options = {}) {
     // Optionally persist assistant messages that include toolCalls; disabled by default
     if (config.persistAssistantToolCalls) {
       await this.addMessage(sessionId, userId, {
         role: "assistant",
         content: content || "",
         toolCalls,
+        ojoTypeName: options.ojoTypeName || undefined,
+        ojoTypeDisplayName: options.ojoTypeDisplayName || undefined,
         timestamp: new Date(),
       });
     } else {
@@ -494,6 +502,9 @@ class MongoMemoryStore {
           content: msg.content,
           functionCall: msg.functionCall,
           name: msg.name,
+          // include OjoType metadata if present
+          ojoTypeName: msg.ojoTypeName,
+          ojoTypeDisplayName: msg.ojoTypeDisplayName,
           timestamp: msg.timestamp,
         })),
       };
@@ -557,6 +568,9 @@ class MongoMemoryStore {
       content: msg.content,
       functionCall: msg.functionCall,
       name: msg.name,
+      // include OjoType metadata if present
+      ojoTypeName: msg.ojoTypeName,
+      ojoTypeDisplayName: msg.ojoTypeDisplayName,
       timestamp: msg.timestamp,
     }));
 

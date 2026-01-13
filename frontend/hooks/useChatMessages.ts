@@ -15,6 +15,7 @@
  */
 import { useState, useCallback } from "react";
 import { sendChatMessage, SendMessageResponse, ChatSessionSummary, ChatMessage } from "../services/chatService";
+import { useOjoType } from "../hooks";
 
 const MAX_CACHED_MESSAGES_PER_SESSION = 50;
 const SEND_TIMEOUT_MS = 15000;
@@ -25,6 +26,7 @@ export function useChatMessages(updateSession: (session: ChatSessionSummary) => 
   const [sessionId, setSessionId] = useState<string>(() => `session_${Date.now()}`);
 
   const createClientId = useCallback(() => `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, []);
+  const { currentOjoType } = useOjoType();
 
   const buildSessionUpdate = (
     sessionId: string,
@@ -132,7 +134,14 @@ export function useChatMessages(updateSession: (session: ChatSessionSummary) => 
             content: response.response,
             timestamp: agentNow.toISOString(),
             clientId: createClientId(),
+            // Attach the current user's OjoType so the UI can render persona-specific gradient immediately
+            ojoTypeName: (response as any).ojoTypeName || currentOjoType,
           };
+
+          console.debug(
+            "[useChatMessages] Inserting assistant message with ojoTypeName:",
+            assistantMessage.ojoTypeName
+          );
 
           // If the last message is an error related to this clientId, replace it with the assistant message
           // instead of appending so that the error disappears and the reply appears in its place.

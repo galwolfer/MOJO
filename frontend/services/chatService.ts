@@ -27,6 +27,9 @@ export type ChatMessage = {
   clientId?: string;
   relatedClientId?: string;
   status?: "pending" | "failed" | "sent";
+  // OjoType metadata for assistant messages
+  ojoTypeName?: string;
+  ojoTypeDisplayName?: string;
 };
 
 export type SendMessageResponse = {
@@ -34,6 +37,9 @@ export type SendMessageResponse = {
   response?: string;
   sessionId?: string;
   error?: string;
+  // OjoType metadata for the produced assistant message (if available)
+  ojoTypeName?: string;
+  ojoTypeDisplayName?: string;
 };
 
 export type ChatHistoryResponse = {

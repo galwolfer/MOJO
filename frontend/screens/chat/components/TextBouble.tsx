@@ -243,6 +243,9 @@ type Props = {
   typewriter?: boolean; // Default: true for agent, false for user
   typingSpeedCps?: number; // chars per second, default 100
   onTypingDone?: () => void;
+
+  // Optional persona gradient colors for conic gradient display
+  gradientColors?: string[] | undefined;
 };
 
 const DEFAULT_CPS = 50;
@@ -316,6 +319,7 @@ const TextBouble: React.FC<Props> = ({
   typingSpeedCps = DEFAULT_CPS,
   onTypingDone,
   playOnceKey,
+  gradientColors,
 }) => {
   const resolvedTypewriter = typewriter ?? mode === "agent";
   const fullText = useMemo(() => pickText(children, text), [children, text]);
@@ -541,6 +545,11 @@ const TextBouble: React.FC<Props> = ({
           {showConic && (
             <Animated.View pointerEvents="none" style={[styles.shadowLayer, { opacity: conicOpacity }]}>
               <ConicGradientBubble
+                colors={
+                  gradientColors && gradientColors.length > 0
+                    ? gradientColors
+                    : [COLORS.primary1, COLORS.primary2, COLORS.primary1]
+                }
                 style={{
                   ...styles.conic,
                   ...radii,

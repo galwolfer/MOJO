@@ -348,7 +348,11 @@ export class AgentController {
             console.log(`[AgentController] Tool calls requested: ${response.tool_calls.length}`);
 
             // Persist assistant message with tool calls to session history
-            await memoryStore.addAssistantToolCalls(sessionId, userId, persistentContent, response.tool_calls);
+            // Persist assistant tool call message and include the user's OjoType (if available)
+            await memoryStore.addAssistantToolCalls(sessionId, userId, persistentContent, response.tool_calls, {
+              ojoTypeName: userProfile?.ojoType?.name,
+              ojoTypeDisplayName: userProfile?.ojoType?.displayName,
+            });
 
             // Add the LLM's response (which includes tool calls) to the message history
             currentMessages.push(response);
@@ -494,11 +498,18 @@ export class AgentController {
       // Store the final response in the session
       if (finalResponse) {
         finalResponse = this._sanitizeResponse(finalResponse);
-        await memoryStore.addAssistantMessage(sessionId, userId, finalResponse);
+        // Persist assistant message and attach which OjoType authored it (user's selected OjoType)
+        await memoryStore.addAssistantMessage(sessionId, userId, finalResponse, {
+          ojoTypeName: userProfile?.ojoType?.name,
+          ojoTypeDisplayName: userProfile?.ojoType?.displayName,
+        });
       } else {
         // Fallback response if something went wrong
         finalResponse = "Sorry, I encountered an issue processing the request. Please try again.";
-        await memoryStore.addAssistantMessage(sessionId, userId, finalResponse);
+        await memoryStore.addAssistantMessage(sessionId, userId, finalResponse, {
+          ojoTypeName: userProfile?.ojoType?.name,
+          ojoTypeDisplayName: userProfile?.ojoType?.displayName,
+        });
       }
 
       // STEP 10: RETURN RESULT
@@ -515,6 +526,9 @@ export class AgentController {
         response: finalResponse,
         sessionId,
         messageCount: await memoryStore.getMessageCount(sessionId, userId),
+        // Expose which OjoType authored this assistant message so clients can render persona UI immediately
+        ojoTypeName: userProfile?.ojoType?.name,
+        ojoTypeDisplayName: userProfile?.ojoType?.displayName,
       };
     } catch (error) {
       console.error("Agent processing error:", error);

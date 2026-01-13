@@ -4,6 +4,7 @@
  */
 import { useState, useEffect, useCallback } from "react";
 import { OjoTypeName } from "../config/ojoTypeConfig";
+import { get as httpGet, patch as httpPatch, getAuthToken } from "../services/httpClient";
 
 export interface OjoTypeData {
   _id: string;
@@ -40,27 +41,41 @@ export function useOjoType(token?: string): UseOjoTypeReturn {
       setLoading(true);
       setError(null);
 
-      const response = await fetch("/api/auth/me", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch user profile");
-      }
-
-      const data = await response.json();
-      const ojoType = data.user?.profile?.ojoType;
-
-      if (ojoType) {
-        setCurrentOjoType(ojoType.name as OjoTypeName);
-        setOjoTypeData(ojoType);
+      try {
+        // Use shared httpClient so Authorization header is included when set        const token = getAuthToken();
+        console.debug("[useOjoType] httpClient.get('/auth/me') - auth token present:", !!token);
+        console.debug("[useOjoType] using httpClient.get('/auth/me')");
+        const data = await httpGet<any>("/auth/me");
+        const ojoType = data.user?.profile?.ojoType;
+        if (ojoType) {
+          setCurrentOjoType(ojoType.name as OjoTypeName);
+          setOjoTypeData(ojoType);
+        }
+      } catch (err) {
+        // Re-throw to be handled by outer catch; add debug info
+        console.error("[useOjoType] httpClient.get('/auth/me') failed:", err);
+        throw err;
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      // If the server indicates no token/unauthorized, treat as unauthenticated and suppress noisy errors
+      if (err && err instanceof Error && (err.name === "ServerError" || err.name === "Error")) {
+        const msg = (err as Error).message || "";
+        if (
+          msg.includes("No token provided") ||
+          msg.includes("Invalid token") ||
+          msg.includes("Token expired") ||
+          msg.includes("401")
+        ) {
+          console.debug("[useOjoType] Unauthenticated - /auth/me returned:", msg);
+          setError(null);
+          setCurrentOjoType(null);
+          setOjoTypeData(null);
+          setLoading(false);
+          return;
+        }
+      }
+
       setError(errorMessage);
       console.error("Failed to fetch OjoType:", err);
     } finally {
@@ -74,24 +89,18 @@ export function useOjoType(token?: string): UseOjoTypeReturn {
         setLoading(true);
         setError(null);
 
-        const response = await fetch("/api/auth/profile", {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token && { Authorization: `Bearer ${token}` }),
-          },
-          body: JSON.stringify({
-            ojoTypeName,
-          }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "Failed to update OjoType");
+        try {
+          console.debug("[useOjoType] using httpClient.patch('/auth/profile')");
+          const data = await httpPatch<any>("/auth/profile", { ojoTypeName });
+          const newOjoType = data.profile?.ojoType;
+          if (newOjoType) {
+            setCurrentOjoType(newOjoType.name as OjoTypeName);
+            setOjoTypeData(newOjoType);
+          }
+        } catch (err) {
+          console.error("[useOjoType] httpClient.patch('/auth/profile') failed:", err);
+          throw err;
         }
-
-        const data = await response.json();
-        const newOjoType = data.profile?.ojoType;
 
         if (newOjoType) {
           setCurrentOjoType(newOjoType.name as OjoTypeName);

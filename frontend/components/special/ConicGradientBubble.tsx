@@ -6,13 +6,17 @@ import { COLORS, SPACING } from "../../theme";
 
 type Props = {
   style?: ViewStyle;
+  colors?: string[]; // gradient colors
 };
 
 /**
  * ConicGradientBubble - An animated gradient bubble component using Skia.
  * @param style - Optional custom styles.
  */
-export default function ConicGradientBubble({ style }: Props) {
+export default function ConicGradientBubble({
+  style,
+  colors = [COLORS.primary1, COLORS.primary2, COLORS.primary1],
+}: Props) {
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
   const center = useSharedValue(vec(0, 0));
 
@@ -24,6 +28,10 @@ export default function ConicGradientBubble({ style }: Props) {
 
   const shadowShrink = SPACING.xlg * 1.5;
   const progress = useSharedValue(0);
+
+  // colors for the sweep gradient - use passed-in `colors` prop
+  const gradientColors: string[] =
+    Array.isArray(colors) && colors.length > 0 ? colors : [COLORS.primary1, COLORS.primary2, COLORS.primary1];
 
   useEffect(() => {
     progress.value = withRepeat(withTiming(1, { duration: 3000, easing: Easing.linear }), -1, false);
@@ -48,19 +56,9 @@ export default function ConicGradientBubble({ style }: Props) {
           <Rect x={shadowShrink / 2} y={shadowShrink / 2} width={size.w - shadowShrink} height={size.h - shadowShrink}>
             <SweepGradient
               c={centerPoint}
-              colors={[
-                COLORS.primary1,
-                COLORS.primary2,
-                COLORS.primary1,
-                COLORS.primary2,
-                COLORS.primary1,
-                COLORS.primary2,
-                COLORS.primary1,
-                COLORS.primary2,
-                COLORS.primary1,
-              ]}
+              colors={gradientColors}
               start={0}
-              positions={[0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1]}
+              positions={gradientColors.map((_: string, i: number) => i / Math.max(1, gradientColors.length - 1))}
               transform={transform}
             />
           </Rect>
