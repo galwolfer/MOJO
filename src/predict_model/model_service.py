@@ -28,7 +28,7 @@ import sys
 import os
 import pickle
 from pathlib import Path
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 
 # Import the model and feature extractor from the linucb package
 from linucb import MultiFeatureLinUCB, extract_features
@@ -104,17 +104,17 @@ class ModelService:
             except Exception as e:
                 print(f"⚠️  Failed to load model: {e}. Creating new model.", file=sys.stderr)
 
-        # Calculate total number of features:
-        # motivation=1 + duration=2 + difficulty=3 + pressure=4 + category=18
-        total_features = 1 + 2 + 3 + 4 + len(self.CATEGORIES)
-        
-        # Create fresh model
-        model = MultiFeatureLinUCB(
-            n_features=total_features,
-            alpha=self.ALPHA
+        # Create fresh model with priors for better cold-start predictions
+        model = MultiFeatureLinUCB.create_with_priors(
+            categories=self.CATEGORIES,
+            motivation_weight=1.0,              # High motivation → better completion
+            difficulty_weights=(0.3, 0.0, -0.3), # Easy → better, hard → worse
+            alpha=self.ALPHA,
+            prior_strength=5.0,                  # Prior worth ~5 observations
+            learn_rate=0.5,                      # Moderate adaptation speed
         )
         user_context = f" for user {self.user_id}" if self.user_id else " (global)"
-        print(f"✅ Created new model with {total_features} features{user_context}", file=sys.stderr)
+        print(f"✅ Created new model with priors{user_context}", file=sys.stderr)
         return model
 
     def _save_model(self) -> None:
@@ -125,7 +125,40 @@ class ModelService:
         except Exception as e:
             print(f"⚠️  Failed to save model: {e}", file=sys.stderr)
 
-    def predict(self, task_input: Dict[str, Any]) -> Dict[str, Any]:
+    def _sync_subcategories(self, subcategory_map: Optional[Dict[str, List[str]]]) -> None:
+        """
+        Sync the model's internal subcategory_map with the provided database subcategories.
+        
+        Uses model.add_subcategory() to dynamically expand feature space as needed.
+        
+        Args:
+            subcategory_map: Dict mapping category keys to lists of subcategory names
+        """
+        if not subcategory_map:
+            return
+        
+        # Get current subcategories in the model
+        current_subcats = self.model.get_all_subcategories()
+        
+        # Track if we added any new subcategories
+        added_any = False
+        
+        # Add any new subcategories to the model
+        for category, subcats in subcategory_map.items():
+            for subcat in subcats:
+                # Check if already exists
+                if category not in current_subcats or subcat not in current_subcats.get(category, []):
+                    success, message = self.model.add_subcategory(category, subcat)
+                    if success:
+                        print(f"  Added subcategory: {category}/{subcat}", file=sys.stderr)
+                        added_any = True
+                    # Note: If it fails (e.g., duplicate), we just skip it silently
+        
+        # Save model if we made changes
+        if added_any:
+            self._save_model()
+
+    def predict(self, task_input: Dict[str, Any], subcategory_map: Optional[Dict[str, List[str]]] = None) -> Dict[str, Any]:
         """
         Predict completion difficulty and confidence for a task.
 
@@ -136,6 +169,7 @@ class ModelService:
             'difficulty': 1-5,        # Task effort
             'delta_hours': float,     # Hours until deadline (0 if no deadline)
             'category': 0-17,         # Task category (index into CATEGORIES)
+            'subcategory': str,       # Optional subcategory name
         }
 
         Output:
@@ -158,15 +192,19 @@ class ModelService:
                 missing = required - task_input.keys()
                 raise ValueError(f"Missing required fields: {missing}")
 
-            # Extract features using the model's feature engineering
-            features = extract_features(
+            # Sync subcategories from database with model
+            self._sync_subcategories(subcategory_map)
+
+            # Extract features using the model's built-in method
+            subcategory = task_input.get('subcategory', None)
+            features = self.model.extract_features_with_subcategory(
                 motivation=task_input['motivation'],
                 duration=task_input['duration'],
                 difficulty=task_input['difficulty'],
                 delta_hours=task_input['delta_hours'],
                 category=self.CATEGORIES[task_input['category']],
-                categories=self.CATEGORIES,
-                max_duration=self.MAX_DURATION
+                max_duration=self.MAX_DURATION,
+                subcategory=subcategory
             )
 
             # Get predictions from the model
@@ -193,7 +231,7 @@ class ModelService:
                 'error': str(e)
             }
 
-    def train(self, task_input: Dict[str, Any], reward: float) -> Dict[str, Any]:
+    def train(self, task_input: Dict[str, Any], reward: float, subcategory_map: Optional[Dict[str, List[str]]] = None) -> Dict[str, Any]:
         """
         Update the model with observed task completion data.
 
@@ -218,15 +256,19 @@ class ModelService:
             if not (0 <= reward <= 1):
                 raise ValueError(f"Reward must be in [0, 1], got {reward}")
 
-            # Extract features
-            features = extract_features(
+            # Sync subcategories from database with model
+            self._sync_subcategories(subcategory_map)
+
+            # Extract features using the model's built-in method
+            subcategory = task_input.get('subcategory', None)
+            features = self.model.extract_features_with_subcategory(
                 motivation=task_input['motivation'],
                 duration=task_input['duration'],
                 difficulty=task_input['difficulty'],
                 delta_hours=task_input['delta_hours'],
                 category=self.CATEGORIES[task_input['category']],
-                categories=self.CATEGORIES,
-                max_duration=self.MAX_DURATION
+                max_duration=self.MAX_DURATION,
+                subcategory=subcategory
             )
 
             # Update model weights
@@ -243,6 +285,43 @@ class ModelService:
 
         except Exception as e:
             print(f"❌ Training error: {e}", file=sys.stderr)
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
+    def calculate_deadline_reward(
+        self, 
+        completed_at: float, 
+        scheduled_at: float, 
+        deadline: float
+    ) -> Dict[str, Any]:
+        """
+        Calculate reward based on deadline timing.
+        
+        Uses the model's static calculate_deadline_reward method.
+        
+        Args:
+            completed_at: Unix timestamp (seconds) when task was completed
+            scheduled_at: Unix timestamp (seconds) when task was scheduled
+            deadline: Unix timestamp (seconds) of the deadline
+            
+        Returns:
+            Dict with 'success' and 'reward' (0-1)
+        """
+        try:
+            reward = MultiFeatureLinUCB.calculate_deadline_reward(
+                completed_at=completed_at,
+                scheduled_at=scheduled_at,
+                deadline=deadline
+            )
+            
+            return {
+                'success': True,
+                'reward': float(reward)
+            }
+        except Exception as e:
+            print(f"❌ Deadline reward calculation error: {e}", file=sys.stderr)
             return {
                 'success': False,
                 'error': str(e)
@@ -265,6 +344,7 @@ def main():
     Usage:
         python model_service.py predict <userId> '{"motivation": 4, "duration": 60, ...}'
         python model_service.py train <userId> '{"motivation": 4, ...}' 0.75
+        python model_service.py calculate_deadline_reward <userId> <completed_at> <scheduled_at> <deadline>
         python model_service.py health [userId]
     """
     if len(sys.argv) < 2:
@@ -272,6 +352,7 @@ def main():
         print("Commands:", file=sys.stderr)
         print("  predict <userId> <json>  - Predict on task for specific user", file=sys.stderr)
         print("  train <userId> <json> <reward>  - Train on completed task for specific user", file=sys.stderr)
+        print("  calculate_deadline_reward <userId> <completed_at> <scheduled_at> <deadline>", file=sys.stderr)
         print("  health [userId]  - Check service health", file=sys.stderr)
         sys.exit(1)
 
@@ -280,7 +361,7 @@ def main():
     # Extract userId if provided (not for health check without userId)
     user_id = None
     arg_offset = 2
-    if command in ['predict', 'train']:
+    if command in ['predict', 'train', 'calculate_deadline_reward']:
         if len(sys.argv) < 3:
             print(f"❌ {command} requires userId argument", file=sys.stderr)
             sys.exit(1)
@@ -295,19 +376,33 @@ def main():
     try:
         if command == 'predict':
             if len(sys.argv) < arg_offset + 1:
-                print("❌ predict requires task JSON argument", file=sys.stderr)
+                print("❌ predict requires payload JSON argument", file=sys.stderr)
                 sys.exit(1)
-            task_input = json.loads(sys.argv[arg_offset])
-            result = service.predict(task_input)
+            payload = json.loads(sys.argv[arg_offset])
+            task_input = payload.get('task', payload)  # Support both {task: ..., subcategory_map: ...} and direct task
+            subcategory_map = payload.get('subcategory_map', None)
+            result = service.predict(task_input, subcategory_map)
             print(json.dumps(result))
 
         elif command == 'train':
             if len(sys.argv) < arg_offset + 2:
-                print("❌ train requires task JSON and reward arguments", file=sys.stderr)
+                print("❌ train requires payload JSON and reward arguments", file=sys.stderr)
                 sys.exit(1)
-            task_input = json.loads(sys.argv[arg_offset])
+            payload = json.loads(sys.argv[arg_offset])
+            task_input = payload.get('task', payload)  # Support both formats
+            subcategory_map = payload.get('subcategory_map', None)
             reward = float(sys.argv[arg_offset + 1])
-            result = service.train(task_input, reward)
+            result = service.train(task_input, reward, subcategory_map)
+            print(json.dumps(result))
+
+        elif command == 'calculate_deadline_reward':
+            if len(sys.argv) < arg_offset + 3:
+                print("❌ calculate_deadline_reward requires 3 timestamp arguments", file=sys.stderr)
+                sys.exit(1)
+            completed_at = float(sys.argv[arg_offset])
+            scheduled_at = float(sys.argv[arg_offset + 1])
+            deadline = float(sys.argv[arg_offset + 2])
+            result = service.calculate_deadline_reward(completed_at, scheduled_at, deadline)
             print(json.dumps(result))
 
         elif command == 'health':

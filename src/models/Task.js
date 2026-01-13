@@ -16,12 +16,11 @@ const taskSchema = new mongoose.Schema(
     effort: { type: Number, min: 1, max: 5, default: 3 }, // 1=small, 5=big
     category: {
       type: String,
-      enum: CATEGORY_STRING_VALUES,
       validate: {
         validator: function (value) {
-          return isValidCategory(value) || value === "";
+          return isValidCategory(value) || value === "" || !value;
         },
-        message: `Invalid category. Must be one of: ${CATEGORY_STRING_VALUES.join(", ")}`,
+        message: `Invalid category. Must be one of: ${CATEGORY_STRING_VALUES.join(", ")} or empty`,
       },
       default: "",
       trim: true,
@@ -67,10 +66,83 @@ const taskSchema = new mongoose.Schema(
 );
 
 // (add/edit) after each task save
+import { SubTask } from "./SubTask.js";
+
+// Helper: Synchronize subtasks to match the task's chunkCount when taskType is in_parts or leaky
+async function syncSubTasksForTask(taskDoc) {
+  try {
+    // Only relevant for "in_parts" or "leaky"
+    if (!["in_parts", "leaky"].includes(taskDoc.taskType)) {
+      // If switching to "perfect", remove any existing subtasks
+      await SubTask.deleteMany({ taskId: taskDoc._id }).catch(() => {});
+      return;
+    }
+
+    // Determine desired count of subtasks:
+    // Prefer explicit chunkCount, otherwise estimate from estimatedDuration and minChunk/default
+    const minChunk = taskDoc.minChunk || 30;
+    const desiredCount = taskDoc.chunkCount && Number.isInteger(taskDoc.chunkCount) && taskDoc.chunkCount > 0
+      ? taskDoc.chunkCount
+      : Math.max(1, Math.ceil((taskDoc.estimatedDuration || minChunk) / minChunk));
+
+    const existing = await SubTask.find({ taskId: taskDoc._id }).sort({ index: 1 });
+
+    // If there are fewer than desired, create missing
+    if (existing.length < desiredCount) {
+      const toCreate = desiredCount - existing.length;
+      const startIndex = existing.length + 1;
+      const createOps = [];
+      for (let i = 0; i < toCreate; i++) {
+        const idx = startIndex + i;
+        createOps.push({
+          taskId: taskDoc._id,
+          userId: taskDoc.userId,
+          index: idx,
+          title: `Part ${idx}`,
+          minutes: taskDoc.chunkMinutes || Math.round((taskDoc.estimatedDuration || minChunk) / desiredCount),
+        });
+      }
+      if (createOps.length) {
+        await SubTask.insertMany(createOps);
+      }
+    }
+
+    // If there are more than desired, remove the extras (highest indexes)
+    if (existing.length > desiredCount) {
+      const toRemove = existing.slice(desiredCount).map((s) => s._id);
+      if (toRemove.length) {
+        await SubTask.deleteMany({ _id: { $in: toRemove } });
+      }
+    }
+
+    // If counts match, ensure indexes are sequential and titles are "Part N" if empty
+    const updatedList = await SubTask.find({ taskId: taskDoc._id }).sort({ index: 1 });
+    for (let i = 0; i < updatedList.length; i++) {
+      const desiredIndex = i + 1;
+      const s = updatedList[i];
+      let changed = false;
+      if (s.index !== desiredIndex) {
+        s.index = desiredIndex;
+        changed = true;
+      }
+      if (!s.title || s.title.trim() === "") {
+        s.title = `Part ${desiredIndex}`;
+        changed = true;
+      }
+      if (changed) await s.save();
+    }
+  } catch (err) {
+    console.error("⚠️  syncSubTasksForTask failed:", err && err.message ? err.message : err);
+  }
+}
+
 taskSchema.post("save", async function () {
   // When a task is created or updated, recalculate priority scores for all open tasks
   console.log("🧩 Task saved — updating priority scores...");
   await updateAllScores();
+
+  // After saving, ensure subTasks reflect the task's chunk configuration
+  await syncSubTasksForTask(this);
 });
 
 // (remove) after each task remove
@@ -78,6 +150,9 @@ taskSchema.post("remove", async function () {
   // When a task is deleted, recalculate priority scores to keep cache consistent
   console.log("🧩 Task removed — updating priority scores...");
   await updateAllScores();
+
+  // Remove any subtasks belonging to this task
+  await SubTask.deleteMany({ taskId: this._id }).catch(() => {});
 });
 
 taskSchema.pre("save", async function () {
@@ -157,6 +232,13 @@ taskSchema.pre("save", async function () {
       // Leave prediction fields undefined - they'll remain empty in DB
     }
   }
+});
+
+// Virtual populate: subtasks (created for in_parts / leaky tasks)
+taskSchema.virtual("subTasks", {
+  ref: "SubTask",
+  localField: "_id",
+  foreignField: "taskId",
 });
 
 // Compound indexes for efficient queries

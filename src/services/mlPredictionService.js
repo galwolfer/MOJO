@@ -9,6 +9,9 @@ import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { taskToMLInput, calculateReward } from '../utils/mlInputConverter.js';
+import { User } from '../models/User.js';
+import { TaskSchedule } from '../models/TaskSchedule.js';
+import { CATEGORY_INDEX_TO_KEY } from '../config/categories.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,6 +21,45 @@ const PYTHON_SERVICE_PATH = path.join(__dirname, '../predict_model/model_service
 
 // Timeout for Python subprocess (ms)
 const SUBPROCESS_TIMEOUT = 5000;
+
+/**
+ * Build subcategory map from user's custom subcategories
+ * 
+ * Converts User.subCategories array to the format expected by Python:
+ * { "work_and_career": ["Deep Work", "Meetings"], "workout": ["HIIT", "Cardio"], ... }
+ * 
+ * The Python model will use model.add_subcategory() to sync these with its internal
+ * feature space, dynamically expanding n_features as needed.
+ * 
+ * @param {string} userId - User ID to fetch subcategories for
+ * @returns {Promise<Object>} Subcategory map grouped by category string keys
+ */
+async function buildSubcategoryMap(userId) {
+  try {
+    const user = await User.findById(userId).lean();
+    if (!user || !user.subCategories || user.subCategories.length === 0) {
+      return {}; // No custom subcategories
+    }
+
+    const subcategoryMap = {};
+    
+    for (const sub of user.subCategories) {
+      const categoryKey = CATEGORY_INDEX_TO_KEY[sub.category]; // Convert index to string key
+      if (!categoryKey) continue; // Skip invalid categories
+      
+      if (!subcategoryMap[categoryKey]) {
+        subcategoryMap[categoryKey] = [];
+      }
+      
+      subcategoryMap[categoryKey].push(sub.name);
+    }
+    
+    return subcategoryMap;
+  } catch (error) {
+    console.error('❌ Error building subcategory map:', error.message);
+    return {}; // Return empty map on error, don't fail prediction
+  }
+}
 
 /**
  * Call Python model service with a command and JSON input
@@ -106,9 +148,18 @@ export async function predictTask(task) {
     // Convert Task to ML input format
     const mlInput = taskToMLInput(task);
 
-    // Call Python service with userId and task data
+    // Build subcategory map from user's custom subcategories
     const userId = task.userId.toString();
-    const jsonInput = JSON.stringify(mlInput);
+    const subcategoryMap = await buildSubcategoryMap(userId);
+
+    // Prepare payload: task input + subcategory_map
+    const payload = {
+      task: mlInput,
+      subcategory_map: subcategoryMap
+    };
+
+    // Call Python service with userId and payload
+    const jsonInput = JSON.stringify(payload);
     const result = await callPythonService('predict', [userId, jsonInput]);
 
     if (!result.success) {
@@ -156,16 +207,73 @@ export async function trainTask(task) {
     // Convert Task to ML input format
     const mlInput = taskToMLInput(task);
 
-    // Calculate reward signal
-    const reward = calculateReward(task.estimatedDuration, task.actualCompletionMinutes);
+    // Calculate reward signal - prefer deadline-based, fallback to estimation-based
+    let reward;
+    let rewardType = 'estimation'; // Track which method was used
     
+    // Try deadline-based reward if we have schedule and deadline
+    if (task.dueDate) {
+      try {
+        // Find the earliest scheduled session for this task
+        const scheduledSession = await TaskSchedule.findOne({
+          taskId: task._id,
+          status: 'completed'
+        }).sort({ start: 1 }).lean();
+
+        if (scheduledSession) {
+          // Call Python's calculate_deadline_reward method
+          const completedAt = new Date(); // Task just completed
+          const scheduledAt = scheduledSession.start;
+          const deadline = task.dueDate;
+          
+          // Convert to Unix timestamps (seconds)
+          const completedTs = completedAt.getTime() / 1000;
+          const scheduledTs = scheduledAt.getTime() / 1000;
+          const deadlineTs = deadline.getTime() / 1000;
+          
+          // Call Python model service to calculate deadline reward
+          const rewardResult = await callPythonService('calculate_deadline_reward', [
+            userId,
+            String(completedTs),
+            String(scheduledTs),
+            String(deadlineTs)
+          ]);
+          
+          if (rewardResult.success && rewardResult.reward !== undefined) {
+            reward = rewardResult.reward;
+            rewardType = 'deadline';
+            console.log(`  Using deadline-based reward: ${reward.toFixed(3)} (completed: ${completedAt.toISOString()}, scheduled: ${scheduledAt.toISOString()}, deadline: ${deadline.toISOString()})`);
+          }
+        }
+      } catch (err) {
+        console.warn(`  Could not calculate deadline-based reward: ${err.message}`);
+      }
+    }
+    
+    // Fallback to estimation-based reward
     if (reward === undefined) {
-      throw new Error('Invalid reward calculation');
+      reward = calculateReward(task.estimatedDuration, task.actualCompletionMinutes);
+      rewardType = 'estimation';
+      
+      if (reward === undefined) {
+        throw new Error('Invalid reward calculation');
+      }
+      
+      console.log(`  Using estimation-based reward: ${reward.toFixed(3)} (estimated: ${task.estimatedDuration}min, actual: ${task.actualCompletionMinutes}min)`);
     }
 
-    // Call Python service with userId, task input, and reward
+    // Build subcategory map from user's custom subcategories
     const userId = task.userId.toString();
-    const jsonInput = JSON.stringify(mlInput);
+    const subcategoryMap = await buildSubcategoryMap(userId);
+
+    // Prepare payload: task input + subcategory_map
+    const payload = {
+      task: mlInput,
+      subcategory_map: subcategoryMap
+    };
+
+    // Call Python service with userId, payload, and reward
+    const jsonInput = JSON.stringify(payload);
     const result = await callPythonService('train', [userId, jsonInput, String(reward)]);
 
     if (!result.success) {
@@ -175,6 +283,7 @@ export async function trainTask(task) {
     return {
       success: true,
       reward: result.reward,
+      rewardType, // 'deadline' or 'estimation'
       message: result.message || 'Model trained successfully',
     };
 

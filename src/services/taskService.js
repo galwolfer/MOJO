@@ -26,6 +26,7 @@ import cron from "node-cron";
 import { Task } from "../models/Task.js";
 import { User } from "../models/User.js";
 import { TaskSchedule } from "../models/TaskSchedule.js";
+import { SubTask } from "../models/SubTask.js";
 import { BusyBlock } from "../models/BusyBlock.js";
 import { CATEGORIES, getCategoryIndex } from "../config/categories.js";
 import { logEvent, recordSubCategoryGeneration, recordSubCategoryOverride } from "./telemetryService.js";
@@ -372,8 +373,84 @@ export async function updateTask({ userId, taskId, updates }) {
     },
   });
 
+  // If splitting-related fields changed, ensure subtask sync
+  const splitFields = ["taskType", "chunkCount", "chunkMinutes", "minMinutes", "maxMinutes", "minChunk", "estimatedDuration"];
+  if (Object.keys(sanitizedUpdates).some((f) => splitFields.includes(f))) {
+    try {
+      await syncSubTasksForTask({ taskId });
+    } catch (err) {
+      logger.warn("Failed to sync subtasks after task update:", err && err.message);
+    }
+  }
+
   return { success: true, task: updated };
 }
+
+/**
+ * Ensure subtasks exist/are removed to match task settings
+ */
+export async function syncSubTasksForTask({ taskId }) {
+  if (!taskId) return;
+  const task = await Task.findById(taskId).lean();
+  if (!task) return;
+
+  // Only relevant for "in_parts" / "leaky"
+  if (!["in_parts", "leaky"].includes(task.taskType)) {
+    await SubTask.deleteMany({ taskId }).catch(() => {});
+    return;
+  }
+
+  const minChunk = task.minChunk || 30;
+  const desiredCount = task.chunkCount && Number.isInteger(task.chunkCount) && task.chunkCount > 0
+    ? task.chunkCount
+    : Math.max(1, Math.ceil((task.estimatedDuration || minChunk) / minChunk));
+
+  const existing = await SubTask.find({ taskId }).sort({ index: 1 }).lean();
+
+  if (existing.length < desiredCount) {
+    const toCreate = desiredCount - existing.length;
+    const startIndex = existing.length + 1;
+    const createOps = [];
+    for (let i = 0; i < toCreate; i++) {
+      const idx = startIndex + i;
+      createOps.push({
+        taskId,
+        userId: task.userId,
+        index: idx,
+        title: `Part ${idx}`,
+        minutes: task.chunkMinutes || Math.round((task.estimatedDuration || minChunk) / desiredCount),
+      });
+    }
+    if (createOps.length) {
+      await SubTask.insertMany(createOps);
+    }
+  }
+
+  if (existing.length > desiredCount) {
+    const toRemove = existing.slice(desiredCount).map((s) => s._id);
+    if (toRemove.length) {
+      await SubTask.deleteMany({ _id: { $in: toRemove } });
+    }
+  }
+
+  // Fix up indexes/titles
+  const updatedList = await SubTask.find({ taskId }).sort({ index: 1 });
+  for (let i = 0; i < updatedList.length; i++) {
+    const desiredIndex = i + 1;
+    const s = updatedList[i];
+    let changed = false;
+    if (s.index !== desiredIndex) {
+      s.index = desiredIndex;
+      changed = true;
+    }
+    if (!s.title || s.title.trim() === "") {
+      s.title = `Part ${desiredIndex}`;
+      changed = true;
+    }
+    if (changed) await s.save();
+  }
+}
+
 
 /**
  * Extend the deadline of a task.
@@ -442,6 +519,13 @@ export async function deleteTask({ taskId, userId }) {
       await TaskSchedule.deleteMany({ taskId });
     } catch {
       // Ignore if no schedules exist
+    }
+
+    // Remove subtasks associated with this task
+    try {
+      await SubTask.deleteMany({ taskId });
+    } catch {
+      // Ignore if none exist
     }
 
     await logEvent({
@@ -565,6 +649,65 @@ export async function completeTask({ taskId, userId }) {
   } catch (error) {
     return { success: false, error: error.message };
   }
+}
+// -----------------------------
+// Subtask helpers
+// -----------------------------
+
+/**
+ * Get all subtasks for a task (ensures user access)
+ */
+export async function getSubTasksForTask({ userId, taskId }) {
+  if (!taskId) return [];
+  return SubTask.find({ userId, taskId }).sort({ index: 1 }).lean();
+}
+
+/**
+ * Get a single subtask by id (ensures user access)
+ */
+export async function getSubTaskById({ userId, subTaskId }) {
+  if (!subTaskId) return null;
+  return SubTask.findOne({ _id: subTaskId, userId }).lean();
+}
+
+/**
+ * Update a subtask fields (title, description, status)
+ */
+export async function updateSubTask({ userId, subTaskId, updates }) {
+  if (!subTaskId) return { success: false, error: "SubTask ID is required" };
+
+  const allowed = ["title", "description", "minutes", "status"];
+  const sanitized = {};
+  for (const k of allowed) {
+    if (updates[k] !== undefined) sanitized[k] = updates[k];
+  }
+
+  if (Object.keys(sanitized).length === 0) return { success: false, error: "No valid fields to update" };
+
+  // If marking done, set completedAt
+  if (sanitized.status === "done") sanitized.completedAt = new Date();
+  if (sanitized.status === "todo") sanitized.completedAt = null;
+
+  const updated = await SubTask.findOneAndUpdate({ _id: subTaskId, userId }, { $set: sanitized }, { new: true }).lean();
+
+  if (!updated) return { success: false, error: "SubTask not found or access denied" };
+
+  // If all subtasks are done, optionally mark parent task as done. If some done -> in_progress
+  try {
+    const remaining = await SubTask.countDocuments({ taskId: updated.taskId, status: { $ne: "done" } });
+    const total = await SubTask.countDocuments({ taskId: updated.taskId });
+    if (total > 0) {
+      let newStatus = "todo";
+      if (remaining === 0) newStatus = "done";
+      else if (remaining < total) newStatus = "in_progress";
+      await Task.updateOne({ _id: updated.taskId }, { $set: { status: newStatus } });
+    }
+  } catch (err) {
+    // Non-fatal
+    console.warn("Failed to sync parent task status after subtask update:", err && err.message);
+  }
+
+  return { success: true, subtask: updated };
 }
 
 // =============================================================================

@@ -8,7 +8,9 @@ import { requireAuth } from "../middlewares/auth.js";
 import * as taskController from "../controllers/taskController.js";
 import { Task } from "../models/Task.js";
 import { TaskSchedule } from "../models/TaskSchedule.js";
+import { User } from "../models/User.js";
 import { logger } from "../utils/logger.js";
+import { getCategoryIndex, isValidCategory, getDisplayName } from "../config/categories.js";
 
 const router = Router();
 
@@ -31,10 +33,24 @@ const router = Router();
     PATCH  /:id           Update a task
     DELETE /:id           Delete a task
     POST   /:id/toggle    Toggle completion
+    POST   /:id/complete  Complete task (triggers ML training)
+
+  SUBTASK Operations
+    GET    /:id/subtasks                    Get all subtasks for a task
+    GET    /:taskId/subtasks/:subId         Get single subtask
+    PATCH  /:taskId/subtasks/:subId         Update subtask fields
+    POST   /:taskId/subtasks/:subId/complete   Mark subtask complete
+    POST   /:taskId/subtasks/:subId/todo       Mark subtask as todo
+    PATCH  /:taskId/subtasks/:subId/status     Update subtask status
 
   FILTERED QUERIES
     GET    /upcoming/:days?   Tasks due within N days
     GET    /overdue           Overdue tasks
+
+  SUBCATEGORY MANAGEMENT
+    POST   /subcategories                Add custom subcategory
+    GET    /subcategories?category=...   Get user's subcategories
+    DELETE /subcategories/:name          Remove custom subcategory
 
   EXPIRED TASK MANAGEMENT
     GET    /expired             List all expired tasks
@@ -48,6 +64,234 @@ const router = Router();
 
 // All routes require authentication
 router.use(requireAuth);
+
+/* ─────────────────────────────────────────────────────────────────────────
+   SUBCATEGORY MANAGEMENT
+   User-defined subcategories for personalized task organization
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Add a custom subcategory for a specific category
+ * POST /api/tasks/subcategories
+ * Body: { name: string, category: string }
+ * 
+ * Validates category exists (0-17) and prevents duplicates
+ * Limited to 50 subcategories per category per user
+ */
+router.post("/subcategories", async (req, res, next) => {
+  try {
+    const { name, category } = req.body;
+    const userId = req.user.userId;
+
+    // Validation
+    if (!name || typeof name !== "string" || name.trim().length === 0) {
+      return res.status(400).json({ success: false, error: "Subcategory name is required" });
+    }
+
+    if (!category || typeof category !== "string") {
+      return res.status(400).json({ success: false, error: "Category is required" });
+    }
+
+    // Validate category exists
+    if (!isValidCategory(category)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Invalid category. Must be one of the 18 standard categories" 
+      });
+    }
+
+    const categoryIndex = getCategoryIndex(category);
+    const trimmedName = name.trim();
+
+    // Name length validation
+    if (trimmedName.length < 2 || trimmedName.length > 50) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Subcategory name must be between 2 and 50 characters" 
+      });
+    }
+
+    // Get user and check existing subcategories
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+
+    // Check for duplicate (case-insensitive)
+    const existingInCategory = user.subCategories.filter(s => s.category === categoryIndex);
+    const duplicate = existingInCategory.find(
+      s => s.name.toLowerCase() === trimmedName.toLowerCase()
+    );
+
+    if (duplicate) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Subcategory "${trimmedName}" already exists in ${getDisplayName(category)}` 
+      });
+    }
+
+    // Limit: 50 subcategories per category
+    if (existingInCategory.length >= 50) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Maximum 50 subcategories per category reached for ${getDisplayName(category)}` 
+      });
+    }
+
+    // Add new subcategory
+    user.subCategories.push({ name: trimmedName, category: categoryIndex });
+    await user.save();
+
+    logger.info(`User ${userId} added subcategory "${trimmedName}" to ${category}`);
+
+    res.status(201).json({ 
+      success: true, 
+      message: "Subcategory added successfully",
+      subcategory: { name: trimmedName, category: category, categoryIndex }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Get user's custom subcategories
+ * GET /api/tasks/subcategories?category=work_and_career
+ * 
+ * If category provided: returns subcategories for that category only
+ * If no category: returns all user subcategories grouped by category
+ * 
+ * Also includes historical task-derived subcategories (merged and deduped)
+ */
+router.get("/subcategories", async (req, res, next) => {
+  try {
+    const { category } = req.query;
+    const userId = req.user.userId;
+
+    const user = await User.findById(userId).lean();
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+
+    // Filter by category if provided
+    if (category) {
+      if (!isValidCategory(category)) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Invalid category" 
+        });
+      }
+
+      const categoryIndex = getCategoryIndex(category);
+      const normalizedCategory = category.toLowerCase().replace(/[^a-z_]/g, "");
+
+      // Get user-saved subcategories
+      const userSubs = (user.subCategories || [])
+        .filter(s => s.category === categoryIndex)
+        .map(s => s.name);
+
+      // Get historical task subcategories
+      const taskSubs = await Task.distinct("subCategory.label", { 
+        userId, 
+        category: normalizedCategory 
+      });
+      const validTaskSubs = (taskSubs || [])
+        .filter(s => s && typeof s === "string" && s.trim().length > 0)
+        .map(s => s.trim());
+
+      // Merge and dedupe (case-sensitive)
+      const combined = new Set([...userSubs, ...validTaskSubs]);
+      const subcategories = Array.from(combined).sort();
+
+      return res.json({ 
+        success: true, 
+        category,
+        categoryDisplay: getDisplayName(category),
+        count: subcategories.length,
+        subcategories 
+      });
+    }
+
+    // No category filter: return all grouped by category
+    const grouped = {};
+    
+    for (const sub of (user.subCategories || [])) {
+      const catIndex = sub.category;
+      if (!grouped[catIndex]) {
+        grouped[catIndex] = [];
+      }
+      grouped[catIndex].push(sub.name);
+    }
+
+    res.json({ 
+      success: true, 
+      totalCount: (user.subCategories || []).length,
+      subcategoriesByCategory: grouped 
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Delete a custom subcategory
+ * DELETE /api/tasks/subcategories/:name?category=work_and_career
+ * 
+ * Removes subcategory from user profile
+ * Does NOT affect existing tasks that use this subcategory
+ */
+router.delete("/subcategories/:name", async (req, res, next) => {
+  try {
+    const { name } = req.params;
+    const { category } = req.query;
+    const userId = req.user.userId;
+
+    if (!name || name.trim().length === 0) {
+      return res.status(400).json({ success: false, error: "Subcategory name is required" });
+    }
+
+    if (!category) {
+      return res.status(400).json({ success: false, error: "Category query parameter is required" });
+    }
+
+    if (!isValidCategory(category)) {
+      return res.status(400).json({ success: false, error: "Invalid category" });
+    }
+
+    const categoryIndex = getCategoryIndex(category);
+    const trimmedName = decodeURIComponent(name.trim());
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+
+    // Find and remove (case-insensitive match)
+    const initialLength = user.subCategories.length;
+    user.subCategories = user.subCategories.filter(
+      s => !(s.category === categoryIndex && s.name.toLowerCase() === trimmedName.toLowerCase())
+    );
+
+    if (user.subCategories.length === initialLength) {
+      return res.status(404).json({ 
+        success: false, 
+        error: `Subcategory "${trimmedName}" not found in ${getDisplayName(category)}` 
+      });
+    }
+
+    await user.save();
+
+    logger.info(`User ${userId} removed subcategory "${trimmedName}" from ${category}`);
+
+    res.json({ 
+      success: true, 
+      message: "Subcategory removed successfully",
+      removed: { name: trimmedName, category }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 /* ─────────────────────────────────────────────────────────────────────────
    FILTERED QUERIES
@@ -260,6 +504,27 @@ router.post("/", taskController.createTask);
 
 // Get all tasks (supports filters: tag, completed, dueBefore, dueAfter)
 router.get("/", taskController.getTasks);
+
+// Get subtasks for a task
+router.get("/:id/subtasks", taskController.getSubTasksForTask);
+
+// Get a single subtask by ID
+router.get("/:taskId/subtasks/:subId", taskController.getSubTaskById);
+
+// Update a single subtask for a task (mark complete / update title)
+router.patch("/:taskId/subtasks/:subId", taskController.updateSubTask);
+
+// Mark subtask as complete (shortcut)
+router.post("/:taskId/subtasks/:subId/complete", taskController.markSubTaskComplete);
+
+// Mark subtask as todo (shortcut)
+router.post("/:taskId/subtasks/:subId/todo", taskController.markSubTaskTodo);
+
+// Update subtask status directly
+router.patch("/:taskId/subtasks/:subId/status", taskController.updateSubTaskStatus);
+
+// Bulk update task with subtasks in one call
+router.patch("/:id/full", taskController.bulkUpdateTaskWithSubtasks);
 
 // Get a single task by ID
 router.get("/:id", taskController.getTaskById);
