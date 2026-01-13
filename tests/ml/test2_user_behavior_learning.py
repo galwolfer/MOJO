@@ -26,7 +26,7 @@ import os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from src.predict_model.multi_feature_linucb import MultiFeatureLinUCB, extract_features
+from src.predict_model.linucb import MultiFeatureLinUCB, extract_features
 
 # Standard categories used across all tests
 CATEGORIES = ["sport", "study", "work", "home", "health", "habits"]
@@ -41,7 +41,7 @@ def create_model(
     init_theta = None
     if motivation_bias > 0:
         init_theta = [motivation_bias] + [0.0] * (n_features - 1)
-    return MultiFeatureLinUCB(n_features=n_features, alpha=alpha, init_theta=init_theta)
+    return MultiFeatureLinUCB(n_features=n_features, alpha=alpha, init_theta=init_theta, categories=CATEGORIES)
 
 
 def get_features(

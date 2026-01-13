@@ -97,8 +97,8 @@ export class AgentController {
       console.log(`[AgentController] History length: ${history.length}, Summary length: ${summary.length}`);
 
       // STEP 3: LOAD USER PROFILE
-      // Get user's preferences: name, tone (friendly/professional), persona
-      const user = await User.findById(userId);
+      // Get user's preferences: name, ojoType
+      const user = await User.findById(userId).populate("profile.ojoTypeId");
       console.log(`[AgentController] User found:`, user ? `${user.username} (${user._id})` : "NOT FOUND");
 
       const userProfile = user?.profile ? { ...user.profile } : {}; // Clone to avoid mutation issues
@@ -107,10 +107,15 @@ export class AgentController {
         userProfile.subCategories = user.subCategories;
       }
 
+      // Populate ojoType if not already populated
+      if (userProfile.ojoTypeId && !userProfile.ojoType) {
+        const OjoType = (await import("../models/OjoType.js")).default;
+        userProfile.ojoType = await OjoType.findById(userProfile.ojoTypeId);
+      }
+
       console.log(`[AgentController] User profile:`, {
         name: userProfile.name,
-        tone: userProfile.tone,
-        persona: userProfile.persona,
+        ojoType: userProfile.ojoType?.name,
       });
 
       // STEP 4: SEMANTIC MEMORY RETRIEVAL

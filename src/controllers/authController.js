@@ -7,6 +7,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { User } from "../models/index.js";
 import { env } from "../config/env.js";
+import { getDefaultOjoType } from "../utils/ojoTypeUtils.js";
 
 const JWT_SECRET = env.JWT_SECRET || "your-secret-key-change-in-production";
 const JWT_EXPIRES_IN = "7d"; // Token valid for 7 days
@@ -17,7 +18,7 @@ const JWT_EXPIRES_IN = "7d"; // Token valid for 7 days
  */
 export async function register(req, res, next) {
   try {
-    const { username, email, password } = req.body;
+    const { username, email, password, displayName, profileImage, gender } = req.body;
 
     // Validation
     if (!username || !email || !password) {
@@ -25,6 +26,22 @@ export async function register(req, res, next) {
         success: false,
         error: "Username, email, and password are required",
       });
+    }
+
+    if (!displayName || String(displayName).trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Display name is required",
+      });
+    }
+
+    const ALLOWED_GENDERS = ["female", "male", "nonbinary", "prefer_not_to_say", "other", "unspecified"];
+
+    if (gender !== undefined && gender !== null) {
+      const g = String(gender).toLowerCase();
+      if (!ALLOWED_GENDERS.includes(g)) {
+        return res.status(400).json({ success: false, error: "Invalid gender value" });
+      }
     }
 
     if (password.length < 6) {
@@ -49,19 +66,32 @@ export async function register(req, res, next) {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
+    // Get default OjoType
+    const defaultOjoType = await getDefaultOjoType();
+
     // Create user
     const user = new User({
       username,
       email,
       passwordHash,
       profile: {
-        tone: "friendly",
-        persona: "assistant",
+        name: displayName ? String(displayName).trim() : "",
+        profileImage: profileImage || null,
+        ojoTypeId: defaultOjoType ? defaultOjoType._id : null,
+        gender: gender ? String(gender).toLowerCase() : "unspecified",
         settings: {},
       },
     });
 
     await user.save();
+
+    // Populate OjoType for returned profile
+    await user.populate("profile.ojoTypeId", "name displayName persona tone");
+    const profileObj =
+      user.profile && typeof user.profile.toObject === "function"
+        ? user.profile.toObject()
+        : JSON.parse(JSON.stringify(user.profile || {}));
+    profileObj.ojoType = user.profile && user.profile.ojoTypeId ? user.profile.ojoTypeId : null;
 
     // Generate JWT
     const token = jwt.sign(
@@ -81,7 +111,7 @@ export async function register(req, res, next) {
         id: user._id,
         username: user.username,
         email: user.email,
-        profile: user.profile,
+        profile: profileObj,
       },
     });
   } catch (error) {
@@ -125,6 +155,14 @@ export async function login(req, res, next) {
       });
     }
 
+    // Populate OjoType for returned profile
+    await user.populate("profile.ojoTypeId", "name displayName persona tone");
+    const profileObj =
+      user.profile && typeof user.profile.toObject === "function"
+        ? user.profile.toObject()
+        : JSON.parse(JSON.stringify(user.profile || {}));
+    profileObj.ojoType = user.profile && user.profile.ojoTypeId ? user.profile.ojoTypeId : null;
+
     // Generate JWT
     const token = jwt.sign(
       {
@@ -143,7 +181,7 @@ export async function login(req, res, next) {
         id: user._id,
         username: user.username,
         email: user.email,
-        profile: user.profile,
+        profile: profileObj,
       },
     });
   } catch (error) {
@@ -166,13 +204,23 @@ export async function getMe(req, res, next) {
       });
     }
 
+    // Populate the OjoType object for easier client consumption
+    await user.populate("profile.ojoTypeId", "name displayName persona tone");
+
+    const profileObj =
+      user.profile && typeof user.profile.toObject === "function"
+        ? user.profile.toObject()
+        : JSON.parse(JSON.stringify(user.profile || {}));
+
+    profileObj.ojoType = user.profile && user.profile.ojoTypeId ? user.profile.ojoTypeId : null;
+
     res.json({
       success: true,
       user: {
         id: user._id,
         username: user.username,
         email: user.email,
-        profile: user.profile,
+        profile: profileObj,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       },
@@ -188,7 +236,7 @@ export async function getMe(req, res, next) {
  */
 export async function updateProfile(req, res, next) {
   try {
-    const { name, tone, persona, settings } = req.body;
+    const { name, ojoTypeName, settings, profileImage, gender } = req.body;
     const userId = req.user.userId;
 
     const user = await User.findById(userId);
@@ -202,18 +250,102 @@ export async function updateProfile(req, res, next) {
 
     // Update profile fields
     if (name !== undefined) user.profile.name = name;
-    if (tone) user.profile.tone = tone;
-    if (persona) user.profile.persona = persona;
+    if (profileImage !== undefined) user.profile.profileImage = profileImage;
+    if (ojoTypeName) {
+      // Import OjoType here to avoid circular imports
+      const OjoType = (await import("../models/OjoType.js")).default;
+      const ojoType = await OjoType.findOne({ name: ojoTypeName.toLowerCase() });
+      if (ojoType) {
+        user.profile.ojoTypeId = ojoType._id;
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid ojoType name",
+        });
+      }
+    }
+    if (gender !== undefined) {
+      const g = String(gender).toLowerCase();
+      user.profile.gender = g;
+    }
     if (settings) {
       user.profile.settings = new Map(Object.entries(settings));
     }
 
     await user.save();
 
+    // Populate the OjoType and return the richer profile object
+    await user.populate("profile.ojoTypeId", "name displayName persona tone");
+
+    const profileObj =
+      user.profile && typeof user.profile.toObject === "function"
+        ? user.profile.toObject()
+        : JSON.parse(JSON.stringify(user.profile || {}));
+
+    profileObj.ojoType = user.profile && user.profile.ojoTypeId ? user.profile.ojoTypeId : null;
+
     res.json({
       success: true,
       message: "Profile updated successfully",
-      profile: user.profile,
+      profile: profileObj,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Update user category priorities
+ * POST /api/auth/category-priorities
+ * Body: { priorities: { category_key: priority_value, ... } }
+ */
+export async function updateCategoryPriorities(req, res, next) {
+  try {
+    const { priorities } = req.body;
+    const userId = req.user.userId;
+
+    // Validation
+    if (!priorities || typeof priorities !== "object") {
+      return res.status(400).json({
+        success: false,
+        error: "Priorities object is required",
+      });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: "User not found",
+      });
+    }
+
+    // Validate and set priorities (must be 1-5)
+    const validatedPriorities = {};
+    for (const [key, value] of Object.entries(priorities)) {
+      const numValue = parseInt(value, 10);
+      if (isNaN(numValue) || numValue < 1 || numValue > 5) {
+        return res.status(400).json({
+          success: false,
+          error: `Priority for ${key} must be a number between 1 and 5`,
+        });
+      }
+      validatedPriorities[key] = numValue;
+    }
+
+    // Update priorities
+    user.profile.priorities = {
+      ...user.profile.priorities,
+      ...validatedPriorities,
+    };
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "Category priorities updated successfully",
+      priorities: user.profile.priorities,
     });
   } catch (error) {
     next(error);

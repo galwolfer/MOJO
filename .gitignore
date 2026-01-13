@@ -27,6 +27,8 @@ md
 .env
 /scripts/.token
 /md
+/uploads/
+/private-docs/
 
 # Backups and DB dumps
 /backups/
@@ -57,3 +59,4 @@ data/vector_db/
 
 # Python bytecode caches
 __pycache__/
+

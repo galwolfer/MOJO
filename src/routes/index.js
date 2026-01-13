@@ -20,6 +20,7 @@ import {
   priorityStats,
   priorityTriggerJob,
 } from "../controllers/index.js";
+import { listOjoTypes, getOjoTypeByName } from "../controllers/ojoTypeController.js";
 
 const router = Router();
 
@@ -47,6 +48,12 @@ router.put("/profile", profileUpdate);
 // Add more profile routes below
 // router.get('/profile/things', ...);
 // ==================== PROFILE — ROUTES (END) =======================
+
+// ==================== OJOTYPES — ROUTES (START) ====================
+// Public endpoints to read available OjoTypes (for the onboarding UI)
+router.get("/ojo-types", listOjoTypes);
+router.get("/ojo-types/:name", getOjoTypeByName);
+// ==================== OJOTYPES — ROUTES (END) ======================
 
 // ==================== PRIORITY — ROUTES (START) ====================
 router.post("/priority/coach/next", priorityNext);

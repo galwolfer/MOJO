@@ -4,6 +4,7 @@
  */
 import { User } from "../models/User.js";
 import bcrypt from "bcryptjs";
+import { getDefaultOjoType } from "../utils/ojoTypeUtils.js";
 
 // Get all users
 export async function list(_req, res, next) {
@@ -36,14 +37,16 @@ export async function create(req, res, next) {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
+    // Get default OjoType
+    const defaultOjoType = await getDefaultOjoType();
+
     const user = new User({
       username,
       email,
       passwordHash,
       profile: {
         name: displayName || "",
-        tone: "friendly",
-        persona: "assistant",
+        ojoTypeId: defaultOjoType ? defaultOjoType._id : null,
         settings: {},
       },
     });

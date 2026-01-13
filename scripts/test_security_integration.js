@@ -31,7 +31,7 @@ async function run() {
     return {
       _id: userId,
       username: `test-${userId}`,
-      profile: { name: "Tester", tone: "friendly", persona: "assistant" },
+      profile: { name: "Tester", ojoTypeId: "mentorjo" },
     };
   };
 

@@ -1,11 +1,19 @@
-import { useState, useCallback } from "react";
-
 /**
  * useChatMessages
  *
- * Encapsulates optimistic send logic and in-memory message handling for a chat session.
- * Exposes helpers to send and retry messages while keeping UI responsive.
+ * Hook that encapsulates the client-side message lifecycle for a chat session:
+ * - Optimistic UI updates for sending messages
+ * - Retry handling and failure states
+ * - Message caching trimming and clientId correlation
+ *
+ * Usage:
+ * const { message, setMessage, isLoading, sessionId, setSessionId, handleSend, handleRetry } =
+ *   useChatMessages(updateSession);
+ *
+ * Notes:
+ * - `updateSession` is a callback provided by callers to merge session changes into app state.
  */
+import { useState, useCallback } from "react";
 import { sendChatMessage, SendMessageResponse, ChatSessionSummary, ChatMessage } from "../services/chatService";
 
 const MAX_CACHED_MESSAGES_PER_SESSION = 50;

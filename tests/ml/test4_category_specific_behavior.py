@@ -24,7 +24,7 @@ import os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from src.predict_model.multi_feature_linucb import (
+from src.predict_model.linucb import (
     MultiFeatureLinUCB,
     extract_features,
     get_feature_count,
@@ -41,6 +41,74 @@ def print_header(title):
     print("\n" + "=" * 80)
     print(title)
     print("=" * 80)
+
+
+def test_category_weight_analysis(model):
+    """
+    TEST 10: CATEGORY WEIGHT ANALYSIS - Using New Helper Methods
+    ============================================================
+
+    Demonstrates the new helper methods for analyzing learned category weights:
+    - get_category_feature_index(category)
+    - get_category_weight(category)
+    - get_category_weights_map()
+    - get_category_info(category)
+    """
+    print_header("TEST 10: CATEGORY WEIGHT ANALYSIS (New Helper Methods)")
+
+    print("\nDemonstrating the new helper methods for category analysis:\n")
+
+    # 1. Get all category weights as a map
+    print("1. All Category Weights (get_category_weights_map()):")
+    print("-" * 60)
+    weights_map = model.get_category_weights_map()
+    for category in sorted(weights_map.keys(), key=lambda c: weights_map[c], reverse=True):
+        weight = weights_map[category]
+        bar = "█" * int(abs(weight) * 20)
+        sign = "+" if weight >= 0 else "-"
+        print(f"  {category:<12} {sign} {weight:>8.4f}  {bar}")
+
+    # 2. Get detailed info for each category
+    print("\n2. Detailed Category Information (get_category_info()):")
+    print("-" * 60)
+    for category in CATEGORIES:
+        info = model.get_category_info(category)
+        print(f"  {category:<12} | Index: {info['feature_index']:<2} | Weight: {info['weight']:>8.4f} | Found: {info['found']}")
+
+    # 3. Identify best and worst categories
+    print("\n3. Category Performance Ranking:")
+    print("-" * 60)
+    ranked = sorted(weights_map.items(), key=lambda x: x[1], reverse=True)
+    for rank, (category, weight) in enumerate(ranked, 1):
+        perf = "EXCELLENT" if weight > 0.5 else "GOOD" if weight > 0.2 else "FAIR" if weight > -0.2 else "POOR"
+        print(f"  #{rank}: {category:<12} - Weight: {weight:>8.4f} ({perf})")
+
+    # 4. Single category analysis
+    print("\n4. Detailed Analysis for 'work' and 'sport' Categories:")
+    print("-" * 60)
+    for cat in ["work", "sport"]:
+        info = model.get_category_info(cat)
+        print(f"\n  Category: {info['name']}")
+        print(f"    Feature Index:    {info['feature_index']}")
+        print(f"    Learned Weight:   {info['weight']:.4f}")
+        print(f"    Theta[{info['feature_index']}]:        {model.theta[info['feature_index']]:.4f}")
+        
+        # Interpretation
+        if info['weight'] > 0.5:
+            interpretation = "User EXCELS at this - high completion likelihood"
+        elif info['weight'] > 0.2:
+            interpretation = "User is GOOD at this - above average performance"
+        elif info['weight'] > -0.2:
+            interpretation = "User performs FAIRLY - average performance"
+        elif info['weight'] > -0.5:
+            interpretation = "User STRUGGLES with this - below average"
+        else:
+            interpretation = "User FAILS at this - very low completion rates"
+        print(f"    Interpretation:   {interpretation}")
+
+    print("\n>> Key Insight: The learned weights represent how much each category")
+    print("   contributes to task completion likelihood. Positive weights = better")
+    print("   performance, negative weights = worse performance.")
 
 
 def create_model_with_priors():
@@ -71,6 +139,7 @@ def create_model_with_priors():
         init_theta=init_theta,
         prior_strength=5.0,
         learn_rate=0.5,
+        categories=CATEGORIES,
     )
 
     return model, init_theta
@@ -770,6 +839,7 @@ def test_unseen_category_behavior():
         init_theta=init_theta,
         prior_strength=5.0,
         learn_rate=0.5,
+        categories=CATEGORIES,
     )
 
     # Train all known categories EXCEPT the unseen one
@@ -1013,6 +1083,7 @@ def test_exception_behavior_with_interactions():
         init_theta=init_theta,
         prior_strength=2.0,
         learn_rate=0.8,
+        categories=CATEGORIES,
     )
 
     # Calculate indices for interaction features
@@ -1221,6 +1292,7 @@ if __name__ == "__main__":
     test_unseen_category_behavior()
     test_exception_behavior_single_category()
     test_exception_behavior_with_interactions()
+    test_category_weight_analysis(model)
 
     print("\n" + "=" * 80)
     print("[OK] ALL TESTS COMPLETED")

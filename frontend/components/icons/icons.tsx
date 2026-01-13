@@ -1,3 +1,16 @@
+/**
+ * Icon registry
+ *
+ * Centralized icon creation & registry used across the app. Icons are created
+ * from SVG files and rendered using `react-native-svg` on native and an
+ * inlined data URI `<img>` on web. The `ICONS` map provides a convenient
+ * lookup by key (e.g., `ICONS.send`).
+ *
+ * Notes:
+ * - SVGs are colorized by replacing `currentColor` in the SVG payload with
+ *   the requested color.
+ * - On web we build a colored data URI and render an `<img>` for simplicity.
+ */
 import React from "react";
 import { Platform, Text, View } from "react-native";
 import { SvgXml, type SvgProps } from "react-native-svg";
@@ -7,44 +20,58 @@ import { COLORS } from "../../theme";
 export type IconProps = SvgProps & { size?: number };
 
 const ICON_FILES: Record<string, string> = {
-  creative: "creative.svg",
-  explore: "explore.svg",
-  family: "family.svg",
-  goals: "goals.svg",
-  health: "health.svg",
-  hobbies: "hobbies.svg",
-  home: "Home.svg",
-  mindfulness: "mindfulness.svg",
-  other: "other.svg",
-  reflection: "reflection.svg",
-  repeat: "repeat.svg",
-  settings: "settings.svg",
-  skills: "Skills.svg",
-  work: "Work.svg",
+  mentorjo: "mentorjo.svg",
+  bestojo: "bestojo.svg",
+  brojo: "brojo.svg",
+  strictojo: "strictojo.svg",
   burger: "burger.svg",
   calendar: "calendar.svg",
   cancel: "cancel.svg",
   clock: "clock-1.svg",
+  creative: "creative.svg",
   default: "default.svg",
   down: "down-icon.svg",
   edit: "edit.svg",
+  explore: "explore.svg",
+  family: "family.svg",
   flame: "flame-1.svg",
   friends: "friends.svg",
+  goals: "goals.svg",
+  health: "health.svg",
   heart: "heart.svg",
+  highEffort: "high effort.svg",
+  highPriority: "high Priority.svg",
+  hobbies: "hobbies.svg",
+  home: "Home.svg",
   left: "left.svg",
   list: "list.svg",
+  lowEffort: "low effort.svg",
+  lowImportant: "low important.svg",
   medal: "medal.svg",
+  mediumImportant: "medium important.svg",
+  mediumPiority: "medium piority.svg",
+  mentorjo: "mentorjo.svg",
+  mindfulness: "mindfulness.svg",
   mojo: "mojo-logo.svg",
   move: "move.svg",
+  notifications: "notifications.svg",
   ojo: "ojo.svg",
+  other: "other.svg",
   plus: "plus-1.svg",
+  prefrences: "prefrences.svg",
+  reflection: "reflection.svg",
+  repeat: "repeat.svg",
   right: "right.svg",
   send: "send-icon.svg",
+  settings: "settings.svg",
   shoppingCart: "shopping-cart.svg",
+  skills: "Skills.svg",
+  strictojo: "strictojo.svg",
   study: "study.svg",
   trophy: "trophy.svg",
   up: "up-icon.svg",
   user: "user.svg",
+  work: "Work.svg",
   workout: "workout.svg",
 };
 

@@ -9,6 +9,11 @@ Update this file whenever you add, remove, or change a component.
 - Add a short JSDoc block for each exported component (purpose + props + usage example).
 - Prefer theme tokens (`COLORS`, `SPACING`, `TYPOGRAPHY`) and `StyleProp` for style props.
 
+### Documentation style (follow `Input.tsx`)
+- Use a short header describing the component's purpose, behavior, and usage.
+- Include an `Usage` example and note common patterns (e.g., entrance animations, async upload, error states).
+- If a component is duplicated across `screens/*/components` and `components/`, prefer a single canonical implementation in `components/` and re-export from the screen folder so code consumers can import from either place without duplication.
+
 # Components
 
 This file documents the UI components in `frontend/components`.
@@ -35,11 +40,31 @@ Update this file whenever you add, remove, or change a component.
 - `BoxContainer` — `frontend/components/layout/BoxContainer.tsx`
   - Layout wrapper (ScrollView) that provides the shared `boxContainer` spacing for pages such as the Theme showcase.
 
+- `ScrollableContent` — `frontend/components/layout/ScrollableContent.tsx`
+  - ScrollView wrapper that respects floating header/nav heights and handles keyboard-aware scrolling. Provides a ref API for programmatic scrolling and supports automatic restore of scroll position.
+
+- `MainLayout` — `frontend/components/layout/MainLayout.tsx`
+  - App-level composition of Header, NavBar and content area. Measures header and navbar heights, adapts layout for keyboard, and routes to the active screen (e.g., Chat, Calendar, UserProfile).
+
 - `Input` — `frontend/components/inputs/Input.tsx`
   - Flexible input component supporting multiple types (text, email, password, number). Styled using theme values with consistent spacing, colors, and shadows. Supports label and error states. When `options` prop is provided, acts as a dropdown selector. Use `multiSelect` prop to enable multiple selections with checkboxes; otherwise, it's single select without checkboxes. The dropdown is rendered in a Modal to "fly over" other content, and clicking outside closes it.
 
 - `AppButton` — `frontend/components/common/AppButton.tsx`
    - Reusable button component that supports an icon (choose any key from `frontend/components/icons/icons.tsx`) placed on the left or right via the `iconPosition` prop. Two visual modes are available: `filled` (solid background) and `light` (transparent background with border). Color can be selected from `COLORS` in `frontend/theme.ts` by passing the color key (e.g. `primary1`) or a CSS color string. Uses `SHADOWS.card` for consistent surface shadowing across platforms.
+
+- `AnimatedButtonsContainer.tsx` — `frontend/components/common/AnimatedButtonsContainer.tsx`
+   - Reusable animated wrapper for groups of buttons or action elements. Supports optional vertical stacking, container entrance animation (fade + translateY), and per-child staggered entrance. Useful for onboarding and chat-bubble action groups where buttons should appear sequentially.
+   - Props: `entranceEnabled`, `vertical`, `staggerChildren`, `staggerDelay`, `containerDelay`, `gap`, `paddingTop`, `paddingBottom`.
+
+- `Widget.tsx` — `frontend/components/special/Widget.tsx`
+   - A compact surfaced container (uses `COLORS.white3`) with a configurable entrance animation (fade + translateY). Use to group small forms and controls within chat bubbles or card surfaces.
+   - Props: `entranceEnabled?: boolean`, `entranceDelay?: number`, `entranceDuration?: number`, `style?: StyleProp<ViewStyle>`.
+   - Example:
+```tsx
+<Widget entranceEnabled={typingDone} entranceDelay={100} entranceDuration={200}>
+  <Input label="Email" placeholder="you@example.com" />
+</Widget>
+```
 
 - `ConicGradientBubble.tsx` — `frontend/components/special/ConicGradientBubble.tsx`
    - Animated gradient bubble component using Skia for visual effects.
@@ -47,10 +72,38 @@ Update this file whenever you add, remove, or change a component.
 - `PriorityList.tsx` — `frontend/components/special/PriorityList.tsx`
    - Draggable priority list component for reordering items.
 
-- `TextBouble.tsx` — `frontend/components/common/TextBouble.tsx`
-   - Text bubble component for displaying text in a styled bubble.
+- `TextBouble.tsx` — `frontend/screens/chat/components/TextBouble.tsx`
+   - High-performance chat text bubble component that supports typewriter animations and non-text fade-ins. Use for assistant and user message presentation.
+
+- `ChatMessageBubble.tsx` — `frontend/screens/chat/components/ChatMessageBubble.tsx`
+   - Renders a single chat message with user/assistant styles, error heuristics and retry hooks. Uses `TextBouble` for animated message rendering.
+
+- `TimelineItem.tsx` — `frontend/screens/chat/components/TimelineItem.tsx`
+   - Renders either a `SessionDivider` (session boundary) or a `ChatMessageBubble` entry. Optimized with `React.memo` and a custom `areEqual` comparator for long lists.
+
+- `SessionDivider.tsx` — `frontend/screens/chat/components/SessionDivider.tsx`
+   - Small centered label used to separate chat sessions in the timeline.
+
+- `ChatScreen` — `frontend/screens/Chat.tsx`
+   - Main chat screen responsible for wiring up sessions, messages, and the message composer. Handles keyboard-aware scrolling, restore behavior and integrates timeline rendering utilities.
 
 - Barrel exports: `frontend/components/index.ts` exports the public components (e.g. `AppText`, `Box`, `BoxContainer`, `Checkbox`, `ProgressIcon`, `Input`, `ConicGradientBubble`, `PriorityList`, `TextBouble`). Use these for cleaner imports across the app.
+
+## Hooks
+
+- `useKeyboard` — `frontend/hooks/useKeyboard.ts`
+  - Tracks keyboard visibility and height across platforms. Use to adjust content and input positioning when the keyboard appears.
+  - Usage: `const { visible, height } = useKeyboard();`
+
+- `useContentInsets` — `frontend/hooks/useContentInsets.ts`
+  - Computes content insets that respect the floating header and navbar and provides a `bottomWithKeyboard` value when the keyboard appears.
+  - Usage: `const { top, bottom, bottomWithKeyboard } = useContentInsets();`
+
+- `useChatSessions` — `frontend/hooks/useChatSessions.ts`
+  - Loads, merges and caches chat sessions; exposes `sessions`, `loadMoreSessions`, and `updateSession` helpers.
+
+- `useChatMessages` — `frontend/hooks/useChatMessages.ts`
+  - Manages message send/retry lifecycle with optimistic UI updates and failure handling.
 
 ## Examples
 
@@ -58,6 +111,15 @@ Update this file whenever you add, remove, or change a component.
 ```tsx
 <AppButton title="Save" onPress={save} icon="check" mode="filled" color="primary6" />
 ```
+
+### AnimatedButtonsContainer
+```tsx
+<AnimatedButtonsContainer entranceEnabled={typingDone} vertical staggerChildren staggerDelay={120}>
+  <AppButton title="Primary action" width="100%" color="primary6" />
+  <AppButton title="Secondary" mode="light" width="100%" />
+</AnimatedButtonsContainer>
+```
+
 
 ### Input
 ```tsx
@@ -89,6 +151,7 @@ Update this file whenever you add, remove, or change a component.
    - Any notable cross-platform differences (web vs native)
    - The file path
 
-2. When updating a component, update this file with the change summary and date.
+2. When updating a component, update this file with the change summary and date. Example:
+   - `2026-01-11` — Added `AnimatedButtonsContainer` (`common`) and `Widget` (`special`); refactored auth steps to use `AnimatedButtonsContainer` and added Welcome screen stagger behaviour.
 
 3. Keep `components/index.ts` in sync so imports across the app can use `import { Box } from './components'`.

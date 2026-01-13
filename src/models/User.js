@@ -116,14 +116,19 @@ const userSchema = new mongoose.Schema(
         trim: true,
         default: "",
       },
-      tone: {
+      profileImage: {
         type: String,
-        enum: ["friendly", "professional", "casual", "formal", "enthusiastic"],
-        default: "friendly",
+        default: null,
       },
-      persona: {
+      ojoTypeId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "OjoType",
+        default: null,
+      },
+      gender: {
         type: String,
-        default: "assistant",
+        enum: ["female", "male", "nonbinary", "prefer_not_to_say", "other", "unspecified"],
+        default: "unspecified",
       },
       settings: {
         type: Map,
