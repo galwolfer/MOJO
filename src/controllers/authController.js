@@ -85,6 +85,14 @@ export async function register(req, res, next) {
 
     await user.save();
 
+    // Populate OjoType for returned profile
+    await user.populate("profile.ojoTypeId", "name displayName persona tone");
+    const profileObj =
+      user.profile && typeof user.profile.toObject === "function"
+        ? user.profile.toObject()
+        : JSON.parse(JSON.stringify(user.profile || {}));
+    profileObj.ojoType = user.profile && user.profile.ojoTypeId ? user.profile.ojoTypeId : null;
+
     // Generate JWT
     const token = jwt.sign(
       {
@@ -103,7 +111,7 @@ export async function register(req, res, next) {
         id: user._id,
         username: user.username,
         email: user.email,
-        profile: user.profile,
+        profile: profileObj,
       },
     });
   } catch (error) {
@@ -147,6 +155,14 @@ export async function login(req, res, next) {
       });
     }
 
+    // Populate OjoType for returned profile
+    await user.populate("profile.ojoTypeId", "name displayName persona tone");
+    const profileObj =
+      user.profile && typeof user.profile.toObject === "function"
+        ? user.profile.toObject()
+        : JSON.parse(JSON.stringify(user.profile || {}));
+    profileObj.ojoType = user.profile && user.profile.ojoTypeId ? user.profile.ojoTypeId : null;
+
     // Generate JWT
     const token = jwt.sign(
       {
@@ -165,7 +181,7 @@ export async function login(req, res, next) {
         id: user._id,
         username: user.username,
         email: user.email,
-        profile: user.profile,
+        profile: profileObj,
       },
     });
   } catch (error) {
@@ -188,13 +204,23 @@ export async function getMe(req, res, next) {
       });
     }
 
+    // Populate the OjoType object for easier client consumption
+    await user.populate("profile.ojoTypeId", "name displayName persona tone");
+
+    const profileObj =
+      user.profile && typeof user.profile.toObject === "function"
+        ? user.profile.toObject()
+        : JSON.parse(JSON.stringify(user.profile || {}));
+
+    profileObj.ojoType = user.profile && user.profile.ojoTypeId ? user.profile.ojoTypeId : null;
+
     res.json({
       success: true,
       user: {
         id: user._id,
         username: user.username,
         email: user.email,
-        profile: user.profile,
+        profile: profileObj,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       },
@@ -248,10 +274,20 @@ export async function updateProfile(req, res, next) {
 
     await user.save();
 
+    // Populate the OjoType and return the richer profile object
+    await user.populate("profile.ojoTypeId", "name displayName persona tone");
+
+    const profileObj =
+      user.profile && typeof user.profile.toObject === "function"
+        ? user.profile.toObject()
+        : JSON.parse(JSON.stringify(user.profile || {}));
+
+    profileObj.ojoType = user.profile && user.profile.ojoTypeId ? user.profile.ojoTypeId : null;
+
     res.json({
       success: true,
       message: "Profile updated successfully",
-      profile: user.profile,
+      profile: profileObj,
     });
   } catch (error) {
     next(error);

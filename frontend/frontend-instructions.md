@@ -46,6 +46,17 @@
   - `components/inputs/Input.tsx` — documented, simplified dropdown handling, web caret support explained.
   - `components/layout/Box.tsx` & `BoxContainer.tsx` — typed and better documented.
   - `components/special/PriorityList.tsx` — web drag-and-drop list (documented).
+  - `components/common/OjoTypeBadge.tsx` & `components/special/OjoTypeSelector.tsx` — new OjoType selection components with color-coded personality types. Used in onboarding flow.
+  - `screens/auth/components/OjoTypeStep.tsx` — onboarding step for personality selection (appears after signup/login, before category priorities). Updates server with selected OjoType.
+
+**Onboarding Flow** 🚀
+
+The onboarding sequence follows this order:
+1. **WelcomeStep** — Initial screen with "Start New" or "Have Account" options
+2. **NameStep** — User enters display name (signup flow only)
+3. **LoginStep** or **SignupStep** — Authentication
+4. **OjoTypeStep** — NEW: User selects personality type (mentorjo, brojo, bestojo, strictojo)
+5. **PrioritiesStep** — User sets category priorities using CategoryGrid
 
 **Running & Development Workflow**
 

@@ -9,7 +9,6 @@ export type OjoTypeName = "mentorjo" | "brojo" | "bestojo" | "strictojo";
 export interface OjoTypeConfig {
   name: OjoTypeName;
   displayName: string;
-  emoji: string;
   persona: string;
   tones: string[];
   icon: string;
@@ -27,7 +26,6 @@ export const OJO_TYPES: Record<OjoTypeName, OjoTypeConfig> = {
   mentorjo: {
     name: "mentorjo",
     displayName: "Mentorjo",
-    emoji: "🧠",
     persona: "A wise mentor who helps you think long-term and grow.",
     tones: ["Thoughtful", "Professional", "Supportive"],
     icon: "mentorjo",
@@ -39,7 +37,6 @@ export const OJO_TYPES: Record<OjoTypeName, OjoTypeConfig> = {
   brojo: {
     name: "brojo",
     displayName: "Brojo",
-    emoji: "😎",
     persona: "Your bro, friend who's always got your back.",
     tones: ["Friendly", "Motivating", "Funny"],
     icon: "brojo",
@@ -51,7 +48,6 @@ export const OJO_TYPES: Record<OjoTypeName, OjoTypeConfig> = {
   bestojo: {
     name: "bestojo",
     displayName: "Bestojo",
-    emoji: "❤️",
     persona: "A supportive best friend who listens and encourages you.",
     tones: ["Warm", "Caring", "Positive"],
     icon: "bestojo",
@@ -63,7 +59,6 @@ export const OJO_TYPES: Record<OjoTypeName, OjoTypeConfig> = {
   strictojo: {
     name: "strictojo",
     displayName: "StrictOjo",
-    emoji: "💪",
     persona: "A no-nonsense mentor who holds you accountable and expects results.",
     tones: ["Firm", "Focused", "Honest"],
     icon: "strictojo",
@@ -117,12 +112,4 @@ export function getOjoTypeBackgroundColor(name: OjoTypeName | string): string {
 export function getOjoTypeIcon(name: OjoTypeName | string): string {
   const ojoType = OJO_TYPES[name as OjoTypeName];
   return ojoType ? ojoType.icon : "mentorjo";
-}
-
-/**
- * Get OjoType emoji by name
- */
-export function getOjoTypeEmoji(name: OjoTypeName | string): string {
-  const ojoType = OJO_TYPES[name as OjoTypeName];
-  return ojoType ? ojoType.emoji : "🧠";
 }

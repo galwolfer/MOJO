@@ -19,6 +19,7 @@ import {
   Platform,
 } from "react-native";
 import AppText from "../../../components/common/AppText";
+import GridEntranceItem from "../../../components/common/animations/GridEntranceItem";
 import { CATEGORY_KEYS, getCategoryMeta, CategoryKey } from "../../../config/categoryMeta";
 import { ICONS } from "../../../components/icons/icons";
 import { COLORS, SPACING, FONT_SIZES } from "../../../theme";
@@ -32,8 +33,6 @@ const DEFAULT_ENTRANCE = {
   stagger: 80, // ms per grid step (rowIndex + colIndex)
   duration: 300, // duration of each item's scale/opacity animation
 };
-
-const AnimatedAppText = Animated.createAnimatedComponent(AppText);
 
 type CategoryGridProps = {
   onCategoryPress: (categoryKey: CategoryKey) => void;
@@ -70,9 +69,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
 
   // On Android enable LayoutAnimation support if available
   useEffect(() => {
-    if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
-      UIManager.setLayoutAnimationEnabledExperimental(true);
-    }
+    // LayoutAnimation is enabled by default in newer React Native versions
   }, []);
 
   const CategoryItem: React.FC<{
@@ -80,90 +77,24 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
     meta: ReturnType<typeof getCategoryMeta>;
     IconComponent: React.FC<any> | null;
     isSelected: boolean;
-    rowIndex: number;
-    colIndex: number;
-  }> = ({ categoryKey, meta, IconComponent, isSelected, rowIndex, colIndex }) => {
-    const alreadyAnimated = animatedSetRef.current.has(categoryKey);
-    const initialScale = alreadyAnimated ? 1 : enabled ? 0.8 : 1;
-    const scale = useRef(new Animated.Value(initialScale)).current;
-    const iconOpacity = useRef(new Animated.Value(alreadyAnimated ? 1 : enabled ? 0 : 1)).current;
-    const textOpacity = useRef(new Animated.Value(alreadyAnimated ? 1 : enabled ? 0 : 1)).current;
-    const outline = useRef(new Animated.Value(isSelected ? 3 : 0)).current;
+  }> = ({ categoryKey, meta, IconComponent, isSelected }) => {
+    const scale = useRef(new Animated.Value(isSelected ? 1.1 : 1)).current;
 
     useEffect(() => {
-      // Animate outline when selection changes
-      Animated.timing(outline, {
-        toValue: isSelected ? 3 : 0,
-        duration: 180,
+      // Animate scale when selection changes
+      Animated.timing(scale, {
+        toValue: isSelected ? 1.1 : 1,
+        duration: 200,
         useNativeDriver: false,
       }).start();
-    }, [isSelected, outline]);
-
-    useEffect(() => {
-      if (!enabled) return;
-      // If this item already animated, ensure final values & skip
-      if (animatedSetRef.current.has(categoryKey)) {
-        scale.setValue(1);
-        iconOpacity.setValue(1);
-        textOpacity.setValue(1);
-        return;
-      }
-
-      const delay = baseDelay + (rowIndex + colIndex) * stagger;
-      // Sequence: appear -> small bump -> settle
-      Animated.sequence([
-        Animated.delay(delay),
-        Animated.parallel([
-          Animated.timing(scale, { toValue: 1, duration, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-          Animated.timing(iconOpacity, {
-            toValue: 1,
-            duration: Math.max(120, duration - 50),
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-          Animated.timing(textOpacity, {
-            toValue: 1,
-            duration: Math.max(120, duration - 50),
-            delay: 40,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.timing(scale, {
-          toValue: 1.06,
-          duration: 120,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(scale, { toValue: 1, duration: 160, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-      ]).start(() => {
-        // Mark this item as animated so it won't replay on future re-renders
-        animatedSetRef.current.add(categoryKey);
-      });
-    }, [enabled, baseDelay, stagger, duration, rowIndex, colIndex, scale, textOpacity, iconOpacity, categoryKey]);
-
-    const onPressIn = () => {
-      Animated.parallel([
-        Animated.timing(scale, { toValue: 0.95, duration: 120, useNativeDriver: true }),
-        Animated.timing(outline, { toValue: 5, duration: 120, useNativeDriver: false }),
-      ]).start();
-    };
-
-    const onPressOut = () => {
-      Animated.parallel([
-        Animated.timing(scale, { toValue: 1, duration: 150, useNativeDriver: true }),
-        Animated.timing(outline, { toValue: isSelected ? 3 : 0, duration: 150, useNativeDriver: false }),
-      ]).start();
-    };
+    }, [isSelected, scale]);
 
     return (
       <Pressable
         key={categoryKey}
-        style={styles.categoryItem}
         onPress={() => onCategoryPress(categoryKey)}
-        onPressIn={onPressIn}
-        onPressOut={onPressOut}
         android_ripple={{ color: COLORS.black }}
+        style={{ alignItems: "center", justifyContent: "center", width: "100%" }}
       >
         <Animated.View
           style={[
@@ -174,29 +105,25 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
               borderRadius: iconSize / 2,
               backgroundColor: meta.color,
               transform: [{ scale }],
-              opacity: iconOpacity,
             },
           ]}
         >
-          <Animated.View
+          <View
             style={{
               flex: 1,
               justifyContent: "center",
               alignItems: "center",
-              borderColor: COLORS.white3,
-              borderWidth: outline,
-              borderRadius: iconSize / 2,
               width: "100%",
               height: "100%",
             }}
           >
             {IconComponent && <IconComponent size={iconSize * 0.5} color={COLORS.colorWhite} />}
-          </Animated.View>
+          </View>
         </Animated.View>
 
-        <AnimatedAppText variant="notes" style={{ textAlign: "center", opacity: textOpacity }} numberOfLines={2}>
+        <AppText variant="notes" style={{ textAlign: "center" }} numberOfLines={2}>
           {meta.displayName}
-        </AnimatedAppText>
+        </AppText>
       </Pressable>
     );
   }; // Build rows of 3 items so we can insert the priority Box right after
@@ -209,74 +136,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
     visible = false,
     children,
   }) => {
-    const boxOpacity = useRef(new Animated.Value(enabled ? 0 : visible ? 1 : 0)).current;
-    const translateY = useRef(new Animated.Value(enabled ? 6 : visible ? 0 : 6)).current;
-
-    useEffect(() => {
-      // Animate on initial entrance when enabled
-      if (enabled) {
-        const delay = baseDelay + (rowIndex + 1) * stagger + 40;
-        Animated.parallel([
-          Animated.timing(boxOpacity, {
-            toValue: 1,
-            duration: Math.max(180, duration),
-            delay,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-          Animated.timing(translateY, {
-            toValue: 0,
-            duration: Math.max(180, duration),
-            delay,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-        ]).start();
-        return;
-      }
-
-      // Animate when visibility toggles (selection changes)
-      // Trigger LayoutAnimation for smooth layout shifts
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-
-      if (visible) {
-        Animated.parallel([
-          Animated.timing(boxOpacity, {
-            toValue: 1,
-            duration: 220,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-          Animated.timing(translateY, {
-            toValue: 0,
-            duration: 220,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-        ]).start();
-      } else {
-        Animated.parallel([
-          Animated.timing(boxOpacity, {
-            toValue: 0,
-            duration: 180,
-            easing: Easing.in(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(translateY, {
-            toValue: 6,
-            duration: 180,
-            easing: Easing.in(Easing.ease),
-            useNativeDriver: true,
-          }),
-        ]).start();
-      }
-    }, [enabled, visible, baseDelay, rowIndex, stagger, duration, boxOpacity, translateY]);
-
-    return (
-      <Animated.View style={[styles.rowBoxWrapper, { opacity: boxOpacity, transform: [{ translateY }] }]}>
-        {children}
-      </Animated.View>
-    );
+    return <View style={styles.rowBoxWrapper}>{children}</View>;
   };
 
   return (
@@ -292,15 +152,25 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
                 const isSelected = selectedCategory === categoryKey;
 
                 return (
-                  <CategoryItem
+                  <GridEntranceItem
                     key={categoryKey}
-                    categoryKey={categoryKey as CategoryKey}
-                    meta={meta}
-                    IconComponent={IconComponent}
-                    isSelected={isSelected}
+                    id={categoryKey}
                     rowIndex={rowIndex}
                     colIndex={colIndex}
-                  />
+                    enabled={enabled}
+                    baseDelay={baseDelay}
+                    stagger={stagger}
+                    duration={duration}
+                    animatedSetRef={animatedSetRef}
+                    style={styles.categoryItem}
+                  >
+                    <CategoryItem
+                      categoryKey={categoryKey as CategoryKey}
+                      meta={meta}
+                      IconComponent={IconComponent}
+                      isSelected={isSelected}
+                    />
+                  </GridEntranceItem>
                 );
               })}
             </View>
@@ -354,8 +224,9 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: "row",
-    justifyContent: "space-around",
+    justifyContent: "space-between",
     width: "100%",
+    paddingHorizontal: SPACING.sm,
   },
   rowBoxWrapper: {
     width: "100%",
@@ -379,7 +250,6 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
     overflow: "hidden",
     borderWidth: 0,
-    borderColor: COLORS.white3,
   },
 });
 

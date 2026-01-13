@@ -1,6 +1,6 @@
 import React from "react";
 import { Animated, Easing, View } from "react-native";
-import { SPACING } from "../../theme";
+import { SPACING } from "../../../theme";
 
 /**
  * AnimatedButtonsContainer

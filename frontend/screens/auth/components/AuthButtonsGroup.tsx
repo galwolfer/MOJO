@@ -1,6 +1,6 @@
 import React from "react";
 import { View } from "react-native";
-import AnimatedButtonsContainer from "../../../components/common/AnimatedButtonsContainer";
+import AnimatedButtonsContainer from "../../../components/common/animations/AnimatedButtonsContainer";
 import AppButton from "../../../components/common/AppButton";
 import { SPACING } from "../../../theme";
 
@@ -12,6 +12,7 @@ interface BtnSpec {
   color?: string;
   mode?: "light" | "filled";
   width?: string | number;
+  disabled?: boolean;
 }
 
 interface Props {
@@ -48,6 +49,7 @@ const AuthButtonsGroup: React.FC<Props> = ({ left, right, vertical, entranceEnab
             onPress={left.onPress}
             width={left.width}
             color={left.color}
+            disabled={left.disabled}
             style={{ marginRight: right ? SPACING.md : 0 }}
           />
         ) : null}
@@ -60,6 +62,7 @@ const AuthButtonsGroup: React.FC<Props> = ({ left, right, vertical, entranceEnab
             onPress={right.onPress}
             width={right.width}
             color={right.color}
+            disabled={right.disabled}
           />
         ) : null}
       </View>

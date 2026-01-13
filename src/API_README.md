@@ -46,7 +46,8 @@ This document describes the HTTP API exposed by the server in `src/`. It covers 
 
 - `PATCH /api/auth/profile`
   - Protected
-  - Body: `{ name?, tone?, persona?, settings? }`
+  - Body: `{ name?, ojoTypeName?, settings?, profileImage?, gender? }`
+  - Description: Update profile fields; set `ojoTypeName` to one of `mentorjo`, `brojo`, `bestojo`, `strictojo` to change the user's OjoType.
   - Response: `{ success: true, message, profile }`
 
 ---
@@ -156,10 +157,18 @@ Most chat endpoints require authentication unless otherwise noted.
 
 ---
 
-## Feature Routes (profile / priority)
+## Feature Routes (profile / priority / ojotypes)
 
 - `GET /api/profile` — Get the profile (mock or from `profileService`)
 - `PUT /api/profile` — Update the profile (mocked fallback exists)
+
+- `GET /api/ojo-types` — List available OjoTypes for onboarding
+  - Public
+  - Response: `{ success: true, count, ojoTypes: [{ name, displayName, persona, tone, isDefault }, ...] }`
+
+- `GET /api/ojo-types/:name` — Get a specific OjoType by name
+  - Public
+  - Response: `{ success: true, ojoType: { name, displayName, persona, tone, isDefault } }`
 
 - `POST /api/priority/coach/next` — Compute next recommended activity
   - Body: `{ userId? }` (will attempt to read `req.user.userId`)

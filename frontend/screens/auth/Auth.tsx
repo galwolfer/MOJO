@@ -28,6 +28,7 @@ import WelcomeStep from "./components/WelcomeStep";
 import NameStep from "./components/NameStep";
 import LoginStep from "./components/LoginStep";
 import SignupStep from "./components/SignupStep";
+import OjoTypeStep from "./components/OjoTypeStep";
 import PrioritiesStep from "./components/PrioritiesStep";
 
 import {
@@ -39,7 +40,7 @@ import {
 
 export default function AuthScreen() {
   const { signIn } = useAuth();
-  const [screen, setScreen] = useState<"welcome" | "name" | "login" | "signup" | "priorities">("welcome");
+  const [screen, setScreen] = useState<"welcome" | "name" | "login" | "signup" | "ojotype" | "priorities">("welcome");
   const [loginError, setLoginError] = useState<string | null>(null);
   const [signupError, setSignupError] = useState<string | null>(null);
   const [loginUsername, setLoginUsername] = useState("");
@@ -84,7 +85,7 @@ export default function AuthScreen() {
         const parsed = JSON.parse(raw);
         if (parsed && parsed.token) {
           setPendingAuth(parsed);
-          setScreen("priorities");
+          setScreen("ojotype");
         }
       }
     } catch (err) {
@@ -229,7 +230,7 @@ export default function AuthScreen() {
         const pa = { token: data.token, user: data.user };
         setPendingAuth(pa);
         await savePendingAuthToStorage(pa);
-        setScreen("priorities");
+        setScreen("ojotype");
       } else {
         throw new Error("Invalid response from server");
       }
@@ -342,6 +343,16 @@ export default function AuthScreen() {
         </View>
       )}
 
+      {screen === "ojotype" && (
+        <View style={{ width: "100%" }}>
+          <OjoTypeStep
+            pendingToken={pendingAuth?.token}
+            onBack={() => setScreen(isLoginFlow ? "login" : "signup")}
+            onNext={() => setScreen("priorities")}
+          />
+        </View>
+      )}
+
       {screen === "priorities" && (
         <View style={{ width: "100%" }}>
           <PrioritiesStep
@@ -349,7 +360,7 @@ export default function AuthScreen() {
             setPriorities={setPriorities}
             selectedCategory={selectedCategory}
             setSelectedCategory={setSelectedCategory}
-            onBack={() => setScreen(isLoginFlow ? "login" : "signup")}
+            onBack={() => setScreen("ojotype")}
             entranceEnabled={true}
             entranceBaseDelay={300}
             onFinish={async (payload) => {
