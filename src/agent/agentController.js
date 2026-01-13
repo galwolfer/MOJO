@@ -329,20 +329,23 @@ export class AgentController {
             continue;
           }
 
+          // Normalize content to string (LangChain/Gemini may return array)
+          let persistentContent = "";
+          if (typeof response.content === "string") {
+            persistentContent = response.content;
+          } else if (Array.isArray(response.content)) {
+            persistentContent = response.content
+              .map((c) => (typeof c === "string" ? c : c.text || JSON.stringify(c)))
+              .join("\n");
+          }
+          persistentContent = this._sanitizeResponse(persistentContent);
+
+          // Set normalized content on response
+          response.content = persistentContent;
+
           // Check if the LLM wants to call any tools
           if (response.tool_calls && response.tool_calls.length > 0) {
             console.log(`[AgentController] Tool calls requested: ${response.tool_calls.length}`);
-
-            // Normalize content to string for persistence (LangChain/Gemini may return array)
-            let persistentContent = "";
-            if (typeof response.content === "string") {
-              persistentContent = response.content;
-            } else if (Array.isArray(response.content)) {
-              persistentContent = response.content
-                .map((c) => (typeof c === "string" ? c : c.text || JSON.stringify(c)))
-                .join("\n");
-            }
-            persistentContent = this._sanitizeResponse(persistentContent);
 
             // Persist assistant message with tool calls to session history
             await memoryStore.addAssistantToolCalls(sessionId, userId, persistentContent, response.tool_calls);
