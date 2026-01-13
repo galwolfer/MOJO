@@ -128,7 +128,10 @@ export default function AuthScreen() {
         const pa = { token: data.token, user: data.user };
         setPendingAuth(pa);
         await savePendingAuthToStorage(pa);
-        setScreen("priorities");
+        // For login, finish auth immediately without going to priorities
+        await signIn(pa.token, pa.user);
+        setPendingAuth(null);
+        await removePendingAuthFromStorage();
       } else {
         throw new Error("Invalid response from server");
       }

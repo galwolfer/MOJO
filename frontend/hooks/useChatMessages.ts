@@ -189,6 +189,15 @@ export function useChatMessages(updateSession: (session: ChatSessionSummary) => 
     [message, isLoading, sendMessage]
   );
 
+  const sendText = useCallback(
+    async (currentSessionId: string, text: string, getSessions: () => ChatSessionSummary[]) => {
+      const trimmedText = text.trim();
+      if (!trimmedText || isLoading) return;
+      await sendMessage(currentSessionId, trimmedText, getSessions);
+    },
+    [isLoading, sendMessage]
+  );
+
   const handleRetry = useCallback(
     async (currentSessionId: string, clientId: string, getSessions: () => ChatSessionSummary[]) => {
       const sessionsNow = getSessions();
@@ -208,6 +217,7 @@ export function useChatMessages(updateSession: (session: ChatSessionSummary) => 
     sessionId,
     setSessionId,
     handleSend,
+    sendText,
     handleRetry,
   };
 }

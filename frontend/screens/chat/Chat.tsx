@@ -20,7 +20,6 @@ import {
   InteractionManager,
 } from "react-native";
 import AppText from "../../components/common/AppText";
-import Input from "../../components/inputs/Input";
 import { COLORS, FONT_SIZES, SHADOWS, SPACING } from "../../theme";
 import { useNavigation } from "../../context/NavigationContext";
 import { useAuth } from "../../context/AuthContext";
@@ -30,6 +29,7 @@ import { useKeyboard, useContentInsets } from "../../hooks";
 import GlassSurface from "../../components/common/GlassSurface";
 import { useChatSessions, useChatMessages } from "../../hooks";
 import { TimelineItem, buildTimelineItems } from "../../utils/chatUtils";
+import ChatComposer from "./components/ChatComposer";
 import TimelineItemComponent from "./components/TimelineItem";
 import type { ChatSessionSummary } from "../../services/chatService";
 
@@ -52,7 +52,7 @@ export default function ChatScreen() {
   const { sessions, isLoadingSessions, isLoadingMoreSessions, hasMoreSessions, loadMoreSessions, updateSession } =
     useChatSessions();
 
-  const { message, setMessage, isLoading, sessionId, setSessionId, handleSend, handleRetry } =
+  const { isLoading, sessionId, setSessionId, sendText, handleRetry } =
     useChatMessages(updateSession);
 
   // Set auth token for chat service
@@ -104,14 +104,19 @@ export default function ChatScreen() {
     }
   }, [sessions, sessionId, setSessionId, getTodaySessionId]);
 
-  const onSend = useCallback(() => {
+  const onSend = useCallback(
+    (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed || isLoading) return;
     const todaySessionId = getTodaySessionId(sessionsRef.current);
     const activeSessionId = todaySessionId || sessionId;
     if (todaySessionId && todaySessionId !== sessionId) {
       setSessionId(todaySessionId);
     }
-    handleSend(activeSessionId, () => sessionsRef.current);
-  }, [handleSend, sessionId, getTodaySessionId, setSessionId]);
+      sendText(activeSessionId, trimmed, () => sessionsRef.current);
+    },
+    [getTodaySessionId, isLoading, sendText, sessionId, setSessionId]
+  );
 
   const onRetry = useCallback(
     (sessionIdToRetry: string, clientId: string) => {
@@ -123,33 +128,9 @@ export default function ChatScreen() {
   // Put the chat input back into the shared NavBar (original behavior)
   const navWidget = useMemo(
     () => (
-      <View style={[styles.inputContainer]}>
-        <View style={{ flex: 1 }}>
-          <Input
-            placeholder="Type a message..."
-            value={message}
-            onChangeText={setMessage}
-            onSubmitEditing={onSend}
-            returnKeyType="send"
-            editable={!isLoading}
-            multiline
-          />
-        </View>
-        <TouchableOpacity
-          style={[styles.sendButton, (!message.trim() || isLoading) && styles.sendButtonDisabled]}
-          onPress={onSend}
-          disabled={!message.trim() || isLoading}
-          activeOpacity={0.7}
-        >
-          {isLoading ? (
-            <ActivityIndicator size="small" color={COLORS.colorWhite} />
-          ) : (
-            <ICONS.send size={FONT_SIZES.base} color={COLORS.colorWhite} />
-          )}
-        </TouchableOpacity>
-      </View>
+      <ChatComposer isLoading={isLoading} onSend={onSend} />
     ),
-    [message, isLoading, onSend]
+    [isLoading, onSend]
   );
 
   useEffect(() => {
@@ -397,27 +378,6 @@ const styles = StyleSheet.create({
   emptySubtext: {
     color: COLORS.lightGray,
     textAlign: "center",
-  },
-  inputContainer: {
-    width: "100%",
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.md,
-    gap: SPACING.sm,
-    minHeight: FONT_SIZES.base * 3.5,
-  },
-  sendButton: {
-    width: FONT_SIZES.base * 2.5 + 1.5,
-    height: FONT_SIZES.base * 2.5 + 1.5,
-    borderRadius: FONT_SIZES.base,
-    backgroundColor: COLORS.primary1,
-    justifyContent: "center",
-    alignItems: "center",
-    ...SHADOWS.card,
-  },
-  sendButtonDisabled: {
-    backgroundColor: COLORS.lightGray,
   },
   // Container to position the glossy button
   scrollToBottomButtonContainer: {

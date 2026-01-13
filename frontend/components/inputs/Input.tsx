@@ -34,6 +34,7 @@ interface InputProps<T = any> extends Omit<TextInputProps, "style"> {
   type?: InputType;
   label?: string;
   error?: string;
+  enterToSubmit?: boolean;
   // Optional props for dropdown functionality
   options?: string[];
   onSelect?: (values: string[]) => void;
@@ -109,6 +110,7 @@ function Input<T = any>({
   label,
   error,
   placeholder,
+  enterToSubmit = false,
   options,
   onSelect,
   multiSelect = false,
@@ -117,6 +119,15 @@ function Input<T = any>({
 }: InputProps<T>) {
   const borderColorAnim = useRef(new Animated.Value(0)).current;
   const webNativeID = useWebCaret();
+  const {
+    onChangeText: onChangeTextProp,
+    onFocus: onFocusProp,
+    onSubmitEditing: onSubmitEditingProp,
+    value: valueProp,
+    defaultValue: defaultValueProp,
+    ...restInputProps
+  } = rest as TextInputProps;
+  const hasValueProp = Object.prototype.hasOwnProperty.call(rest, "value");
 
   const wrapperRef = useRef<View>(null);
   const inputRef = useRef<TextInput>(null);
@@ -149,15 +160,17 @@ function Input<T = any>({
       }
     }, 50);
   };
-  const providedValue = (rest as any).value ?? (rest as any).defaultValue;
+  const providedValue = hasValueProp ? valueProp : defaultValueProp;
 
-  const [inputValue, setInputValue] = useState<string>(typeof providedValue === "string" ? providedValue : "");
+  const [inputValue, setInputValue] = useState<string>(
+    !hasValueProp && typeof providedValue === "string" ? providedValue : ""
+  );
 
   useEffect(() => {
-    if (providedValue !== undefined && providedValue !== null) {
+    if (!hasValueProp && providedValue !== undefined && providedValue !== null) {
       setInputValue(String(providedValue));
     }
-  }, [providedValue]);
+  }, [providedValue, hasValueProp]);
 
   const hasSelected = selected.length > 0;
   const isEmpty = !hasSelected && (!inputValue || inputValue.length === 0);
@@ -167,8 +180,8 @@ function Input<T = any>({
   // input to *look* like a placeholder (gray text). To do this we leave the
   // TextInput value empty and set the placeholder to the desired text
   // (explicit `value` or `defaultValue` or the passed `placeholder`).
-  const explicitValue = (rest as any).value as string | undefined;
-  const defaultValue = (rest as any).defaultValue as string | undefined;
+  const explicitValue = hasValueProp ? valueProp : undefined;
+  const defaultValue = defaultValueProp as string | undefined;
   let displayValue: string | undefined = explicitValue as any;
   let effectivePlaceholder: string | undefined = placeholder as any;
 
@@ -189,8 +202,12 @@ function Input<T = any>({
       effectivePlaceholder = placeholder;
     }
   } else {
-    // For plain inputs (no options) prefer explicit/default value, then the controlled input value.
-    displayValue = nonEmpty(explicitValue) ?? nonEmpty(defaultValue) ?? inputValue ?? "";
+    if (hasValueProp) {
+      displayValue =
+        typeof explicitValue === "string" ? explicitValue : explicitValue == null ? "" : String(explicitValue);
+    } else {
+      displayValue = nonEmpty(defaultValue) ?? inputValue ?? "";
+    }
     effectivePlaceholder = placeholder;
   }
 
@@ -242,6 +259,21 @@ function Input<T = any>({
   const getSecureTextEntry = () => type === "password";
   const selectionColor = Platform.OS === "android" ? hexToRgba(COLORS.primary1, 0.28) : COLORS.primary1;
   const cursorColor = COLORS.primary1;
+  const isMultiline = Boolean(restInputProps.multiline ?? type === "longtext");
+  const handleKeyPress = (event: any) => {
+    if (!enterToSubmit || (Platform as any).OS !== "web") {
+      restInputProps.onKeyPress?.(event);
+      return;
+    }
+    const key = event?.nativeEvent?.key;
+    const shiftKey = event?.nativeEvent?.shiftKey;
+    if (key === "Enter" && !shiftKey) {
+      event.preventDefault?.();
+      onSubmitEditingProp?.(event);
+      return;
+    }
+    restInputProps.onKeyPress?.(event);
+  };
 
   // No dropdown filtering - plain text input now
 
@@ -307,20 +339,26 @@ function Input<T = any>({
             keyboardType={getKeyboardType()}
             secureTextEntry={getSecureTextEntry()}
             editable={!options}
-            multiline={type === "longtext"}
+            multiline={isMultiline}
             numberOfLines={type === "longtext" ? 5 : undefined}
+            blurOnSubmit={enterToSubmit && isMultiline}
+            returnKeyType={enterToSubmit ? "send" : restInputProps.returnKeyType}
             value={displayValue}
             onFocus={(e) => {
-              rest.onFocus?.(e);
+              onFocusProp?.(e);
               scrollInputIntoView();
             }}
             onChangeText={(text) => {
-              setInputValue(text);
+              if (!hasValueProp) {
+                setInputValue(text);
+              }
               if (!options) {
-                rest.onChangeText?.(text);
+                onChangeTextProp?.(text);
               }
             }}
-            {...rest}
+            onSubmitEditing={onSubmitEditingProp}
+            onKeyPress={handleKeyPress}
+            {...restInputProps}
             selectionColor={selectionColor}
             cursorColor={cursorColor}
             {...((Platform as any).OS === "web" && webNativeID ? { nativeID: webNativeID } : {})}
