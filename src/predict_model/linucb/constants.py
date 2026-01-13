@@ -89,13 +89,13 @@ DIFFICULTY_HARD_RANGE: Tuple[int, int] = (4, 5)
 PRESSURE_NO_THRESHOLD: float = 72.0
 """> 72 hours: no pressure."""
 
-PRESSURE_MILD_THRESHOLD: float = 24.0
-"""24-72 hours: mild pressure."""
+PRESSURE_MILD_THRESHOLD: float = 48.0
+"""48-72 hours: mild pressure."""
 
-PRESSURE_STRONG_THRESHOLD: float = 6.0
-"""6-24 hours: strong pressure."""
+PRESSURE_STRONG_THRESHOLD: float = 24.0
+"""24-48 hours: strong pressure."""
 
-# ≤ 6 hours: urgent (no constant needed, it's the else case)
+# ≤ 24 hours: urgent (no constant needed, it's the else case)
 
 
 # =============================================================================
