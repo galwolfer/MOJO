@@ -83,7 +83,7 @@ export function useChatMessages(updateSession: (session: ChatSessionSummary) => 
             }
             return m;
           })
-          .filter((m) => !(m.isError && m.relatedClientId === clientId));
+          .filter((m) => !m.isError);
 
         if (!found) {
           nextMessages.push(pendingMessage);
@@ -121,33 +121,62 @@ export function useChatMessages(updateSession: (session: ChatSessionSummary) => 
           const sessionsAfter = getSessions();
           const existingAfter = sessionsAfter.find((s) => s.sessionId === sid);
           const baseAfter = existingAfter?.messages || optimisticMessages;
-          const updatedMessages = baseAfter.map(
+
+          // Mark the original user message as sent
+          let updatedMessages = baseAfter.map(
             (m): ChatMessage => (m.clientId === clientId ? { ...m, status: "sent" } : m)
           );
-          updatedMessages.push({
+
+          const assistantMessage: ChatMessage = {
             role: "assistant",
             content: response.response,
             timestamp: agentNow.toISOString(),
             clientId: createClientId(),
-          });
+          };
+
+          // If the last message is an error related to this clientId, replace it with the assistant message
+          // instead of appending so that the error disappears and the reply appears in its place.
+          let messageCountDeltaSuccess = 1;
+          const last = updatedMessages[updatedMessages.length - 1];
+          if (last?.isError && last.relatedClientId === clientId) {
+            updatedMessages[updatedMessages.length - 1] = assistantMessage;
+            messageCountDeltaSuccess = 0;
+          } else {
+            updatedMessages.push(assistantMessage);
+          }
+
           const trimmed = updatedMessages.slice(-MAX_CACHED_MESSAGES_PER_SESSION);
-          updateSession(buildSessionUpdate(sid, agentNow, getSessions, trimmed, 1));
+          updateSession(buildSessionUpdate(sid, agentNow, getSessions, trimmed, messageCountDeltaSuccess));
         } else {
           const errNow = new Date();
           const sessionsAfter = getSessions();
           const existingAfter = sessionsAfter.find((s) => s.sessionId === currentSessionId);
           const baseAfter = existingAfter?.messages || optimisticMessages;
-          const updatedMessages: ChatMessage[] = baseAfter
-            .map((m): ChatMessage => (m.clientId === clientId ? { ...m, status: "failed" } : m))
-            .filter((m) => !(m.isError && m.relatedClientId === clientId));
-          updatedMessages.push({
-            role: "assistant",
-            content: response.error || "Sorry, something went wrong. Please try again.",
-            timestamp: errNow.toISOString(),
-            isError: true,
-            clientId: createClientId(),
-            relatedClientId: clientId,
-          });
+          let updatedMessages: ChatMessage[] = baseAfter.map(
+            (m): ChatMessage => (m.clientId === clientId ? { ...m, status: "failed" } : m)
+          );
+
+          const last = updatedMessages[updatedMessages.length - 1];
+          if (last?.isError) {
+            // Update the last error in-place (keep its clientId) so we don't stack errors
+            updatedMessages[updatedMessages.length - 1] = {
+              ...last,
+              content: response.error || "Server error",
+              timestamp: errNow.toISOString(),
+              isError: true,
+              relatedClientId: clientId,
+            };
+          } else {
+            updatedMessages.push({
+              role: "assistant",
+              content: response.error || "Server error",
+              timestamp: errNow.toISOString(),
+              isError: true,
+              clientId: createClientId(),
+              relatedClientId: clientId,
+            });
+          }
+
           const trimmed = updatedMessages.slice(-MAX_CACHED_MESSAGES_PER_SESSION);
           updateSession(buildSessionUpdate(currentSessionId, errNow, getSessions, trimmed, 1));
         }
@@ -156,17 +185,30 @@ export function useChatMessages(updateSession: (session: ChatSessionSummary) => 
         const sessionsAfter = getSessions();
         const existingAfter = sessionsAfter.find((s) => s.sessionId === currentSessionId);
         const baseAfter = existingAfter?.messages || optimisticMessages;
-        const updatedMessages: ChatMessage[] = baseAfter
-          .map((m): ChatMessage => (m.clientId === clientId ? { ...m, status: "failed" } : m))
-          .filter((m) => !(m.isError && m.relatedClientId === clientId));
-        updatedMessages.push({
-          role: "assistant",
-          content: "Unable to connect. Please check your connection and try again.",
-          timestamp: errNow.toISOString(),
-          isError: true,
-          clientId: createClientId(),
-          relatedClientId: clientId,
-        });
+        let updatedMessages: ChatMessage[] = baseAfter.map(
+          (m): ChatMessage => (m.clientId === clientId ? { ...m, status: "failed" } : m)
+        );
+
+        const last = updatedMessages[updatedMessages.length - 1];
+        const errContent = (error as Error).name === "NetworkError" ? "Couldn't connect" : "Server error";
+        if (last?.isError) {
+          updatedMessages[updatedMessages.length - 1] = {
+            ...last,
+            content: errContent,
+            timestamp: errNow.toISOString(),
+            isError: true,
+            relatedClientId: clientId,
+          };
+        } else {
+          updatedMessages.push({
+            role: "assistant",
+            content: errContent,
+            timestamp: errNow.toISOString(),
+            isError: true,
+            clientId: createClientId(),
+            relatedClientId: clientId,
+          });
+        }
         const trimmed = updatedMessages.slice(-MAX_CACHED_MESSAGES_PER_SESSION);
         updateSession(buildSessionUpdate(currentSessionId, errNow, getSessions, trimmed, 1));
       } finally {

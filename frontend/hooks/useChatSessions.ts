@@ -126,6 +126,26 @@ export function useChatSessions() {
         return aTime - bTime;
       });
 
+      // Remove any local error messages if the incoming (server) messages include
+      const localErrors = (prevMessages || []).filter((m) => m.isError && !!m.relatedClientId);
+      for (const err of localErrors) {
+        const relatedClientId = err.relatedClientId!;
+        const userMsg = (prevMessages || []).find((m) => m.clientId === relatedClientId && m.role === "user");
+        if (!userMsg || !userMsg.timestamp) continue;
+
+        const userTime = new Date(userMsg.timestamp).getTime();
+        const assistantAppeared = (nextMessages || []).some((n) => {
+          if (n.role !== "assistant" || !n.timestamp) return false;
+          return new Date(n.timestamp).getTime() > userTime;
+        });
+
+        if (assistantAppeared) {
+          // drop this error from merged
+          const idx = merged.findIndex((m) => m === err || (m.isError && m.relatedClientId === relatedClientId));
+          if (idx !== -1) merged.splice(idx, 1);
+        }
+      }
+
       return merged;
     };
 
