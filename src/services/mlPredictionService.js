@@ -10,6 +10,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { taskToMLInput, calculateReward } from '../utils/mlInputConverter.js';
 import { User } from '../models/User.js';
+import { TaskSchedule } from '../models/TaskSchedule.js';
 import { CATEGORY_INDEX_TO_KEY } from '../config/categories.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -27,8 +28,11 @@ const SUBPROCESS_TIMEOUT = 5000;
  * Converts User.subCategories array to the format expected by Python:
  * { "work_and_career": ["Deep Work", "Meetings"], "workout": ["HIIT", "Cardio"], ... }
  * 
+ * The Python model will use model.add_subcategory() to sync these with its internal
+ * feature space, dynamically expanding n_features as needed.
+ * 
  * @param {string} userId - User ID to fetch subcategories for
- * @returns {Promise<Object>} Subcategory map grouped by category string
+ * @returns {Promise<Object>} Subcategory map grouped by category string keys
  */
 async function buildSubcategoryMap(userId) {
   try {
@@ -203,11 +207,59 @@ export async function trainTask(task) {
     // Convert Task to ML input format
     const mlInput = taskToMLInput(task);
 
-    // Calculate reward signal
-    const reward = calculateReward(task.estimatedDuration, task.actualCompletionMinutes);
+    // Calculate reward signal - prefer deadline-based, fallback to estimation-based
+    let reward;
+    let rewardType = 'estimation'; // Track which method was used
     
+    // Try deadline-based reward if we have schedule and deadline
+    if (task.dueDate) {
+      try {
+        // Find the earliest scheduled session for this task
+        const scheduledSession = await TaskSchedule.findOne({
+          taskId: task._id,
+          status: 'completed'
+        }).sort({ start: 1 }).lean();
+
+        if (scheduledSession) {
+          // Call Python's calculate_deadline_reward method
+          const completedAt = new Date(); // Task just completed
+          const scheduledAt = scheduledSession.start;
+          const deadline = task.dueDate;
+          
+          // Convert to Unix timestamps (seconds)
+          const completedTs = completedAt.getTime() / 1000;
+          const scheduledTs = scheduledAt.getTime() / 1000;
+          const deadlineTs = deadline.getTime() / 1000;
+          
+          // Call Python model service to calculate deadline reward
+          const rewardResult = await callPythonService('calculate_deadline_reward', [
+            userId,
+            String(completedTs),
+            String(scheduledTs),
+            String(deadlineTs)
+          ]);
+          
+          if (rewardResult.success && rewardResult.reward !== undefined) {
+            reward = rewardResult.reward;
+            rewardType = 'deadline';
+            console.log(`  Using deadline-based reward: ${reward.toFixed(3)} (completed: ${completedAt.toISOString()}, scheduled: ${scheduledAt.toISOString()}, deadline: ${deadline.toISOString()})`);
+          }
+        }
+      } catch (err) {
+        console.warn(`  Could not calculate deadline-based reward: ${err.message}`);
+      }
+    }
+    
+    // Fallback to estimation-based reward
     if (reward === undefined) {
-      throw new Error('Invalid reward calculation');
+      reward = calculateReward(task.estimatedDuration, task.actualCompletionMinutes);
+      rewardType = 'estimation';
+      
+      if (reward === undefined) {
+        throw new Error('Invalid reward calculation');
+      }
+      
+      console.log(`  Using estimation-based reward: ${reward.toFixed(3)} (estimated: ${task.estimatedDuration}min, actual: ${task.actualCompletionMinutes}min)`);
     }
 
     // Build subcategory map from user's custom subcategories
@@ -231,6 +283,7 @@ export async function trainTask(task) {
     return {
       success: true,
       reward: result.reward,
+      rewardType, // 'deadline' or 'estimation'
       message: result.message || 'Model trained successfully',
     };
 
