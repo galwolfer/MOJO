@@ -19,6 +19,9 @@ export { default as AuthStep } from "../screens/auth/components/AuthStep";
 export { default as TextBouble } from "../screens/chat/components/TextBouble";
 export type { TextBoubleMode } from "../screens/chat/components/TextBouble";
 
+// Widget components
+export * from "./widgets";
+
 // Category components
 export { default as CategoryGrid } from "../screens/auth/components/CategoryGrid";
 

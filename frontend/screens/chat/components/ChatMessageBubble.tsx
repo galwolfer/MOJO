@@ -30,6 +30,8 @@ interface ChatMessageBubbleProps {
   // OjoType metadata for assistant messages
   ojoTypeName?: string;
   ojoTypeDisplayName?: string;
+  // Widget action callback (for agent messages with widgets)
+  onWidgetAction?: (actionId: string, actionData?: any) => void;
 }
 
 function ChatMessageBubble({
@@ -43,6 +45,7 @@ function ChatMessageBubble({
   onRetry,
   ojoTypeName,
   ojoTypeDisplayName,
+  onWidgetAction,
 }: ChatMessageBubbleProps) {
   const isUser = role === "user";
   const normalized = content.trim().toLowerCase();
@@ -95,6 +98,7 @@ function ChatMessageBubble({
         playOnceKey={playOnceKey}
         style={styles.messageBubble}
         gradientColors={personaGradient}
+        onWidgetAction={!isUser ? onWidgetAction : undefined}
       >
         <AppText variant="bodyText">{content.endsWith("\n") ? content.slice(0, -1) : content}</AppText>
       </TextBouble>
@@ -124,7 +128,8 @@ function areEqual(prev: ChatMessageBubbleProps, next: ChatMessageBubbleProps) {
     prev.isError === next.isError &&
     prev.status === next.status &&
     prev.ojoTypeName === next.ojoTypeName &&
-    prev.ojoTypeDisplayName === next.ojoTypeDisplayName
+    prev.ojoTypeDisplayName === next.ojoTypeDisplayName &&
+    prev.onWidgetAction === next.onWidgetAction
   );
 }
 

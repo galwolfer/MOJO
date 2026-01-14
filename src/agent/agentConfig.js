@@ -28,7 +28,7 @@ export function getWidgetPromptInstructions() {
   lines.push("");
   lines.push("FORMAT:");
   lines.push("<WIDGET_JSON>");
-  lines.push('{"version":"1.0","widget_type":"TYPE","data":{...}}');
+  lines.push('{"widget_type":"TYPE","data":{...}}');
   lines.push("</WIDGET_JSON>");
   lines.push("");
   lines.push("AVAILABLE WIDGET TYPES:");

@@ -15,6 +15,9 @@ import React, { useEffect, useMemo, useRef, useState, memo } from "react";
 import { Animated, Easing, Platform, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { COLORS, SHADOWS, SPACING } from "../../../theme";
 import ConicGradientBubble from "../../../components/special/ConicGradientBubble";
+import { splitTextAndWidget } from "../../../utils/widgetParser";
+import { WidgetRenderer } from "../../../utils/widgetFactory";
+import AppText from "../../../components/common/AppText";
 
 export type TextBoubleMode = "agent" | "user";
 
@@ -246,6 +249,9 @@ type Props = {
 
   // Optional persona gradient colors for conic gradient display
   gradientColors?: string[] | undefined;
+
+  // Widget action callback - called when user interacts with widget buttons
+  onWidgetAction?: (actionId: string, actionData?: any) => void;
 };
 
 const DEFAULT_CPS = 50;
@@ -270,6 +276,20 @@ function extractPlainText(node: React.ReactNode): string | null {
 function pickText(children: React.ReactNode, text?: string): string | null {
   if (typeof text === "string") return text;
   return extractPlainText(children);
+}
+
+/**
+ * Helper to extract display text for typewriter animation (strips widget JSON)
+ * Only processes agent messages, returns text as-is for user messages
+ */
+function extractDisplayText(text: string | null, mode: TextBoubleMode): string | null {
+  if (!text || mode !== "agent") return text;
+
+  // Try to split text and widget - return only the text part for display
+  const { beforeText, widget } = splitTextAndWidget(text);
+
+  // If there's a widget, return only the text before it for typing display
+  return widget ? beforeText : text;
 }
 
 function getRadii(mode: TextBoubleMode) {
@@ -323,9 +343,27 @@ const TextBouble: React.FC<Props> = ({
   onTypingDone,
   playOnceKey,
   gradientColors,
+  onWidgetAction,
 }) => {
   const resolvedTypewriter = typewriter ?? mode === "agent";
-  const fullText = useMemo(() => pickText(children, text), [children, text]);
+
+  // Extract raw text including potential widget JSON
+  const rawText = useMemo(() => pickText(children, text), [children, text]);
+
+  // Parse widget data from agent messages
+  const parsedContent = useMemo(() => {
+    if (!rawText || mode !== "agent") {
+      return { displayText: rawText, widget: null };
+    }
+    const { beforeText, widget } = splitTextAndWidget(rawText);
+    return {
+      displayText: widget ? beforeText || null : rawText,
+      widget,
+    };
+  }, [rawText, mode]);
+
+  // Display text for typewriter (without widget JSON)
+  const fullText = parsedContent.displayText;
 
   const [showConic, setShowConic] = useState(() => mode === "agent" && resolvedTypewriter && !!fullText);
   const [isTyping, setIsTyping] = useState(() => mode === "agent" && resolvedTypewriter && !!fullText);
@@ -530,13 +568,27 @@ const TextBouble: React.FC<Props> = ({
   }, [isTyping, fullText, typingSpeedCps, handleTypingDone]);
 
   // Render full content (used as invisible placeholder during typing to reserve space)
+  // For agent mode with widgets, use displayText (stripped of widget JSON)
+  const textToDisplay = mode === "agent" && parsedContent.widget ? parsedContent.displayText : null;
+
+  // Helper to render the text part with proper AppText styling
+  const renderTextContent = (text: string | null) => {
+    if (!text) return null;
+    return <AppText variant="bodyText">{text}</AppText>;
+  };
+
   const fullContent =
-    React.isValidElement(children) && (children as any).type !== React.Fragment ? (
+    // If we have a parsed text display (widget case), render it with AppText
+    textToDisplay !== null ? (
+      renderTextContent(textToDisplay)
+    ) : React.isValidElement(children) && (children as any).type !== React.Fragment ? (
       React.cloneElement(children as any, {
         style: [(children as any).props?.style, mode === "user" ? { color: COLORS.colorWhite } : undefined],
       })
     ) : typeof children === "string" ? (
-      <Text style={[styles.text, mode === "user" ? { color: COLORS.colorWhite } : undefined]}>{children}</Text>
+      <AppText variant="bodyText" style={mode === "user" ? { color: COLORS.colorWhite } : undefined}>
+        {children}
+      </AppText>
     ) : (
       // If children is a fragment/array (multiple children), do not attempt to clone the fragment
       // because React.Fragment cannot accept props like `style`. Return children as-is.
@@ -589,6 +641,13 @@ const TextBouble: React.FC<Props> = ({
           <>{cloneChildrenWithTyping(children, typedChars)}</>
         ) : (
           fullContent
+        )}
+
+        {/* Render widget if present (agent mode only) */}
+        {mode === "agent" && parsedContent.widget && !isTyping && (
+          <Animated.View style={{ opacity: nonTextOpacity, width: "100%" }}>
+            <WidgetRenderer widget={parsedContent.widget} onAction={onWidgetAction} />
+          </Animated.View>
         )}
       </View>
     </View>
