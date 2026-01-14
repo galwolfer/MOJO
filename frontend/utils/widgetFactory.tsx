@@ -5,12 +5,14 @@
 
 import React from "react";
 import { WidgetData } from "./widgetParser";
-import TaskListWidget from "../components/widgets/TaskListWidget";
-import TaskConfirmationWidget from "../components/widgets/TaskConfirmationWidget";
-import ConfirmationWidget from "../components/widgets/ConfirmationWidget";
-import CalendarEventWidget from "../components/widgets/CalendarEventWidget";
-import TaskDetailWidget from "../components/widgets/TaskDetailWidget";
-import TaskListDetailedWidget from "../components/widgets/TaskListDetailedWidget";
+import {
+  TaskListWidget,
+  TaskConfirmationWidget,
+  ConfirmationWidget,
+  CalendarEventWidget,
+  TaskDetailWidget,
+  TaskListDetailedWidget,
+} from "../components/widgets";
 
 /**
  * Type definition for widget component props

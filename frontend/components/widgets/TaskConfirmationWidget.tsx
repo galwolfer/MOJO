@@ -152,13 +152,6 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) =
           </View>
         )}
 
-        {/* Action Message */}
-        <View style={styles.confirmMessage}>
-          <AppText variant="bodyText" style={styles.confirmText}>
-            Does this look correct?
-          </AppText>
-        </View>
-
         {/* Action buttons removed for now */}
       </ScrollView>
     </Widget>

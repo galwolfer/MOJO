@@ -695,9 +695,9 @@ const styles = StyleSheet.create({
   containerBase: {
     flexDirection: "column",
     height: "auto",
-    padding: 17,
+    padding: SPACING.md,
     alignItems: "flex-start",
-    gap: 17,
+    gap: SPACING.md,
     alignSelf: "stretch",
   },
 

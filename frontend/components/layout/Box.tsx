@@ -51,7 +51,7 @@ const Box: React.FC<BoxProps> = ({ title, titleIcon, children, widget = false, s
   const wrappedChildren = wrapStringChildren(children);
 
   return (
-    <View style={[styles.box, widget ? { backgroundColor: COLORS.white3, marginTop: SPACING.md } : SHADOWS.card]}>
+    <View style={[styles.box, widget ? { backgroundColor: COLORS.white3 } : SHADOWS.card]}>
       {title && (
         <View style={[styles.titleWrap, titleColor && { backgroundColor: titleColor }]}>
           {titleIcon ? <View style={styles.titleIcon}>{titleIcon}</View> : null}

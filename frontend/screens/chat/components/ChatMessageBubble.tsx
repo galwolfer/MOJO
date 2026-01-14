@@ -138,7 +138,7 @@ export default React.memo(ChatMessageBubble, areEqual);
 const styles = StyleSheet.create({
   messageRow: {
     marginBottom: SPACING.md,
-    maxWidth: "85%",
+    maxWidth: "90%",
   },
   userMessageRow: {
     alignSelf: "flex-end",
