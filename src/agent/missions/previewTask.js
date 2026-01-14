@@ -274,8 +274,6 @@ const previewTaskMission = new GuidedMission({
           recurrence: recurrence || null,
           description: description || (recurrence ? `Recurrence: ${recurrence.type}` : ""),
           canSplit: finalCanSplit,
-          confirmLabel: "Create Task",
-          cancelLabel: "Edit",
         },
       };
 

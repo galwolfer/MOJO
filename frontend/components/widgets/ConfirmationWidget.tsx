@@ -65,23 +65,7 @@ const ConfirmationWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
           </AppText>
         )}
 
-        {/* Action Buttons */}
-        <View style={styles.actions}>
-          <AppButton
-            title={cancelText}
-            mode="light"
-            color={getButtonColor(cancelColor, COLORS.darkGray)}
-            onPress={handleCancel}
-            style={styles.button}
-          />
-          <AppButton
-            title={confirmText}
-            mode="filled"
-            color={getButtonColor(confirmColor, COLORS.primary6)}
-            onPress={handleConfirm}
-            style={styles.button}
-          />
-        </View>
+        {/* Action buttons removed for now */}
       </View>
     </Widget>
   );
@@ -109,14 +93,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     color: COLORS.darkGray,
   },
-  actions: {
-    flexDirection: "row",
-    gap: SPACING.md,
-    width: "100%",
-  },
-  button: {
-    flex: 1,
-  },
+  // actions & button styles removed while buttons are disabled
 });
 
 export default ConfirmationWidget;

@@ -159,18 +159,7 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) =
           </AppText>
         </View>
 
-        {/* Action Buttons */}
-        <View style={styles.actions}>
-          <AppButton title="Cancel" mode="light" color={COLORS.darkGray} onPress={handleCancel} style={styles.button} />
-          <AppButton title="Edit" mode="light" color={COLORS.primary1} onPress={handleEdit} style={styles.button} />
-          <AppButton
-            title="Confirm"
-            mode="filled"
-            color={COLORS.primary6}
-            onPress={handleConfirm}
-            style={styles.button}
-          />
-        </View>
+        {/* Action buttons removed for now */}
       </ScrollView>
     </Widget>
   );
@@ -216,14 +205,7 @@ const styles = StyleSheet.create({
   confirmText: {
     color: COLORS.darkGray,
   },
-  actions: {
-    flexDirection: "row",
-    gap: SPACING.sm,
-    marginTop: SPACING.sm,
-  },
-  button: {
-    flex: 1,
-  },
+  // actions and button styles removed while buttons are disabled
 });
 
 export default TaskConfirmationWidget;

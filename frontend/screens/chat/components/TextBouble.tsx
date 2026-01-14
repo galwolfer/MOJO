@@ -368,6 +368,11 @@ const TextBouble: React.FC<Props> = ({
   const [showConic, setShowConic] = useState(() => mode === "agent" && resolvedTypewriter && !!fullText);
   const [isTyping, setIsTyping] = useState(() => mode === "agent" && resolvedTypewriter && !!fullText);
 
+  // Track whether the widget should be mounted and remain visible once shown.
+  // We intentionally do NOT set it to false when typing restarts so the widget
+  // remains visible after it's been revealed.
+  const [widgetMounted, setWidgetMounted] = useState<boolean>(() => false);
+
   // Cross-fade shadow layers (agent only)
   const conicOpacity = useRef(new Animated.Value(0)).current;
   const glowOpacity = useRef(new Animated.Value(0)).current;
@@ -388,6 +393,10 @@ const TextBouble: React.FC<Props> = ({
     () => () => {
       onTypingDone?.();
       setIsTyping(false);
+      // Ensure the widget is mounted/visible once typing completes
+      try {
+        setWidgetMounted(true);
+      } catch (_) {}
 
       // On mobile, animating opacity via JS driver is more reliable
       // when the gradient component is SVG/complex.
@@ -439,7 +448,7 @@ const TextBouble: React.FC<Props> = ({
         } catch (_) {}
       });
     },
-    [onTypingDone, conicOpacity, glowOpacity, nonTextOpacity]
+    [onTypingDone, conicOpacity, glowOpacity, nonTextOpacity, setWidgetMounted]
   );
 
   useEffect(() => {
@@ -466,6 +475,8 @@ const TextBouble: React.FC<Props> = ({
         // If we are not typing, mark as played so we don't attempt later
         playedRef.current = true;
         if (playOnceKey) playedMap.set(playOnceKey, true);
+        // If there's a widget and we're not typing, mount it immediately
+        if (parsedContent.widget) setWidgetMounted(true);
       }
     } else {
       // Already initialized: don't restart animations on re-renders. But if typing
@@ -519,6 +530,19 @@ const TextBouble: React.FC<Props> = ({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fullText, mode, typewriter]);
+
+  // Keep the widget mounted once it's visible so it won't disappear if
+  // a new message (or other re-render) temporarily toggles typing.
+  useEffect(() => {
+    if (!parsedContent.widget) {
+      setWidgetMounted(false);
+      return;
+    }
+
+    // If there's a widget and we're not currently typing, ensure it is mounted.
+    if (!isTyping) setWidgetMounted(true);
+    // If we're typing, do not unmount; we only mount once typing completes.
+  }, [parsedContent.widget, isTyping]);
 
   const radii = useMemo(() => getRadii(mode), [mode]);
   const containerBg = useMemo(() => getContainerBackground(mode), [mode]);
@@ -644,7 +668,7 @@ const TextBouble: React.FC<Props> = ({
         )}
 
         {/* Render widget if present (agent mode only) */}
-        {mode === "agent" && parsedContent.widget && !isTyping && (
+        {mode === "agent" && parsedContent.widget && widgetMounted && (
           <Animated.View style={{ opacity: nonTextOpacity, width: "100%" }}>
             <WidgetRenderer widget={parsedContent.widget} onAction={onWidgetAction} />
           </Animated.View>

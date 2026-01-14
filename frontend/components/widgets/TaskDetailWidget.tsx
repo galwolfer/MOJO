@@ -170,23 +170,7 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
           </View>
         )}
 
-        {/* Actions */}
-        <View style={styles.actions}>
-          <AppButton
-            title="Edit"
-            mode="light"
-            color={COLORS.primary1}
-            onPress={handleEdit}
-            style={styles.actionButton}
-          />
-          <AppButton
-            title="Complete"
-            mode="filled"
-            color={COLORS.primary6}
-            onPress={handleComplete}
-            style={styles.actionButton}
-          />
-        </View>
+        {/* Action buttons removed for now */}
       </View>
     </Widget>
   );
@@ -240,14 +224,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     lineHeight: 18,
   },
-  actions: {
-    flexDirection: "row",
-    gap: SPACING.sm,
-    marginTop: SPACING.sm,
-  },
-  actionButton: {
-    flex: 1,
-  },
+  // actions and actionButton styles removed while buttons are disabled
 });
 
 export default TaskDetailWidget;

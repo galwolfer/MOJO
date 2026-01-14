@@ -162,23 +162,7 @@ const CalendarEventWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
             </View>
           )}
 
-          {/* Actions */}
-          <View style={styles.actions}>
-            <AppButton
-              title="Dismiss"
-              mode="light"
-              color={COLORS.darkGray}
-              onPress={handleDismiss}
-              style={styles.button}
-            />
-            <AppButton
-              title="Add to Calendar"
-              mode="filled"
-              color={eventColor}
-              onPress={handleAddToCalendar}
-              style={styles.button}
-            />
-          </View>
+          {/* Action buttons removed for now */}
         </View>
       </View>
     </Widget>
@@ -258,14 +242,7 @@ const styles = StyleSheet.create({
   metaText: {
     color: COLORS.darkGray,
   },
-  actions: {
-    flexDirection: "row",
-    gap: SPACING.sm,
-    marginTop: SPACING.sm,
-  },
-  button: {
-    flex: 1,
-  },
+  // actions & button styles removed while buttons are disabled
 });
 
 export default CalendarEventWidget;

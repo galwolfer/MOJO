@@ -58,9 +58,6 @@ export const widgetRegistry = new WidgetRegistry([
     description: "Ask for user confirmation before a critical action.",
     schema: {
       message: "The question to ask the user",
-      confirmLabel: "Label for the confirm button (default: Yes)",
-      cancelLabel: "Label for the cancel button (default: No)",
-      actionId: "ID to reference the action if confirmed",
     },
   }),
   new WidgetDefinition({
@@ -75,7 +72,7 @@ export const widgetRegistry = new WidgetRegistry([
   }),
   new WidgetDefinition({
     type: "task_confirmation",
-    description: "Show a task draft with all details and Confirm/Cancel buttons.",
+    description: "Show a task draft with all details.",
     schema: {
       id: "Draft task ID",
       title: "Task title",
@@ -90,8 +87,6 @@ export const widgetRegistry = new WidgetRegistry([
       taskType: "Task splitting strategy (perfect/in_parts/leaky)",
       tags: "Legacy tags array (optional)",
       description: "Task description",
-      confirmLabel: "Label for confirm button",
-      cancelLabel: "Label for cancel button",
     },
   }),
 ]);

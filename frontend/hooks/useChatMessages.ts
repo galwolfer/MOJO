@@ -138,11 +138,6 @@ export function useChatMessages(updateSession: (session: ChatSessionSummary) => 
             ojoTypeName: (response as any).ojoTypeName || currentOjoType,
           };
 
-          console.debug(
-            "[useChatMessages] Inserting assistant message with ojoTypeName:",
-            assistantMessage.ojoTypeName
-          );
-
           // If the last message is an error related to this clientId, replace it with the assistant message
           // instead of appending so that the error disappears and the reply appears in its place.
           let messageCountDeltaSuccess = 1;
