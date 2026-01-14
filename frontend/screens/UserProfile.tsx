@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 
 /**
  * UserProfileScreen
@@ -17,6 +17,7 @@ import {
   TouchableOpacity,
   Image,
   useWindowDimensions,
+  ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import AppText from "../components/common/AppText";
@@ -29,14 +30,9 @@ import { Box } from "../components";
 import ScrollableContent from "../components/layout/ScrollableContent";
 import { StatBadge, ProgressGraph, FriendListItem } from "./user/components";
 import { moderateScale } from "react-native-size-matters";
+import { getUserStats } from "../services/userService";
 
-// Mock data for demo - will be replaced with API calls
-const MOCK_STATS = {
-  tasks: 34,
-  points: 289,
-  streak: 17,
-};
-
+// Mock data for progress and friends - will be replaced with API calls
 const MOCK_PROGRESS = [20, 35, 25, 50, 45, 60, 55, 70, 65, 80, 75];
 
 const MOCK_FRIENDS = [
@@ -70,16 +66,43 @@ const MOCK_FRIENDS = [
   },
 ];
 
+type UserStats = {
+  tasks: number;
+  points: number;
+  streak: number;
+};
+
 export default function UserProfileScreen() {
   const { user, signOut } = useAuth();
   const { setHeaderConfig } = useNavigation();
   const { width } = useWindowDimensions();
+
+  // Real-time stats state
+  const [stats, setStats] = useState<UserStats>({ tasks: 0, points: 0, streak: 0 });
+  const [loading, setLoading] = useState(true);
 
   const SettingsIcon = ICONS.settings;
   const UserIcon = ICONS.user;
   const CheckIcon = ICONS.list;
   const FlameIcon = ICONS.flame;
   const TrophyIcon = ICONS.trophy;
+
+  // Fetch user stats on mount
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setLoading(true);
+        const data = await getUserStats();
+        setStats(data);
+      } catch (error) {
+        console.warn("Failed to fetch user stats:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   useEffect(() => {
     setHeaderConfig({
@@ -145,24 +168,30 @@ export default function UserProfileScreen() {
 
         {/* Stats Row */}
         <View style={styles.statsRow}>
-          <StatBadge
-            icon={<CheckIcon size={16} color={COLORS.colorWhite} />}
-            value={MOCK_STATS.tasks}
-            label="Tasks"
-            color={COLORS.primary6}
-          />
-          <StatBadge
-            icon={<TrophyIcon size={16} color={COLORS.colorWhite} />}
-            value={MOCK_STATS.points}
-            label="Points"
-            color={COLORS.primary5}
-          />
-          <StatBadge
-            icon={<FlameIcon size={16} color={COLORS.colorWhite} />}
-            value={MOCK_STATS.streak}
-            label="Days Streak"
-            color={COLORS.primary4}
-          />
+          {loading ? (
+            <ActivityIndicator size="small" color={COLORS.primary1} />
+          ) : (
+            <>
+              <StatBadge
+                icon={<CheckIcon size={16} color={COLORS.colorWhite} />}
+                value={stats.tasks}
+                label="Tasks"
+                color={COLORS.primary6}
+              />
+              <StatBadge
+                icon={<TrophyIcon size={16} color={COLORS.colorWhite} />}
+                value={stats.points}
+                label="Points"
+                color={COLORS.primary5}
+              />
+              <StatBadge
+                icon={<FlameIcon size={16} color={COLORS.colorWhite} />}
+                value={stats.streak}
+                label="Days Streak"
+                color={COLORS.primary4}
+              />
+            </>
+          )}
         </View>
       </View>
 

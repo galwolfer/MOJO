@@ -4,7 +4,20 @@
  */
 
 import { User } from "../models/User.js";
-import Task from "../models/Task.js";
+import { Task } from "../models/Task.js";
+import { logger } from "../utils/logger.js";
+
+// Ensure gamification subdocument exists on user doc
+function ensureGamification(user) {
+  if (!user.gamification) {
+    user.gamification = {
+      points: 0,
+      currentStreak: 0,
+      longestStreak: 0,
+      lastActiveDate: null,
+    };
+  }
+}
 
 /**
  * Helper: Check and update user streak based on activity
@@ -13,6 +26,8 @@ import Task from "../models/Task.js";
 export async function updateUserStreak(userId) {
   const user = await User.findById(userId);
   if (!user) return null;
+
+  ensureGamification(user);
 
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -51,12 +66,27 @@ export async function updateUserStreak(userId) {
  * Helper: Add points to user
  */
 export async function addUserPoints(userId, points) {
-  const user = await User.findById(userId);
-  if (!user) return null;
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      logger.warn(`[addUserPoints] User ${userId} not found`);
+      return null;
+    }
 
-  user.gamification.points = (user.gamification.points || 0) + points;
-  await user.save();
-  return user.gamification.points;
+    ensureGamification(user);
+
+    const oldPoints = user.gamification.points || 0;
+    user.gamification.points = oldPoints + points;
+    
+    const saved = await user.save();
+    
+    logger.info(`[addUserPoints] User ${userId}: ${oldPoints} + ${points} = ${user.gamification.points}`);
+    
+    return user.gamification.points;
+  } catch (error) {
+    logger.error(`[addUserPoints] Error adding points to user ${userId}:`, error);
+    return null;
+  }
 }
 
 /**
@@ -76,6 +106,11 @@ export const getUserStats = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, error: "User not found" });
     }
+
+    ensureGamification(user);
+
+    // Persist defaults if they were missing
+    await user.save();
 
     // Count completed tasks
     const completedTasks = await Task.countDocuments({
@@ -104,24 +139,31 @@ export const getUserStats = async (req, res) => {
  * Called internally when task is marked as done
  */
 export async function awardTaskCompletionPoints(userId, task) {
-  // Base points for completing a task
-  let points = 10;
+  try {
+    // Base points for completing a task
+    let points = 10;
 
-  // Bonus for importance
-  points += (task.importance || 3) * 2;
+    // Bonus for importance
+    points += (task.importance || 3) * 2;
 
-  // Bonus for effort
-  points += (task.effort || 3) * 2;
+    // Bonus for effort
+    points += (task.effort || 3) * 2;
 
-  // Bonus for completing before deadline
-  if (task.dueDate && new Date() < new Date(task.dueDate)) {
-    points += 5;
+    // Bonus for completing before deadline
+    if (task.dueDate && new Date() < new Date(task.dueDate)) {
+      points += 5;
+    }
+
+    logger.info(`[awardTaskCompletionPoints] Task ${task._id} (importance: ${task.importance}, effort: ${task.effort}) = ${points} points`);
+
+    await addUserPoints(userId, points);
+    await updateUserStreak(userId);
+
+    return points;
+  } catch (error) {
+    logger.error(`[awardTaskCompletionPoints] Error awarding points:`, error);
+    throw error;
   }
-
-  await addUserPoints(userId, points);
-  await updateUserStreak(userId);
-
-  return points;
 }
 
 export default {

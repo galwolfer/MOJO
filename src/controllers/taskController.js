@@ -413,6 +413,18 @@ export async function updateTask(req, res) {
       return res.status(404).json({ success: false, error: result ? result.error : "Task not found" });
     }
 
+    // Award points when task is completed via update
+    const isCompletedUpdate = updates.status === "done" || raw.completed === true;
+    if (isCompletedUpdate && result.task) {
+      try {
+        const { awardTaskCompletionPoints } = await import("./userController.js");
+        const pointsAwarded = await awardTaskCompletionPoints(userId, result.task);
+        logger.info(`[updateTask] Awarded ${pointsAwarded} points to user ${userId} for task ${id}`);
+      } catch (pointsError) {
+        logger.error("[updateTask] Failed to award points:", pointsError.message);
+      }
+    }
+
     return res.status(200).json({ 
       success: true, 
       task: result.task,
@@ -863,6 +875,15 @@ export async function completeTask(req, res) {
         success: false,
         error: result?.error || "Task not found",
       });
+    }
+
+    // Award points for task completion
+    try {
+      const { awardTaskCompletionPoints } = await import("./userController.js");
+      const pointsAwarded = await awardTaskCompletionPoints(userId, result.task);
+      logger.info(`Awarded ${pointsAwarded} points to user ${userId} for completing task ${id}`);
+    } catch (pointsError) {
+      logger.warn("Failed to award points for task completion:", pointsError.message);
     }
 
     return res.status(200).json({
