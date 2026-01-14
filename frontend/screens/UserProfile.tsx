@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     alignItems: "center",
     gap: SPACING.lg,
-    paddingBottom: SPACING.xlg * 2,
+    paddingBottom: SPACING.xlg * 4,
   },
 
   // Profile Section
