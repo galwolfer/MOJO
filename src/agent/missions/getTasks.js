@@ -57,8 +57,9 @@ const getTasksMission = new LightMission({
         },
       };
 
-      // Return widget only; the LLM should generate the natural assistant message referencing this widget
-      return `<WIDGET_JSON>${JSON.stringify(widgetJson)}</WIDGET_JSON>`;
+      // Return widget only (use canonical builder to ensure correct tags/fields)
+      const { buildWidgetString } = await import("../../widgets/widgetUtils.js");
+      return buildWidgetString("task_list", { tasks: widgetJson.data.tasks });
     } catch (error) {
       return `ok=false\nerr="${error.message}"`;
     }

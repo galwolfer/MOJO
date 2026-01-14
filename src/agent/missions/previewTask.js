@@ -240,44 +240,43 @@ const previewTaskMission = new GuidedMission({
       const categoryDisplay = getDisplayName(category || inferred.category || "");
       const shortDescription = `${taskname} — ${categoryDisplay} • due ${finalDeadline}`;
 
-      const widgetJson = {
-        version: "1.0",
-        widget_type: "task_confirmation",
-        data: {
-          id: "draft-" + Date.now(),
-          title: taskname,
-          status: "draft",
-          dueDate: new Date(finalDeadline).toISOString(),
-          category: category || "",
-          categoryDisplay,
-          subcategory: subcategory || "",
-          subcategoryDisplay: subcategory || "",
-          importance: finalImportance,
-          effort: finalEffort,
-          estimatedDuration: finalDuration,
-          // Short human-readable summary (use before the widget; keep concise)
-          shortDescription,
-          // Prompt message asking for confirmation / edits (user-facing; default in English)
-          confirmationMessage:
-            "The task is ready to be created. Would you like to create it now? If you'd like to make any changes, tell me what to change.",
-          // Aliases to support different widget consumers
-          taskname: taskname,
-          deadline: finalDeadline,
-          duration: finalDuration,
-          taskType: finalTaskType,
-          minChunk: displayMinChunk,
-          chunkCount: displayChunkCount,
-          chunkMinutes: displayChunkMinutes,
-          minMinutes: displayMinMinutes,
-          maxMinutes: displayMaxMinutes,
-          earliestStart: finalEarliestStart,
-          recurrence: recurrence || null,
-          description: description || (recurrence ? `Recurrence: ${recurrence.type}` : ""),
-          canSplit: finalCanSplit,
-        },
+      const widgetPayload = {
+        id: "draft-" + Date.now(),
+        title: taskname,
+        status: "draft",
+        dueDate: new Date(finalDeadline).toISOString(),
+        category: category || "",
+        categoryDisplay,
+        subcategory: subcategory || "",
+        subcategoryDisplay: subcategory || "",
+        importance: finalImportance,
+        effort: finalEffort,
+        estimatedDuration: finalDuration,
+        // Short human-readable summary (use before the widget; keep concise)
+        shortDescription,
+        // Prompt message asking for confirmation / edits (user-facing; default in English)
+        confirmationMessage:
+          "The task is ready to be created. Would you like to create it now? If you'd like to make any changes, tell me what to change.",
+        // Aliases to support different widget consumers
+        taskname: taskname,
+        deadline: finalDeadline,
+        duration: finalDuration,
+        taskType: finalTaskType,
+        minChunk: displayMinChunk,
+        chunkCount: displayChunkCount,
+        chunkMinutes: displayChunkMinutes,
+        minMinutes: displayMinMinutes,
+        maxMinutes: displayMaxMinutes,
+        earliestStart: finalEarliestStart,
+        recurrence: recurrence || null,
+        description: description || (recurrence ? `Recurrence: ${recurrence.type}` : ""),
+        canSplit: finalCanSplit,
       };
 
-      return JSON.stringify(widgetJson);
+      // Build a canonical widget string using the central helper (ensures
+      // fields match registry schema and always uses the exact tags)
+      const { buildWidgetString } = await import("../../widgets/widgetUtils.js");
+      return buildWidgetString("task_confirmation", widgetPayload);
     } catch (error) {
       return `ok=false\nerr="Failed to generate preview: ${error.message}"`;
     }

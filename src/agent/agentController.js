@@ -7,6 +7,7 @@ import { HumanMessage, AIMessage, SystemMessage, ToolMessage } from "@langchain/
 import { memoryStore } from "../services/memoryService.js";
 import { createLangChainTools } from "./langchainTools.js";
 import { validateToolCall, validateWidgetPayload } from "./security.js";
+import { extractWidgetFromText } from "./widgets/widgetUtils.js";
 import { PromptManager } from "./promptManager.js";
 import { TOKEN_BUDGET, LOGGING_FIELDS } from "./tokenBudget.js";
 import { User } from "../models/index.js";
@@ -674,22 +675,15 @@ export class AgentController {
         }
 
         // Also extract from widget JSON if present
-        const widgetMatch = result.match(/<WIDGET_JSON>([^<]+)<\/WIDGET_JSON>/);
-        if (widgetMatch) {
-          try {
-            const widget = JSON.parse(widgetMatch[1]);
-            if (widget.data?.id) {
-              memoryStore.addSessionEntity(sessionId, "task", widget.data.id, widget.data.title || taskName, {
-                action: toolName === "add_task" ? "created" : "previewed",
-                dueDate: widget.data.dueDate,
-                status: widget.data.status,
-                importance: widget.data.importance,
-                taskType: widget.data.taskType,
-              });
-            }
-          } catch (e) {
-            // Ignore JSON parse errors
-          }
+        const widget = extractWidgetFromText(result);
+        if (widget && widget.data?.id) {
+          memoryStore.addSessionEntity(sessionId, "task", widget.data.id, widget.data.title || taskName, {
+            action: toolName === "add_task" ? "created" : "previewed",
+            dueDate: widget.data.dueDate,
+            status: widget.data.status,
+            importance: widget.data.importance,
+            taskType: widget.data.taskType,
+          });
         }
       }
 
@@ -703,21 +697,18 @@ export class AgentController {
 
       // Get tasks - track all returned tasks (user might refer to any of them)
       if (toolName === "get_tasks" || toolName === "get_upcoming_tasks" || toolName === "get_overdue_tasks") {
-        const widgetMatch = result.match(/<WIDGET_JSON>([^<]+)<\/WIDGET_JSON>/);
-        if (widgetMatch) {
-          try {
-            const widget = JSON.parse(widgetMatch[1]);
-            if (widget.data?.tasks && Array.isArray(widget.data.tasks)) {
-              // Add each task to context (most recent first = last in array)
-              widget.data.tasks
-                .slice()
-                .reverse()
-                .forEach((task) => {
-                  if (task.id && task.title) {
-                    memoryStore.addSessionEntity(sessionId, "task", task.id, task.title, {
-                      action: "listed",
-                      status: task.status,
-                      dueDate: task.dueDate,
+        const widget = extractWidgetFromText(result);
+        if (widget && widget.data?.tasks && Array.isArray(widget.data.tasks)) {
+          // Add each task to context (most recent first = last in array)
+          widget.data.tasks
+            .slice()
+            .reverse()
+            .forEach((task) => {
+              if (task.id && task.title) {
+                memoryStore.addSessionEntity(sessionId, "task", task.id, task.title, {
+                  action: "listed",
+                  status: task.status,
+                  dueDate: task.dueDate,
                     });
                   }
                 });
