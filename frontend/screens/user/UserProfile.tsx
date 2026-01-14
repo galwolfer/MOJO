@@ -1,16 +1,4 @@
-import React, { useEffect } from "react";
-
-/**
- * UserProfileScreen
- *
- * Displays user profile with:
- * - Profile photo with gradient ring
- * - Username display
- * - Stats row (tasks, points, streak)
- * - Progress graph
- * - Friends list
- * - Logout action
- */
+import React, { useEffect, useState } from "react";
 import {
   View,
   StyleSheet,
@@ -19,16 +7,27 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import AppText from "../components/common/AppText";
-import AppButton from "../components/common/AppButton";
-import { COLORS, SPACING, SHADOWS } from "../theme";
-import { useAuth } from "../context/AuthContext";
-import { useNavigation } from "../context/NavigationContext";
-import { ICONS } from "../components/icons/icons";
-import { Box } from "../components";
-import ScrollableContent from "../components/layout/ScrollableContent";
-import { StatBadge, ProgressGraph, FriendListItem } from "./user/components";
+import AppText from "../../components/common/AppText";
+import { COLORS, SPACING, SHADOWS } from "../../theme";
+import { useAuth } from "../../context/AuthContext";
+import { useNavigation } from "../../context/NavigationContext";
+import { ICONS } from "../../components/icons/icons";
+import ScrollableContent from "../../components/layout/ScrollableContent";
+import Box from "../../components/layout/Box";
+import { StatBadge, ProgressGraph, FriendListItem } from "./components";
 import { moderateScale } from "react-native-size-matters";
+
+/**
+ * UserProfileScreen
+ *
+ * Displays the user's profile with:
+ * - Profile photo with gradient ring
+ * - Username display
+ * - Stats row (tasks, points, streak)
+ * - Progress graph
+ * - Goals section
+ * - Friends list
+ */
 
 // Mock data for demo - will be replaced with API calls
 const MOCK_STATS = {

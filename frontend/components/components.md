@@ -146,6 +146,20 @@ Update this file whenever you add, remove, or change a component.
       2. Run `node scripts/generate-svg-data-uris.js` to update `svg-data-uris.ts` for web fallback.
       3. Add the icon to the `ICONS` map in `icons.tsx` (follow existing naming conventions).
 
+## User Profile Components
+
+- `StatBadge` — `frontend/screens/user/components/StatBadge.tsx`
+   - Displays a single stat with an icon, value, and label. Used in the user profile for showing tasks, points, and streak.
+   - Props: `icon` (React node), `value` (number/string), `label` (string), `color` (optional, defaults to primary1).
+
+- `ProgressGraph` — `frontend/screens/user/components/ProgressGraph.tsx`
+   - Displays a simple line graph showing user progress over time using react-native-svg.
+   - Props: `data` (array of numbers), `width`, `height`, `color` (optional).
+
+- `FriendListItem` — `frontend/screens/user/components/FriendListItem.tsx`
+   - Displays a friend in the friends list with avatar, name, and mini stats.
+   - Props: `name`, `avatar`, `stats` (tasks/streak/points), `isOnline`.
+
 1. When adding a new component, add a short entry above and include:
    - Purpose / one-line description
    - Any notable cross-platform differences (web vs native)
@@ -153,5 +167,7 @@ Update this file whenever you add, remove, or change a component.
 
 2. When updating a component, update this file with the change summary and date. Example:
    - `2026-01-11` — Added `AnimatedButtonsContainer` (`common`) and `Widget` (`special`); refactored auth steps to use `AnimatedButtonsContainer` and added Welcome screen stagger behaviour.
+   - `2026-01-15` — Added `UserProfileScreen` with `StatBadge`, `ProgressGraph`, and `FriendListItem` components for the new profile page design.
 
 3. Keep `components/index.ts` in sync so imports across the app can use `import { Box } from './components'`.
+

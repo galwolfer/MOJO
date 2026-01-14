@@ -9,3 +9,6 @@ export * from "./apiClient";
 
 // Chat services
 export * from "./chatService";
+
+// User profile services
+export * from "./userService";

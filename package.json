@@ -49,6 +49,7 @@
     "node-cron": "^4.2.1",
     "node-fetch": "^2.7.0",
     "react-native-size-matters": "^0.4.2",
+    "start": "^5.1.0",
     "zod": "^4.1.12"
   },
   "devDependencies": {
