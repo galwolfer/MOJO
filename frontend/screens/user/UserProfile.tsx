@@ -36,7 +36,7 @@ const MOCK_STATS = {
   streak: 17,
 };
 
-const MOCK_PROGRESS = [20, 35, 25, 50, 45, 60, 55, 70, 65, 80, 75];
+const MOCK_PROGRESS = [20, 35, 25, 50, 45, 60, 55, 70, 65, 80, 75, 82, 78, 85];
 
 const MOCK_FRIENDS = [
   {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 
 /**
  * UserProfileScreen
@@ -7,7 +7,7 @@ import React, { useEffect, useState } from "react";
  * - Profile photo with gradient ring
  * - Username display
  * - Stats row (tasks, points, streak)
- * - Progress graph
+ * - Progress graph (real-time from tasks)
  * - Friends list
  * - Logout action
  */
@@ -18,6 +18,8 @@ import {
   Image,
   useWindowDimensions,
   ActivityIndicator,
+  AppState,
+  AppStateStatus,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import AppText from "../components/common/AppText";
@@ -25,15 +27,20 @@ import AppButton from "../components/common/AppButton";
 import { COLORS, SPACING, SHADOWS } from "../theme";
 import { useAuth } from "../context/AuthContext";
 import { useNavigation } from "../context/NavigationContext";
+import { useTaskContext } from "../context/TaskContext";
 import { ICONS } from "../components/icons/icons";
 import { Box } from "../components";
 import ScrollableContent from "../components/layout/ScrollableContent";
 import { StatBadge, ProgressGraph, FriendListItem } from "./user/components";
 import { moderateScale } from "react-native-size-matters";
 import { getUserStats } from "../services/userService";
+import { getTasks, calculateTaskProgress, Task, TaskProgress } from "../services/taskService";
 
-// Mock data for progress and friends - will be replaced with API calls
-const MOCK_PROGRESS = [20, 35, 25, 50, 45, 60, 55, 70, 65, 80, 75];
+// Default progress data used as fallback
+const DEFAULT_PROGRESS = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+// Polling interval for real-time updates (in milliseconds)
+const POLL_INTERVAL = 5000; // 5 seconds
 
 const MOCK_FRIENDS = [
   {
@@ -75,11 +82,19 @@ type UserStats = {
 export default function UserProfileScreen() {
   const { user, signOut } = useAuth();
   const { setHeaderConfig } = useNavigation();
+  const { subscribeToTaskUpdates } = useTaskContext();
   const { width } = useWindowDimensions();
 
   // Real-time stats state
   const [stats, setStats] = useState<UserStats>({ tasks: 0, points: 0, streak: 0 });
   const [loading, setLoading] = useState(true);
+  const [progressData, setProgressData] = useState<number[]>(DEFAULT_PROGRESS);
+  const [taskProgress, setTaskProgress] = useState<TaskProgress | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  
+  // Refs for polling
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(true);
 
   const SettingsIcon = ICONS.settings;
   const UserIcon = ICONS.user;
@@ -87,22 +102,95 @@ export default function UserProfileScreen() {
   const FlameIcon = ICONS.flame;
   const TrophyIcon = ICONS.trophy;
 
-  // Fetch user stats on mount
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoading(true);
-        const data = await getUserStats();
-        setStats(data);
-      } catch (error) {
-        console.warn("Failed to fetch user stats:", error);
-      } finally {
+  /**
+   * Fetch all data (stats and tasks)
+   * This function is called on mount and on every poll interval
+   */
+  const fetchAllData = useCallback(async () => {
+    if (!isMountedRef.current) return;
+    
+    try {
+      // Fetch stats and tasks in parallel for efficiency
+      const [statsData, tasksData] = await Promise.all([
+        getUserStats(),
+        getTasks(),
+      ]);
+
+      if (!isMountedRef.current) return;
+
+      // Update stats
+      setStats(statsData);
+      
+      // Update tasks and calculate progress
+      setTasks(tasksData);
+      
+      // Calculate real-time progress from tasks
+      const progress = calculateTaskProgress(tasksData, 14);
+      setTaskProgress(progress);
+      setProgressData(progress.dailyProgress);
+      
+    } catch (error) {
+      console.warn("Failed to fetch user data:", error);
+    } finally {
+      if (isMountedRef.current) {
         setLoading(false);
+      }
+    }
+  }, []);
+
+  // Initial fetch and polling setup
+  useEffect(() => {
+    isMountedRef.current = true;
+    
+    // Initial fetch
+    fetchAllData();
+
+    // Set up polling for real-time updates
+    pollIntervalRef.current = setInterval(fetchAllData, POLL_INTERVAL);
+
+    return () => {
+      isMountedRef.current = false;
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, [fetchAllData]);
+
+  // Handle app state changes (pause polling when app is in background)
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        // App came to foreground - refresh data immediately and resume polling
+        fetchAllData();
+        if (!pollIntervalRef.current) {
+          pollIntervalRef.current = setInterval(fetchAllData, POLL_INTERVAL);
+        }
+      } else {
+        // App went to background - pause polling to save resources
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
       }
     };
 
-    fetchStats();
-  }, []);
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      subscription?.remove();
+    };
+  }, [fetchAllData]);
+
+  // Subscribe to task updates from other parts of the app (chat, task completion, etc.)
+  useEffect(() => {
+    const unsubscribe = subscribeToTaskUpdates(() => {
+      // Immediately refresh data when a task is updated anywhere in the app
+      fetchAllData();
+    });
+
+    return unsubscribe;
+  }, [subscribeToTaskUpdates, fetchAllData]);
 
   useEffect(() => {
     setHeaderConfig({
@@ -198,13 +286,54 @@ export default function UserProfileScreen() {
       {/* Progress Section */}
       <Box title="My Progress" titleColor={COLORS.primary3}>
         <View style={styles.progressContent}>
-          <ProgressGraph
-            data={MOCK_PROGRESS}
-            width={graphWidth}
-            height={moderateScale(100)}
-          />
+          {/* Today's Progress Summary */}
+          {taskProgress && (
+            <View style={styles.progressSummary}>
+              <View style={styles.progressSummaryItem}>
+                <AppText variant="boldText" style={styles.progressSummaryValue}>
+                  {taskProgress.today.completed}/{taskProgress.today.total}
+                </AppText>
+                <AppText variant="notes" style={styles.progressSummaryLabel}>
+                  Today
+                </AppText>
+              </View>
+              <View style={styles.progressSummaryDivider} />
+              <View style={styles.progressSummaryItem}>
+                <AppText variant="boldText" style={styles.progressSummaryValue}>
+                  {taskProgress.today.percentage}%
+                </AppText>
+                <AppText variant="notes" style={styles.progressSummaryLabel}>
+                  Completed
+                </AppText>
+              </View>
+              <View style={styles.progressSummaryDivider} />
+              <View style={styles.progressSummaryItem}>
+                <AppText variant="boldText" style={styles.progressSummaryValue}>
+                  {taskProgress.week.completed}
+                </AppText>
+                <AppText variant="notes" style={styles.progressSummaryLabel}>
+                  This Week
+                </AppText>
+              </View>
+            </View>
+          )}
+          
+          {/* Progress Graph */}
+          {loading ? (
+            <ActivityIndicator size="small" color={COLORS.primary3} style={{ marginVertical: SPACING.lg }} />
+          ) : (
+            <ProgressGraph
+              data={progressData}
+              width={graphWidth}
+              height={moderateScale(100)}
+            />
+          )}
+          
           <AppText variant="notes" style={styles.progressNote}>
-            Your Goals, lets talk about what you want to achieve.
+            {tasks.length > 0 
+              ? `Track your daily task completion over the last ${progressData.length} days`
+              : "Complete tasks to see your progress here!"
+            }
           </AppText>
         </View>
       </Box>
@@ -327,6 +456,35 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: SPACING.md,
     gap: SPACING.md,
+  },
+  progressSummary: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.white2,
+    borderRadius: SPACING.md,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  progressSummaryItem: {
+    alignItems: "center",
+    paddingHorizontal: SPACING.md,
+  },
+  progressSummaryValue: {
+    color: COLORS.primary3,
+    fontSize: moderateScale(18),
+  },
+  progressSummaryLabel: {
+    color: COLORS.grayLight,
+    fontSize: moderateScale(10),
+    marginTop: 2,
+  },
+  progressSummaryDivider: {
+    width: 1,
+    height: moderateScale(30),
+    backgroundColor: COLORS.grayLight,
+    opacity: 0.3,
   },
   progressNote: {
     color: COLORS.grayLight,

@@ -32,6 +32,7 @@ import AppText from "../components/common/AppText";
 import { COLORS, FONT_SIZES, SHADOWS, SPACING } from "../theme";
 import { useNavigation } from "../context/NavigationContext";
 import { useAuth } from "../context/AuthContext";
+import { useTaskContext } from "../context/TaskContext";
 import { ICONS } from "../components/icons/icons";
 import { setChatAuthToken } from "../services/chatService";
 import { useKeyboard, useContentInsets } from "../hooks";
@@ -45,6 +46,7 @@ import type { ChatSessionSummary } from "../services/chatService";
 export default function ChatScreen() {
   const { setHeaderConfig, setNavBarConfig, scrollPositions, setScrollPosition } = useNavigation();
   const { token } = useAuth();
+  const { notifyTaskUpdate } = useTaskContext();
   const sessionsRef = useRef<ChatSessionSummary[]>([]);
   const listRef = useRef<FlatList<TimelineItem>>(null);
   const scrollOffsetRef = useRef(0);
@@ -61,7 +63,10 @@ export default function ChatScreen() {
   const { sessions, isLoadingSessions, isLoadingMoreSessions, hasMoreSessions, loadMoreSessions, updateSession } =
     useChatSessions();
 
-  const { isLoading, sessionId, setSessionId, sendText, handleRetry } = useChatMessages(updateSession);
+  // Pass task change callback to update progress when tasks are created/modified via chat
+  const { isLoading, sessionId, setSessionId, sendText, handleRetry } = useChatMessages(updateSession, {
+    onTaskChange: notifyTaskUpdate,
+  });
 
   // Set auth token for chat service
   useEffect(() => {
@@ -142,11 +147,46 @@ export default function ChatScreen() {
 
   const timelineItems: TimelineItem[] = useMemo(() => buildTimelineItems(sessions), [sessions]);
 
+  /**
+   * Handle widget actions from chat messages (e.g., task completion, confirmations)
+   * This notifies other parts of the app to refresh their data
+   */
+  const handleWidgetAction = useCallback(
+    (actionId: string, actionData?: any) => {
+      console.log("[Chat] Widget action:", actionId, actionData);
+      
+      // Notify TaskContext to trigger updates in UserProfile and other screens
+      // Task-related actions: task_toggled, confirmed, completed, created, updated, deleted
+      const taskActions = [
+        "task_toggled",
+        "confirmed",
+        "completed",
+        "created",
+        "updated",
+        "deleted",
+        "task_completed",
+        "task_created",
+        "task_updated",
+        "task_deleted",
+      ];
+      
+      if (taskActions.includes(actionId)) {
+        notifyTaskUpdate();
+      }
+    },
+    [notifyTaskUpdate]
+  );
+
   const renderTimelineItem = useCallback(
     ({ item, index }: { item: TimelineItem; index: number }) => (
-      <TimelineItemComponent item={item} isLastItem={index === timelineItems.length - 1} onRetry={onRetry} />
+      <TimelineItemComponent
+        item={item}
+        isLastItem={index === timelineItems.length - 1}
+        onRetry={onRetry}
+        onWidgetAction={handleWidgetAction}
+      />
     ),
-    [timelineItems.length, onRetry]
+    [timelineItems.length, onRetry, handleWidgetAction]
   );
 
   const keyExtractor = useCallback((item: TimelineItem) => item.id, []);

@@ -34,9 +34,7 @@ export async function updateUserStreak(userId) {
   const lastActive = user.gamification?.lastActiveDate;
 
   if (!lastActive) {
-    // First activity ever
-    user.gamification.currentStreak = 1;
-    user.gamification.longestStreak = 1;
+    // First activity ever - keep streak at 0 until first task completion
     user.gamification.lastActiveDate = today;
   } else {
     const lastActiveDay = new Date(lastActive.getFullYear(), lastActive.getMonth(), lastActive.getDate());
@@ -52,8 +50,8 @@ export async function updateUserStreak(userId) {
       }
       user.gamification.lastActiveDate = today;
     } else {
-      // Streak broken - reset to 1
-      user.gamification.currentStreak = 1;
+      // Streak broken - reset to 0 (no active streak)
+      user.gamification.currentStreak = 0;
       user.gamification.lastActiveDate = today;
     }
   }

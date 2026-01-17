@@ -12,3 +12,6 @@ export * from "./chatService";
 
 // User profile services
 export * from "./userService";
+
+// Task services
+export * from "./taskService";
