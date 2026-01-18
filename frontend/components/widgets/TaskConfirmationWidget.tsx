@@ -105,22 +105,45 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) =
         </View>
 
         {/* Category */}
-        {task.category && (
+        {(task.categoryDisplay || task.category) && (
           <View style={styles.field}>
             <AppText variant="notes" style={styles.labelText}>
               📁 Category
             </AppText>
-            <AppText variant="bodyText">{task.category}</AppText>
+            <AppText variant="bodyText">{task.categoryDisplay || task.category}</AppText>
           </View>
         )}
 
         {/* Subcategory */}
-        {task.subcategory && (
+        {(task.subcategoryDisplay || task.subcategory) && (
           <View style={styles.field}>
             <AppText variant="notes" style={styles.labelText}>
               📂 Subcategory
             </AppText>
-            <AppText variant="bodyText">{task.subcategory}</AppText>
+            <AppText variant="bodyText">{task.subcategoryDisplay || task.subcategory}</AppText>
+          </View>
+        )}
+
+        {/* Estimated duration */}
+        {task.estimatedDuration != null && (
+          <View style={styles.field}>
+            <AppText variant="notes" style={styles.labelText}>
+              ⏱️ Estimated duration
+            </AppText>
+            <AppText variant="bodyText">{Math.round((task.estimatedDuration || 0) / 60)} hours</AppText>
+          </View>
+        )}
+
+        {/* Splitting */}
+        {task.taskType === "in_parts" && (
+          <View style={styles.field}>
+            <AppText variant="notes" style={styles.labelText}>
+              🔀 Splitting
+            </AppText>
+            <AppText variant="bodyText">
+              {task.chunkCount ? `${task.chunkCount} parts` : "Split into parts"}
+              {task.minChunk ? ` • min chunk ${task.minChunk} minutes` : ""}
+            </AppText>
           </View>
         )}
 

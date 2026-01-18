@@ -81,11 +81,12 @@ function parseRelativeDate(dateString) {
 
   // Fallback: throw error if can't parse
   throw new Error(
-    `Cannot parse date: "${dateString}". Use formats like "2026-01-09", "tomorrow", "next Thursday", etc.`
+    `Cannot parse date: "${dateString}". Use formats like "2026-01-09", "tomorrow", "next Thursday", etc.`,
   );
 }
 
 const previewTaskMission = new GuidedMission({
+  returnDirect: true,
   name: "preview_task",
   group: "task",
   description:
@@ -172,8 +173,8 @@ const previewTaskMission = new GuidedMission({
 
       // Apply defaults and inference
       let finalImportance = importance !== undefined && importance !== null ? importance : null;
-      const finalEffort = effort !== undefined && effort !== null ? effort : inferred.effort ?? null;
-      const finalDuration = duration !== undefined && duration !== null ? duration : inferred.duration ?? null;
+      const finalEffort = effort !== undefined && effort !== null ? effort : (inferred.effort ?? null);
+      const finalDuration = duration !== undefined && duration !== null ? duration : (inferred.duration ?? null);
       const finalCanSplit = canSplit !== undefined ? canSplit : TASK_CONFIG.defaults.splitable;
 
       // If duration isn't provided, request it from the user
@@ -275,8 +276,25 @@ const previewTaskMission = new GuidedMission({
 
       // Build a canonical widget string using the central helper (ensures
       // fields match registry schema and always uses the exact tags)
-      const { buildWidgetString } = await import("../../widgets/widgetUtils.js");
-      return buildWidgetString("task_confirmation", widgetPayload);
+      try {
+        const { buildWidgetString } = await import("../widgets/widgetUtils.js");
+        // Return a human-friendly message followed by the canonical widget block so
+        // the frontend displays both text and the widget content together.
+        const widgetString = buildWidgetString("task_confirmation", widgetPayload);
+        const message =
+          widgetPayload.confirmationMessage || "Here is a preview of the task. Please confirm or edit as needed.";
+        return `${message}\n\n${widgetString}`;
+      } catch (err) {
+        console.error("[previewTask] Failed to build widget string:", err.message);
+        // If widget generation fails for any reason, return a human-friendly
+        // assistant message and DO NOT include any widget block so the
+        // frontend will not attempt to parse one.
+        return (
+          "I’m sorry — I ran into a problem generating a preview for the task. " +
+          "I can still create the task for you with the details you provided, " +
+          "or make any edits you want before I create it."
+        );
+      }
     } catch (error) {
       return `ok=false\nerr="Failed to generate preview: ${error.message}"`;
     }

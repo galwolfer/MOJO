@@ -43,7 +43,7 @@ const getUpcomingTasksMission = new LightMission({
       };
 
       // Return widget only (use canonical builder to ensure correct tags/fields)
-      const { buildWidgetString } = await import("../../widgets/widgetUtils.js");
+      const { buildWidgetString } = await import("../widgets/widgetUtils.js");
       return buildWidgetString("task_list", { tasks: widgetJson.data.tasks });
     } catch (error) {
       return `ok=false\nerr="${error.message}"`;

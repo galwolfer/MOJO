@@ -241,7 +241,7 @@ const updateTaskMission = new GuidedMission({
         },
       };
 
-      const { buildWidgetString } = await import("../../widgets/widgetUtils.js");
+      const { buildWidgetString } = await import("../widgets/widgetUtils.js");
       return buildWidgetString("task_detail", widgetJson.data);
     } catch (error) {
       return `ok=false\nerr="${error.message}"`;
