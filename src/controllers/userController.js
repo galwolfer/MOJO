@@ -23,7 +23,7 @@ function ensureGamification(user) {
  * Helper: Check and update user streak based on activity
  * Call this when user completes a task or logs in
  */
-export async function updateUserStreak(userId) {
+export async function updateUserStreak(userId, isTaskCompletion = false) {
   const user = await User.findById(userId);
   if (!user) return null;
 
@@ -34,7 +34,11 @@ export async function updateUserStreak(userId) {
   const lastActive = user.gamification?.lastActiveDate;
 
   if (!lastActive) {
-    // First activity ever - keep streak at 0 until first task completion
+    // First activity ever - only increment streak if a task is being completed
+    if (isTaskCompletion) {
+      user.gamification.currentStreak = 1;
+      user.gamification.longestStreak = 1;
+    }
     user.gamification.lastActiveDate = today;
   } else {
     const lastActiveDay = new Date(lastActive.getFullYear(), lastActive.getMonth(), lastActive.getDate());
@@ -116,9 +120,6 @@ export const getUserStats = async (req, res) => {
       status: "done",
     });
 
-    // Update streak if user is active today
-    await updateUserStreak(userId);
-
     const stats = {
       tasks: completedTasks,
       points: user.gamification?.points || 0,
@@ -155,9 +156,9 @@ export async function awardTaskCompletionPoints(userId, task) {
     logger.info(`[awardTaskCompletionPoints] Task ${task._id} (importance: ${task.importance}, effort: ${task.effort}) = ${points} points`);
 
     await addUserPoints(userId, points);
-    await updateUserStreak(userId);
+    const updatedGamification = await updateUserStreak(userId, true);
 
-    return points;
+    return { points, gamification: updatedGamification };
   } catch (error) {
     logger.error(`[awardTaskCompletionPoints] Error awarding points:`, error);
     throw error;

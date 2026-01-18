@@ -156,13 +156,9 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14): TaskPro
     return createdAt >= todayStart && createdAt < todayEnd;
   });
 
-  // If no tasks specifically for today, show all incomplete tasks as "today's work"
-  const effectiveTodayTasks = todayTasks.length > 0
-    ? todayTasks
-    : tasks.filter((t) => !(t.status === "done" || t.completed === true));
-
-  const todayTotal = effectiveTodayTasks.length;
-  const todayCompleted = effectiveTodayTasks.filter((t) => t.status === "done" || t.completed === true).length;
+  // Only count tasks that are actually due today (or created today with no due date)
+  const todayTotal = todayTasks.length;
+  const todayCompleted = todayTasks.filter((t) => t.status === "done" || t.completed === true).length;
 
   // Calculate week's progress using Sunday -> Saturday boundaries
   // Determine the start of the current week (Sunday 00:00)

@@ -415,11 +415,13 @@ export async function updateTask(req, res) {
 
     // Award points when task is completed via update
     const isCompletedUpdate = updates.status === "done" || raw.completed === true;
+    let gamification = null;
     if (isCompletedUpdate && result.task) {
       try {
         const { awardTaskCompletionPoints } = await import("./userController.js");
-        const pointsAwarded = await awardTaskCompletionPoints(userId, result.task);
-        logger.info(`[updateTask] Awarded ${pointsAwarded} points to user ${userId} for task ${id}`);
+        const reward = await awardTaskCompletionPoints(userId, result.task);
+        logger.info(`[updateTask] Awarded ${reward.points} points to user ${userId} for task ${id}`);
+        gamification = reward.gamification;
       } catch (pointsError) {
         logger.error("[updateTask] Failed to award points:", pointsError.message);
       }
@@ -428,6 +430,7 @@ export async function updateTask(req, res) {
     return res.status(200).json({ 
       success: true, 
       task: result.task,
+      gamification: gamification,
       message: "Task updated successfully"
     });
   } catch (error) {
@@ -878,10 +881,12 @@ export async function completeTask(req, res) {
     }
 
     // Award points for task completion
+    let gamification = null;
     try {
       const { awardTaskCompletionPoints } = await import("./userController.js");
-      const pointsAwarded = await awardTaskCompletionPoints(userId, result.task);
-      logger.info(`Awarded ${pointsAwarded} points to user ${userId} for completing task ${id}`);
+      const reward = await awardTaskCompletionPoints(userId, result.task);
+      logger.info(`Awarded ${reward.points} points to user ${userId} for completing task ${id}`);
+      gamification = reward.gamification;
     } catch (pointsError) {
       logger.warn("Failed to award points for task completion:", pointsError.message);
     }
@@ -889,6 +894,7 @@ export async function completeTask(req, res) {
     return res.status(200).json({
       success: true,
       task: result.task,
+      gamification: gamification,
       actualCompletionMinutes: result.actualCompletionMinutes,
       message: "Task completed successfully",
     });
