@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { GuidedMission } from "./GuidedMission.js";
 import * as taskService from "../../services/taskService.js";
-import { awardTaskCompletionPoints } from "../../controllers/userController.js";
 import { CATEGORY_STRING_VALUES, getDisplayName } from "../../config/categories.js";
 import { TASK_CONFIG } from "../taskRules.js";
 import { getIllegalDisplayFields, getIllegalCharsErrorMessage } from "../../utils/illegalChars.js";
@@ -201,15 +200,6 @@ const updateTaskMission = new GuidedMission({
       }
 
       const task = result.task;
-
-      // Award points if task is marked as completed
-      if (completed === true && result.task) {
-        try {
-          await awardTaskCompletionPoints(userId, result.task);
-        } catch (pointsError) {
-          console.warn("[updateTaskMission] Failed to award points:", pointsError.message);
-        }
-      }
 
       // Construct task_detail widget to show the updated task
       const widgetJson = {
