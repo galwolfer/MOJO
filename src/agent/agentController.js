@@ -709,9 +709,13 @@ export class AgentController {
                   action: "listed",
                   status: task.status,
                   dueDate: task.dueDate,
+                    });
+                  }
                 });
-              }
-            });
+            }
+          } catch (e) {
+            // Ignore JSON parse errors
+          }
         }
       }
 
