@@ -40,9 +40,11 @@ interface UseChatMessagesOptions {
   onTaskChange?: () => void;
 }
 
+type SendMessageOptions = UseChatMessagesOptions & { clientId?: string; isRetry?: boolean };
+
 export function useChatMessages(
   updateSession: (session: ChatSessionSummary) => void,
-  options?: UseChatMessagesOptions
+  options?: UseChatMessagesOptions,
 ) {
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -51,12 +53,14 @@ export function useChatMessages(
   const createClientId = useCallback(() => `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, []);
   const { currentOjoType } = useOjoType();
 
+  const hookOnTaskChange = options?.onTaskChange;
+
   const buildSessionUpdate = (
     sessionId: string,
     now: Date,
     getSessions: () => ChatSessionSummary[],
     messages: ChatMessage[],
-    messageCountDelta: number
+    messageCountDelta: number,
   ): ChatSessionSummary => {
     const sessionsNow = getSessions();
     const existing = sessionsNow.find((s) => s.sessionId === sessionId);
@@ -76,7 +80,7 @@ export function useChatMessages(
       currentSessionId: string,
       text: string,
       getSessions: () => ChatSessionSummary[],
-      options?: { clientId?: string; isRetry?: boolean }
+      options?: SendMessageOptions,
     ) => {
       if (!text || isLoading) return;
 
@@ -132,7 +136,7 @@ export function useChatMessages(
             message: text,
             sessionId: currentSessionId,
           },
-          { timeoutMs: SEND_TIMEOUT_MS }
+          { timeoutMs: SEND_TIMEOUT_MS },
         );
 
         if (response.success && response.response) {
@@ -149,7 +153,7 @@ export function useChatMessages(
 
           // Mark the original user message as sent
           let updatedMessages = baseAfter.map(
-            (m): ChatMessage => (m.clientId === clientId ? { ...m, status: "sent" } : m)
+            (m): ChatMessage => (m.clientId === clientId ? { ...m, status: "sent" } : m),
           );
 
           const assistantMessage: ChatMessage = {
@@ -175,14 +179,14 @@ export function useChatMessages(
           const trimmed = updatedMessages.slice(-MAX_CACHED_MESSAGES_PER_SESSION);
           updateSession(buildSessionUpdate(sid, agentNow, getSessions, trimmed, messageCountDeltaSuccess));
 
-          // Check if response indicates task-related action and notify
-          if (options?.onTaskChange && response.response) {
+          // Check if response indicates task-related action and notify.
+          // Per-call onTaskChange overrides hook-level; fall back to hookOnTaskChange.
+          const effectiveOnTaskChange = options?.onTaskChange || hookOnTaskChange;
+          if (effectiveOnTaskChange && response.response) {
             const responseText = response.response.toLowerCase();
-            const hasTaskAction = TASK_ACTION_KEYWORDS.some((keyword) =>
-              responseText.includes(keyword.toLowerCase())
-            );
+            const hasTaskAction = TASK_ACTION_KEYWORDS.some((keyword) => responseText.includes(keyword.toLowerCase()));
             if (hasTaskAction) {
-              options.onTaskChange();
+              effectiveOnTaskChange();
             }
           }
         } else {
@@ -191,7 +195,7 @@ export function useChatMessages(
           const existingAfter = sessionsAfter.find((s) => s.sessionId === currentSessionId);
           const baseAfter = existingAfter?.messages || optimisticMessages;
           let updatedMessages: ChatMessage[] = baseAfter.map(
-            (m): ChatMessage => (m.clientId === clientId ? { ...m, status: "failed" } : m)
+            (m): ChatMessage => (m.clientId === clientId ? { ...m, status: "failed" } : m),
           );
 
           const last = updatedMessages[updatedMessages.length - 1];
@@ -224,7 +228,7 @@ export function useChatMessages(
         const existingAfter = sessionsAfter.find((s) => s.sessionId === currentSessionId);
         const baseAfter = existingAfter?.messages || optimisticMessages;
         let updatedMessages: ChatMessage[] = baseAfter.map(
-          (m): ChatMessage => (m.clientId === clientId ? { ...m, status: "failed" } : m)
+          (m): ChatMessage => (m.clientId === clientId ? { ...m, status: "failed" } : m),
         );
 
         const last = updatedMessages[updatedMessages.length - 1];
@@ -253,7 +257,7 @@ export function useChatMessages(
         setIsLoading(false);
       }
     },
-    [isLoading, updateSession, createClientId, setSessionId]
+    [isLoading, updateSession, createClientId, setSessionId],
   );
 
   const handleSend = useCallback(
@@ -266,7 +270,7 @@ export function useChatMessages(
 
       await sendMessage(currentSessionId, trimmedText, getSessions);
     },
-    [message, isLoading, sendMessage]
+    [message, isLoading, sendMessage],
   );
 
   const sendText = useCallback(
@@ -275,7 +279,7 @@ export function useChatMessages(
       if (!trimmedText || isLoading) return;
       await sendMessage(currentSessionId, trimmedText, getSessions);
     },
-    [isLoading, sendMessage]
+    [isLoading, sendMessage],
   );
 
   const handleRetry = useCallback(
@@ -287,7 +291,7 @@ export function useChatMessages(
 
       await sendMessage(currentSessionId, retryTarget.content, getSessions, { clientId, isRetry: true });
     },
-    [sendMessage]
+    [sendMessage],
   );
 
   return {
