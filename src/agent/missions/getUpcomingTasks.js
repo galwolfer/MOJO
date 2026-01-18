@@ -5,8 +5,8 @@ import * as taskService from "../../services/taskService.js";
 const getUpcomingTasksMission = new LightMission({
   name: "get_upcoming_tasks",
   group: "task",
-  description: "Return tasks due within N days",
-  missionInfo: "Tasks due soon",
+  description: "Return tasks due within N days. Keep message brief - widget shows details.",
+  missionInfo: "Tasks due soon. Write short intro (e.g., 'Here are your upcoming tasks:'). Don't repeat details.",
   widgets: ["task_list"],
   schema: z.object({
     days: z.number().optional().default(7),
@@ -43,7 +43,7 @@ const getUpcomingTasksMission = new LightMission({
       };
 
       // Return widget only (use canonical builder to ensure correct tags/fields)
-      const { buildWidgetString } = await import("../../widgets/widgetUtils.js");
+      const { buildWidgetString } = await import("../widgets/widgetUtils.js");
       return buildWidgetString("task_list", { tasks: widgetJson.data.tasks });
     } catch (error) {
       return `ok=false\nerr="${error.message}"`;

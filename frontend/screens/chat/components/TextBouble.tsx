@@ -25,6 +25,12 @@ export type TextBoubleMode = "agent" | "user";
 // to `TextBouble`, the animation will only play once ever for that key
 // (survives mount/unmount cycles during the app session).
 const playedMap = new Map<string, boolean>();
+
+// Persistent map of shown widgets by key. Once a widget has been revealed for
+// a message, it should remain visible even across re-renders (e.g., when new
+// messages arrive). This prevents the widget from disappearing and re-appearing.
+const widgetShownMap = new Map<string, boolean>();
+
 /**
  * Isolated typewriter component that updates independently
  * without causing parent re-renders. Uses requestAnimationFrame
@@ -86,7 +92,7 @@ const TypewriterText = memo<{
       {
         style: [textStyle, (children as any).props?.style],
       },
-      displayText
+      displayText,
     );
   }
 
@@ -157,7 +163,7 @@ function cloneChildrenWithTyping(node: React.ReactNode, typedChars: number): Rea
         out.push(
           <React.Fragment key={i}>
             {cloneChildrenWithTyping(child, Math.min(remainingTyped, childTextLen))}
-          </React.Fragment>
+          </React.Fragment>,
         );
         consumedSoFar += childTextLen;
       } else {
@@ -166,7 +172,7 @@ function cloneChildrenWithTyping(node: React.ReactNode, typedChars: number): Rea
         out.push(
           <React.Fragment key={i}>
             <NonTextFade visible={visible}>{child}</NonTextFade>
-          </React.Fragment>
+          </React.Fragment>,
         );
       }
     });
@@ -224,7 +230,7 @@ const AnimatedTypingContent: React.FC<{
       {
         style: [(children as any).props?.style, mode === "user" ? { color: COLORS.colorWhite } : undefined],
       },
-      content
+      content,
     );
   }
 
@@ -353,25 +359,33 @@ const TextBouble: React.FC<Props> = ({
   // Parse widget data from agent messages
   const parsedContent = useMemo(() => {
     if (!rawText || mode !== "agent") {
-      return { displayText: rawText, widget: null };
+      return { displayText: rawText, widget: null, afterText: null };
     }
-    const { beforeText, widget } = splitTextAndWidget(rawText);
+    const { beforeText, widget, afterText } = splitTextAndWidget(rawText);
     return {
       displayText: widget ? beforeText || null : rawText,
       widget,
+      afterText: widget ? afterText || null : null,
     };
   }, [rawText, mode]);
 
   // Display text for typewriter (without widget JSON)
   const fullText = parsedContent.displayText;
+  const afterText = parsedContent.afterText;
 
   const [showConic, setShowConic] = useState(() => mode === "agent" && resolvedTypewriter && !!fullText);
   const [isTyping, setIsTyping] = useState(() => mode === "agent" && resolvedTypewriter && !!fullText);
 
   // Track whether the widget should be mounted and remain visible once shown.
-  // We intentionally do NOT set it to false when typing restarts so the widget
-  // remains visible after it's been revealed.
-  const [widgetMounted, setWidgetMounted] = useState<boolean>(() => false);
+  // Use the persistent map to check if this widget was already revealed (survives re-renders).
+  // Once a widget is shown, it should NEVER be hidden again.
+  const [widgetMounted, setWidgetMounted] = useState<boolean>(() => {
+    // If we have a playOnceKey and the widget was already shown, start mounted
+    if (playOnceKey && widgetShownMap.get(playOnceKey)) return true;
+    // If there's a widget and we're not going to type, show it immediately
+    if (parsedContent.widget && !resolvedTypewriter) return true;
+    return false;
+  });
 
   // Cross-fade shadow layers (agent only)
   const conicOpacity = useRef(new Animated.Value(0)).current;
@@ -381,7 +395,9 @@ const TextBouble: React.FC<Props> = ({
   const glowAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
   // Fade-in animation for non-text elements after typing completes
-  const nonTextOpacity = useRef(new Animated.Value(0)).current;
+  // If widget was already shown for this message, start fully visible
+  const widgetAlreadyShown = Boolean(playOnceKey && widgetShownMap.get(playOnceKey));
+  const nonTextOpacity = useRef(new Animated.Value(widgetAlreadyShown ? 1 : 0)).current;
 
   // Track last seen meaningful inputs to avoid restarting animations on unrelated re-renders
   // Only run the typewriter the first time this TextBouble is shown.
@@ -394,8 +410,12 @@ const TextBouble: React.FC<Props> = ({
       onTypingDone?.();
       setIsTyping(false);
       // Ensure the widget is mounted/visible once typing completes
+      // and persist this in the global map so it survives re-renders
       try {
         setWidgetMounted(true);
+        if (playOnceKey && parsedContent.widget) {
+          widgetShownMap.set(playOnceKey, true);
+        }
       } catch (_) {}
 
       // On mobile, animating opacity via JS driver is more reliable
@@ -448,13 +468,16 @@ const TextBouble: React.FC<Props> = ({
         } catch (_) {}
       });
     },
-    [onTypingDone, conicOpacity, glowOpacity, nonTextOpacity, setWidgetMounted]
+    [onTypingDone, conicOpacity, glowOpacity, nonTextOpacity, setWidgetMounted],
   );
 
   useEffect(() => {
     // Initialize only once per mount/show. If the typewriter has already played
     // for this instance, do not restart it on subsequent re-renders (e.g., showing errors).
     const shouldType = (typewriter ?? mode === "agent") && mode === "agent" && !!fullText;
+
+    // Check if widget was already shown - if so, never hide it
+    const widgetWasShown = playOnceKey && widgetShownMap.get(playOnceKey);
 
     if (!initializedRef.current) {
       initializedRef.current = true;
@@ -465,7 +488,8 @@ const TextBouble: React.FC<Props> = ({
         setShowConic(true);
         conicOpacity.setValue(1);
         glowOpacity.setValue(0);
-        nonTextOpacity.setValue(0);
+        // Keep widget visible if it was already shown
+        nonTextOpacity.setValue(widgetWasShown ? 1 : 0);
       } else {
         setIsTyping(false);
         setShowConic(false);
@@ -475,8 +499,11 @@ const TextBouble: React.FC<Props> = ({
         // If we are not typing, mark as played so we don't attempt later
         playedRef.current = true;
         if (playOnceKey) playedMap.set(playOnceKey, true);
-        // If there's a widget and we're not typing, mount it immediately
-        if (parsedContent.widget) setWidgetMounted(true);
+        // If there's a widget and we're not typing, mount it immediately and persist
+        if (parsedContent.widget) {
+          setWidgetMounted(true);
+          if (playOnceKey) widgetShownMap.set(playOnceKey, true);
+        }
       }
     } else {
       // Already initialized: don't restart animations on re-renders. But if typing
@@ -486,7 +513,8 @@ const TextBouble: React.FC<Props> = ({
         setShowConic(true);
         conicOpacity.setValue(1);
         glowOpacity.setValue(0);
-        nonTextOpacity.setValue(0);
+        // Keep widget visible if it was already shown
+        nonTextOpacity.setValue(widgetWasShown ? 1 : 0);
       } else {
         // Keep current visual state (do not restart)
       }
@@ -521,11 +549,15 @@ const TextBouble: React.FC<Props> = ({
         glowOpacity.setValue(finalGlow);
       }
       try {
+        // If widget was already shown, keep nonTextOpacity at 1
+        const widgetWasShown = playOnceKey && widgetShownMap.get(playOnceKey);
+        const finalNonTextOpacity = widgetWasShown ? 1 : shouldType ? 0 : 1;
         nonTextOpacity.stopAnimation(() => {
-          nonTextOpacity.setValue(shouldType ? 0 : 1);
+          nonTextOpacity.setValue(finalNonTextOpacity);
         });
       } catch (_) {
-        nonTextOpacity.setValue(shouldType ? 0 : 1);
+        const widgetWasShown = playOnceKey && widgetShownMap.get(playOnceKey);
+        nonTextOpacity.setValue(widgetWasShown ? 1 : shouldType ? 0 : 1);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -533,23 +565,37 @@ const TextBouble: React.FC<Props> = ({
 
   // Keep the widget mounted once it's visible so it won't disappear if
   // a new message (or other re-render) temporarily toggles typing.
+  // CRITICAL: Once a widget has been shown, it should NEVER be hidden.
   useEffect(() => {
-    if (!parsedContent.widget) {
-      setWidgetMounted(false);
+    // If this widget was already shown (persisted in global map), always keep it mounted
+    // and ensure opacity is set to 1 so it's visible
+    if (playOnceKey && widgetShownMap.get(playOnceKey)) {
+      if (!widgetMounted) setWidgetMounted(true);
+      // Force opacity to 1 in case it was reset during re-render
+      nonTextOpacity.setValue(1);
       return;
     }
 
-    // If there's a widget and we're not currently typing, ensure it is mounted.
-    if (!isTyping) setWidgetMounted(true);
+    // No widget in this message - nothing to mount
+    if (!parsedContent.widget) {
+      return;
+    }
+
+    // If there's a widget and we're not currently typing, mount it and persist
+    if (!isTyping) {
+      setWidgetMounted(true);
+      nonTextOpacity.setValue(1);
+      if (playOnceKey) widgetShownMap.set(playOnceKey, true);
+    }
     // If we're typing, do not unmount; we only mount once typing completes.
-  }, [parsedContent.widget, isTyping]);
+  }, [parsedContent.widget, isTyping, playOnceKey, widgetMounted, nonTextOpacity]);
 
   const radii = useMemo(() => getRadii(mode), [mode]);
   const containerBg = useMemo(() => getContainerBackground(mode), [mode]);
   // Determine shadow color from persona gradient if provided
   const shadowColor = useMemo(
     () => (gradientColors && gradientColors.length > 0 ? gradientColors[0] : undefined),
-    [gradientColors]
+    [gradientColors],
   );
   const containerShadow = useMemo(() => getContainerShadow(mode, shadowColor), [mode, shadowColor]);
 
@@ -671,6 +717,11 @@ const TextBouble: React.FC<Props> = ({
         {mode === "agent" && parsedContent.widget && widgetMounted && (
           <Animated.View style={{ opacity: nonTextOpacity, width: "100%" }}>
             <WidgetRenderer widget={parsedContent.widget} onAction={onWidgetAction} />
+          </Animated.View>
+        )}
+        {mode === "agent" && parsedContent.widget && widgetMounted && afterText && (
+          <Animated.View style={{ opacity: nonTextOpacity, width: "100%" }}>
+            {renderTextContent(afterText)}
           </Animated.View>
         )}
       </View>

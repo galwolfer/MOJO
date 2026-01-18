@@ -1,4 +1,5 @@
 import { widgetRegistry } from "./registry.js";
+import { sanitizeDisplayStringsDeep } from "../../utils/illegalChars.js";
 
 /**
  * Ensure the provided data object contains all keys listed in the widget
@@ -28,10 +29,11 @@ export function ensureWidgetFields(widgetType, data = {}) {
  */
 export function buildWidgetString(widgetType, data = {}) {
   const canonicalData = ensureWidgetFields(widgetType, data);
+  const safeData = sanitizeDisplayStringsDeep(canonicalData);
   const payload = {
     version: "1.0",
     widget_type: widgetType,
-    data: canonicalData,
+    data: safeData,
   };
 
   // JSON.stringify with stable ordering - use Object.keys to ensure order
@@ -55,7 +57,7 @@ export function extractWidgetFromText(text) {
   if (!text || typeof text !== "string") return null;
 
   // Quick fix: replace common misspellings of the closing tag
-  const fixed = text.replace(/<\/?W+IDGET_JSON>/gi, (m) => {
+  const fixed = text.replace(/<\s*\/?\s*W[^>]*JSON\s*>/gi, (m) => {
     // Normalize to either opening or correct closing tag
     return m.startsWith("</") ? "</WIDGET_JSON>" : "<WIDGET_JSON>";
   });

@@ -82,6 +82,18 @@ export class AgentController {
   async processMessage(sessionId, userMessage, userId) {
     try {
       console.log(`[AgentController] Processing message for user: ${userId}, session: ${sessionId}`);
+      let lastWidgetResult = null;
+      const captureWidgetBlock = (raw) => {
+        if (typeof raw !== "string") return null;
+        const match = raw.match(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/);
+        return match ? match[0] : null;
+      };
+      const normalizeWidgetTags = (text) => {
+        if (typeof text !== "string") return text;
+        return text.replace(/<\s*\/?\s*W[^>]*JSON\s*>/gi, (m) =>
+          m.includes("</") ? "</WIDGET_JSON>" : "<WIDGET_JSON>",
+        );
+      };
 
       // STEP 1: SAVE USER MESSAGE
       // Store the user's message in the session for later retrieval
@@ -147,9 +159,19 @@ export class AgentController {
         });
       }
 
+      // Language hint: detect basic script of the user's message and add a short USER_LANGUAGE marker
+      // This is a lightweight hint to help the model choose natural phrasing without heavy rules.
+      try {
+        const userLang = /[\u0590-\u05FF]/.test(userMessage) ? "Hebrew" : "English";
+        memoryContext += `\nUSER_LANGUAGE: ${userLang}`;
+        console.log(`[AgentController] Detected USER_LANGUAGE=${userLang}`);
+      } catch (e) {
+        // ignore non-critical errors
+      }
+
       console.log(`[AgentController] Memory context length: ${memoryContext.length} chars`);
       console.log(
-        `[AgentController] Retrieved ${relevantMemories.primary.length} primary + ${relevantMemories.conversation.length} conversation memories`
+        `[AgentController] Retrieved ${relevantMemories.primary.length} primary + ${relevantMemories.conversation.length} conversation memories`,
       );
 
       // SAFETY: Truncate long memory context to avoid huge prompts
@@ -157,7 +179,7 @@ export class AgentController {
       const MAX_MEMORY_CHARS = TOKEN_BUDGET.MAX_MEMORY_TOKENS * 4; // Approx 4 chars per token
       if (memoryContext.length > MAX_MEMORY_CHARS) {
         console.warn(
-          `[AgentController] memoryContext is ${memoryContext.length} chars; truncating to ${MAX_MEMORY_CHARS} chars. LLM can use search_memories tool for more.`
+          `[AgentController] memoryContext is ${memoryContext.length} chars; truncating to ${MAX_MEMORY_CHARS} chars. LLM can use search_memories tool for more.`,
         );
         memoryContext = memoryContext.substring(0, MAX_MEMORY_CHARS) + "...";
       }
@@ -234,11 +256,15 @@ export class AgentController {
                     userId,
                     callId,
                     getTasksTool.name,
-                    `ok=false\nerr="Widget validation failed: ${widgetValidation.reason}"`
+                    `ok=false\nerr="Widget validation failed: ${widgetValidation.reason}"`,
                   );
                   result = `ok=false\nerr="Widget validation failed: ${widgetValidation.reason}"`;
                 }
               }
+            }
+            const widgetBlock = captureWidgetBlock(result);
+            if (widgetBlock) {
+              lastWidgetResult = widgetBlock;
             }
 
             // Persist and add to messages so LLM can craft a natural response referencing it
@@ -248,7 +274,7 @@ export class AgentController {
                 content: result,
                 tool_call_id: callId,
                 name: getTasksTool.name,
-              })
+              }),
             );
 
             // Extract entities from the result so recent entities are available
@@ -285,13 +311,13 @@ export class AgentController {
           } catch (err) {
             console.error(
               `[AgentController] LLM invocation failed. Sanitized messages:`,
-              currentMessages.map((m) => ({ type: m._getType && m._getType(), content: m.content }))
+              currentMessages.map((m) => ({ type: m._getType && m._getType(), content: m.content })),
             );
             // If we saw the internal TypeError (reading 'message'), perform a minimal retry
             // to help isolate provider/formatting issues (system + last user message)
             if (err instanceof TypeError && /reading 'message'/.test(err.message)) {
               console.warn(
-                `[AgentController] Detected TypeError in LLM invoke (reading 'message'). Retrying with minimal messages (system + last user message).`
+                `[AgentController] Detected TypeError in LLM invoke (reading 'message'). Retrying with minimal messages (system + last user message).`,
               );
               const systemMsg = currentMessages.find((m) => m._getType && m._getType() === "system");
               const lastUser = [...currentMessages].reverse().find((m) => m._getType && m._getType() === "human");
@@ -323,7 +349,7 @@ export class AgentController {
                 content: errText,
                 tool_call_id: "_system_rejected",
                 name: "_system_rejected",
-              })
+              }),
             );
 
             // Try loop again so the LLM can respond to the rejection
@@ -371,7 +397,7 @@ export class AgentController {
                   const validation = validateToolCall(tool, toolCall.args || {});
                   if (!validation.valid) {
                     console.warn(
-                      `[AgentController] Tool call validation failed for ${toolCall.name}: ${validation.reason}`
+                      `[AgentController] Tool call validation failed for ${toolCall.name}: ${validation.reason}`,
                     );
                     const errText = `ok=false\nerr="Validation failed: ${validation.reason}"`;
                     // Persist failure to session for auditing
@@ -383,7 +409,7 @@ export class AgentController {
                         content: errText,
                         tool_call_id: toolCall.id,
                         name: toolCall.name || toolCall.id || "unknown",
-                      })
+                      }),
                     );
                     continue; // skip execution
                   }
@@ -399,7 +425,7 @@ export class AgentController {
                     const widgetValidation = validateWidgetPayload(result);
                     if (!widgetValidation.valid) {
                       console.warn(
-                        `[AgentController] Widget validation failed for ${toolCall.name}: ${widgetValidation.reason}`
+                        `[AgentController] Widget validation failed for ${toolCall.name}: ${widgetValidation.reason}`,
                       );
 
                       // Special-case: empty task list -> return structured empty result instead of showing empty widget
@@ -410,9 +436,11 @@ export class AgentController {
                         console.log(`[AgentController] Replacing empty task_list widget with structured empty result`);
                         result = `ok=true\ncount=0`;
                       } else if (toolCall.name === "preview_task") {
-                        // For preview_task, always pass the widget through even if validation issues
-                        // The LLM will handle any display errors gracefully
-                        console.log(`[AgentController] Allowing preview_task widget despite validation issue`);
+                        // For preview_task, do NOT show an invalid widget — return a friendly fallback message
+                        console.warn(`[AgentController] Replacing invalid preview_task widget with fallback message`);
+                        result =
+                          "I’m sorry — I ran into a problem generating a preview for the task. " +
+                          "I can still create the task for you with the details you provided, or make any edits you want before I create it.";
                       } else {
                         // Persist failure for auditing
                         await memoryStore.addToolResult(
@@ -420,11 +448,15 @@ export class AgentController {
                           userId,
                           toolCall.id,
                           toolCall.name,
-                          `ok=false\nerr="Widget validation failed: ${widgetValidation.reason}"`
+                          `ok=false\nerr="Widget validation failed: ${widgetValidation.reason}"`,
                         );
                         result = `ok=false\nerr="Widget validation failed: ${widgetValidation.reason}"`;
                       }
                     }
+                  }
+                  const widgetBlock = captureWidgetBlock(result);
+                  if (widgetBlock) {
+                    lastWidgetResult = widgetBlock;
                   }
 
                   // Add the tool result to the message history and persist it
@@ -433,7 +465,7 @@ export class AgentController {
                       content: result,
                       tool_call_id: toolCall.id,
                       name: toolCall.name || toolCall.id || "unknown",
-                    })
+                    }),
                   );
                   await memoryStore.addToolResult(sessionId, userId, toolCall.id, toolCall.name, result);
 
@@ -454,7 +486,7 @@ export class AgentController {
                       content: errText,
                       tool_call_id: toolCall.id,
                       name: toolCall.name || toolCall.id || "unknown",
-                    })
+                    }),
                   );
                   await memoryStore.addToolResult(sessionId, userId, toolCall.id, toolCall.name, errText);
                 }
@@ -466,7 +498,7 @@ export class AgentController {
                     content: errText,
                     tool_call_id: toolCall.id,
                     name: toolCall.name || toolCall.id || "unknown",
-                  })
+                  }),
                 );
                 await memoryStore.addToolResult(sessionId, userId, toolCall.id, "unknown", errText);
               }
@@ -499,6 +531,42 @@ export class AgentController {
       // Store the final response in the session
       if (finalResponse) {
         finalResponse = this._sanitizeResponse(finalResponse);
+        finalResponse = normalizeWidgetTags(finalResponse);
+        if (lastWidgetResult) {
+          if (extractWidgetFromText(finalResponse)) {
+            finalResponse = finalResponse.replace(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/i, lastWidgetResult);
+          } else {
+            finalResponse = finalResponse ? `${finalResponse}\n${lastWidgetResult}` : lastWidgetResult;
+          }
+        } else if (extractWidgetFromText(finalResponse)) {
+          const widgetMatch = finalResponse.match(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/i);
+          if (widgetMatch) {
+            const widgetBlock = widgetMatch[0];
+            finalResponse = finalResponse.replace(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/i, widgetBlock);
+          }
+        }
+        // If the message is just a widget or has very short surrounding text, insert a short, natural fallback
+        try {
+          const widgetPresent = extractWidgetFromText(finalResponse) || lastWidgetResult;
+          if (widgetPresent) {
+            // Extract widget block
+            const match = finalResponse.match(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/i);
+            const widgetBlock = match ? match[0] : lastWidgetResult || "";
+            const surrounding = finalResponse.replace(widgetBlock, "").trim();
+
+            // Decide if surrounding text is too terse (few words or just punctuation)
+            const words = surrounding.split(/\s+/).filter(Boolean);
+            if (words.length < 3) {
+              const isHebrew = /[\u0590-\u05FF]/.test(userMessage);
+              const pre = isHebrew ? "הנה הטיוטה שלך." : "Here is your draft for your mission.";
+              const post = isHebrew ? "אפשר לאשר, לערוך או לבטל." : "You can confirm, edit, or cancel.";
+              finalResponse = `${pre}\n${widgetBlock}\n${post}`;
+            }
+          }
+        } catch (e) {
+          // Non-critical - fall back to original finalResponse
+        }
+
         // Persist assistant message and attach which OjoType authored it (user's selected OjoType)
         await memoryStore.addAssistantMessage(sessionId, userId, finalResponse, {
           ojoTypeName: userProfile?.ojoType?.name,
@@ -647,6 +715,20 @@ export class AgentController {
     // Clean up extra newlines and whitespace
     cleaned = cleaned.replace(/\n\s*\n+/g, "\n").trim();
 
+    // Strip illegal display characters outside widget blocks
+    const widgetBlocks = [];
+    cleaned = cleaned.replace(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/gi, (match) => {
+      const token = `__WIDGET_BLOCK_${widgetBlocks.length}__`;
+      widgetBlocks.push(match);
+      return token;
+    });
+    cleaned = cleaned.replace(/[<>]/g, "");
+    widgetBlocks.forEach((block, idx) => {
+      cleaned = cleaned.replace(`__WIDGET_BLOCK_${idx}__`, block);
+    });
+
+    cleaned = cleaned.replace(/\n\s*\n+/g, "\n").trim();
+
     return cleaned;
   }
 
@@ -709,13 +791,9 @@ export class AgentController {
                   action: "listed",
                   status: task.status,
                   dueDate: task.dueDate,
-                    });
-                  }
                 });
-            }
-          } catch (e) {
-            // Ignore JSON parse errors
-          }
+              }
+            });
         }
       }
 

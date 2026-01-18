@@ -5,8 +5,9 @@ import * as taskService from "../../services/taskService.js";
 const getTasksMission = new LightMission({
   name: "get_tasks",
   group: "task",
-  description: "Fetch tasks (filters/search)",
-  missionInfo: "Retrieve tasks",
+  description: "Fetch tasks (filters/search). Keep your message brief - widget shows the details.",
+  missionInfo:
+    "Retrieve tasks. Write short intro before widget (e.g., 'Here are your tasks:'). Don't list details in text.",
   widgets: ["task_list"],
   schema: z.object({
     search: z.string().optional().describe("Search query to find tasks by name/title"),
@@ -58,7 +59,7 @@ const getTasksMission = new LightMission({
       };
 
       // Return widget only (use canonical builder to ensure correct tags/fields)
-      const { buildWidgetString } = await import("../../widgets/widgetUtils.js");
+      const { buildWidgetString } = await import("../widgets/widgetUtils.js");
       return buildWidgetString("task_list", { tasks: widgetJson.data.tasks });
     } catch (error) {
       return `ok=false\nerr="${error.message}"`;

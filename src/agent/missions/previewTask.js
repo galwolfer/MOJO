@@ -2,6 +2,7 @@ import { z } from "zod";
 import { GuidedMission } from "./GuidedMission.js";
 import { TASK_CONFIG, inferTaskProperties, inferSplittingParams } from "../taskRules.js";
 import { getDisplayName } from "../../config/categories.js";
+import { getIllegalDisplayFields, getIllegalCharsErrorMessage } from "../../utils/illegalChars.js";
 
 /**
  * Parse relative date strings like "next Thursday", "tomorrow", "in 3 days"
@@ -81,7 +82,7 @@ function parseRelativeDate(dateString) {
 
   // Fallback: throw error if can't parse
   throw new Error(
-    `Cannot parse date: "${dateString}". Use formats like "2026-01-09", "tomorrow", "next Thursday", etc.`
+    `Cannot parse date: "${dateString}". Use formats like "2026-01-09", "tomorrow", "next Thursday", etc.`,
   );
 }
 
@@ -89,14 +90,18 @@ const previewTaskMission = new GuidedMission({
   name: "preview_task",
   group: "task",
   description:
-    "Return a task_confirmation widget for approval. Required: taskname, deadline, estimatedDuration, category, subcategory. Must call get_subcategories first.",
-  missionInfo: "Draft and show a task_confirmation widget. User must choose category/subcategory first.",
+    "Return a task_confirmation widget for approval. Keep your message brief - the widget shows all details. Required: taskname, deadline, estimatedDuration, category, subcategory.",
+  missionInfo:
+    "Draft and show a task_confirmation widget. Use 1 short, natural sentence before the widget and one short sentence after (confirm/edit/cancel). Prefer the user's language when evident, otherwise default to English. Allow the model to pick an appropriate, natural phrasing (vary wording and tone as needed). Do NOT repeat fields already shown in the widget.",
   behavior: [
     "Use when user asks to create a task.",
     "STEP 1: Determine category ",
     "STEP 2: Call get_subcategories(category=<chosen>) to fetch options.",
-    "STEP 3: Show preview_task with confirmed category and subcategory.",
+    "STEP 3: Call preview_task, then write 1-2 natural 'draft ready' sentences (avoid greetings; vary wording) before the widget and a short confirm/edit/cancel line after it. If the subcategory is new, mention it briefly.",
+    "STEP 3b: If the user's language is English, use English sample phrases (e.g., 'Here is your draft for your mission.' before the widget and 'You can confirm, edit, or cancel.' after it). If the user's language is not English, match the user's language. If language detection is ambiguous, default to English.",
+
     "STEP 4: After user confirms, call add_task with final details.",
+    "IMPORTANT: Do NOT list task details in your message - the widget displays everything.",
   ],
   widgets: ["task_confirmation"],
   schema: z.object({
@@ -149,6 +154,15 @@ const previewTaskMission = new GuidedMission({
     } = args;
 
     try {
+      const illegalFields = getIllegalDisplayFields({
+        taskname,
+        description,
+        subcategory,
+      });
+      if (illegalFields.length > 0) {
+        return `ok=false\nerr="illegal_characters"\nmsg="${getIllegalCharsErrorMessage(illegalFields)}"`;
+      }
+
       // Parse relative dates (e.g., "next Thursday", "tomorrow", "in 3 days") to ISO format
       let finalDeadline = deadline;
       try {
@@ -172,8 +186,8 @@ const previewTaskMission = new GuidedMission({
 
       // Apply defaults and inference
       let finalImportance = importance !== undefined && importance !== null ? importance : null;
-      const finalEffort = effort !== undefined && effort !== null ? effort : inferred.effort ?? null;
-      const finalDuration = duration !== undefined && duration !== null ? duration : inferred.duration ?? null;
+      const finalEffort = effort !== undefined && effort !== null ? effort : (inferred.effort ?? null);
+      const finalDuration = duration !== undefined && duration !== null ? duration : (inferred.duration ?? null);
       const finalCanSplit = canSplit !== undefined ? canSplit : TASK_CONFIG.defaults.splitable;
 
       // If duration isn't provided, request it from the user
@@ -240,43 +254,81 @@ const previewTaskMission = new GuidedMission({
       const categoryDisplay = getDisplayName(category || inferred.category || "");
       const shortDescription = `${taskname} — ${categoryDisplay} • due ${finalDeadline}`;
 
+      // Widget payload - clean structure with no duplicate fields
+      // Small helper to detect Hebrew vs English based on characters in text
+      function detectLangFromText(text) {
+        if (!text || typeof text !== "string") return "en";
+        // Hebrew Unicode block test
+        if (/[\u0590-\u05FF]/.test(text)) return "he";
+        return "en";
+      }
+
+      const userLang = detectLangFromText(taskname || description || categoryDisplay);
+
+      // Build a short confirmation message localized to userLang. Keep it concise.
+      const confirmationMessage =
+        userLang === "he"
+          ? "הטיוטה מוכנה. אפשר לאשר, לערוך או לבטל."
+          : "Here is your draft. You can confirm, edit, or cancel.";
+
       const widgetPayload = {
         id: "draft-" + Date.now(),
         title: taskname,
+        description: description || "",
         status: "draft",
         dueDate: new Date(finalDeadline).toISOString(),
+        // Use internal category key for the 'category' field (for internal operations)
         category: category || "",
-        categoryDisplay,
+        // Provide user-facing display name separately
+        categoryDisplay: categoryDisplay,
         subcategory: subcategory || "",
-        subcategoryDisplay: subcategory || "",
         importance: finalImportance,
         effort: finalEffort,
         estimatedDuration: finalDuration,
-        // Short human-readable summary (use before the widget; keep concise)
-        shortDescription,
-        // Prompt message asking for confirmation / edits (user-facing; default in English)
-        confirmationMessage:
-          "The task is ready to be created. Would you like to create it now? If you'd like to make any changes, tell me what to change.",
-        // Aliases to support different widget consumers
-        taskname: taskname,
-        deadline: finalDeadline,
-        duration: finalDuration,
+        canSplit: finalCanSplit,
         taskType: finalTaskType,
+        // Splitting parameters (only include when relevant)
         minChunk: displayMinChunk,
         chunkCount: displayChunkCount,
-        chunkMinutes: displayChunkMinutes,
         minMinutes: displayMinMinutes,
         maxMinutes: displayMaxMinutes,
         earliestStart: finalEarliestStart,
         recurrence: recurrence || null,
-        description: description || (recurrence ? `Recurrence: ${recurrence.type}` : ""),
-        canSplit: finalCanSplit,
+        tags: null,
+        // Small human-readable short description for listing/preview
+        shortDescription,
+        // Confirmation message to show near the widget (localized)
+        confirmationMessage,
+        // Store internal category key for task creation
+        _categoryKey: category || "",
       };
 
       // Build a canonical widget string using the central helper (ensures
       // fields match registry schema and always uses the exact tags)
-      const { buildWidgetString } = await import("../../widgets/widgetUtils.js");
-      return buildWidgetString("task_confirmation", widgetPayload);
+      try {
+        const { buildWidgetString } = await import("../widgets/widgetUtils.js");
+        // Build the widget string, but return the raw JSON payload (without
+        // the <WIDGET_JSON> wrapper) so programmatic callers can parse it
+        // with JSON.parse. When the LLM uses this tool, the outer system can
+        // wrap it as needed for assistant messages.
+        const widgetStr = buildWidgetString("task_confirmation", widgetPayload);
+        const match = widgetStr.match(/<WIDGET_JSON>([\s\S]*?)<\/WIDGET_JSON>/);
+        if (match) {
+          return match[1];
+        }
+        // Fallback: return the full string if it didn't match the expected tag
+        return widgetStr;
+      } catch (err) {
+        console.error("[previewTask] Failed to build widget string:", err.message);
+        // If widget generation fails for any reason, return a human-friendly
+        // assistant message and DO NOT include any widget block so the
+        // frontend will not attempt to parse one.
+        return (
+          "I’m sorry — I ran into a problem generating a preview for the task. " +
+          "I can still create the task for you with the details you provided, " +
+          "or make any edits you want before I create it."
+        );
+      }
     } catch (error) {
       return `ok=false\nerr="Failed to generate preview: ${error.message}"`;
     }
