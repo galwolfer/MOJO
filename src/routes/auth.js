@@ -59,6 +59,9 @@ router.post("/login", login);
 // Get current user (protected)
 router.get("/me", requireAuth, getMe);
 
+// Update user profile (protected)
+router.patch("/profile", requireAuth, updateProfile);
+
 // Delete account (protected)
 router.delete("/account", requireAuth, deleteAccount);
 
