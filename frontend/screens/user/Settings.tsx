@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { View, StyleSheet, TouchableOpacity, Image, Alert } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import * as ImagePicker from "expo-image-picker";
 import AppText from "../../components/common/AppText";
 import Input from "../../components/inputs/Input";
 import AppButton from "../../components/common/AppButton";
@@ -40,12 +41,16 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editedProfileImage, setEditedProfileImage] = useState<string | null>(user?.profileImage || null);
+  const [newProfileImage, setNewProfileImage] = useState<{ uri: string; base64: string } | null>(null);
+  const [showPasswordSection, setShowPasswordSection] = useState(false);
 
   const LeftIcon = ICONS.left;
   const UserIcon = ICONS.user;
   const EditIcon = ICONS.edit;
   const ChatIcon = ICONS.mojo;
   const NotificationIcon = ICONS.notifications;
+  const PencilIcon = ICONS.edit;
 
   // Update local state when user changes
   useEffect(() => {
@@ -86,6 +91,48 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
     setNewPassword("");
     setConfirmPassword("");
     setError(null);
+    setNewProfileImage(null);
+    setShowPasswordSection(false);
+  };
+
+  const handlePickImage = async () => {
+    console.log("handlePickImage called");
+    try {
+      // Request permission
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setError("Camera roll permission is required to change your profile picture");
+        return;
+      }
+
+      // Pick image
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        console.log("Image picked:", asset.uri);
+        setNewProfileImage({
+          uri: asset.uri,
+          base64: asset.base64 || "",
+        });
+        setEditedProfileImage(asset.uri);
+      }
+    } catch (err: any) {
+      console.error("Error picking image:", err);
+      setError("Failed to pick image");
+    }
+  };
+
+  const handleDeleteProfileImage = () => {
+    console.log("handleDeleteProfileImage called");
+    setEditedProfileImage(null);
+    setNewProfileImage({ uri: "", base64: "" }); // Mark as deleted
   };
 
   const handleSave = async () => {
@@ -141,6 +188,17 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
         updateData.newPassword = newPassword;
       }
 
+      // Add profile image if changed or deleted
+      if (newProfileImage) {
+        if (newProfileImage.uri === "") {
+          // Delete image
+          updateData.deleteProfileImage = true;
+        } else if (newProfileImage.base64) {
+          // Upload new image
+          updateData.profileImage = newProfileImage.base64;
+        }
+      }
+
       const response = await updateProfile(updateData);
 
       console.log("updateProfile response:", response);
@@ -162,6 +220,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+      setNewProfileImage(null);
       setIsEditMode(false);
     } catch (err: any) {
       console.error("Error updating profile:", err);
@@ -180,7 +239,10 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
     setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
+    setEditedProfileImage(user?.profileImage || null);
+    setNewProfileImage(null);
     setError(null);
+    setShowPasswordSection(false);
   };
 
   const handleEditPreferences = () => {
@@ -250,42 +312,63 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
       {/* Profile Settings Section */}
       <Box title="Profile Settings" titleColor={COLORS.primary1}>
         <View style={styles.profileContent}>
-          {/* User Avatar */}
+          {/* User Avatar with gradient ring */}
           <View style={styles.avatarContainer}>
-            {user?.profileImage ? (
-              <View style={styles.avatarWrapper}>
-                <Image
-                  source={{
-                    uri: user.profileImage,
-                  }}
-                  style={styles.avatarImage}
-                />
+            <LinearGradient
+              colors={[COLORS.primary1, COLORS.primary2, COLORS.primary4]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.avatarGradient}
+            >
+              <View style={styles.avatarInner}>
+                {editedProfileImage ? (
+                  <Image
+                    source={{
+                      uri: editedProfileImage,
+                    }}
+                    style={styles.avatarImage}
+                  />
+                ) : (
+                  <UserIcon size={40} color={COLORS.grayLight} />
+                )}
               </View>
-            ) : user?.displayName ? (
-              <View style={styles.avatarWrapper}>
-                <LinearGradient
-                  colors={[COLORS.primary1, COLORS.primary2, COLORS.primary4]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.avatarGradient}
-                >
-                  <View style={styles.avatarInner}>
-                    <AppText variant="title2" style={styles.avatarText}>
-                      {user.displayName.charAt(0).toUpperCase()}
-                    </AppText>
-                  </View>
-                </LinearGradient>
-              </View>
-            ) : (
-              <View style={styles.avatarPlaceholder}>
-                <UserIcon size={40} color={COLORS.grayLight} />
-              </View>
+            </LinearGradient>
+
+            {/* Edit button overlay */}
+            {!isEditMode && (
+              <TouchableOpacity style={styles.editOverlay} onPress={handleEditProfile}>
+                <PencilIcon size={20} color={COLORS.colorWhite} />
+              </TouchableOpacity>
             )}
           </View>
 
           {/* User Info */}
           {isEditMode ? (
             <View style={styles.editForm}>
+              {/* Profile Image Options */}
+              <View style={styles.imageSection}>
+                <AppText variant="boldText" style={styles.imageSectionTitle}>
+                  Profile Picture
+                </AppText>
+                <View style={styles.imageButtonsRow}>
+                  <TouchableOpacity style={styles.imageButton} onPress={handlePickImage}>
+                    <AppText variant="boldText" style={styles.imageButtonText}>
+                      Upload Photo
+                    </AppText>
+                  </TouchableOpacity>
+                  {editedProfileImage && (
+                    <TouchableOpacity
+                      style={[styles.imageButton, styles.deleteImageButton]}
+                      onPress={handleDeleteProfileImage}
+                    >
+                      <AppText variant="boldText" style={styles.deleteImageButtonText}>
+                        Delete Photo
+                      </AppText>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
               <Input
                 label="Display Name"
                 value={editedDisplayName}
@@ -303,18 +386,29 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                 type="email"
               />
               
-              {/* Password Change Section */}
-              <View style={styles.passwordSection}>
-                <AppText variant="boldText" style={styles.passwordSectionTitle}>
-                  Change Password (Optional)
+              {/* Change Password Button */}
+              <TouchableOpacity
+                style={styles.changePasswordButton}
+                onPress={() => setShowPasswordSection(!showPasswordSection)}
+              >
+                <AppText variant="boldText" style={styles.changePasswordButtonText}>
+                  {showPasswordSection ? "Hide Password Change" : "Change Password (Optional)"}
                 </AppText>
-                <Input
-                  label="Current Password"
-                  value={currentPassword}
-                  onChangeText={setCurrentPassword}
-                  type="password"
-                  placeholder="Enter current password"
-                />
+              </TouchableOpacity>
+
+              {/* Password Change Section */}
+              {showPasswordSection && (
+                <View style={styles.passwordSection}>
+                  <AppText variant="boldText" style={styles.passwordSectionTitle}>
+                    Enter New Password
+                  </AppText>
+                  <Input
+                    label="Current Password"
+                    value={currentPassword}
+                    onChangeText={setCurrentPassword}
+                    type="password"
+                    placeholder="Enter current password"
+                  />
                 <Input
                   label="New Password"
                   value={newPassword}
@@ -329,7 +423,8 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                   type="password"
                   placeholder="Re-enter new password"
                 />
-              </View>
+                </View>
+              )}
               
               {error && (
                 <AppText variant="notes" style={styles.errorText}>
@@ -472,22 +567,20 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     marginBottom: SPACING.sm,
-  },
-  avatarWrapper: {
     position: "relative",
   },
   avatarGradient: {
-    width: moderateScale(80),
-    height: moderateScale(80),
-    borderRadius: moderateScale(40),
-    padding: 3,
+    width: moderateScale(100),
+    height: moderateScale(100),
+    borderRadius: moderateScale(50),
+    padding: 4,
     alignItems: "center",
     justifyContent: "center",
   },
   avatarInner: {
     width: "100%",
     height: "100%",
-    borderRadius: moderateScale(38),
+    borderRadius: moderateScale(48),
     backgroundColor: COLORS.white,
     alignItems: "center",
     justifyContent: "center",
@@ -495,20 +588,24 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     color: COLORS.primary1,
-    fontSize: moderateScale(32),
+    fontSize: moderateScale(40),
   },
   avatarImage: {
-    width: moderateScale(80),
-    height: moderateScale(80),
-    borderRadius: moderateScale(40),
+    width: "100%",
+    height: "100%",
+    borderRadius: moderateScale(48),
   },
-  avatarPlaceholder: {
-    width: moderateScale(80),
-    height: moderateScale(80),
-    borderRadius: moderateScale(40),
-    backgroundColor: COLORS.white2,
+  editOverlay: {
+    position: "absolute",
+    top: SPACING.sm,
+    right: SPACING.sm,
+    width: moderateScale(32),
+    height: moderateScale(32),
+    borderRadius: moderateScale(16),
+    backgroundColor: COLORS.primary1,
     alignItems: "center",
     justifyContent: "center",
+    ...SHADOWS.card,
   },
   userInfo: {
     alignItems: "center",
@@ -539,6 +636,55 @@ const styles = StyleSheet.create({
     width: "100%",
     gap: SPACING.md,
     paddingHorizontal: SPACING.md,
+  },
+  imageSection: {
+    width: "100%",
+    gap: SPACING.md,
+    marginBottom: SPACING.md,
+    paddingBottom: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.white2,
+  },
+  imageSectionTitle: {
+    color: COLORS.primary1,
+  },
+  imageButtonsRow: {
+    flexDirection: "row",
+    gap: SPACING.md,
+  },
+  imageButton: {
+    flex: 1,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    backgroundColor: COLORS.primary6,
+    borderRadius: SPACING.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  imageButtonText: {
+    color: COLORS.colorWhite,
+    fontSize: moderateScale(12),
+  },
+  deleteImageButton: {
+    backgroundColor: COLORS.primary5,
+  },
+  deleteImageButtonText: {
+    color: COLORS.colorWhite,
+    fontSize: moderateScale(12),
+  },
+  changePasswordButton: {
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    backgroundColor: COLORS.white2,
+    borderRadius: SPACING.md,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: COLORS.primary2,
+  },
+  changePasswordButtonText: {
+    color: COLORS.primary2,
+    fontSize: moderateScale(14),
   },
   editButtons: {
     flexDirection: "row",
