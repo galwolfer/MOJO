@@ -82,12 +82,15 @@ export default function UserProfileScreen() {
 
   useEffect(() => {
     setHeaderConfig({
-      title: "Mojo",
+      title: "My Profile",
       show: true,
       icon: ICONS.mojo,
       rightElement: (
-        <TouchableOpacity onPress={() => {}}>
+        <TouchableOpacity onPress={() => {}} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
           <SettingsIcon size={24} color={COLORS.primary1} />
+          <AppText variant="boldText" style={{ color: COLORS.primary1 }}>
+            Settings
+          </AppText>
         </TouchableOpacity>
       ),
     });
