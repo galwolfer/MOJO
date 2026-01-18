@@ -34,7 +34,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedUsername, setEditedUsername] = useState(user?.username || "");
   const [editedEmail, setEditedEmail] = useState(user?.email || "");
-  const [editedDisplayName, setEditedDisplayName] = useState(user?.displayName || "");
+  const [editedDisplayName, setEditedDisplayName] = useState(user?.displayName || user?.username || "");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,7 +49,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
     if (user && !isEditMode) {
       setEditedUsername(user.username || "");
       setEditedEmail(user.email || "");
-      setEditedDisplayName(user.displayName || "");
+      setEditedDisplayName(user.displayName || user.username || "");
     }
   }, [user, isEditMode]);
 
@@ -78,7 +78,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
     setIsEditMode(true);
     setEditedUsername(user?.username || "");
     setEditedEmail(user?.email || "");
-    setEditedDisplayName(user?.displayName || "");
+    setEditedDisplayName(user?.displayName || user?.username || "");
     setError(null);
   };
 
@@ -135,7 +135,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
     setIsEditMode(false);
     setEditedUsername(user?.username || "");
     setEditedEmail(user?.email || "");
-    setEditedDisplayName(user?.displayName || "");
+    setEditedDisplayName(user?.displayName || user?.username || "");
     setError(null);
   };
 
