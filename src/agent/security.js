@@ -50,7 +50,7 @@ export function validateToolCall(tool, args) {
  * @param {string} raw - The raw tool output string potentially containing <WIDGET_JSON>...</WIDGET_JSON>
  * @returns {{ valid: boolean, reason?: string, widget?: any }}
  */
-export async function validateWidgetPayload(raw) {
+export function validateWidgetPayload(raw) {
   if (typeof raw !== "string") return { valid: false, reason: "Tool result not a string" };
 
   const start = raw.indexOf("<WIDGET_JSON>");

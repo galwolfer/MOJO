@@ -697,25 +697,25 @@ export class AgentController {
 
       // Get tasks - track all returned tasks (user might refer to any of them)
       if (toolName === "get_tasks" || toolName === "get_upcoming_tasks" || toolName === "get_overdue_tasks") {
-        try {
-          const widget = extractWidgetFromText(result);
-          if (widget && widget.data?.tasks && Array.isArray(widget.data.tasks)) {
-            // Add each task to context (most recent first = last in array)
-            widget.data.tasks
-              .slice()
-              .reverse()
-              .forEach((task) => {
-                if (task.id && task.title) {
-                  memoryStore.addSessionEntity(sessionId, "task", task.id, task.title, {
-                    action: "listed",
-                    status: task.status,
-                    dueDate: task.dueDate,
-                  });
-                }
-              });
+        const widget = extractWidgetFromText(result);
+        if (widget && widget.data?.tasks && Array.isArray(widget.data.tasks)) {
+          // Add each task to context (most recent first = last in array)
+          widget.data.tasks
+            .slice()
+            .reverse()
+            .forEach((task) => {
+              if (task.id && task.title) {
+                memoryStore.addSessionEntity(sessionId, "task", task.id, task.title, {
+                  action: "listed",
+                  status: task.status,
+                  dueDate: task.dueDate,
+                    });
+                  }
+                });
+            }
+          } catch (e) {
+            // Ignore JSON parse errors
           }
-        } catch (e) {
-          // Ignore JSON parse errors
         }
       }
 
