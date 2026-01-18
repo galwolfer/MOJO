@@ -221,7 +221,7 @@ export class AgentController {
 
             // Validate widget payload like normal tool execution
             if (typeof result === "string" && result.includes("<WIDGET_JSON>")) {
-              const widgetValidation = validateWidgetPayload(result);
+              const widgetValidation = await validateWidgetPayload(result);
               if (!widgetValidation.valid) {
                 if (
                   widgetValidation.reason === "Empty task list" &&
@@ -396,7 +396,7 @@ export class AgentController {
 
                   // If result contains a widget payload, validate it
                   if (typeof result === "string" && result.includes("<WIDGET_JSON>")) {
-                    const widgetValidation = validateWidgetPayload(result);
+                    const widgetValidation = await validateWidgetPayload(result);
                     if (!widgetValidation.valid) {
                       console.warn(
                         `[AgentController] Widget validation failed for ${toolCall.name}: ${widgetValidation.reason}`
@@ -697,25 +697,25 @@ export class AgentController {
 
       // Get tasks - track all returned tasks (user might refer to any of them)
       if (toolName === "get_tasks" || toolName === "get_upcoming_tasks" || toolName === "get_overdue_tasks") {
-        const widget = extractWidgetFromText(result);
-        if (widget && widget.data?.tasks && Array.isArray(widget.data.tasks)) {
-          // Add each task to context (most recent first = last in array)
-          widget.data.tasks
-            .slice()
-            .reverse()
-            .forEach((task) => {
-              if (task.id && task.title) {
-                memoryStore.addSessionEntity(sessionId, "task", task.id, task.title, {
-                  action: "listed",
-                  status: task.status,
-                  dueDate: task.dueDate,
-                    });
-                  }
-                });
-            }
-          } catch (e) {
-            // Ignore JSON parse errors
+        try {
+          const widget = extractWidgetFromText(result);
+          if (widget && widget.data?.tasks && Array.isArray(widget.data.tasks)) {
+            // Add each task to context (most recent first = last in array)
+            widget.data.tasks
+              .slice()
+              .reverse()
+              .forEach((task) => {
+                if (task.id && task.title) {
+                  memoryStore.addSessionEntity(sessionId, "task", task.id, task.title, {
+                    action: "listed",
+                    status: task.status,
+                    dueDate: task.dueDate,
+                  });
+                }
+              });
           }
+        } catch (e) {
+          // Ignore JSON parse errors
         }
       }
 

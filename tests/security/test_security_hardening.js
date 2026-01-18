@@ -37,12 +37,12 @@ function run() {
     widget_type: "task_confirmation",
     data: { id: "d1", title: "Buy milk", dueDate: "2026-01-06" },
   })}</WIDGET_JSON>`;
-  const w1 = validateWidgetPayload(goodWidget);
+  const w1 = await validateWidgetPayload(goodWidget);
   assert(w1.valid && w1.widget.widget_type === "task_confirmation", "Good widget should validate");
 
   // 5) Widget payload validation: invalid JSON
   const badWidget = `OK\nWidget Payload: <WIDGET_JSON>{notjson}</WIDGET_JSON>`;
-  const w2 = validateWidgetPayload(badWidget);
+  const w2 = await validateWidgetPayload(badWidget);
   assert(!w2.valid && w2.reason.includes("Invalid JSON"), "Invalid JSON should fail");
 
   // 6) Widget payload validation: missing required fields
@@ -51,7 +51,7 @@ function run() {
     widget_type: "task_confirmation",
     data: { title: "no id" },
   })}</WIDGET_JSON>`;
-  const w3 = validateWidgetPayload(badWidget2);
+  const w3 = await validateWidgetPayload(badWidget2);
   assert(!w3.valid && w3.reason.includes("Missing required field"), "Missing required data should fail");
 
   console.log("- Widget payload validation: OK");
