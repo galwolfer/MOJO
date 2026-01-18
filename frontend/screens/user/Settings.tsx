@@ -35,6 +35,9 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
   const [editedUsername, setEditedUsername] = useState(user?.username || "");
   const [editedEmail, setEditedEmail] = useState(user?.email || "");
   const [editedDisplayName, setEditedDisplayName] = useState(user?.displayName || user?.username || "");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,6 +82,9 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
     setEditedUsername(user?.username || "");
     setEditedEmail(user?.email || "");
     setEditedDisplayName(user?.displayName || user?.username || "");
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
     setError(null);
   };
 
@@ -96,14 +102,46 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
         return;
       }
 
+      // Password validation if changing password
+      if (newPassword || confirmPassword || currentPassword) {
+        if (!currentPassword) {
+          setError("Current password is required to change password");
+          setIsSaving(false);
+          return;
+        }
+        if (!newPassword) {
+          setError("New password is required");
+          setIsSaving(false);
+          return;
+        }
+        if (newPassword.length < 6) {
+          setError("New password must be at least 6 characters");
+          setIsSaving(false);
+          return;
+        }
+        if (newPassword !== confirmPassword) {
+          setError("New passwords do not match");
+          setIsSaving(false);
+          return;
+        }
+      }
+
       console.log("Calling updateProfile API with:", { username: editedUsername, email: editedEmail, name: editedDisplayName });
 
       // Call API to update profile
-      const response = await updateProfile({
+      const updateData: any = {
         username: editedUsername,
         email: editedEmail,
         name: editedDisplayName,
-      });
+      };
+
+      // Add password fields if changing password
+      if (newPassword) {
+        updateData.currentPassword = currentPassword;
+        updateData.newPassword = newPassword;
+      }
+
+      const response = await updateProfile(updateData);
 
       console.log("updateProfile response:", response);
 
@@ -121,6 +159,9 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
       }
 
       console.log("Profile update successful, exiting edit mode");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
       setIsEditMode(false);
     } catch (err: any) {
       console.error("Error updating profile:", err);
@@ -136,6 +177,9 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
     setEditedUsername(user?.username || "");
     setEditedEmail(user?.email || "");
     setEditedDisplayName(user?.displayName || user?.username || "");
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
     setError(null);
   };
 
@@ -258,6 +302,35 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                 onChangeText={setEditedEmail}
                 type="email"
               />
+              
+              {/* Password Change Section */}
+              <View style={styles.passwordSection}>
+                <AppText variant="boldText" style={styles.passwordSectionTitle}>
+                  Change Password (Optional)
+                </AppText>
+                <Input
+                  label="Current Password"
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
+                  type="password"
+                  placeholder="Enter current password"
+                />
+                <Input
+                  label="New Password"
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  type="password"
+                  placeholder="At least 6 characters"
+                />
+                <Input
+                  label="Confirm New Password"
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  type="password"
+                  placeholder="Re-enter new password"
+                />
+              </View>
+              
               {error && (
                 <AppText variant="notes" style={styles.errorText}>
                   {error}
@@ -500,6 +573,18 @@ const styles = StyleSheet.create({
   errorText: {
     color: COLORS.primary5,
     textAlign: "center",
+  },
+  passwordSection: {
+    width: "100%",
+    gap: SPACING.md,
+    marginTop: SPACING.md,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.white2,
+  },
+  passwordSectionTitle: {
+    color: COLORS.primary1,
+    marginBottom: SPACING.sm,
   },
 
   // Preferences Content

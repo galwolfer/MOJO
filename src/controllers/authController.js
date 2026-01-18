@@ -236,7 +236,7 @@ export async function getMe(req, res, next) {
  */
 export async function updateProfile(req, res, next) {
   try {
-    const { name, ojoTypeName, settings, profileImage, gender, username, email } = req.body;
+    const { name, ojoTypeName, settings, profileImage, gender, username, email, currentPassword, newPassword } = req.body;
     const userId = req.user.userId;
 
     const user = await User.findById(userId);
@@ -246,6 +246,37 @@ export async function updateProfile(req, res, next) {
         success: false,
         error: "User not found",
       });
+    }
+
+    // Handle password change if requested
+    if (newPassword) {
+      // Require current password for security
+      if (!currentPassword) {
+        return res.status(400).json({
+          success: false,
+          error: "Current password is required to change password",
+        });
+      }
+
+      // Verify current password
+      const isValidPassword = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!isValidPassword) {
+        return res.status(401).json({
+          success: false,
+          error: "Current password is incorrect",
+        });
+      }
+
+      // Validate new password
+      if (newPassword.length < 6) {
+        return res.status(400).json({
+          success: false,
+          error: "New password must be at least 6 characters",
+        });
+      }
+
+      // Hash and update password
+      user.passwordHash = await bcrypt.hash(newPassword, 10);
     }
 
     // Check if username is being updated and if it's already taken
