@@ -10,6 +10,7 @@ import { COLORS } from "./theme";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { NavigationProvider } from "./context/NavigationContext";
 import { LayoutProvider } from "./context/LayoutContext";
+import { TaskProvider } from "./context/TaskContext";
 import MainLayout from "./components/layout/MainLayout";
 
 SplashScreen.preventAutoHideAsync();
@@ -80,7 +81,9 @@ export default function App() {
     <AuthProvider>
       <NavigationProvider>
         <LayoutProvider>
-          <AppContent />
+          <TaskProvider>
+            <AppContent />
+          </TaskProvider>
         </LayoutProvider>
       </NavigationProvider>
     </AuthProvider>

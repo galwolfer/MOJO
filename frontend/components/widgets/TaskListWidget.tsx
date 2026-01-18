@@ -9,6 +9,8 @@ import AppText from "../common/AppText";
 import { COLORS, SPACING } from "../../theme";
 import Widget from "../special/Widget";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
+import { useTaskContext } from "../../context/TaskContext";
+import { completeTask, toggleTaskCompletion } from "../../services/taskService";
 
 interface Task {
   id: string;
@@ -25,16 +27,56 @@ interface Task {
 const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
   const tasks: Task[] = data.tasks || [];
   const [checkedTasks, setCheckedTasks] = useState<Set<string>>(new Set());
+  const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
+  const { notifyTaskUpdate } = useTaskContext();
 
-  const handleToggleTask = (taskId: string) => {
+  const handleToggleTask = async (taskId: string) => {
+    // Optimistically update UI
     const newChecked = new Set(checkedTasks);
-    if (newChecked.has(taskId)) {
+    const wasChecked = newChecked.has(taskId);
+    
+    if (wasChecked) {
       newChecked.delete(taskId);
     } else {
       newChecked.add(taskId);
     }
     setCheckedTasks(newChecked);
-    onAction?.("task_toggled", { taskId, checked: newChecked.has(taskId) });
+    
+    // Track loading state
+    setLoadingTasks((prev) => new Set(prev).add(taskId));
+    
+    try {
+      // Call API to toggle/complete the task
+      if (!wasChecked) {
+        // Completing the task
+        await completeTask(taskId);
+      } else {
+        // Uncompleting - use toggle
+        await toggleTaskCompletion(taskId);
+      }
+      
+      // Notify other components (like UserProfile) to refresh
+      notifyTaskUpdate();
+      
+      // Also call the onAction callback for any additional handling
+      onAction?.("task_toggled", { taskId, checked: !wasChecked });
+    } catch (error) {
+      console.warn("Failed to toggle task:", error);
+      // Revert optimistic update on error
+      const revertChecked = new Set(checkedTasks);
+      if (wasChecked) {
+        revertChecked.add(taskId);
+      } else {
+        revertChecked.delete(taskId);
+      }
+      setCheckedTasks(revertChecked);
+    } finally {
+      setLoadingTasks((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(taskId);
+        return newSet;
+      });
+    }
   };
 
   const handleTaskPress = (taskId: string) => {

@@ -34,9 +34,10 @@ interface TimelineItemProps {
   item: TimelineItem;
   isLastItem: boolean;
   onRetry?: (sessionId: string, clientId: string) => void;
+  onWidgetAction?: (actionId: string, actionData?: any) => void;
 }
 
-function TimelineItemComponent({ item, isLastItem, onRetry }: TimelineItemProps) {
+function TimelineItemComponent({ item, isLastItem, onRetry, onWidgetAction }: TimelineItemProps) {
   if (item.kind === "divider") {
     return <SessionDivider label={item.label} />;
   }
@@ -57,6 +58,8 @@ function TimelineItemComponent({ item, isLastItem, onRetry }: TimelineItemProps)
       // Pass OjoType metadata (if any) so message bubble can pick persona gradient
       ojoTypeName={(item as any).ojoTypeName}
       ojoTypeDisplayName={(item as any).ojoTypeDisplayName}
+      // Pass widget action handler for task-related actions
+      onWidgetAction={item.role === "assistant" ? onWidgetAction : undefined}
     />
   );
 }

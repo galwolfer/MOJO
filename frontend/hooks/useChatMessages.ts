@@ -8,10 +8,11 @@
  *
  * Usage:
  * const { message, setMessage, isLoading, sessionId, setSessionId, handleSend, handleRetry } =
- *   useChatMessages(updateSession);
+ *   useChatMessages(updateSession, { onTaskChange: () => notifyTaskUpdate() });
  *
  * Notes:
  * - `updateSession` is a callback provided by callers to merge session changes into app state.
+ * - `onTaskChange` (optional) is called when assistant response suggests task was created/updated
  */
 import { useState, useCallback } from "react";
 import { sendChatMessage, SendMessageResponse, ChatSessionSummary, ChatMessage } from "../services/chatService";
@@ -20,7 +21,29 @@ import { useOjoType } from "./useOjoType";
 const MAX_CACHED_MESSAGES_PER_SESSION = 50;
 const SEND_TIMEOUT_MS = 15000;
 
-export function useChatMessages(updateSession: (session: ChatSessionSummary) => void) {
+// Keywords that indicate a task-related action in the response
+const TASK_ACTION_KEYWORDS = [
+  "task_list",
+  "task_confirmation",
+  "task_detail",
+  "created a task",
+  "added a task",
+  "task has been",
+  "completed the task",
+  "marked as done",
+  "marked as complete",
+  "updated the task",
+  "deleted the task",
+];
+
+interface UseChatMessagesOptions {
+  onTaskChange?: () => void;
+}
+
+export function useChatMessages(
+  updateSession: (session: ChatSessionSummary) => void,
+  options?: UseChatMessagesOptions
+) {
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string>(() => `session_${Date.now()}`);
@@ -151,6 +174,17 @@ export function useChatMessages(updateSession: (session: ChatSessionSummary) => 
 
           const trimmed = updatedMessages.slice(-MAX_CACHED_MESSAGES_PER_SESSION);
           updateSession(buildSessionUpdate(sid, agentNow, getSessions, trimmed, messageCountDeltaSuccess));
+
+          // Check if response indicates task-related action and notify
+          if (options?.onTaskChange && response.response) {
+            const responseText = response.response.toLowerCase();
+            const hasTaskAction = TASK_ACTION_KEYWORDS.some((keyword) =>
+              responseText.includes(keyword.toLowerCase())
+            );
+            if (hasTaskAction) {
+              options.onTaskChange();
+            }
+          }
         } else {
           const errNow = new Date();
           const sessionsAfter = getSessions();
