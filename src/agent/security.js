@@ -69,13 +69,8 @@ export function validateWidgetPayload(raw) {
 
   // Fallback: tolerant extractor (fix common malformed tags and parse)
   if (!payload) {
-    try {
-      const { extractWidgetFromText } = await import("./widgets/widgetUtils.js");
-      payload = extractWidgetFromText(raw);
-      if (!payload) return { valid: false, reason: "No widget payload found" };
-    } catch (err) {
-      return { valid: false, reason: "No widget payload found" };
-    }
+    payload = extractWidgetFromText(raw);
+    if (!payload) return { valid: false, reason: "No widget payload found" };
   }
 
   // Basic structure checks

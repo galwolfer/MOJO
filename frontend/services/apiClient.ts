@@ -55,6 +55,15 @@ export async function updateCategoryPriorities(payload: CategoryPrioritiesReques
 }
 
 /**
+ * Update user profile
+ * PATCH /api/auth/profile
+ */
+export async function updateProfile(payload: { name?: string; profileImage?: string; email?: string; username?: string }): Promise<any> {
+  const { patch } = await import("./httpClient");
+  return patch<any>("/auth/profile", payload);
+}
+
+/**
  * Upload profile image file (multipart/form-data)
  * Expects the server to return { success: true, url }
  */
@@ -97,4 +106,13 @@ export async function uploadProfileImage(fileOrUri: string | File): Promise<{ su
   return data as { success: boolean; url?: string };
 }
 
-export default { setApiBase, setAuthToken, login, register, updateCategoryPriorities, uploadProfileImage };
+/**
+ * Delete user account
+ * DELETE /api/auth/account
+ */
+export async function deleteAccount(): Promise<any> {
+  const { del } = await import("./httpClient");
+  return del<any>("/auth/account");
+}
+
+export default { setApiBase, setAuthToken, login, register, updateCategoryPriorities, uploadProfileImage, updateProfile, deleteAccount };

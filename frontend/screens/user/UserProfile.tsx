@@ -22,6 +22,7 @@ import { StatBadge, ProgressGraph, FriendListItem } from "./components";
 import { moderateScale } from "react-native-size-matters";
 import { getUserStats } from "../../services/userService";
 import { getTasks, calculateTaskProgress, type Task, type TaskProgress } from "../../services/taskService";
+import SettingsScreen from "./Settings";
 
 /**
  * UserProfileScreen
@@ -74,6 +75,9 @@ export default function UserProfileScreen() {
   const { width } = useWindowDimensions();
   const { subscribeToTaskUpdates } = useTaskContext();
 
+  // Screen navigation state
+  const [currentScreen, setCurrentScreen] = useState<"profile" | "settings">("profile");
+
   const [stats, setStats] = useState({ tasks: 0, points: 0, streak: 0 });
   const [loading, setLoading] = useState(true);
   const [progressData, setProgressData] = useState<number[]>(DEFAULT_PROGRESS);
@@ -89,20 +93,22 @@ export default function UserProfileScreen() {
   const TrophyIcon = ICONS.trophy;
 
   useEffect(() => {
-    setHeaderConfig({
-      title: "My Profile",
-      show: true,
-      icon: ICONS.mojo,
-      rightElement: (
-        <TouchableOpacity onPress={() => {}} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <SettingsIcon size={24} color={COLORS.primary1} />
-          <AppText variant="boldText" style={{ color: COLORS.primary1 }}>
-            Settings
-          </AppText>
-        </TouchableOpacity>
-      ),
-    });
-  }, []);
+    if (currentScreen === "profile") {
+      setHeaderConfig({
+        title: "My Profile",
+        show: true,
+        icon: ICONS.mojo,
+        rightElement: (
+          <TouchableOpacity onPress={() => setCurrentScreen("settings")} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <SettingsIcon size={24} color={COLORS.primary1} />
+            <AppText variant="boldText" style={{ color: COLORS.primary1 }}>
+              Settings
+            </AppText>
+          </TouchableOpacity>
+        ),
+      });
+    }
+  }, [currentScreen]);
 
   const fetchAllData = useCallback(async () => {
     if (!mountedRef.current) return;
@@ -155,6 +161,11 @@ export default function UserProfileScreen() {
 
   const graphWidth = Math.min(width - SPACING.xlg * 2 - SPACING.md * 2, 300);
 
+  // If on Settings screen, render SettingsScreen
+  if (currentScreen === "settings") {
+    return <SettingsScreen onBack={() => setCurrentScreen("profile")} />;
+  }
+
   return (
     <ScrollableContent
       respectHeader={true}
@@ -175,12 +186,10 @@ export default function UserProfileScreen() {
             style={styles.avatarGradient}
           >
             <View style={styles.avatarInner}>
-              {user?.displayName ? (
+              {user?.profileImage ? (
                 <Image
                   source={{
-                    uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                      user.displayName
-                    )}&background=random&size=120`,
+                    uri: user.profileImage,
                   }}
                   style={styles.avatarImage}
                 />
@@ -198,10 +207,15 @@ export default function UserProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Username */}
+        {/* Display Name */}
         <AppText variant="title2" style={styles.username}>
           {user?.displayName || user?.username || "User"}
         </AppText>
+        {user?.username && user?.displayName && user.displayName !== user.username && (
+          <AppText variant="notes" style={styles.displayName}>
+            @{user.username}
+          </AppText>
+        )}
 
         {/* Stats Row */}
         <View style={styles.statsRow}>
@@ -377,6 +391,11 @@ const styles = StyleSheet.create({
     color: COLORS.primary1,
     textAlign: "center",
     marginTop: SPACING.sm,
+  },
+  displayName: {
+    color: COLORS.grayLight,
+    textAlign: "center",
+    marginTop: 2,
   },
 
   // Stats Row

@@ -236,7 +236,7 @@ export async function getMe(req, res, next) {
  */
 export async function updateProfile(req, res, next) {
   try {
-    const { name, ojoTypeName, settings, profileImage, gender } = req.body;
+    const { name, ojoTypeName, settings, profileImage, gender, username, email } = req.body;
     const userId = req.user.userId;
 
     const user = await User.findById(userId);
@@ -246,6 +246,30 @@ export async function updateProfile(req, res, next) {
         success: false,
         error: "User not found",
       });
+    }
+
+    // Check if username is being updated and if it's already taken
+    if (username !== undefined && username !== user.username) {
+      const existingUserWithUsername = await User.findOne({ username, _id: { $ne: userId } });
+      if (existingUserWithUsername) {
+        return res.status(409).json({
+          success: false,
+          error: "Username already taken",
+        });
+      }
+      user.username = username;
+    }
+
+    // Check if email is being updated and if it's already taken
+    if (email !== undefined && email !== user.email) {
+      const existingUserWithEmail = await User.findOne({ email, _id: { $ne: userId } });
+      if (existingUserWithEmail) {
+        return res.status(409).json({
+          success: false,
+          error: "Email already in use",
+        });
+      }
+      user.email = email;
     }
 
     // Update profile fields
@@ -287,7 +311,57 @@ export async function updateProfile(req, res, next) {
     res.json({
       success: true,
       message: "Profile updated successfully",
-      profile: profileObj,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        profile: profileObj,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Delete user account
+ * DELETE /api/auth/account
+ */
+export async function deleteAccount(req, res, next) {
+  try {
+    const userId = req.user.userId;
+
+    // Delete user and all associated data
+    const user = await User.findByIdAndDelete(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: "User not found",
+      });
+    }
+
+    // Delete all tasks associated with the user
+    const Task = (await import("../models/index.js")).Task;
+    if (Task) {
+      await Task.deleteMany({ userId });
+    }
+
+    // Delete all chat sessions associated with the user
+    const ChatSession = (await import("../models/index.js")).ChatSession;
+    if (ChatSession) {
+      await ChatSession.deleteMany({ userId });
+    }
+
+    // Delete all chat messages associated with the user
+    const ChatMessage = (await import("../models/index.js")).ChatMessage;
+    if (ChatMessage) {
+      await ChatMessage.deleteMany({ userId });
+    }
+
+    res.json({
+      success: true,
+      message: "Account and all associated data deleted successfully",
     });
   } catch (error) {
     next(error);

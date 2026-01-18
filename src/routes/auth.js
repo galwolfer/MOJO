@@ -6,7 +6,7 @@
 import express from "express";
 import path from "path";
 import multer from "multer";
-import { register, login, getMe, updateProfile, updateCategoryPriorities } from "../controllers/authController.js";
+import { register, login, getMe, updateProfile, updateCategoryPriorities, deleteAccount } from "../controllers/authController.js";
 import { requireAuth } from "../middlewares/auth.js";
 
 const router = express.Router();
@@ -59,8 +59,8 @@ router.post("/login", login);
 // Get current user (protected)
 router.get("/me", requireAuth, getMe);
 
-// Update user profile (protected)
-router.patch("/profile", requireAuth, updateProfile);
+// Delete account (protected)
+router.delete("/account", requireAuth, deleteAccount);
 
 // Update category priorities (protected)
 router.post("/category-priorities", requireAuth, updateCategoryPriorities);
