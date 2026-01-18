@@ -89,14 +89,18 @@ const previewTaskMission = new GuidedMission({
   name: "preview_task",
   group: "task",
   description:
-    "Return a task_confirmation widget for approval. Required: taskname, deadline, estimatedDuration, category, subcategory. Must call get_subcategories first.",
-  missionInfo: "Draft and show a task_confirmation widget. User must choose category/subcategory first.",
+    "Return a task_confirmation widget for approval. Keep your message brief - the widget shows all details. Required: taskname, deadline, estimatedDuration, category, subcategory.",
+  missionInfo:
+    "Draft and show a task_confirmation widget. Use 1 short, natural sentence before the widget and one short sentence after (confirm/edit/cancel). Prefer the user's language when evident, otherwise default to English. Allow the model to pick an appropriate, natural phrasing (vary wording and tone as needed). Do NOT repeat fields already shown in the widget.",
   behavior: [
     "Use when user asks to create a task.",
     "STEP 1: Determine category ",
     "STEP 2: Call get_subcategories(category=<chosen>) to fetch options.",
-    "STEP 3: Show preview_task with confirmed category and subcategory.",
+    "STEP 3: Call preview_task, then write 1-2 natural 'draft ready' sentences (avoid greetings; vary wording) before the widget and a short confirm/edit/cancel line after it. If the subcategory is new, mention it briefly.",
+    "STEP 3b: If the user's language is English, use English sample phrases (e.g., 'Here is your draft for your mission.' before the widget and 'You can confirm, edit, or cancel.' after it). If the user's language is not English, match the user's language. If language detection is ambiguous, default to English.",
+
     "STEP 4: After user confirms, call add_task with final details.",
+    "IMPORTANT: Do NOT list task details in your message - the widget displays everything.",
   ],
   widgets: ["task_confirmation"],
   schema: z.object({
@@ -241,13 +245,32 @@ const previewTaskMission = new GuidedMission({
       const shortDescription = `${taskname} — ${categoryDisplay} • due ${finalDeadline}`;
 
       // Widget payload - clean structure with no duplicate fields
+      // Small helper to detect Hebrew vs English based on characters in text
+      function detectLangFromText(text) {
+        if (!text || typeof text !== "string") return "en";
+        // Hebrew Unicode block test
+        if (/[\u0590-\u05FF]/.test(text)) return "he";
+        return "en";
+      }
+
+      const userLang = detectLangFromText(taskname || description || categoryDisplay);
+
+      // Build a short confirmation message localized to userLang. Keep it concise.
+      const confirmationMessage =
+        userLang === "he"
+          ? "הטיוטה מוכנה. אפשר לאשר, לערוך או לבטל."
+          : "Here is your draft. You can confirm, edit, or cancel.";
+
       const widgetPayload = {
         id: "draft-" + Date.now(),
         title: taskname,
         description: description || "",
         status: "draft",
         dueDate: new Date(finalDeadline).toISOString(),
-        category: categoryDisplay, // Use display name for category
+        // Use internal category key for the 'category' field (for internal operations)
+        category: category || "",
+        // Provide user-facing display name separately
+        categoryDisplay: categoryDisplay,
         subcategory: subcategory || "",
         importance: finalImportance,
         effort: finalEffort,
@@ -262,6 +285,10 @@ const previewTaskMission = new GuidedMission({
         earliestStart: finalEarliestStart,
         recurrence: recurrence || null,
         tags: null,
+        // Small human-readable short description for listing/preview
+        shortDescription,
+        // Confirmation message to show near the widget (localized)
+        confirmationMessage,
         // Store internal category key for task creation
         _categoryKey: category || "",
       };
@@ -270,7 +297,17 @@ const previewTaskMission = new GuidedMission({
       // fields match registry schema and always uses the exact tags)
       try {
         const { buildWidgetString } = await import("../widgets/widgetUtils.js");
-        return buildWidgetString("task_confirmation", widgetPayload);
+        // Build the widget string, but return the raw JSON payload (without
+        // the <WIDGET_JSON> wrapper) so programmatic callers can parse it
+        // with JSON.parse. When the LLM uses this tool, the outer system can
+        // wrap it as needed for assistant messages.
+        const widgetStr = buildWidgetString("task_confirmation", widgetPayload);
+        const match = widgetStr.match(/<WIDGET_JSON>([\s\S]*?)<\/WIDGET_JSON>/);
+        if (match) {
+          return match[1];
+        }
+        // Fallback: return the full string if it didn't match the expected tag
+        return widgetStr;
       } catch (err) {
         console.error("[previewTask] Failed to build widget string:", err.message);
         // If widget generation fails for any reason, return a human-friendly

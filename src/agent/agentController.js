@@ -82,6 +82,18 @@ export class AgentController {
   async processMessage(sessionId, userMessage, userId) {
     try {
       console.log(`[AgentController] Processing message for user: ${userId}, session: ${sessionId}`);
+      let lastWidgetResult = null;
+      const captureWidgetBlock = (raw) => {
+        if (typeof raw !== "string") return null;
+        const match = raw.match(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/);
+        return match ? match[0] : null;
+      };
+      const normalizeWidgetTags = (text) => {
+        if (typeof text !== "string") return text;
+        return text.replace(/<\s*\/?\s*W[^>]*JSON\s*>/gi, (m) =>
+          m.includes("</") ? "</WIDGET_JSON>" : "<WIDGET_JSON>",
+        );
+      };
 
       // STEP 1: SAVE USER MESSAGE
       // Store the user's message in the session for later retrieval
@@ -145,6 +157,16 @@ export class AgentController {
         relevantMemories.conversation.forEach((mem, idx) => {
           memoryContext += `${mem.text}; `;
         });
+      }
+
+      // Language hint: detect basic script of the user's message and add a short USER_LANGUAGE marker
+      // This is a lightweight hint to help the model choose natural phrasing without heavy rules.
+      try {
+        const userLang = /[\u0590-\u05FF]/.test(userMessage) ? "Hebrew" : "English";
+        memoryContext += `\nUSER_LANGUAGE: ${userLang}`;
+        console.log(`[AgentController] Detected USER_LANGUAGE=${userLang}`);
+      } catch (e) {
+        // ignore non-critical errors
       }
 
       console.log(`[AgentController] Memory context length: ${memoryContext.length} chars`);
@@ -239,6 +261,10 @@ export class AgentController {
                   result = `ok=false\nerr="Widget validation failed: ${widgetValidation.reason}"`;
                 }
               }
+            }
+            const widgetBlock = captureWidgetBlock(result);
+            if (widgetBlock) {
+              lastWidgetResult = widgetBlock;
             }
 
             // Persist and add to messages so LLM can craft a natural response referencing it
@@ -428,6 +454,10 @@ export class AgentController {
                       }
                     }
                   }
+                  const widgetBlock = captureWidgetBlock(result);
+                  if (widgetBlock) {
+                    lastWidgetResult = widgetBlock;
+                  }
 
                   // Add the tool result to the message history and persist it
                   currentMessages.push(
@@ -501,6 +531,42 @@ export class AgentController {
       // Store the final response in the session
       if (finalResponse) {
         finalResponse = this._sanitizeResponse(finalResponse);
+        finalResponse = normalizeWidgetTags(finalResponse);
+        if (lastWidgetResult) {
+          if (extractWidgetFromText(finalResponse)) {
+            finalResponse = finalResponse.replace(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/i, lastWidgetResult);
+          } else {
+            finalResponse = finalResponse ? `${finalResponse}\n${lastWidgetResult}` : lastWidgetResult;
+          }
+        } else if (extractWidgetFromText(finalResponse)) {
+          const widgetMatch = finalResponse.match(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/i);
+          if (widgetMatch) {
+            const widgetBlock = widgetMatch[0];
+            finalResponse = finalResponse.replace(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/i, widgetBlock);
+          }
+        }
+        // If the message is just a widget or has very short surrounding text, insert a short, natural fallback
+        try {
+          const widgetPresent = extractWidgetFromText(finalResponse) || lastWidgetResult;
+          if (widgetPresent) {
+            // Extract widget block
+            const match = finalResponse.match(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/i);
+            const widgetBlock = match ? match[0] : lastWidgetResult || "";
+            const surrounding = finalResponse.replace(widgetBlock, "").trim();
+
+            // Decide if surrounding text is too terse (few words or just punctuation)
+            const words = surrounding.split(/\s+/).filter(Boolean);
+            if (words.length < 3) {
+              const isHebrew = /[\u0590-\u05FF]/.test(userMessage);
+              const pre = isHebrew ? "הנה הטיוטה שלך." : "Here is your draft for your mission.";
+              const post = isHebrew ? "אפשר לאשר, לערוך או לבטל." : "You can confirm, edit, or cancel.";
+              finalResponse = `${pre}\n${widgetBlock}\n${post}`;
+            }
+          }
+        } catch (e) {
+          // Non-critical - fall back to original finalResponse
+        }
+
         // Persist assistant message and attach which OjoType authored it (user's selected OjoType)
         await memoryStore.addAssistantMessage(sessionId, userId, finalResponse, {
           ojoTypeName: userProfile?.ojoType?.name,

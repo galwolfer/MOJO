@@ -5,8 +5,8 @@ import * as taskService from "../../services/taskService.js";
 const getUpcomingTasksMission = new LightMission({
   name: "get_upcoming_tasks",
   group: "task",
-  description: "Return tasks due within N days",
-  missionInfo: "Tasks due soon",
+  description: "Return tasks due within N days. Keep message brief - widget shows details.",
+  missionInfo: "Tasks due soon. Write short intro (e.g., 'Here are your upcoming tasks:'). Don't repeat details.",
   widgets: ["task_list"],
   schema: z.object({
     days: z.number().optional().default(7),

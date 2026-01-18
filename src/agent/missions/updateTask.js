@@ -8,9 +8,8 @@ import { TASK_CONFIG } from "../taskRules.js";
 const updateTaskMission = new GuidedMission({
   name: "update_task",
   group: "task",
-  description:
-    "Update a task; requires confirm=true. Can update: taskname, deadline, estimatedDuration, category, subcategory, importance, effort, canSplit, taskType, completed. Call get_subcategories if changing category.",
-  missionInfo: "Modify task (optionally change category/subcategory)",
+  description: "Update a task; requires confirm=true. Keep message brief - widget shows updated details.",
+  missionInfo: "Modify task. Write short confirmation (e.g., 'Task updated:'). Don't list all changes in text.",
   behavior: [
     "If changing category: call get_subcategories(category=<new>) first.",
     "Require confirm=true before applying updates.",

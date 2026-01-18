@@ -5,8 +5,9 @@ import * as taskService from "../../services/taskService.js";
 const getTasksMission = new LightMission({
   name: "get_tasks",
   group: "task",
-  description: "Fetch tasks (filters/search)",
-  missionInfo: "Retrieve tasks",
+  description: "Fetch tasks (filters/search). Keep your message brief - widget shows the details.",
+  missionInfo:
+    "Retrieve tasks. Write short intro before widget (e.g., 'Here are your tasks:'). Don't list details in text.",
   widgets: ["task_list"],
   schema: z.object({
     search: z.string().optional().describe("Search query to find tasks by name/title"),

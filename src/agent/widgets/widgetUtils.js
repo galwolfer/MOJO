@@ -55,7 +55,7 @@ export function extractWidgetFromText(text) {
   if (!text || typeof text !== "string") return null;
 
   // Quick fix: replace common misspellings of the closing tag
-  const fixed = text.replace(/<\/?W+IDGET_JSON>/gi, (m) => {
+  const fixed = text.replace(/<\s*\/?\s*W[^>]*JSON\s*>/gi, (m) => {
     // Normalize to either opening or correct closing tag
     return m.startsWith("</") ? "</WIDGET_JSON>" : "<WIDGET_JSON>";
   });

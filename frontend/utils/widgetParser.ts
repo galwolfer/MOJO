@@ -9,18 +9,24 @@ export interface WidgetData {
   data: Record<string, any>;
 }
 
+function normalizeWidgetTags(text: string): string {
+  return text.replace(/<\s*\/?\s*W[^>]*JSON\s*>/gi, (m) => (m.includes("</") ? "</WIDGET_JSON>" : "<WIDGET_JSON>"));
+}
+
 /**
  * Detects if a text contains a widget JSON block
  */
 export function hasWidget(text: string): boolean {
-  return /<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/.test(text);
+  const normalized = normalizeWidgetTags(text);
+  return /<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/.test(normalized);
 }
 
 /**
  * Extracts the raw JSON string from <WIDGET_JSON> tags
  */
 function extractWidgetJsonString(text: string): string | null {
-  const match = text.match(/<WIDGET_JSON>([\s\S]*?)<\/WIDGET_JSON>/);
+  const normalized = normalizeWidgetTags(text);
+  const match = normalized.match(/<WIDGET_JSON>([\s\S]*?)<\/WIDGET_JSON>/);
   return match ? match[1].trim() : null;
 }
 
@@ -56,7 +62,8 @@ export function parseWidget(text: string): WidgetData | null {
  * Removes the <WIDGET_JSON> block from text, returning only the text content
  */
 export function stripWidgetJson(text: string): string {
-  return text.replace(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/g, "").trim();
+  const normalized = normalizeWidgetTags(text);
+  return normalized.replace(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/g, "").trim();
 }
 
 /**
@@ -68,7 +75,8 @@ export function splitTextAndWidget(text: string): {
   widget: WidgetData | null;
   afterText: string;
 } {
-  const widgetMatch = text.match(/([\s\S]*?)<WIDGET_JSON>([\s\S]*?)<\/WIDGET_JSON>([\s\S]*)/);
+  const normalized = normalizeWidgetTags(text);
+  const widgetMatch = normalized.match(/([\s\S]*?)<WIDGET_JSON>([\s\S]*?)<\/WIDGET_JSON>([\s\S]*)/);
 
   if (!widgetMatch) {
     return {

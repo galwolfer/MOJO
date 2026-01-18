@@ -5,8 +5,8 @@ import * as taskService from "../../services/taskService.js";
 const getOverdueTasksMission = new LightMission({
   name: "get_overdue_tasks",
   group: "task",
-  description: "Return overdue incomplete tasks",
-  missionInfo: "Late tasks",
+  description: "Return overdue incomplete tasks. Keep message brief - widget shows details.",
+  missionInfo: "Late tasks. Write short intro (e.g., 'Here are your overdue tasks:'). Don't repeat details.",
   widgets: ["task_list"],
   schema: z.object({}),
   execute: async ({ userId }) => {
