@@ -86,7 +86,6 @@ function parseRelativeDate(dateString) {
 }
 
 const previewTaskMission = new GuidedMission({
-  returnDirect: true,
   name: "preview_task",
   group: "task",
   description:
@@ -241,49 +240,37 @@ const previewTaskMission = new GuidedMission({
       const categoryDisplay = getDisplayName(category || inferred.category || "");
       const shortDescription = `${taskname} — ${categoryDisplay} • due ${finalDeadline}`;
 
+      // Widget payload - clean structure with no duplicate fields
       const widgetPayload = {
         id: "draft-" + Date.now(),
         title: taskname,
+        description: description || "",
         status: "draft",
         dueDate: new Date(finalDeadline).toISOString(),
-        category: category || "",
-        categoryDisplay,
+        category: categoryDisplay, // Use display name for category
         subcategory: subcategory || "",
-        subcategoryDisplay: subcategory || "",
         importance: finalImportance,
         effort: finalEffort,
         estimatedDuration: finalDuration,
-        // Short human-readable summary (use before the widget; keep concise)
-        shortDescription,
-        // Prompt message asking for confirmation / edits (user-facing; default in English)
-        confirmationMessage:
-          "The task is ready to be created. Would you like to create it now? If you'd like to make any changes, tell me what to change.",
-        // Aliases to support different widget consumers
-        taskname: taskname,
-        deadline: finalDeadline,
-        duration: finalDuration,
+        canSplit: finalCanSplit,
         taskType: finalTaskType,
+        // Splitting parameters (only include when relevant)
         minChunk: displayMinChunk,
         chunkCount: displayChunkCount,
-        chunkMinutes: displayChunkMinutes,
         minMinutes: displayMinMinutes,
         maxMinutes: displayMaxMinutes,
         earliestStart: finalEarliestStart,
         recurrence: recurrence || null,
-        description: description || (recurrence ? `Recurrence: ${recurrence.type}` : ""),
-        canSplit: finalCanSplit,
+        tags: null,
+        // Store internal category key for task creation
+        _categoryKey: category || "",
       };
 
       // Build a canonical widget string using the central helper (ensures
       // fields match registry schema and always uses the exact tags)
       try {
         const { buildWidgetString } = await import("../widgets/widgetUtils.js");
-        // Return a human-friendly message followed by the canonical widget block so
-        // the frontend displays both text and the widget content together.
-        const widgetString = buildWidgetString("task_confirmation", widgetPayload);
-        const message =
-          widgetPayload.confirmationMessage || "Here is a preview of the task. Please confirm or edit as needed.";
-        return `${message}\n\n${widgetString}`;
+        return buildWidgetString("task_confirmation", widgetPayload);
       } catch (err) {
         console.error("[previewTask] Failed to build widget string:", err.message);
         // If widget generation fails for any reason, return a human-friendly

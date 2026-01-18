@@ -6,40 +6,44 @@
 import React from "react";
 import { View, StyleSheet, ScrollView } from "react-native";
 import AppText from "../common/AppText";
-import AppButton from "../common/AppButton";
 import { COLORS, SPACING } from "../../theme";
 import Widget from "../special/Widget";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
 
 interface TaskData {
+  id: string;
   title: string;
   description?: string;
   dueDate?: string;
   importance?: number;
   effort?: number;
+  estimatedDuration?: number;
   category?: string;
   subcategory?: string;
   status?: string;
-  notes?: string;
+  canSplit?: boolean;
+  taskType?: string;
+  minChunk?: number;
+  chunkCount?: number;
+  minMinutes?: number;
+  maxMinutes?: number;
+  earliestStart?: string;
+  recurrence?: {
+    type: string;
+    interval?: number;
+    endDate?: string;
+    count?: number;
+  };
+  tags?: string[];
 }
 
 /**
  * TaskConfirmationWidget - Renders task details for confirmation
+ * Note: data comes directly from the widget, no nested 'task' object
  */
-const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
-  const task: TaskData = data.task || data;
-
-  const handleConfirm = () => {
-    onAction?.("confirmed", { task });
-  };
-
-  const handleEdit = () => {
-    onAction?.("edit", { task });
-  };
-
-  const handleCancel = () => {
-    onAction?.("cancelled", {});
-  };
+const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({ data }) => {
+  // Data is passed directly - use as TaskData
+  const task: TaskData = data as TaskData;
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return "Not set";
@@ -66,6 +70,15 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) =
     if (!effort) return "Not set";
     const labels = ["", "Minimal", "Light", "Moderate", "Heavy", "Extensive"];
     return labels[effort] || `Level ${effort}`;
+  };
+
+  const formatDuration = (minutes?: number) => {
+    if (!minutes) return "Not set";
+    if (minutes < 60) return `${minutes} minutes`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (mins === 0) return `${hours} hour${hours > 1 ? "s" : ""}`;
+    return `${hours}h ${mins}m`;
   };
 
   return (
@@ -105,45 +118,22 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) =
         </View>
 
         {/* Category */}
-        {(task.categoryDisplay || task.category) && (
+        {task.category && (
           <View style={styles.field}>
             <AppText variant="notes" style={styles.labelText}>
               📁 Category
             </AppText>
-            <AppText variant="bodyText">{task.categoryDisplay || task.category}</AppText>
+            <AppText variant="bodyText">{task.category}</AppText>
           </View>
         )}
 
         {/* Subcategory */}
-        {(task.subcategoryDisplay || task.subcategory) && (
+        {task.subcategory && (
           <View style={styles.field}>
             <AppText variant="notes" style={styles.labelText}>
               📂 Subcategory
             </AppText>
-            <AppText variant="bodyText">{task.subcategoryDisplay || task.subcategory}</AppText>
-          </View>
-        )}
-
-        {/* Estimated duration */}
-        {task.estimatedDuration != null && (
-          <View style={styles.field}>
-            <AppText variant="notes" style={styles.labelText}>
-              ⏱️ Estimated duration
-            </AppText>
-            <AppText variant="bodyText">{Math.round((task.estimatedDuration || 0) / 60)} hours</AppText>
-          </View>
-        )}
-
-        {/* Splitting */}
-        {task.taskType === "in_parts" && (
-          <View style={styles.field}>
-            <AppText variant="notes" style={styles.labelText}>
-              🔀 Splitting
-            </AppText>
-            <AppText variant="bodyText">
-              {task.chunkCount ? `${task.chunkCount} parts` : "Split into parts"}
-              {task.minChunk ? ` • min chunk ${task.minChunk} minutes` : ""}
-            </AppText>
+            <AppText variant="bodyText">{task.subcategory}</AppText>
           </View>
         )}
 
@@ -163,14 +153,28 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) =
           </View>
         </View>
 
-        {/* Notes */}
-        {task.notes && (
+        {/* Estimated Duration */}
+        {task.estimatedDuration && (
           <View style={styles.field}>
             <AppText variant="notes" style={styles.labelText}>
-              📝 Notes
+              ⏱️ Estimated Duration
             </AppText>
-            <AppText variant="bodyText" numberOfLines={3} style={styles.notesText}>
-              {task.notes}
+            <AppText variant="bodyText">{formatDuration(task.estimatedDuration)}</AppText>
+          </View>
+        )}
+
+        {/* Splitting */}
+        {task.canSplit && (
+          <View style={styles.field}>
+            <AppText variant="notes" style={styles.labelText}>
+              🔀 Splitting
+            </AppText>
+            <AppText variant="bodyText">
+              {task.taskType === "in_parts" && task.chunkCount
+                ? `${task.chunkCount} parts`
+                : task.taskType === "leaky"
+                  ? `Flexible (${task.minMinutes || 15}-${task.maxMinutes || 60} min)`
+                  : "Can be split"}
             </AppText>
           </View>
         )}

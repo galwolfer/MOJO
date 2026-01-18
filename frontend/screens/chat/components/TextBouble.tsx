@@ -86,7 +86,7 @@ const TypewriterText = memo<{
       {
         style: [textStyle, (children as any).props?.style],
       },
-      displayText
+      displayText,
     );
   }
 
@@ -157,7 +157,7 @@ function cloneChildrenWithTyping(node: React.ReactNode, typedChars: number): Rea
         out.push(
           <React.Fragment key={i}>
             {cloneChildrenWithTyping(child, Math.min(remainingTyped, childTextLen))}
-          </React.Fragment>
+          </React.Fragment>,
         );
         consumedSoFar += childTextLen;
       } else {
@@ -166,7 +166,7 @@ function cloneChildrenWithTyping(node: React.ReactNode, typedChars: number): Rea
         out.push(
           <React.Fragment key={i}>
             <NonTextFade visible={visible}>{child}</NonTextFade>
-          </React.Fragment>
+          </React.Fragment>,
         );
       }
     });
@@ -224,7 +224,7 @@ const AnimatedTypingContent: React.FC<{
       {
         style: [(children as any).props?.style, mode === "user" ? { color: COLORS.colorWhite } : undefined],
       },
-      content
+      content,
     );
   }
 
@@ -448,7 +448,7 @@ const TextBouble: React.FC<Props> = ({
         } catch (_) {}
       });
     },
-    [onTypingDone, conicOpacity, glowOpacity, nonTextOpacity, setWidgetMounted]
+    [onTypingDone, conicOpacity, glowOpacity, nonTextOpacity, setWidgetMounted],
   );
 
   useEffect(() => {
@@ -549,7 +549,7 @@ const TextBouble: React.FC<Props> = ({
   // Determine shadow color from persona gradient if provided
   const shadowColor = useMemo(
     () => (gradientColors && gradientColors.length > 0 ? gradientColors[0] : undefined),
-    [gradientColors]
+    [gradientColors],
   );
   const containerShadow = useMemo(() => getContainerShadow(mode, shadowColor), [mode, shadowColor]);
 
