@@ -1,21 +1,27 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   View,
   StyleSheet,
   TouchableOpacity,
   Image,
   useWindowDimensions,
+  ActivityIndicator,
+  AppState,
+  AppStateStatus,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import AppText from "../../components/common/AppText";
 import { COLORS, SPACING, SHADOWS } from "../../theme";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigation } from "../../context/NavigationContext";
+import { useTaskContext } from "../../context/TaskContext";
 import { ICONS } from "../../components/icons/icons";
 import ScrollableContent from "../../components/layout/ScrollableContent";
 import Box from "../../components/layout/Box";
 import { StatBadge, ProgressGraph, FriendListItem } from "./components";
 import { moderateScale } from "react-native-size-matters";
+import { getUserStats } from "../../services/userService";
+import { getTasks, calculateTaskProgress, type Task, type TaskProgress } from "../../services/taskService";
 
 /**
  * UserProfileScreen
@@ -29,14 +35,7 @@ import { moderateScale } from "react-native-size-matters";
  * - Friends list
  */
 
-// Mock data for demo - will be replaced with API calls
-const MOCK_STATS = {
-  tasks: 34,
-  points: 289,
-  streak: 17,
-};
-
-const MOCK_PROGRESS = [20, 35, 25, 50, 45, 60, 55, 70, 65, 80, 75, 82, 78, 85];
+const DEFAULT_PROGRESS = new Array(14).fill(0);
 
 const MOCK_FRIENDS = [
   {
@@ -73,6 +72,15 @@ export default function UserProfileScreen() {
   const { user, signOut } = useAuth();
   const { setHeaderConfig } = useNavigation();
   const { width } = useWindowDimensions();
+  const { subscribeToTaskUpdates } = useTaskContext();
+
+  const [stats, setStats] = useState({ tasks: 0, points: 0, streak: 0 });
+  const [loading, setLoading] = useState(true);
+  const [progressData, setProgressData] = useState<number[]>(DEFAULT_PROGRESS);
+  const [taskProgress, setTaskProgress] = useState<TaskProgress | null>(null);
+  const [tasks, setTasksState] = useState<Task[]>([]);
+  const pollRef = useRef<NodeJS.Timeout | null>(null);
+  const mountedRef = useRef(true);
 
   const SettingsIcon = ICONS.settings;
   const UserIcon = ICONS.user;
@@ -96,6 +104,55 @@ export default function UserProfileScreen() {
     });
   }, []);
 
+  const fetchAllData = useCallback(async () => {
+    if (!mountedRef.current) return;
+    try {
+      const [statsData, taskList] = await Promise.all([getUserStats(), getTasks()]);
+      if (!mountedRef.current) return;
+      setStats(statsData);
+      setTasksState(taskList);
+      const progress = calculateTaskProgress(taskList, 14);
+      setTaskProgress(progress);
+      setProgressData(progress.dailyProgress);
+    } catch (err) {
+      console.warn("UserProfile fetch failed", err);
+    } finally {
+      if (mountedRef.current) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    fetchAllData();
+    pollRef.current = setInterval(fetchAllData, 5000);
+    return () => {
+      mountedRef.current = false;
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, [fetchAllData]);
+
+  useEffect(() => {
+    const onState = (state: AppStateStatus) => {
+      if (state === "active") {
+        fetchAllData();
+        if (!pollRef.current) pollRef.current = setInterval(fetchAllData, 5000);
+      } else if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+    const sub = AppState.addEventListener("change", onState);
+    return () => sub.remove();
+  }, [fetchAllData]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToTaskUpdates(() => fetchAllData());
+    return unsubscribe;
+  }, [subscribeToTaskUpdates, fetchAllData]);
+
   const graphWidth = Math.min(width - SPACING.xlg * 2 - SPACING.md * 2, 300);
 
   return (
@@ -105,6 +162,7 @@ export default function UserProfileScreen() {
       extraTopPadding={SPACING.lg}
       scrollKey="user-profile"
       contentContainerStyle={styles.contentContainer}
+      extraBottomPadding={SPACING.xlg * 3}
     >
       {/* Profile Header Section */}
       <View style={styles.profileSection}>
@@ -147,37 +205,71 @@ export default function UserProfileScreen() {
 
         {/* Stats Row */}
         <View style={styles.statsRow}>
-          <StatBadge
-            icon={<CheckIcon size={16} color={COLORS.colorWhite} />}
-            value={MOCK_STATS.tasks}
-            label="Tasks"
-            color={COLORS.primary6}
-          />
-          <StatBadge
-            icon={<TrophyIcon size={16} color={COLORS.colorWhite} />}
-            value={MOCK_STATS.points}
-            label="Points"
-            color={COLORS.primary5}
-          />
-          <StatBadge
-            icon={<FlameIcon size={16} color={COLORS.colorWhite} />}
-            value={MOCK_STATS.streak}
-            label="Days Streak"
-            color={COLORS.primary4}
-          />
+          {loading ? (
+            <ActivityIndicator size="small" color={COLORS.primary1} />
+          ) : (
+            <>
+              <StatBadge
+                icon={<CheckIcon size={16} color={COLORS.colorWhite} />}
+                value={stats.tasks}
+                label="Tasks"
+                color={COLORS.primary6}
+              />
+              <StatBadge
+                icon={<TrophyIcon size={16} color={COLORS.colorWhite} />}
+                value={stats.points}
+                label="Points"
+                color={COLORS.primary5}
+              />
+              <StatBadge
+                icon={<FlameIcon size={16} color={COLORS.colorWhite} />}
+                value={stats.streak}
+                label="Days Streak"
+                color={COLORS.primary4}
+              />
+            </>
+          )}
         </View>
       </View>
 
       {/* Progress Section */}
       <Box title="My Progress" titleColor={COLORS.primary3}>
         <View style={styles.progressContent}>
-          <ProgressGraph
-            data={MOCK_PROGRESS}
-            width={graphWidth}
-            height={moderateScale(100)}
-          />
+          {loading ? (
+            <ActivityIndicator size="small" color={COLORS.primary3} style={{ marginVertical: SPACING.lg }} />
+          ) : (
+            <>
+              {taskProgress && (
+                <View style={styles.progressSummary}>
+                  <View style={styles.progressSummaryItem}>
+                    <AppText variant="boldText" style={styles.progressSummaryValue}>
+                      {taskProgress.today.completed}/{taskProgress.today.total}
+                    </AppText>
+                    <AppText variant="notes" style={styles.progressSummaryLabel}>Today</AppText>
+                  </View>
+                  <View style={styles.progressSummaryDivider} />
+                  <View style={styles.progressSummaryItem}>
+                    <AppText variant="boldText" style={styles.progressSummaryValue}>
+                      {taskProgress.today.percentage}%
+                    </AppText>
+                    <AppText variant="notes" style={styles.progressSummaryLabel}>Completed</AppText>
+                  </View>
+                  <View style={styles.progressSummaryDivider} />
+                  <View style={styles.progressSummaryItem}>
+                    <AppText variant="boldText" style={styles.progressSummaryValue}>
+                      {taskProgress.week.completed}
+                    </AppText>
+                    <AppText variant="notes" style={styles.progressSummaryLabel}>This Week</AppText>
+                  </View>
+                </View>
+              )}
+              <ProgressGraph data={progressData} width={graphWidth} height={moderateScale(100)} />
+            </>
+          )}
           <AppText variant="notes" style={styles.progressNote}>
-            Your Goals, lets talk about what you want to achieve.
+            {tasks.length > 0
+              ? `Track your daily task completion over the last ${progressData.length} days`
+              : "Complete tasks to see your progress here!"}
           </AppText>
         </View>
       </Box>
@@ -301,6 +393,35 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
     gap: SPACING.md,
   },
+  progressSummary: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.white2,
+    borderRadius: SPACING.md,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    gap: SPACING.md,
+  },
+  progressSummaryItem: {
+    alignItems: "center",
+    paddingHorizontal: SPACING.md,
+  },
+  progressSummaryValue: {
+    color: COLORS.primary3,
+    fontSize: moderateScale(18),
+  },
+  progressSummaryLabel: {
+    color: COLORS.grayLight,
+    fontSize: moderateScale(10),
+    marginTop: 2,
+  },
+  progressSummaryDivider: {
+    width: 1,
+    height: moderateScale(30),
+    backgroundColor: COLORS.grayLight,
+    opacity: 0.3,
+  },
   progressNote: {
     color: COLORS.grayLight,
     textAlign: "center",
@@ -342,6 +463,7 @@ const styles = StyleSheet.create({
     borderRadius: SPACING.lg,
     ...SHADOWS.card,
     marginTop: SPACING.md,
+    marginBottom: SPACING.xlg * 2,
   },
   logoutText: {
     color: COLORS.primary7,

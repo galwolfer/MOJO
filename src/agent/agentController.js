@@ -221,7 +221,7 @@ export class AgentController {
 
             // Validate widget payload like normal tool execution
             if (typeof result === "string" && result.includes("<WIDGET_JSON>")) {
-              const widgetValidation = await validateWidgetPayload(result);
+              const widgetValidation = validateWidgetPayload(result);
               if (!widgetValidation.valid) {
                 if (
                   widgetValidation.reason === "Empty task list" &&
@@ -396,7 +396,7 @@ export class AgentController {
 
                   // If result contains a widget payload, validate it
                   if (typeof result === "string" && result.includes("<WIDGET_JSON>")) {
-                    const widgetValidation = await validateWidgetPayload(result);
+                    const widgetValidation = validateWidgetPayload(result);
                     if (!widgetValidation.valid) {
                       console.warn(
                         `[AgentController] Widget validation failed for ${toolCall.name}: ${widgetValidation.reason}`
