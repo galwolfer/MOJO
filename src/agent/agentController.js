@@ -715,6 +715,20 @@ export class AgentController {
     // Clean up extra newlines and whitespace
     cleaned = cleaned.replace(/\n\s*\n+/g, "\n").trim();
 
+    // Strip illegal display characters outside widget blocks
+    const widgetBlocks = [];
+    cleaned = cleaned.replace(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/gi, (match) => {
+      const token = `__WIDGET_BLOCK_${widgetBlocks.length}__`;
+      widgetBlocks.push(match);
+      return token;
+    });
+    cleaned = cleaned.replace(/[<>]/g, "");
+    widgetBlocks.forEach((block, idx) => {
+      cleaned = cleaned.replace(`__WIDGET_BLOCK_${idx}__`, block);
+    });
+
+    cleaned = cleaned.replace(/\n\s*\n+/g, "\n").trim();
+
     return cleaned;
   }
 

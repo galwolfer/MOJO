@@ -7,6 +7,7 @@ import * as taskService from "../services/taskService.js";
 import { logger } from "../utils/logger.js";
 import { User } from "../models/User.js";
 import { getCategoryIndex, isValidCategory } from "../config/categories.js";
+import { hasIllegalDisplayChars } from "../utils/illegalChars.js";
 
 /**
  * Task Controller
@@ -82,8 +83,16 @@ export async function createTask(req, res) {
       return res.status(400).json({ success: false, error: "Task title is required" });
     }
 
+    if (hasIllegalDisplayChars(title)) {
+      return res.status(400).json({ success: false, error: "Task title cannot include angle brackets." });
+    }
+
     if (!deadline) {
       return res.status(400).json({ success: false, error: "Deadline is required" });
+    }
+
+    if (subcategory && hasIllegalDisplayChars(subcategory)) {
+      return res.status(400).json({ success: false, error: "Subcategory cannot include angle brackets." });
     }
 
     // Validate recurrence if provided
@@ -264,6 +273,9 @@ export async function updateTask(req, res) {
         if (trimmed.length === 0) {
           return res.status(400).json({ success: false, error: "Task name cannot be empty" });
         }
+        if (hasIllegalDisplayChars(trimmed)) {
+          return res.status(400).json({ success: false, error: "Task name cannot include angle brackets." });
+        }
         if (trimmed.length > 200) {
           return res.status(400).json({ success: false, error: "Task name too long (max 200 characters)" });
         }
@@ -274,7 +286,11 @@ export async function updateTask(req, res) {
     // Description
     if (raw.description !== undefined) {
       if (typeof raw.description === "string") {
-        updates.description = raw.description.trim();
+        const trimmed = raw.description.trim();
+        if (hasIllegalDisplayChars(trimmed)) {
+          return res.status(400).json({ success: false, error: "Description cannot include angle brackets." });
+        }
+        updates.description = trimmed;
       }
     }
     
@@ -283,6 +299,9 @@ export async function updateTask(req, res) {
     
     // Subcategory
     if (raw.subcategory !== undefined) {
+      if (typeof raw.subcategory === "string" && hasIllegalDisplayChars(raw.subcategory)) {
+        return res.status(400).json({ success: false, error: "Subcategory cannot include angle brackets." });
+      }
       updates.subCategory = { label: raw.subcategory, source: "user", confidence: 1, updatedAt: new Date() };
       
       // Auto-save subcategory to user profile
@@ -638,6 +657,9 @@ export async function updateSubTask(req, res) {
         if (trimmed.length > 200) {
           return res.status(400).json({ success: false, error: "Subtask title too long (max 200 characters)" });
         }
+        if (hasIllegalDisplayChars(trimmed)) {
+          return res.status(400).json({ success: false, error: "Subtask title cannot include angle brackets." });
+        }
         updates.title = trimmed;
       }
     }
@@ -645,7 +667,11 @@ export async function updateSubTask(req, res) {
     // Description
     if (raw.description !== undefined) {
       if (typeof raw.description === "string") {
-        updates.description = raw.description.trim();
+        const trimmed = raw.description.trim();
+        if (hasIllegalDisplayChars(trimmed)) {
+          return res.status(400).json({ success: false, error: "Subtask description cannot include angle brackets." });
+        }
+        updates.description = trimmed;
       }
     }
     

@@ -34,6 +34,7 @@ import { mapCategoryToLifecycle } from "../algorithms/priority/categorizing.js";
 import { trainTask } from "./mlPredictionService.js";
 import { logger } from "../utils/logger.js";
 import { startOfDay } from "../utils/dateUtils.js";
+import { getIllegalDisplayFields, getIllegalCharsErrorMessage } from "../utils/illegalChars.js";
 
 // =============================================================================
 // INTERNAL HELPERS
@@ -68,6 +69,17 @@ async function _saveUserSubCategory(userId, categoryName, subCategory) {
   }
 }
 
+function getSubCategoryLabel(subCategory) {
+  if (!subCategory) return "";
+  if (typeof subCategory === "string") return subCategory;
+  if (typeof subCategory === "object") return subCategory.label || subCategory.name || "";
+  return "";
+}
+
+function buildIllegalCharsError(fields) {
+  return getIllegalCharsErrorMessage(fields);
+}
+
 // =============================================================================
 // TASK CRUD OPERATIONS
 // =============================================================================
@@ -96,6 +108,15 @@ export async function createTask({
   subCategory = null,
   recurrence = null,
 }) {
+  const illegalFields = getIllegalDisplayFields({
+    taskname,
+    description,
+    subcategory: getSubCategoryLabel(subCategory),
+  });
+  if (illegalFields.length > 0) {
+    throw new Error(buildIllegalCharsError(illegalFields));
+  }
+
   const created = await Task.create({
     userId,
     taskname,
@@ -308,6 +329,15 @@ export async function updateTask({ userId, taskId, updates }) {
 
   if (Object.keys(sanitizedUpdates).length === 0) {
     return { success: false, error: "No valid fields to update." };
+  }
+
+  const illegalFields = getIllegalDisplayFields({
+    taskname: sanitizedUpdates.taskname,
+    description: sanitizedUpdates.description,
+    subcategory: getSubCategoryLabel(sanitizedUpdates.subCategory),
+  });
+  if (illegalFields.length > 0) {
+    return { success: false, error: buildIllegalCharsError(illegalFields) };
   }
 
   // Validate numeric fields when provided
@@ -683,6 +713,14 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
   }
 
   if (Object.keys(sanitized).length === 0) return { success: false, error: "No valid fields to update" };
+
+  const illegalFields = getIllegalDisplayFields({
+    title: sanitized.title,
+    description: sanitized.description,
+  });
+  if (illegalFields.length > 0) {
+    return { success: false, error: buildIllegalCharsError(illegalFields) };
+  }
 
   // If marking done, set completedAt
   if (sanitized.status === "done") sanitized.completedAt = new Date();

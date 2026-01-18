@@ -2,6 +2,7 @@ import { z } from "zod";
 import { GuidedMission } from "./GuidedMission.js";
 import { TASK_CONFIG, inferTaskProperties, inferSplittingParams } from "../taskRules.js";
 import { getDisplayName } from "../../config/categories.js";
+import { getIllegalDisplayFields, getIllegalCharsErrorMessage } from "../../utils/illegalChars.js";
 
 /**
  * Parse relative date strings like "next Thursday", "tomorrow", "in 3 days"
@@ -153,6 +154,15 @@ const previewTaskMission = new GuidedMission({
     } = args;
 
     try {
+      const illegalFields = getIllegalDisplayFields({
+        taskname,
+        description,
+        subcategory,
+      });
+      if (illegalFields.length > 0) {
+        return `ok=false\nerr="illegal_characters"\nmsg="${getIllegalCharsErrorMessage(illegalFields)}"`;
+      }
+
       // Parse relative dates (e.g., "next Thursday", "tomorrow", "in 3 days") to ISO format
       let finalDeadline = deadline;
       try {

@@ -1,4 +1,5 @@
 import { widgetRegistry } from "./registry.js";
+import { sanitizeDisplayStringsDeep } from "../../utils/illegalChars.js";
 
 /**
  * Ensure the provided data object contains all keys listed in the widget
@@ -28,10 +29,11 @@ export function ensureWidgetFields(widgetType, data = {}) {
  */
 export function buildWidgetString(widgetType, data = {}) {
   const canonicalData = ensureWidgetFields(widgetType, data);
+  const safeData = sanitizeDisplayStringsDeep(canonicalData);
   const payload = {
     version: "1.0",
     widget_type: widgetType,
-    data: canonicalData,
+    data: safeData,
   };
 
   // JSON.stringify with stable ordering - use Object.keys to ensure order

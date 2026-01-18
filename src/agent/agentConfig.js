@@ -71,6 +71,7 @@ CRITICAL:
 - To list: call get_tasks/get_upcoming_tasks/get_overdue_tasks first.
 - Use RECENT ENTITIES only for reference resolution, not for lists.
 - Use <WIDGET_JSON> when showing tasks.
+- Do not output angle brackets in normal text or task fields; ask the user to remove them if provided. Only block the literal bracket characters.
 - Respond in the user's language.
 
 ${getWidgetPromptInstructions()}

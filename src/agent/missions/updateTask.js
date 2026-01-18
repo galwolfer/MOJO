@@ -4,6 +4,7 @@ import * as taskService from "../../services/taskService.js";
 import { awardTaskCompletionPoints } from "../../controllers/userController.js";
 import { CATEGORY_STRING_VALUES, getDisplayName } from "../../config/categories.js";
 import { TASK_CONFIG } from "../taskRules.js";
+import { getIllegalDisplayFields, getIllegalCharsErrorMessage } from "../../utils/illegalChars.js";
 
 const updateTaskMission = new GuidedMission({
   name: "update_task",
@@ -73,6 +74,14 @@ const updateTaskMission = new GuidedMission({
       // Require explicit confirmation to avoid accidental changes
       if (!confirm) {
         return `ok=false\nerr="confirmation_required"`;
+      }
+
+      const illegalFields = getIllegalDisplayFields({
+        taskname,
+        subcategory,
+      });
+      if (illegalFields.length > 0) {
+        return `ok=false\nerr="illegal_characters"\nmsg="${getIllegalCharsErrorMessage(illegalFields)}"`;
       }
 
       // If taskId not provided, try to resolve by exact task title
