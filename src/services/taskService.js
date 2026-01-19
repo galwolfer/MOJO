@@ -230,6 +230,86 @@ export async function getOverdueTasks(userId) {
 }
 
 /**
+ * Get detailed progress for a task with split parts.
+ * Returns the task, all its subtasks, and their associated schedule blocks.
+ * 
+ * @param {string} userId - User ID
+ * @param {string} taskId - Task ID
+ * @returns {Promise<object>} Task with subtasks and schedule info
+ * 
+ * Example response:
+ * {
+ *   task: { _id, taskname, taskType, chunkCount, estimatedDuration, ... },
+ *   subtasks: [
+ *     { _id, index: 1, title, status, minutes, scheduledAt: {...schedule...} },
+ *     { _id, index: 2, title, status, minutes, scheduledAt: {...schedule...} }
+ *   ],
+ *   completedParts: 2,
+ *   totalParts: 4,
+ *   overallProgress: 0.5
+ * }
+ */
+export async function getTaskProgress(userId, taskId) {
+  // Get the task
+  const task = await Task.findOne({
+    _id: taskId,
+    userId,
+  }).lean();
+
+  if (!task) {
+    return null;
+  }
+
+  // Get all subtasks for this task
+  const subtasks = await SubTask.find({
+    taskId,
+  })
+    .sort({ index: 1 })
+    .lean();
+
+  // Get all schedule blocks for this task
+  const schedules = await TaskSchedule.find({
+    taskId,
+  })
+    .sort({ start: 1 })
+    .lean();
+
+  // Map subtask index to schedule info
+  const subtaskMap = new Map(subtasks.map((st) => [st.index, st]));
+  const schedulesBySubtaskIndex = new Map();
+
+  for (const schedule of schedules) {
+    if (schedule.subtaskIndex) {
+      if (!schedulesBySubtaskIndex.has(schedule.subtaskIndex)) {
+        schedulesBySubtaskIndex.set(schedule.subtaskIndex, []);
+      }
+      schedulesBySubtaskIndex.get(schedule.subtaskIndex).push(schedule);
+    }
+  }
+
+  // Enrich subtasks with schedule info
+  const enrichedSubtasks = subtasks.map((st) => ({
+    ...st,
+    scheduledSessions: schedulesBySubtaskIndex.get(st.index) || [],
+  }));
+
+  // Calculate progress (using cached progressPercentage from task)
+  const completedParts = subtasks.filter((st) => st.status === "done").length;
+  const totalParts = subtasks.length;
+  const overallProgress = totalParts > 0 ? completedParts / totalParts : 0;
+  const progressPercentage = task.progressPercentage || 0; // Cached value from Task model
+
+  return {
+    task,
+    subtasks: enrichedSubtasks,
+    completedParts,
+    totalParts,
+    overallProgress,
+    progressPercentage, // 0-100 format
+  };
+}
+
+/**
  * Sync a task's status based on its scheduled sessions.
  */
 export async function syncTaskStatusFromSessions(taskId) {
