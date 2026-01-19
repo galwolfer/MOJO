@@ -61,6 +61,8 @@ const taskSchema = new mongoose.Schema(
       confidence: { type: Number, min: 0, max: 1, default: 0 },
       updatedAt: { type: Date },
     },
+    // Task progress tracking (for split tasks)
+    progressPercentage: { type: Number, min: 0, max: 100, default: 0 }, // 0-100, synced from subtasks
   },
   { timestamps: true },
 );
@@ -137,6 +139,28 @@ async function syncSubTasksForTask(taskDoc) {
   }
 }
 
+// Helper: Calculate and sync progress percentage based on subtasks
+async function syncProgressPercentageForTask(taskDoc) {
+  try {
+    // Only relevant for split tasks
+    if (!["in_parts", "leaky"].includes(taskDoc.taskType)) {
+      taskDoc.progressPercentage = 0;
+      return;
+    }
+
+    const subtasks = await SubTask.find({ taskId: taskDoc._id }).lean();
+    if (subtasks.length === 0) {
+      taskDoc.progressPercentage = 0;
+      return;
+    }
+
+    const completedCount = subtasks.filter((st) => st.status === "done").length;
+    taskDoc.progressPercentage = Math.round((completedCount / subtasks.length) * 100);
+  } catch (err) {
+    console.error("⚠️  syncProgressPercentageForTask failed:", err && err.message ? err.message : err);
+  }
+}
+
 taskSchema.post("save", async function () {
   // When a task is created or updated, recalculate priority scores for all open tasks
   console.log("🧩 Task saved — updating priority scores...");
@@ -144,6 +168,9 @@ taskSchema.post("save", async function () {
 
   // After saving, ensure subTasks reflect the task's chunk configuration
   await syncSubTasksForTask(this);
+
+  // Sync progress percentage from subtasks
+  await syncProgressPercentageForTask(this);
 });
 
 // (remove) after each task remove
