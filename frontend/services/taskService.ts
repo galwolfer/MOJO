@@ -232,6 +232,34 @@ export async function createTask(taskData: {
 }
 
 /**
+ * Suggest category and subcategory based on task name
+ * POST /api/tasks/suggest-category
+ */
+export async function suggestCategory(taskname: string): Promise<{
+  category: string;
+  subCategory: string | null;
+} | null> {
+  try {
+    const response = await post<{
+      success: boolean;
+      category: string;
+      subCategory: string | null;
+    }>("/tasks/suggest-category", { taskname });
+    
+    if (response.success) {
+      return {
+        category: response.category,
+        subCategory: response.subCategory,
+      };
+    }
+    return null;
+  } catch (error) {
+    console.warn("Failed to suggest category:", error);
+    return null;
+  }
+}
+
+/**
  * Complete a task
  * POST /api/tasks/:id/complete
  */
@@ -299,4 +327,5 @@ export default {
   toggleTaskCompletion,
   updateTask,
   deleteTask,
+  suggestCategory,
 };

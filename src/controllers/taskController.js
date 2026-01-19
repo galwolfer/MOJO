@@ -68,6 +68,58 @@ async function autoSaveSubcategory(userId, subcategoryName, categoryKey) {
 }
 
 /**
+ * Suggest category and subcategory for a task name
+ * POST /api/tasks/suggest-category
+ */
+export async function suggestCategory(req, res) {
+  try {
+    const userId = req.user.userId;
+    const { taskname } = req.body;
+
+    if (!taskname || !taskname.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: "Task name is required",
+      });
+    }
+
+    // Import the category detection and subcategory generation functions
+    const { detectCategory } = await import("../algorithms/priority/categorizing.js");
+    const { generateSubCategory } = await import("../services/ml/subcategoryGenerator.js");
+    const { Task } = await import("../models/Task.js");
+
+    // Detect category from task name
+    const category = detectCategory({
+      title: taskname.trim(),
+      description: "",
+      category: "",
+    });
+
+    // Generate subcategory
+    const subCategory = await generateSubCategory({
+      userId,
+      title: taskname.trim(),
+      description: "",
+      category,
+      current: null,
+      TaskModel: Task,
+    });
+
+    return res.status(200).json({
+      success: true,
+      category,
+      subCategory: subCategory?.label || null,
+    });
+  } catch (error) {
+    logger.error("Error in suggestCategory controller:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to suggest category",
+    });
+  }
+}
+
+/**
  * Create a new task
  * POST /api/tasks
  */
