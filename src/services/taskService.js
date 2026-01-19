@@ -107,6 +107,8 @@ export async function createTask({
   category = "",
   subCategory = null,
   recurrence = null,
+  tags = [],
+  subtasks = [],
 }) {
   const illegalFields = getIllegalDisplayFields({
     taskname,
@@ -135,7 +137,11 @@ export async function createTask({
     category,
     subCategory,
     recurrence,
+    tags: tags || [],
   });
+
+  // Note: SubTask documents are automatically created by the Task model's post-save hook
+  // based on taskType and chunkCount. No need to create them manually here.
 
   if (category && subCategory) {
     await _saveUserSubCategory(userId, category, subCategory);

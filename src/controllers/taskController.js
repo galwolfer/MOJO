@@ -74,7 +74,38 @@ async function autoSaveSubcategory(userId, subcategoryName, categoryKey) {
 export async function createTask(req, res) {
   try {
     const userId = req.user.userId;
-    const { name, taskname, category, subcategory, deadline, recurrence } = req.body;
+    
+    // Log the entire request body for debugging
+    console.log("=== CONTROLLER RECEIVED ===");
+    console.log("req.body:", JSON.stringify(req.body, null, 2));
+    
+    const { 
+      name, 
+      taskname, 
+      category, 
+      subcategory, 
+      deadline, 
+      recurrence,
+      importance,
+      effort,
+      estimatedMinutes,
+      description,
+      tags,
+      subtasks,
+      taskType,
+      chunkCount,
+    } = req.body;
+
+    console.log("Extracted fields:", {
+      importance,
+      effort,
+      estimatedMinutes,
+      description,
+      tags,
+      subtasks,
+      taskType,
+      chunkCount,
+    });
 
     const title = (taskname || name || "").trim();
 
@@ -127,9 +158,17 @@ export async function createTask(req, res) {
     const task = await taskService.createTask({
       userId,
       taskname: title,
+      description: description || undefined,
       category: category || "",
       subCategory: subcategory ? { label: subcategory, source: "user", confidence: 1, updatedAt: new Date() } : null,
       dueDate: deadline ? new Date(deadline) : null,
+      importance: importance !== undefined ? importance : 3, // Default to 3 if not provided
+      effort: effort !== undefined ? effort : 3, // Default to 3 if not provided
+      estimatedDuration: estimatedMinutes || 60, // Default to 60 minutes if not provided
+      tags: tags || undefined,
+      subtasks: subtasks || undefined,
+      taskType: taskType || "perfect",
+      chunkCount: chunkCount || undefined,
       recurrence,
     });
 

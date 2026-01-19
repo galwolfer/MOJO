@@ -19,7 +19,7 @@
  */
 
 import React, { useState, useCallback, useMemo } from "react";
-import { View, StyleSheet, ScrollView, Pressable, Modal } from "react-native";
+import { View, StyleSheet, ScrollView, Pressable, Modal, Alert } from "react-native";
 import { COLORS, SPACING, TYPOGRAPHY, SHADOWS, FONT_SIZES } from "../theme";
 import AppText from "../components/common/AppText";
 import AppButton from "../components/common/AppButton";
@@ -30,6 +30,7 @@ import Box from "../components/layout/Box";
 import { ICONS } from "../components/icons/icons";
 import NavBar from "../components/common/NavBar";
 import { CATEGORY_KEYS, getCategoryMeta, CATEGORY_META } from "../config/categoryMeta";
+import { createTask } from "../services/taskService";
 
 interface Subtask {
   id: string;
@@ -74,6 +75,7 @@ const CreateTask: React.FC = () => {
   const [tagInput, setTagInput] = useState("");
   const [isCategoryModalVisible, setIsCategoryModalVisible] = useState(false);
   const [isCalendarModalVisible, setIsCalendarModalVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Get category display names for dropdown options
   const categoryOptions = useMemo(
@@ -211,11 +213,108 @@ const CreateTask: React.FC = () => {
   }, []);
 
   /**
-   * Handle form submission (currently just logs data)
+   * Handle form submission - Create task via API
    */
-  const handleCreateTask = useCallback(() => {
-    console.log("Creating task with data:", formState);
-    // TODO: Submit to API
+  const handleCreateTask = useCallback(async () => {
+    // Validate required fields
+    if (!formState.taskName.trim()) {
+      Alert.alert("Validation Error", "Please enter a task name");
+      return;
+    }
+
+    if (!formState.timeToComplete.trim()) {
+      Alert.alert("Validation Error", "Please select a date to complete");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Prepare subtasks data
+      const subtasksData = formState.subtasks
+        .filter(st => st.title.trim()) // Only include subtasks with titles
+        .map(st => ({
+          title: st.title,
+          description: st.description || undefined,
+          minutes: st.minutes ? parseInt(st.minutes, 10) : undefined,
+        }));
+
+      // Determine task type based on number of parts and time distribution
+      let taskType: "perfect" | "in_parts" | "leaky" = "perfect";
+      let chunkCount: number | undefined = undefined;
+
+      if (formState.numSubtasks > 1) {
+        // Check if subtasks have different durations (leaky task)
+        const subtaskMinutes = formState.subtasks
+          .map(st => st.minutes ? parseInt(st.minutes, 10) : 0)
+          .filter(m => m > 0);
+
+        if (subtaskMinutes.length >= 2) {
+          // Check if all minutes are the same
+          const allSame = subtaskMinutes.every(m => m === subtaskMinutes[0]);
+          taskType = allSame ? "in_parts" : "leaky";
+        } else {
+          // No specific minutes set, default to in_parts
+          taskType = "in_parts";
+        }
+        chunkCount = formState.numSubtasks;
+      }
+
+      // Create task payload
+      const taskPayload = {
+        taskname: formState.taskName,
+        description: formState.description || undefined,
+        category: formState.category,
+        importance: formState.importance,
+        effort: formState.effort,
+        deadline: formState.timeToComplete, // Backend expects 'deadline' not 'dueDate'
+        estimatedMinutes: formState.estimatedMinutes ? parseInt(formState.estimatedMinutes, 10) : undefined,
+        tags: formState.tags.length > 0 ? formState.tags : undefined,
+        subtasks: subtasksData.length > 0 ? subtasksData : undefined,
+        taskType,
+        chunkCount,
+      };
+
+      console.log("=== CREATING TASK ===");
+      console.log("Payload:", JSON.stringify(taskPayload, null, 2));
+
+      // Call API to create task
+      const result = await createTask(taskPayload);
+
+      console.log("=== TASK CREATED ===");
+      console.log("Result:", JSON.stringify(result, null, 2));
+
+      if (result) {
+        Alert.alert("Success!", "Task created successfully", [
+          {
+            text: "OK",
+            onPress: () => {
+              // Reset form after success
+              setFormState({
+                taskName: "",
+                timeToComplete: "",
+                effort: 3,
+                importance: 3,
+                category: CATEGORY_KEYS[0] || "uncategorized",
+                tags: [],
+                description: "",
+                estimatedMinutes: "",
+                numSubtasks: 1,
+                subtasks: [],
+              });
+              setTagInput("");
+            },
+          },
+        ]);
+      } else {
+        Alert.alert("Error", "Failed to create task. Please try again.");
+      }
+    } catch (error) {
+      console.error("=== ERROR CREATING TASK ===");
+      console.error("Error details:", error);
+      Alert.alert("Error", `Failed to create task: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setIsLoading(false);
+    }
   }, [formState]);
 
   /**
@@ -502,13 +601,14 @@ const CreateTask: React.FC = () => {
   {/* Create Task Button */}
         <View style={styles.buttonContainer}>
           <AppButton
-            title="CREATE TASK"
+            title={isLoading ? "CREATING..." : "CREATE TASK"}
             onPress={handleCreateTask}
             mode="filled"
             color="#2ecc71"
-            icon="plus"
+            icon={isLoading ? undefined : "plus"}
             iconPosition="right"
             width="100%"
+            disabled={isLoading}
           />
         </View>
       </ScrollView>
