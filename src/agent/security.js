@@ -1,4 +1,5 @@
 import { WIDGETS, POLICY_ANCHOR } from "./agentConfig.js";
+import { extractWidgetFromText } from "./widgets/widgetUtils.js";
 
 /**
  * Basic heuristic checks for suspicious input content
@@ -54,15 +55,26 @@ export function validateWidgetPayload(raw) {
 
   const start = raw.indexOf("<WIDGET_JSON>");
   const end = raw.indexOf("</WIDGET_JSON>");
-  if (start === -1 || end === -1 || end < start) return { valid: false, reason: "No widget payload found" };
+  let payload = null;
 
-  const jsonText = raw.substring(start + "<WIDGET_JSON>".length, end).trim();
+  // First try the simple substring approach
+  if (!(start === -1 || end === -1 || end < start)) {
+    const jsonText = raw.substring(start + "<WIDGET_JSON>".length, end).trim();
+    try {
+      payload = JSON.parse(jsonText);
+    } catch (err) {
+      return { valid: false, reason: `Invalid JSON: ${err.message}` };
+    }
+  }
 
-  let payload;
-  try {
-    payload = JSON.parse(jsonText);
-  } catch (err) {
-    return { valid: false, reason: `Invalid JSON: ${err.message}` };
+  // Fallback: tolerant extractor (fix common malformed tags and parse)
+  if (!payload) {
+    try {
+      payload = extractWidgetFromText(raw);
+      if (!payload) return { valid: false, reason: "No widget payload found" };
+    } catch (err) {
+      return { valid: false, reason: "No widget payload found" };
+    }
   }
 
   // Basic structure checks

@@ -3,6 +3,7 @@ import { GuidedMission } from "./GuidedMission.js";
 import * as taskService from "../../services/taskService.js";
 import { TASK_CONFIG, inferTaskProperties, inferSplittingParams } from "../taskRules.js";
 import { CATEGORY_STRING_VALUES } from "../../config/categories.js";
+import { getIllegalDisplayFields, getIllegalCharsErrorMessage } from "../../utils/illegalChars.js";
 
 const addTaskMission = new GuidedMission({
   name: "add_task",
@@ -66,6 +67,15 @@ const addTaskMission = new GuidedMission({
       recurrence,
     } = args;
     try {
+      const illegalFields = getIllegalDisplayFields({
+        taskname,
+        description,
+        subcategory,
+      });
+      if (illegalFields.length > 0) {
+        return `ok=false\nerr="illegal_characters"\nmsg="${getIllegalCharsErrorMessage(illegalFields)}"`;
+      }
+
       // Infer properties from task title if not provided
       const inferred = inferTaskProperties(taskname);
 

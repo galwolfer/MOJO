@@ -214,6 +214,24 @@ const userSchema = new mongoose.Schema(
         default: Date.now,
       },
     },
+    // Gamification stats for user profile
+    gamification: {
+      type: new mongoose.Schema(
+        {
+          points: { type: Number, default: 0 },
+          currentStreak: { type: Number, default: 0 },
+          longestStreak: { type: Number, default: 0 },
+          lastActiveDate: { type: Date, default: null },
+        },
+        { _id: false }
+      ),
+      default: {
+        points: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+        lastActiveDate: null,
+      },
+    },
   },
   { timestamps: true }
 );

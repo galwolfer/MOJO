@@ -20,7 +20,9 @@ import {
   priorityStats,
   priorityTriggerJob,
 } from "../controllers/index.js";
+import { getUserStats } from "../controllers/userController.js";
 import { listOjoTypes, getOjoTypeByName } from "../controllers/ojoTypeController.js";
+import { requireAuth } from "../middlewares/auth.js";
 
 const router = Router();
 
@@ -62,5 +64,10 @@ router.post("/priority/coach/feedback", priorityFeedback);
 router.get("/priority/stats", priorityStats);
 router.post("/priority/job", priorityTriggerJob);
 // ==================== PRIORITY — ROUTES (END) ======================
+
+// ==================== USER — ROUTES (START) ========================
+// User stats and gamification endpoints
+router.get("/user/stats", requireAuth, getUserStats);
+// ==================== USER — ROUTES (END) ==========================
 
 export default router;

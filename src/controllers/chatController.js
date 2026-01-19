@@ -203,6 +203,9 @@ export async function getUserSessionsDoc(req, res, next) {
             content: m.content,
             functionCall: m.functionCall,
             name: m.name,
+            // include OjoType metadata if present
+            ojoTypeName: m.ojoTypeName,
+            ojoTypeDisplayName: m.ojoTypeDisplayName,
             timestamp: m.timestamp,
           }))
         ),

@@ -15,6 +15,8 @@ export interface OjoTypeConfig {
   color: string;
   description: string;
   isDefault: boolean;
+  // New: gradient colors for persona-specific animated gradient
+  gradient?: string[];
 }
 
 /**
@@ -31,6 +33,7 @@ export const OJO_TYPES: Record<OjoTypeName, OjoTypeConfig> = {
     color: COLORS.primary1, // Blue #4361EE
     description: "A wise mentor who helps you think long-term and grow.",
     isDefault: true,
+    gradient: [COLORS.primary1, COLORS.brightP1, COLORS.primary2, COLORS.primary1, COLORS.darkP1, COLORS.primary2],
   },
   brojo: {
     name: "brojo",
@@ -38,9 +41,10 @@ export const OJO_TYPES: Record<OjoTypeName, OjoTypeConfig> = {
     persona: "Your bro, friend who's always got your back.",
     tones: ["Friendly", "Motivating", "Funny"],
     icon: "brojo",
-    color: COLORS.primary6, // Cyan #4CC9F0
+    color: COLORS.primary2, // Cyan #4CC9F0
     description: "Your bro, friend who's always got your back.",
     isDefault: false,
+    gradient: [COLORS.primary2, COLORS.brightP6, COLORS.primary6, COLORS.primary2, COLORS.darkP6, COLORS.primary6],
   },
   strictojo: {
     name: "strictojo",
@@ -51,6 +55,7 @@ export const OJO_TYPES: Record<OjoTypeName, OjoTypeConfig> = {
     color: COLORS.primary7, // Red #F43E3E
     description: "A no-nonsense mentor who holds you accountable and expects results.",
     isDefault: false,
+    gradient: [COLORS.primary7, COLORS.brightP7, COLORS.primary5, COLORS.primary7, COLORS.darkP7, COLORS.primary5],
   },
   bestojo: {
     name: "bestojo",
@@ -61,6 +66,7 @@ export const OJO_TYPES: Record<OjoTypeName, OjoTypeConfig> = {
     color: COLORS.primary3, // Pink #F72585
     description: "A supportive best friend who listens and encourages you.",
     isDefault: false,
+    gradient: [COLORS.primary3, COLORS.primary4, COLORS.brightP3, COLORS.primary3, COLORS.darkP4, COLORS.primary4],
   },
 };
 

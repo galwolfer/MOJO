@@ -15,6 +15,8 @@ import ErrorText from "../../../components/common/ErrorText";
 import TextBouble from "./TextBouble";
 import { COLORS, FONT_SIZES, SPACING } from "../../../theme";
 import { ICONS } from "../../../components/icons/icons";
+import { getOjoType } from "../../../config/ojoTypeConfig";
+import { useOjoType } from "../../../hooks";
 
 interface ChatMessageBubbleProps {
   role: "user" | "assistant";
@@ -25,6 +27,11 @@ interface ChatMessageBubbleProps {
   isError?: boolean;
   status?: "pending" | "failed" | "sent";
   onRetry?: () => void;
+  // OjoType metadata for assistant messages
+  ojoTypeName?: string;
+  ojoTypeDisplayName?: string;
+  // Widget action callback (for agent messages with widgets)
+  onWidgetAction?: (actionId: string, actionData?: any) => void;
 }
 
 function ChatMessageBubble({
@@ -36,6 +43,9 @@ function ChatMessageBubble({
   isError,
   status,
   onRetry,
+  ojoTypeName,
+  ojoTypeDisplayName,
+  onWidgetAction,
 }: ChatMessageBubbleProps) {
   const isUser = role === "user";
   const normalized = content.trim().toLowerCase();
@@ -48,6 +58,28 @@ function ChatMessageBubble({
       normalized.includes("request failed") ||
       normalized.includes("couldn't connect") ||
       normalized.includes("server error"));
+
+  // Determine gradient colors from the message OjoType if present; otherwise fall back to current user's OjoType
+  let personaGradient: string[] | undefined = undefined;
+  if (!isUser && ojoTypeName) {
+    try {
+      const cfg = getOjoType(ojoTypeName as any);
+      personaGradient = cfg.gradient;
+    } catch (err) {
+      personaGradient = undefined;
+    }
+  }
+
+  // use current user OjoType as fallback when message doesn't have a persona
+  const { currentOjoType } = useOjoType();
+  if (!isUser && !personaGradient && currentOjoType) {
+    try {
+      const cfg = getOjoType(currentOjoType as any);
+      personaGradient = cfg.gradient;
+    } catch (err) {
+      personaGradient = undefined;
+    }
+  }
 
   if (isErrorContent) {
     return (
@@ -65,6 +97,8 @@ function ChatMessageBubble({
         typewriter={!isUser && isLastMessage && Boolean(timestamp && Date.now() - new Date(timestamp).getTime() < 5000)}
         playOnceKey={playOnceKey}
         style={styles.messageBubble}
+        gradientColors={personaGradient}
+        onWidgetAction={!isUser ? onWidgetAction : undefined}
       >
         <AppText variant="bodyText">{content.endsWith("\n") ? content.slice(0, -1) : content}</AppText>
       </TextBouble>
@@ -92,7 +126,10 @@ function areEqual(prev: ChatMessageBubbleProps, next: ChatMessageBubbleProps) {
     prev.isLastMessage === next.isLastMessage &&
     prev.playOnceKey === next.playOnceKey &&
     prev.isError === next.isError &&
-    prev.status === next.status
+    prev.status === next.status &&
+    prev.ojoTypeName === next.ojoTypeName &&
+    prev.ojoTypeDisplayName === next.ojoTypeDisplayName &&
+    prev.onWidgetAction === next.onWidgetAction
   );
 }
 
@@ -101,7 +138,7 @@ export default React.memo(ChatMessageBubble, areEqual);
 const styles = StyleSheet.create({
   messageRow: {
     marginBottom: SPACING.md,
-    maxWidth: "85%",
+    maxWidth: "90%",
   },
   userMessageRow: {
     alignSelf: "flex-end",

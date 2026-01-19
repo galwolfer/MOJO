@@ -37,6 +37,12 @@ const sessionSchema = new mongoose.Schema(
         toolCalls: [mongoose.Schema.Types.Mixed],
         tool_call_id: String,
         name: String, // For tool/function results
+        // New: indicate which OjoType produced this message (for assistant messages)
+        ojoTypeName: {
+          type: String,
+          index: true,
+        },
+        ojoTypeDisplayName: String,
         timestamp: {
           type: Date,
           default: Date.now,

@@ -134,6 +134,7 @@ Most chat endpoints require authentication unless otherwise noted.
   - Protected
   - Body: `{ message, sessionId? }`
   - Returns: the agent result `{ success, response, sessionId, messageCount }`
+  - Note: Assistant messages stored in session history now include `ojoTypeName` and `ojoTypeDisplayName` (when available) to indicate which OjoType persona authored the message.
 
 - `POST /api/chat/reset`
   - Protected

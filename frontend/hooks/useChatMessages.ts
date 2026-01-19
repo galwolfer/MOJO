@@ -8,30 +8,59 @@
  *
  * Usage:
  * const { message, setMessage, isLoading, sessionId, setSessionId, handleSend, handleRetry } =
- *   useChatMessages(updateSession);
+ *   useChatMessages(updateSession, { onTaskChange: () => notifyTaskUpdate() });
  *
  * Notes:
  * - `updateSession` is a callback provided by callers to merge session changes into app state.
+ * - `onTaskChange` (optional) is called when assistant response suggests task was created/updated
  */
 import { useState, useCallback } from "react";
 import { sendChatMessage, SendMessageResponse, ChatSessionSummary, ChatMessage } from "../services/chatService";
+import { useOjoType } from "./useOjoType";
 
 const MAX_CACHED_MESSAGES_PER_SESSION = 50;
 const SEND_TIMEOUT_MS = 15000;
 
-export function useChatMessages(updateSession: (session: ChatSessionSummary) => void) {
+// Keywords that indicate a task-related action in the response
+const TASK_ACTION_KEYWORDS = [
+  "task_list",
+  "task_confirmation",
+  "task_detail",
+  "created a task",
+  "added a task",
+  "task has been",
+  "completed the task",
+  "marked as done",
+  "marked as complete",
+  "updated the task",
+  "deleted the task",
+];
+
+interface UseChatMessagesOptions {
+  onTaskChange?: () => void;
+}
+
+type SendMessageOptions = UseChatMessagesOptions & { clientId?: string; isRetry?: boolean };
+
+export function useChatMessages(
+  updateSession: (session: ChatSessionSummary) => void,
+  options?: UseChatMessagesOptions,
+) {
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string>(() => `session_${Date.now()}`);
 
   const createClientId = useCallback(() => `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, []);
+  const { currentOjoType } = useOjoType();
+
+  const hookOnTaskChange = options?.onTaskChange;
 
   const buildSessionUpdate = (
     sessionId: string,
     now: Date,
     getSessions: () => ChatSessionSummary[],
     messages: ChatMessage[],
-    messageCountDelta: number
+    messageCountDelta: number,
   ): ChatSessionSummary => {
     const sessionsNow = getSessions();
     const existing = sessionsNow.find((s) => s.sessionId === sessionId);
@@ -51,7 +80,7 @@ export function useChatMessages(updateSession: (session: ChatSessionSummary) => 
       currentSessionId: string,
       text: string,
       getSessions: () => ChatSessionSummary[],
-      options?: { clientId?: string; isRetry?: boolean }
+      options?: SendMessageOptions,
     ) => {
       if (!text || isLoading) return;
 
@@ -107,7 +136,7 @@ export function useChatMessages(updateSession: (session: ChatSessionSummary) => 
             message: text,
             sessionId: currentSessionId,
           },
-          { timeoutMs: SEND_TIMEOUT_MS }
+          { timeoutMs: SEND_TIMEOUT_MS },
         );
 
         if (response.success && response.response) {
@@ -124,7 +153,7 @@ export function useChatMessages(updateSession: (session: ChatSessionSummary) => 
 
           // Mark the original user message as sent
           let updatedMessages = baseAfter.map(
-            (m): ChatMessage => (m.clientId === clientId ? { ...m, status: "sent" } : m)
+            (m): ChatMessage => (m.clientId === clientId ? { ...m, status: "sent" } : m),
           );
 
           const assistantMessage: ChatMessage = {
@@ -132,6 +161,8 @@ export function useChatMessages(updateSession: (session: ChatSessionSummary) => 
             content: response.response,
             timestamp: agentNow.toISOString(),
             clientId: createClientId(),
+            // Attach the current user's OjoType so the UI can render persona-specific gradient immediately
+            ojoTypeName: (response as any).ojoTypeName || currentOjoType,
           };
 
           // If the last message is an error related to this clientId, replace it with the assistant message
@@ -147,13 +178,24 @@ export function useChatMessages(updateSession: (session: ChatSessionSummary) => 
 
           const trimmed = updatedMessages.slice(-MAX_CACHED_MESSAGES_PER_SESSION);
           updateSession(buildSessionUpdate(sid, agentNow, getSessions, trimmed, messageCountDeltaSuccess));
+
+          // Check if response indicates task-related action and notify.
+          // Per-call onTaskChange overrides hook-level; fall back to hookOnTaskChange.
+          const effectiveOnTaskChange = options?.onTaskChange || hookOnTaskChange;
+          if (effectiveOnTaskChange && response.response) {
+            const responseText = response.response.toLowerCase();
+            const hasTaskAction = TASK_ACTION_KEYWORDS.some((keyword) => responseText.includes(keyword.toLowerCase()));
+            if (hasTaskAction) {
+              effectiveOnTaskChange();
+            }
+          }
         } else {
           const errNow = new Date();
           const sessionsAfter = getSessions();
           const existingAfter = sessionsAfter.find((s) => s.sessionId === currentSessionId);
           const baseAfter = existingAfter?.messages || optimisticMessages;
           let updatedMessages: ChatMessage[] = baseAfter.map(
-            (m): ChatMessage => (m.clientId === clientId ? { ...m, status: "failed" } : m)
+            (m): ChatMessage => (m.clientId === clientId ? { ...m, status: "failed" } : m),
           );
 
           const last = updatedMessages[updatedMessages.length - 1];
@@ -186,7 +228,7 @@ export function useChatMessages(updateSession: (session: ChatSessionSummary) => 
         const existingAfter = sessionsAfter.find((s) => s.sessionId === currentSessionId);
         const baseAfter = existingAfter?.messages || optimisticMessages;
         let updatedMessages: ChatMessage[] = baseAfter.map(
-          (m): ChatMessage => (m.clientId === clientId ? { ...m, status: "failed" } : m)
+          (m): ChatMessage => (m.clientId === clientId ? { ...m, status: "failed" } : m),
         );
 
         const last = updatedMessages[updatedMessages.length - 1];
@@ -215,7 +257,7 @@ export function useChatMessages(updateSession: (session: ChatSessionSummary) => 
         setIsLoading(false);
       }
     },
-    [isLoading, updateSession, createClientId, setSessionId]
+    [isLoading, updateSession, createClientId, setSessionId],
   );
 
   const handleSend = useCallback(
@@ -228,7 +270,7 @@ export function useChatMessages(updateSession: (session: ChatSessionSummary) => 
 
       await sendMessage(currentSessionId, trimmedText, getSessions);
     },
-    [message, isLoading, sendMessage]
+    [message, isLoading, sendMessage],
   );
 
   const sendText = useCallback(
@@ -237,7 +279,7 @@ export function useChatMessages(updateSession: (session: ChatSessionSummary) => 
       if (!trimmedText || isLoading) return;
       await sendMessage(currentSessionId, trimmedText, getSessions);
     },
-    [isLoading, sendMessage]
+    [isLoading, sendMessage],
   );
 
   const handleRetry = useCallback(
@@ -249,7 +291,7 @@ export function useChatMessages(updateSession: (session: ChatSessionSummary) => 
 
       await sendMessage(currentSessionId, retryTarget.content, getSessions, { clientId, isRetry: true });
     },
-    [sendMessage]
+    [sendMessage],
   );
 
   return {

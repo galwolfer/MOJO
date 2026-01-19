@@ -5,19 +5,19 @@ import { COLORS, SPACING } from "../../theme";
 
 type Props = {
   style?: ViewStyle;
+  colors?: string[];
 };
 
-const gradientStops = [
-  `${COLORS.primary1} 0deg`,
-  `${COLORS.primary2} 45deg`,
-  `${COLORS.primary1} 90deg`,
-  `${COLORS.primary2} 135deg`,
-  `${COLORS.primary1} 180deg`,
-  `${COLORS.primary2} 225deg`,
-  `${COLORS.primary1} 270deg`,
-  `${COLORS.primary2} 315deg`,
-  `${COLORS.primary1} 360deg`,
-].join(", ");
+// default gradient (will be overridden by props)
+function gradientStopsFromColors(colors: string[]) {
+  const n = colors.length;
+  if (n === 0) return `${COLORS.primary1} 0deg`;
+  const step = 360 / n;
+  return colors
+    .map((c, i) => `${c} ${Math.round(i * step)}deg`)
+    .concat(`${colors[0]} 360deg`)
+    .join(", ");
+}
 
 const shadowShrink = SPACING.lg;
 
@@ -25,7 +25,10 @@ const shadowShrink = SPACING.lg;
  * ConicGradientBubble - A web-specific animated gradient bubble component using Reanimated.
  * @param style - Optional custom styles.
  */
-export default function ConicGradientBubble({ style }: Props) {
+export default function ConicGradientBubble({
+  style,
+  colors = [COLORS.primary1, COLORS.primary2, COLORS.primary1],
+}: Props) {
   const progress = useSharedValue(0);
 
   useEffect(() => {
@@ -36,10 +39,12 @@ export default function ConicGradientBubble({ style }: Props) {
     transform: [{ rotate: `${progress.value * 360}deg` }],
   }));
 
+  const gradientStops = gradientStopsFromColors(colors);
+
   return (
     <View style={[styles.wrapper, style]}>
       <View style={styles.mask}>
-        <Animated.View style={[styles.gradient, spinStyle]} />
+        <Animated.View style={[styles.gradient, spinStyle, { backgroundImage: `conic-gradient(${gradientStops})` }]} />
       </View>
     </View>
   );
@@ -60,6 +65,7 @@ const styles = StyleSheet.create({
     right: shadowShrink / 2,
     bottom: shadowShrink / 2,
     overflow: "hidden",
+    borderRadius: SPACING.xlg,
   },
   gradient: {
     position: "absolute",
@@ -69,6 +75,6 @@ const styles = StyleSheet.create({
     height: "150vmax",
     marginLeft: "-75vmax",
     marginTop: "-75vmax",
-    backgroundImage: `conic-gradient(${gradientStops})`,
+    borderRadius: SPACING.xlg,
   } as unknown as WebGradientStyle,
 });

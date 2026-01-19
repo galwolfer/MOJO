@@ -14,7 +14,7 @@ import Header from "../common/Header";
 import NavBar from "../common/NavBar";
 import ChatScreen from "../../screens/chat/Chat";
 import CalendarScreen from "../../screens/Calendar";
-import UserProfileScreen from "../../screens/UserProfile";
+import UserProfileScreen from "../../screens/user/UserProfile";
 import { COLORS, SPACING } from "../../theme";
 import { useKeyboard } from "../../hooks";
 

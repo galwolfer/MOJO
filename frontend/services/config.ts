@@ -13,7 +13,10 @@ function stripQuotes(v?: string | null): string | undefined {
 // This allows overriding the IP used on Android devices/emulators.
 export const DEFAULT_MACHINE_IP =
   (typeof process !== "undefined" && process.env && stripQuotes(process.env.EXPO_PUBLIC_DEFAULT_MACHINE_IP)) ||
-  "192.168.68.404";
+  // Default fallback — set this in .env (EXPO_PUBLIC_DEFAULT_MACHINE_IP) to your machine IP.
+  // Note: the previous default had an invalid last octet ("404"). Use loopback by default
+  // to avoid accidental invalid IPs; for Android devices set EXPO_PUBLIC_DEFAULT_MACHINE_IP to your host IP.
+  "127.0.0.1";
 
 console.log("DEFAULT_MACHINE_IP:", DEFAULT_MACHINE_IP);
 

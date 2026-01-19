@@ -54,6 +54,7 @@ export type User = {
   username: string;
   displayName?: string;
   email?: string;
+  profileImage?: string | null;
 };
 
 type AuthContextType = {

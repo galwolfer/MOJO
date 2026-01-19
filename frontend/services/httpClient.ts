@@ -18,6 +18,11 @@ export function setAuthToken(token: string | null): void {
   authToken = token;
 }
 
+// Debug helper: return current auth token (used for diagnostics only)
+export function getAuthToken(): string | null {
+  return authToken;
+}
+
 /**
  * Get headers for API requests
  */

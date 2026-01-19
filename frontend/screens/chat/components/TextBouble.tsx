@@ -15,6 +15,9 @@ import React, { useEffect, useMemo, useRef, useState, memo } from "react";
 import { Animated, Easing, Platform, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { COLORS, SHADOWS, SPACING } from "../../../theme";
 import ConicGradientBubble from "../../../components/special/ConicGradientBubble";
+import { splitTextAndWidget } from "../../../utils/widgetParser";
+import { WidgetRenderer } from "../../../utils/widgetFactory";
+import AppText from "../../../components/common/AppText";
 
 export type TextBoubleMode = "agent" | "user";
 
@@ -22,6 +25,12 @@ export type TextBoubleMode = "agent" | "user";
 // to `TextBouble`, the animation will only play once ever for that key
 // (survives mount/unmount cycles during the app session).
 const playedMap = new Map<string, boolean>();
+
+// Persistent map of shown widgets by key. Once a widget has been revealed for
+// a message, it should remain visible even across re-renders (e.g., when new
+// messages arrive). This prevents the widget from disappearing and re-appearing.
+const widgetShownMap = new Map<string, boolean>();
+
 /**
  * Isolated typewriter component that updates independently
  * without causing parent re-renders. Uses requestAnimationFrame
@@ -83,7 +92,7 @@ const TypewriterText = memo<{
       {
         style: [textStyle, (children as any).props?.style],
       },
-      displayText
+      displayText,
     );
   }
 
@@ -154,7 +163,7 @@ function cloneChildrenWithTyping(node: React.ReactNode, typedChars: number): Rea
         out.push(
           <React.Fragment key={i}>
             {cloneChildrenWithTyping(child, Math.min(remainingTyped, childTextLen))}
-          </React.Fragment>
+          </React.Fragment>,
         );
         consumedSoFar += childTextLen;
       } else {
@@ -163,7 +172,7 @@ function cloneChildrenWithTyping(node: React.ReactNode, typedChars: number): Rea
         out.push(
           <React.Fragment key={i}>
             <NonTextFade visible={visible}>{child}</NonTextFade>
-          </React.Fragment>
+          </React.Fragment>,
         );
       }
     });
@@ -221,7 +230,7 @@ const AnimatedTypingContent: React.FC<{
       {
         style: [(children as any).props?.style, mode === "user" ? { color: COLORS.colorWhite } : undefined],
       },
-      content
+      content,
     );
   }
 
@@ -243,6 +252,12 @@ type Props = {
   typewriter?: boolean; // Default: true for agent, false for user
   typingSpeedCps?: number; // chars per second, default 100
   onTypingDone?: () => void;
+
+  // Optional persona gradient colors for conic gradient display
+  gradientColors?: string[] | undefined;
+
+  // Widget action callback - called when user interacts with widget buttons
+  onWidgetAction?: (actionId: string, actionData?: any) => void;
 };
 
 const DEFAULT_CPS = 50;
@@ -267,6 +282,20 @@ function extractPlainText(node: React.ReactNode): string | null {
 function pickText(children: React.ReactNode, text?: string): string | null {
   if (typeof text === "string") return text;
   return extractPlainText(children);
+}
+
+/**
+ * Helper to extract display text for typewriter animation (strips widget JSON)
+ * Only processes agent messages, returns text as-is for user messages
+ */
+function extractDisplayText(text: string | null, mode: TextBoubleMode): string | null {
+  if (!text || mode !== "agent") return text;
+
+  // Try to split text and widget - return only the text part for display
+  const { beforeText, widget } = splitTextAndWidget(text);
+
+  // If there's a widget, return only the text before it for typing display
+  return widget ? beforeText : text;
 }
 
 function getRadii(mode: TextBoubleMode) {
@@ -297,14 +326,17 @@ function getContainerBackground(mode: TextBoubleMode) {
   return COLORS.white2;
 }
 
-function getContainerShadow(mode: TextBoubleMode) {
+function getContainerShadow(mode: TextBoubleMode, shadowColor?: string) {
   // "user - normal shadow present"
   if (mode === "user") {
     // Use the glowing message shadow for user too
-    return SHADOWS.glowingMessage as ViewStyle;
+    return SHADOWS.card as ViewStyle;
+  } else {
+    const base = { ...SHADOWS.glowingMessage } as ViewStyle;
+    if (shadowColor) base.shadowColor = shadowColor;
+    else base.shadowColor = COLORS.primary1;
+    return base;
   }
-
-  return SHADOWS.glowingMessage as ViewStyle;
 }
 
 const TextBouble: React.FC<Props> = ({
@@ -316,12 +348,44 @@ const TextBouble: React.FC<Props> = ({
   typingSpeedCps = DEFAULT_CPS,
   onTypingDone,
   playOnceKey,
+  gradientColors,
+  onWidgetAction,
 }) => {
   const resolvedTypewriter = typewriter ?? mode === "agent";
-  const fullText = useMemo(() => pickText(children, text), [children, text]);
+
+  // Extract raw text including potential widget JSON
+  const rawText = useMemo(() => pickText(children, text), [children, text]);
+
+  // Parse widget data from agent messages
+  const parsedContent = useMemo(() => {
+    if (!rawText || mode !== "agent") {
+      return { displayText: rawText, widget: null, afterText: null };
+    }
+    const { beforeText, widget, afterText } = splitTextAndWidget(rawText);
+    return {
+      displayText: widget ? beforeText || null : rawText,
+      widget,
+      afterText: widget ? afterText || null : null,
+    };
+  }, [rawText, mode]);
+
+  // Display text for typewriter (without widget JSON)
+  const fullText = parsedContent.displayText;
+  const afterText = parsedContent.afterText;
 
   const [showConic, setShowConic] = useState(() => mode === "agent" && resolvedTypewriter && !!fullText);
   const [isTyping, setIsTyping] = useState(() => mode === "agent" && resolvedTypewriter && !!fullText);
+
+  // Track whether the widget should be mounted and remain visible once shown.
+  // Use the persistent map to check if this widget was already revealed (survives re-renders).
+  // Once a widget is shown, it should NEVER be hidden again.
+  const [widgetMounted, setWidgetMounted] = useState<boolean>(() => {
+    // If we have a playOnceKey and the widget was already shown, start mounted
+    if (playOnceKey && widgetShownMap.get(playOnceKey)) return true;
+    // If there's a widget and we're not going to type, show it immediately
+    if (parsedContent.widget && !resolvedTypewriter) return true;
+    return false;
+  });
 
   // Cross-fade shadow layers (agent only)
   const conicOpacity = useRef(new Animated.Value(0)).current;
@@ -331,7 +395,9 @@ const TextBouble: React.FC<Props> = ({
   const glowAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
   // Fade-in animation for non-text elements after typing completes
-  const nonTextOpacity = useRef(new Animated.Value(0)).current;
+  // If widget was already shown for this message, start fully visible
+  const widgetAlreadyShown = Boolean(playOnceKey && widgetShownMap.get(playOnceKey));
+  const nonTextOpacity = useRef(new Animated.Value(widgetAlreadyShown ? 1 : 0)).current;
 
   // Track last seen meaningful inputs to avoid restarting animations on unrelated re-renders
   // Only run the typewriter the first time this TextBouble is shown.
@@ -343,6 +409,14 @@ const TextBouble: React.FC<Props> = ({
     () => () => {
       onTypingDone?.();
       setIsTyping(false);
+      // Ensure the widget is mounted/visible once typing completes
+      // and persist this in the global map so it survives re-renders
+      try {
+        setWidgetMounted(true);
+        if (playOnceKey && parsedContent.widget) {
+          widgetShownMap.set(playOnceKey, true);
+        }
+      } catch (_) {}
 
       // On mobile, animating opacity via JS driver is more reliable
       // when the gradient component is SVG/complex.
@@ -394,13 +468,16 @@ const TextBouble: React.FC<Props> = ({
         } catch (_) {}
       });
     },
-    [onTypingDone, conicOpacity, glowOpacity, nonTextOpacity]
+    [onTypingDone, conicOpacity, glowOpacity, nonTextOpacity, setWidgetMounted],
   );
 
   useEffect(() => {
     // Initialize only once per mount/show. If the typewriter has already played
     // for this instance, do not restart it on subsequent re-renders (e.g., showing errors).
     const shouldType = (typewriter ?? mode === "agent") && mode === "agent" && !!fullText;
+
+    // Check if widget was already shown - if so, never hide it
+    const widgetWasShown = playOnceKey && widgetShownMap.get(playOnceKey);
 
     if (!initializedRef.current) {
       initializedRef.current = true;
@@ -411,7 +488,8 @@ const TextBouble: React.FC<Props> = ({
         setShowConic(true);
         conicOpacity.setValue(1);
         glowOpacity.setValue(0);
-        nonTextOpacity.setValue(0);
+        // Keep widget visible if it was already shown
+        nonTextOpacity.setValue(widgetWasShown ? 1 : 0);
       } else {
         setIsTyping(false);
         setShowConic(false);
@@ -421,6 +499,11 @@ const TextBouble: React.FC<Props> = ({
         // If we are not typing, mark as played so we don't attempt later
         playedRef.current = true;
         if (playOnceKey) playedMap.set(playOnceKey, true);
+        // If there's a widget and we're not typing, mount it immediately and persist
+        if (parsedContent.widget) {
+          setWidgetMounted(true);
+          if (playOnceKey) widgetShownMap.set(playOnceKey, true);
+        }
       }
     } else {
       // Already initialized: don't restart animations on re-renders. But if typing
@@ -430,7 +513,8 @@ const TextBouble: React.FC<Props> = ({
         setShowConic(true);
         conicOpacity.setValue(1);
         glowOpacity.setValue(0);
-        nonTextOpacity.setValue(0);
+        // Keep widget visible if it was already shown
+        nonTextOpacity.setValue(widgetWasShown ? 1 : 0);
       } else {
         // Keep current visual state (do not restart)
       }
@@ -465,19 +549,55 @@ const TextBouble: React.FC<Props> = ({
         glowOpacity.setValue(finalGlow);
       }
       try {
+        // If widget was already shown, keep nonTextOpacity at 1
+        const widgetWasShown = playOnceKey && widgetShownMap.get(playOnceKey);
+        const finalNonTextOpacity = widgetWasShown ? 1 : shouldType ? 0 : 1;
         nonTextOpacity.stopAnimation(() => {
-          nonTextOpacity.setValue(shouldType ? 0 : 1);
+          nonTextOpacity.setValue(finalNonTextOpacity);
         });
       } catch (_) {
-        nonTextOpacity.setValue(shouldType ? 0 : 1);
+        const widgetWasShown = playOnceKey && widgetShownMap.get(playOnceKey);
+        nonTextOpacity.setValue(widgetWasShown ? 1 : shouldType ? 0 : 1);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fullText, mode, typewriter]);
 
+  // Keep the widget mounted once it's visible so it won't disappear if
+  // a new message (or other re-render) temporarily toggles typing.
+  // CRITICAL: Once a widget has been shown, it should NEVER be hidden.
+  useEffect(() => {
+    // If this widget was already shown (persisted in global map), always keep it mounted
+    // and ensure opacity is set to 1 so it's visible
+    if (playOnceKey && widgetShownMap.get(playOnceKey)) {
+      if (!widgetMounted) setWidgetMounted(true);
+      // Force opacity to 1 in case it was reset during re-render
+      nonTextOpacity.setValue(1);
+      return;
+    }
+
+    // No widget in this message - nothing to mount
+    if (!parsedContent.widget) {
+      return;
+    }
+
+    // If there's a widget and we're not currently typing, mount it and persist
+    if (!isTyping) {
+      setWidgetMounted(true);
+      nonTextOpacity.setValue(1);
+      if (playOnceKey) widgetShownMap.set(playOnceKey, true);
+    }
+    // If we're typing, do not unmount; we only mount once typing completes.
+  }, [parsedContent.widget, isTyping, playOnceKey, widgetMounted, nonTextOpacity]);
+
   const radii = useMemo(() => getRadii(mode), [mode]);
   const containerBg = useMemo(() => getContainerBackground(mode), [mode]);
-  const containerShadow = useMemo(() => getContainerShadow(mode), [mode]);
+  // Determine shadow color from persona gradient if provided
+  const shadowColor = useMemo(
+    () => (gradientColors && gradientColors.length > 0 ? gradientColors[0] : undefined),
+    [gradientColors],
+  );
+  const containerShadow = useMemo(() => getContainerShadow(mode, shadowColor), [mode, shadowColor]);
 
   // Track typed character count for incremental rendering
   const [typedChars, setTypedChars] = useState(0);
@@ -518,13 +638,27 @@ const TextBouble: React.FC<Props> = ({
   }, [isTyping, fullText, typingSpeedCps, handleTypingDone]);
 
   // Render full content (used as invisible placeholder during typing to reserve space)
+  // For agent mode with widgets, use displayText (stripped of widget JSON)
+  const textToDisplay = mode === "agent" && parsedContent.widget ? parsedContent.displayText : null;
+
+  // Helper to render the text part with proper AppText styling
+  const renderTextContent = (text: string | null) => {
+    if (!text) return null;
+    return <AppText variant="bodyText">{text}</AppText>;
+  };
+
   const fullContent =
-    React.isValidElement(children) && (children as any).type !== React.Fragment ? (
+    // If we have a parsed text display (widget case), render it with AppText
+    textToDisplay !== null ? (
+      renderTextContent(textToDisplay)
+    ) : React.isValidElement(children) && (children as any).type !== React.Fragment ? (
       React.cloneElement(children as any, {
         style: [(children as any).props?.style, mode === "user" ? { color: COLORS.colorWhite } : undefined],
       })
     ) : typeof children === "string" ? (
-      <Text style={[styles.text, mode === "user" ? { color: COLORS.colorWhite } : undefined]}>{children}</Text>
+      <AppText variant="bodyText" style={mode === "user" ? { color: COLORS.colorWhite } : undefined}>
+        {children}
+      </AppText>
     ) : (
       // If children is a fragment/array (multiple children), do not attempt to clone the fragment
       // because React.Fragment cannot accept props like `style`. Return children as-is.
@@ -541,6 +675,11 @@ const TextBouble: React.FC<Props> = ({
           {showConic && (
             <Animated.View pointerEvents="none" style={[styles.shadowLayer, { opacity: conicOpacity }]}>
               <ConicGradientBubble
+                colors={
+                  gradientColors && gradientColors.length > 0
+                    ? gradientColors
+                    : [COLORS.primary1, COLORS.primary2, COLORS.primary1]
+                }
                 style={{
                   ...styles.conic,
                   ...radii,
@@ -555,7 +694,7 @@ const TextBouble: React.FC<Props> = ({
 
           {/* Static glowing shadow (visible after typing or when typewriter is off) */}
           <Animated.View pointerEvents="none" style={[styles.shadowLayer, { opacity: glowOpacity }]}>
-            <View style={[styles.glow, radii]} />
+            <View style={[styles.glow, { shadowColor: shadowColor || COLORS.primary4 }, radii]} />
           </Animated.View>
         </>
       )}
@@ -572,6 +711,18 @@ const TextBouble: React.FC<Props> = ({
           <>{cloneChildrenWithTyping(children, typedChars)}</>
         ) : (
           fullContent
+        )}
+
+        {/* Render widget if present (agent mode only) */}
+        {mode === "agent" && parsedContent.widget && widgetMounted && (
+          <Animated.View style={{ opacity: nonTextOpacity, width: "100%" }}>
+            <WidgetRenderer widget={parsedContent.widget} onAction={onWidgetAction} />
+          </Animated.View>
+        )}
+        {mode === "agent" && parsedContent.widget && widgetMounted && afterText && (
+          <Animated.View style={{ opacity: nonTextOpacity, width: "100%" }}>
+            {renderTextContent(afterText)}
+          </Animated.View>
         )}
       </View>
     </View>
@@ -595,9 +746,9 @@ const styles = StyleSheet.create({
   containerBase: {
     flexDirection: "column",
     height: "auto",
-    padding: 17,
+    padding: SPACING.md,
     alignItems: "flex-start",
-    gap: 17,
+    gap: SPACING.md,
     alignSelf: "stretch",
   },
 

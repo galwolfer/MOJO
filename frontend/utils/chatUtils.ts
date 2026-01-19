@@ -17,6 +17,9 @@ export type TimelineItem =
       isError?: boolean;
       clientId?: string;
       status?: "pending" | "failed" | "sent";
+      // OjoType metadata from the stored message
+      ojoTypeName?: string;
+      ojoTypeDisplayName?: string;
     };
 
 export function buildTimelineItems(sessions: ChatSessionSummary[]): TimelineItem[] {
@@ -51,6 +54,9 @@ export function buildTimelineItems(sessions: ChatSessionSummary[]): TimelineItem
         isError: m.isError,
         clientId: m.clientId,
         status: m.status,
+        // Attach OjoType metadata if present on the stored message
+        ojoTypeName: (m as any).ojoTypeName,
+        ojoTypeDisplayName: (m as any).ojoTypeDisplayName,
       });
     }
   }

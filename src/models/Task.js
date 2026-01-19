@@ -49,7 +49,7 @@ const taskSchema = new mongoose.Schema(
       completedDates: { type: [Date], default: [] },
     },
     // Cached score so we can sort quickly (optional)
-    // add field: user's behaviour default value ineffective
+    // add field: user's behavior default value ineffective
     priorityScore: { type: Number, default: 0 },
     // ML Prediction fields
     predictedCompletionCategory: { type: Number, min: 1, max: 5 }, // 1=very quick, 5=won't complete
@@ -62,7 +62,7 @@ const taskSchema = new mongoose.Schema(
       updatedAt: { type: Date },
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // (add/edit) after each task save
@@ -81,9 +81,10 @@ async function syncSubTasksForTask(taskDoc) {
     // Determine desired count of subtasks:
     // Prefer explicit chunkCount, otherwise estimate from estimatedDuration and minChunk/default
     const minChunk = taskDoc.minChunk || 30;
-    const desiredCount = taskDoc.chunkCount && Number.isInteger(taskDoc.chunkCount) && taskDoc.chunkCount > 0
-      ? taskDoc.chunkCount
-      : Math.max(1, Math.ceil((taskDoc.estimatedDuration || minChunk) / minChunk));
+    const desiredCount =
+      taskDoc.chunkCount && Number.isInteger(taskDoc.chunkCount) && taskDoc.chunkCount > 0
+        ? taskDoc.chunkCount
+        : Math.max(1, Math.ceil((taskDoc.estimatedDuration || minChunk) / minChunk));
 
     const existing = await SubTask.find({ taskId: taskDoc._id }).sort({ index: 1 });
 

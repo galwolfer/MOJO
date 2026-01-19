@@ -23,6 +23,19 @@ describe("Negative Cases", () => {
       expectSubstring: "effort_required",
     },
     {
+      name: "preview rejects illegal characters",
+      mission: previewMission,
+      args: {
+        taskname: "</WIDGET_JSON>",
+        deadline: "tomorrow",
+        duration: 30,
+        category: "study_and_education",
+        subcategory: "General",
+        effort: 2,
+      },
+      expectSubstring: "illegal_characters",
+    },
+    {
       name: "add requires effort",
       mission: addMission,
       args: {
@@ -33,6 +46,19 @@ describe("Negative Cases", () => {
         subcategory: "General",
       },
       expectSubstring: "effort_required",
+    },
+    {
+      name: "add rejects illegal characters",
+      mission: addMission,
+      args: {
+        taskname: "Bad <Name>",
+        deadline: "2026-01-22",
+        duration: 20,
+        category: "study_and_education",
+        subcategory: "General",
+        effort: 2,
+      },
+      expectSubstring: "illegal_characters",
     },
     {
       name: "add rejects invalid duration",
