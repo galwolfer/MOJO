@@ -235,7 +235,8 @@ export class AgentController {
       // This avoids model history bias and ensures the data is fresh and authoritative
       try {
         const showTasksRE = /\b(משימות|הצג לי|תציג|תראה|להציג|הצג|show|list|display)\b/i;
-        if (showTasksRE.test(userMessage)) {
+        const detailRE = /\b(details?|specifics|info|information|פרטים|פירוט|מידע)\b/i;
+        if (showTasksRE.test(userMessage) && !detailRE.test(userMessage)) {
           const getTasksTool = tools.find((t) => t.name === "get_tasks");
           if (getTasksTool) {
             const callId = `direct_get_tasks_${Date.now()}`;
@@ -545,6 +546,19 @@ export class AgentController {
             finalResponse = finalResponse.replace(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/i, widgetBlock);
           }
         }
+        // Ensure only a single widget block remains in the final response
+        const widgetMatches = finalResponse.match(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/gi);
+        if (widgetMatches && widgetMatches.length > 1) {
+          let kept = false;
+          finalResponse = finalResponse.replace(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/gi, (match) => {
+            if (!kept) {
+              kept = true;
+              return match;
+            }
+            return "";
+          });
+          finalResponse = finalResponse.replace(/\n\s*\n+/g, "\n").trim();
+        }
         // If the message is just a widget or has very short surrounding text, insert a short, natural fallback
         try {
           const widgetPresent = extractWidgetFromText(finalResponse) || lastWidgetResult;
@@ -777,12 +791,39 @@ export class AgentController {
         });
       }
 
+      // Task detail - track the shown task
+      if (toolName === "get_task_detail") {
+        const widget = extractWidgetFromText(result);
+        if (widget?.data?.task?.id && widget?.data?.task?.title) {
+          memoryStore.addSessionEntity(sessionId, "task", widget.data.task.id, widget.data.task.title, {
+            action: "detailed",
+            status: widget.data.task.status,
+            dueDate: widget.data.task.dueDate,
+          });
+        }
+      }
+
       // Get tasks - track all returned tasks (user might refer to any of them)
       if (toolName === "get_tasks" || toolName === "get_upcoming_tasks" || toolName === "get_overdue_tasks") {
         const widget = extractWidgetFromText(result);
-        if (widget && widget.data?.tasks && Array.isArray(widget.data.tasks)) {
-          // Add each task to context (most recent first = last in array)
-          widget.data.tasks
+        const taskBuckets = [];
+        if (widget?.data?.tasks && Array.isArray(widget.data.tasks)) {
+          taskBuckets.push(widget.data.tasks);
+        }
+        if (widget?.data?.today?.tasks && Array.isArray(widget.data.today.tasks)) {
+          taskBuckets.push(widget.data.today.tasks);
+        }
+        if (widget?.data?.upcoming && Array.isArray(widget.data.upcoming)) {
+          widget.data.upcoming.forEach((group) => {
+            if (group?.tasks && Array.isArray(group.tasks)) {
+              taskBuckets.push(group.tasks);
+            }
+          });
+        }
+
+        if (taskBuckets.length > 0) {
+          const flat = taskBuckets.flat();
+          flat
             .slice()
             .reverse()
             .forEach((task) => {

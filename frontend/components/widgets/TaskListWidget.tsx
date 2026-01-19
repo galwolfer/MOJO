@@ -19,6 +19,14 @@ interface Task {
   dueDate?: string;
   importance?: number;
   effort?: number;
+  progressPercentage?: number;
+  scheduledSessions?: ScheduledSession[];
+}
+
+interface ScheduledSession {
+  start?: string;
+  end?: string;
+  status?: string;
 }
 
 /**
@@ -102,6 +110,27 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
     return COLORS.primary7;
   };
 
+  const getProgressColor = (progress?: number) => {
+    const value = typeof progress === "number" ? progress : 0;
+    if (value >= 80) return COLORS.primary6;
+    if (value >= 40) return COLORS.primary5;
+    return COLORS.primary7;
+  };
+
+  const formatTimeRange = (session?: ScheduledSession) => {
+    if (!session?.start) return null;
+    try {
+      const start = new Date(session.start);
+      const end = session.end ? new Date(session.end) : null;
+      const startText = start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+      if (!end || Number.isNaN(end.getTime())) return startText;
+      const endText = end.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+      return `${startText} - ${endText}`;
+    } catch {
+      return null;
+    }
+  };
+
   if (!tasks || tasks.length === 0) {
     return (
       <Widget skipAnimation>
@@ -143,6 +172,11 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
                     📅 {formatDate(task.dueDate)}
                   </AppText>
                 )}
+                {task.scheduledSessions && task.scheduledSessions.length > 0 && (
+                  <AppText variant="notes" style={styles.metaText}>
+                    {formatTimeRange(task.scheduledSessions[0]) || "Time TBD"}
+                  </AppText>
+                )}
                 {task.importance && (
                   <View style={[styles.importanceBadge, { backgroundColor: getImportanceColor(task.importance) }]}>
                     <AppText variant="notes" style={styles.importanceText}>
@@ -150,6 +184,11 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
                     </AppText>
                   </View>
                 )}
+                <View style={[styles.progressBadge, { backgroundColor: getProgressColor(task.progressPercentage) }]}>
+                  <AppText variant="notes" style={styles.progressText}>
+                    {Math.round(task.progressPercentage ?? 0)}%
+                  </AppText>
+                </View>
               </View>
             </View>
           </TouchableOpacity>
@@ -221,6 +260,16 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   importanceText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: COLORS.colorWhite,
+  },
+  progressBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 3,
+  },
+  progressText: {
     fontSize: 10,
     fontWeight: "600",
     color: COLORS.colorWhite,

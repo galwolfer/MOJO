@@ -12,6 +12,7 @@ import {
   CalendarEventWidget,
   TaskDetailWidget,
   TaskListDetailedWidget,
+  UpcomingTasksWidget,
 } from "../components/widgets";
 
 /**
@@ -33,6 +34,7 @@ export class WidgetFactory {
     task_confirmation: TaskConfirmationWidget,
     confirmation: ConfirmationWidget,
     calendar_event: CalendarEventWidget,
+    upcoming_tasks: UpcomingTasksWidget,
   };
 
   /**

@@ -1,6 +1,119 @@
 import { widgetRegistry } from "./registry.js";
 import { sanitizeDisplayStringsDeep } from "../../utils/illegalChars.js";
 
+const TASK_FIELDS = [
+  "id",
+  "title",
+  "taskname",
+  "description",
+  "status",
+  "dueDate",
+  "deadline",
+  "estimatedDuration",
+  "duration",
+  "importance",
+  "effort",
+  "priorityScore",
+  "progressPercentage",
+  "taskType",
+  "minChunk",
+  "chunkCount",
+  "chunkMinutes",
+  "minMinutes",
+  "maxMinutes",
+  "earliestStart",
+  "category",
+  "categoryDisplay",
+  "subcategory",
+  "subcategoryDisplay",
+  "subCategory",
+  "canSplit",
+  "tags",
+  "scheduledSessions",
+];
+
+const SCHEDULE_FIELDS = [
+  "taskId",
+  "id",
+  "start",
+  "end",
+  "minutes",
+  "status",
+  "subtaskIndex",
+  "subtaskId",
+  "subtaskTitle",
+  "subtaskStatus",
+];
+
+function normalizeScheduleSession(session = {}) {
+  const out = { ...session };
+  SCHEDULE_FIELDS.forEach((key) => {
+    if (!(key in out)) out[key] = null;
+  });
+  return out;
+}
+
+function normalizeTaskItem(task = {}) {
+  const out = { ...task };
+  TASK_FIELDS.forEach((key) => {
+    if (!(key in out)) out[key] = null;
+  });
+  if (Array.isArray(out.scheduledSessions)) {
+    out.scheduledSessions = out.scheduledSessions.map(normalizeScheduleSession);
+  } else if (out.scheduledSessions == null) {
+    out.scheduledSessions = [];
+  }
+  return out;
+}
+
+function normalizeTaskList(tasks) {
+  if (!Array.isArray(tasks)) return [];
+  return tasks.map((task) => normalizeTaskItem(task));
+}
+
+function normalizeUpcomingGroup(group) {
+  if (!group || typeof group !== "object") {
+    return { date: null, tasks: [] };
+  }
+  return {
+    ...group,
+    date: group.date || null,
+    tasks: normalizeTaskList(group.tasks),
+  };
+}
+
+function normalizeWidgetData(widgetType, data = {}) {
+  if (!data || typeof data !== "object") return data;
+
+  if (widgetType === "task_list" || widgetType === "task_list_detailed") {
+    return { ...data, tasks: normalizeTaskList(data.tasks) };
+  }
+
+  if (widgetType === "task_detail") {
+    const task = data.task ? normalizeTaskItem(data.task) : normalizeTaskItem(data);
+    return { ...data, task };
+  }
+
+  if (widgetType === "task_confirmation") {
+    const normalized = normalizeTaskItem(data);
+    if (normalized.progressPercentage === null || normalized.progressPercentage === undefined) {
+      normalized.progressPercentage = 0;
+    }
+    return normalized;
+  }
+
+  if (widgetType === "upcoming_tasks") {
+    return {
+      ...data,
+      days: data.days ?? null,
+      today: normalizeUpcomingGroup(data.today),
+      upcoming: Array.isArray(data.upcoming) ? data.upcoming.map(normalizeUpcomingGroup) : [],
+    };
+  }
+
+  return data;
+}
+
 /**
  * Ensure the provided data object contains all keys listed in the widget
  * definition schema. Missing keys are added with null values. This enforces
@@ -28,7 +141,8 @@ export function ensureWidgetFields(widgetType, data = {}) {
  * Returns a string ready to embed in an assistant message.
  */
 export function buildWidgetString(widgetType, data = {}) {
-  const canonicalData = ensureWidgetFields(widgetType, data);
+  const normalizedData = normalizeWidgetData(widgetType, data);
+  const canonicalData = ensureWidgetFields(widgetType, normalizedData);
   const safeData = sanitizeDisplayStringsDeep(canonicalData);
   const payload = {
     version: "1.0",

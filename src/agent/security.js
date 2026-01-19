@@ -104,6 +104,13 @@ export function validateWidgetPayload(raw) {
     }
   }
 
+  if (payload.widget_type === "upcoming_tasks") {
+    const todayTasks = payload.data?.today?.tasks;
+    if (!Array.isArray(todayTasks)) {
+      return { valid: false, reason: "upcoming_tasks payload missing today.tasks array" };
+    }
+  }
+
   // No suspicious tokens in JSON string
   if (containsSuspiciousToken(JSON.stringify(payload)))
     return { valid: false, reason: "Widget payload contains suspicious tokens" };

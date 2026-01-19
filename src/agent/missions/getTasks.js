@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { LightMission } from "./LightMission.js";
 import * as taskService from "../../services/taskService.js";
+import { fetchScheduledSessionsByTask, getScheduleWindow } from "./taskScheduleUtils.js";
 
 const getTasksMission = new LightMission({
   name: "get_tasks",
@@ -36,6 +37,14 @@ const getTasksMission = new LightMission({
         return `ok=true\ncount=0`;
       }
 
+      const { start, end } = getScheduleWindow(7);
+      const scheduledByTaskId = await fetchScheduledSessionsByTask({
+        userId,
+        taskIds: tasks.map((t) => t._id),
+        start,
+        end,
+      });
+
       // Construct Widget JSON
       const widgetJson = {
         version: "1.0",
@@ -47,13 +56,18 @@ const getTasksMission = new LightMission({
             status: t.status,
             dueDate: t.dueDate ? new Date(t.dueDate).toISOString() : null,
             importance: t.importance,
+            effort: t.effort,
             priorityScore: t.priorityScore || 0,
+            progressPercentage: t.progressPercentage ?? 0,
             taskType: t.taskType || null,
             subCategory: t.subCategory || null,
+            subcategory: t.subCategory ? t.subCategory.label : null,
+            category: t.category || null,
             tags: t.tags,
             description: t.description,
             estimatedDuration: t.estimatedDuration,
             canSplit: t.canSplit,
+            scheduledSessions: scheduledByTaskId.get(t._id.toString()) || [],
           })),
         },
       };

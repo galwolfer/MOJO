@@ -4,6 +4,7 @@ import * as taskService from "../../services/taskService.js";
 import { CATEGORY_STRING_VALUES, getDisplayName } from "../../config/categories.js";
 import { TASK_CONFIG } from "../taskRules.js";
 import { getIllegalDisplayFields, getIllegalCharsErrorMessage } from "../../utils/illegalChars.js";
+import { fetchScheduledSessionsByTask, getScheduleWindow } from "./taskScheduleUtils.js";
 
 const updateTaskMission = new GuidedMission({
   name: "update_task",
@@ -200,6 +201,13 @@ const updateTaskMission = new GuidedMission({
       }
 
       const task = result.task;
+      const { start, end } = getScheduleWindow(7);
+      const scheduledByTaskId = await fetchScheduledSessionsByTask({
+        userId,
+        taskIds: [task._id],
+        start,
+        end,
+      });
 
       // Construct task_detail widget to show the updated task
       const widgetJson = {
@@ -218,7 +226,9 @@ const updateTaskMission = new GuidedMission({
             estimatedDuration: task.estimatedDuration,
             duration: task.estimatedDuration,
             importance: task.importance,
+            effort: task.effort,
             priorityScore: task.priorityScore || 0,
+            progressPercentage: task.progressPercentage ?? 0,
             taskType: task.taskType || null,
             minChunk: task.minChunk !== undefined ? task.minChunk : null,
             chunkCount: task.chunkCount !== undefined ? task.chunkCount : null,
@@ -234,7 +244,10 @@ const updateTaskMission = new GuidedMission({
             category: task.category,
             categoryDisplay: getDisplayName(task.category),
             subcategoryDisplay: task.subCategory ? task.subCategory.label : null,
+            subcategory: task.subCategory ? task.subCategory.label : null,
             canSplit: task.canSplit,
+            tags: task.tags || null,
+            scheduledSessions: scheduledByTaskId.get(task._id.toString()) || [],
           },
         },
       };

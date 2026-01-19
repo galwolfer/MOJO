@@ -33,7 +33,8 @@ export const widgetRegistry = new WidgetRegistry([
     type: "task_list",
     description: "Display a list of tasks with checkboxes and details.",
     schema: {
-      tasks: "Array of task objects { id, title, status, dueDate, importance }",
+      tasks:
+        "Array of task objects { id, title, status, dueDate, importance, effort, estimatedDuration, category, subcategory, progressPercentage, priorityScore, taskType, subCategory, tags, description, canSplit, scheduledSessions: Array { id, taskId, start, end, minutes, status, subtaskIndex, subtaskId, subtaskTitle, subtaskStatus } }",
     },
   }),
   new WidgetDefinition({
@@ -41,7 +42,8 @@ export const widgetRegistry = new WidgetRegistry([
     description:
       "Display a single task with full details (title, description, due date, category, subcategory, priority, tags, status).",
     schema: {
-      task: "Task object { id, title, description, status, dueDate, category, subcategory, importance, effort, estimatedDuration, canSplit, tags }",
+      task:
+        "Task object { id, title, description, status, dueDate, category, subcategory, importance, effort, estimatedDuration, canSplit, taskType, progressPercentage, priorityScore, tags, scheduledSessions: Array { id, taskId, start, end, minutes, status, subtaskIndex, subtaskId, subtaskTitle, subtaskStatus } }",
     },
   }),
   new WidgetDefinition({
@@ -50,7 +52,7 @@ export const widgetRegistry = new WidgetRegistry([
       "Display a list of tasks with ALL fields shown (title, description, due date, category, subcategory, priority, importance, effort, tags, status). Use this when the user wants to see full details of multiple tasks.",
     schema: {
       tasks:
-        "Array of task objects { id, title, description, status, dueDate, importance, effort, estimatedDuration, canSplit, tags }",
+        "Array of task objects { id, title, description, status, dueDate, importance, effort, estimatedDuration, canSplit, taskType, progressPercentage, priorityScore, category, subcategory, tags, scheduledSessions: Array { id, taskId, start, end, minutes, status, subtaskIndex, subtaskId, subtaskTitle, subtaskStatus } }",
     },
   }),
   new WidgetDefinition({
@@ -93,6 +95,17 @@ export const widgetRegistry = new WidgetRegistry([
       earliestStart: "Earliest start date (optional)",
       recurrence: "Recurrence config object (optional)",
       tags: "Tags array (optional)",
+      progressPercentage: "Progress percentage 0-100",
+      scheduledSessions: "Optional scheduled sessions (array)",
+    },
+  }),
+  new WidgetDefinition({
+    type: "upcoming_tasks",
+    description: "Display tasks scheduled for today and the next N days with session times and completion controls.",
+    schema: {
+      days: "Number of days in the upcoming range",
+      today: "Object { date, tasks } for today",
+      upcoming: "Array of objects { date, tasks } for future days",
     },
   }),
 ]);

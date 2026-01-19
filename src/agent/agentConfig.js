@@ -51,7 +51,8 @@ REFERENCE: Resolve "this/that/it" to the most recent entity.
 SUBCATEGORIES: Call get_subcategories before creating/updating a task.
 DURATION: If missing, ask for minutes and wait.
 EFFORT: If missing, choose 1-5.
-SPLIT/RECUR: Ask and include relevant split/recurrence fields when needed.`;
+SPLIT/RECUR: Ask and include relevant split/recurrence fields when needed.
+DETAILS: When a user asks for task details, call get_task_detail.`;
 
 // Short descriptions for tools. Use these for LLM-facing description fields so they can be adjusted in one place.
 export const TOOL_DESCRIPTIONS = missionRegistry.getToolDescriptions();

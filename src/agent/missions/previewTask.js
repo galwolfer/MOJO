@@ -284,6 +284,8 @@ const previewTaskMission = new GuidedMission({
         earliestStart: finalEarliestStart,
         recurrence: recurrence || null,
         tags: null,
+        progressPercentage: 0,
+        scheduledSessions: [],
         // Small human-readable short description for listing/preview
         shortDescription,
         // Confirmation message to show near the widget (localized)

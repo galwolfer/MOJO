@@ -19,6 +19,14 @@ interface Task {
   importance?: number;
   effort?: number;
   category?: string;
+  progressPercentage?: number;
+  scheduledSessions?: ScheduledSession[];
+}
+
+interface ScheduledSession {
+  start?: string;
+  end?: string;
+  status?: string;
 }
 
 /**
@@ -62,6 +70,27 @@ const TaskListDetailedWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) =
     return COLORS.primary7;
   };
 
+  const getProgressColor = (progress?: number) => {
+    const value = typeof progress === "number" ? progress : 0;
+    if (value >= 80) return COLORS.primary6;
+    if (value >= 40) return COLORS.primary5;
+    return COLORS.primary7;
+  };
+
+  const formatTimeRange = (session?: ScheduledSession) => {
+    if (!session?.start) return null;
+    try {
+      const start = new Date(session.start);
+      const end = session.end ? new Date(session.end) : null;
+      const startText = start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+      if (!end || Number.isNaN(end.getTime())) return startText;
+      const endText = end.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+      return `${startText} - ${endText}`;
+    } catch {
+      return null;
+    }
+  };
+
   const handleTaskSelect = (taskId: string) => {
     onAction?.("task_selected", { taskId });
   };
@@ -101,6 +130,11 @@ const TaskListDetailedWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) =
                   </AppText>
                 </View>
               )}
+              <View style={[styles.progressBadge, { backgroundColor: getProgressColor(task.progressPercentage) }]}>
+                <AppText variant="notes" style={styles.progressText}>
+                  {Math.round(task.progressPercentage ?? 0)}%
+                </AppText>
+              </View>
             </View>
 
             {/* Description */}
@@ -116,6 +150,14 @@ const TaskListDetailedWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) =
                 <View style={styles.metaItem}>
                   <AppText variant="notes" style={styles.metaText}>
                     📅 {formatDate(task.dueDate)}
+                  </AppText>
+                </View>
+              )}
+
+              {task.scheduledSessions && task.scheduledSessions.length > 0 && (
+                <View style={styles.metaItem}>
+                  <AppText variant="notes" style={styles.metaText}>
+                    {formatTimeRange(task.scheduledSessions[0]) || "Time TBD"}
                   </AppText>
                 </View>
               )}
@@ -184,6 +226,16 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   importanceText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: COLORS.colorWhite,
+  },
+  progressBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  progressText: {
     fontSize: 10,
     fontWeight: "600",
     color: COLORS.colorWhite,

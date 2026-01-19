@@ -8,6 +8,7 @@ import { get, post, patch, del } from "./httpClient";
 
 // Types
 export type TaskStatus = "todo" | "in_progress" | "done";
+export type SubTaskStatus = "todo" | "done";
 
 export type Task = {
   _id: string;
@@ -249,6 +250,24 @@ export async function updateTask(
 }
 
 /**
+ * Update a subtask status
+ * PATCH /api/tasks/:taskId/subtasks/:subId/status
+ */
+export async function updateSubTaskStatus(
+  taskId: string,
+  subtaskId: string,
+  status: SubTaskStatus
+): Promise<boolean> {
+  try {
+    await patch<{ success: boolean }>(`/tasks/${taskId}/subtasks/${subtaskId}/status`, { status });
+    return true;
+  } catch (error) {
+    console.warn("Failed to update subtask status:", error);
+    return false;
+  }
+}
+
+/**
  * Delete a task
  * DELETE /api/tasks/:id
  */
@@ -269,5 +288,6 @@ export default {
   completeTask,
   toggleTaskCompletion,
   updateTask,
+  updateSubTaskStatus,
   deleteTask,
 };
