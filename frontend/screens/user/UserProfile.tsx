@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import AppText from "../../components/common/AppText";
+import AppButton from "../../components/common/AppButton";
 import { COLORS, SPACING, SHADOWS } from "../../theme";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigation } from "../../context/NavigationContext";
@@ -95,20 +96,70 @@ export default function UserProfileScreen() {
   useEffect(() => {
     if (currentScreen === "profile") {
       setHeaderConfig({
-        title: "My Profile",
         show: true,
-        icon: ICONS.mojo,
-        rightElement: (
-          <TouchableOpacity onPress={() => setCurrentScreen("settings")} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <SettingsIcon size={24} color={COLORS.primary1} />
-            <AppText variant="boldText" style={{ color: COLORS.primary1 }}>
-              Settings
+        element: (
+          <View style={styles.headerProfileSection}>
+            {/* Avatar */}
+            <View style={styles.headerAvatarWrapper}>
+              {user?.profileImage ? (
+                <Image
+                  source={{
+                    uri: user.profileImage,
+                  }}
+                  style={styles.headerAvatarImage}
+                />
+              ) : (
+                <View style={styles.headerAvatarPlaceholder}>
+                  <UserIcon size={50} color={COLORS.grayLight} />
+                </View>
+              )}
+            </View>
+
+            {/* Display Name */}
+            <AppText variant="title2" style={styles.headerUsername}>
+              {user?.displayName || user?.username || "User"}
             </AppText>
-          </TouchableOpacity>
+            {user?.username && user?.displayName && user.displayName !== user.username && (
+              <AppText variant="notes" style={styles.headerDisplayName}>
+                @{user.username}
+              </AppText>
+            )}
+
+            {/* Stats Row */}
+            <View style={styles.headerStatsRow}>
+              {loading ? (
+                <ActivityIndicator size="small" color={COLORS.primary1} />
+              ) : (
+                <>
+                  <StatBadge
+                    icon={<CheckIcon size={16} color={COLORS.colorWhite} />}
+                    value={stats.tasks}
+                    label="Tasks"
+                    color={COLORS.primary6}
+                  />
+                  <StatBadge
+                    icon={<TrophyIcon size={16} color={COLORS.colorWhite} />}
+                    value={stats.points}
+                    label="Points"
+                    color={COLORS.primary5}
+                  />
+                  <StatBadge
+                    icon={<FlameIcon size={16} color={COLORS.colorWhite} />}
+                    value={stats.streak}
+                    label="Days Streak"
+                    color={COLORS.primary4}
+                  />
+                </>
+              )}
+            </View>
+          </View>
+        ),
+        rightElement: (
+          <AppButton icon="settings" mode="light" color="primary1" onPress={() => setCurrentScreen("settings")} />
         ),
       });
     }
-  }, [currentScreen]);
+  }, [currentScreen, user?.profileImage, user?.displayName, user?.username, loading, stats]);
 
   const fetchAllData = useCallback(async () => {
     if (!mountedRef.current) return;
@@ -175,79 +226,8 @@ export default function UserProfileScreen() {
       contentContainerStyle={styles.contentContainer}
       extraBottomPadding={SPACING.xlg * 3}
     >
-      {/* Profile Header Section */}
-      <View style={styles.profileSection}>
-        {/* Avatar with gradient ring */}
-        <View style={styles.avatarWrapper}>
-          <LinearGradient
-            colors={[COLORS.primary1, COLORS.primary2, COLORS.primary4]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.avatarGradient}
-          >
-            <View style={styles.avatarInner}>
-              {user?.profileImage ? (
-                <Image
-                  source={{
-                    uri: user.profileImage,
-                  }}
-                  style={styles.avatarImage}
-                />
-              ) : (
-                <View style={styles.avatarPlaceholder}>
-                  <UserIcon size={50} color={COLORS.grayLight} />
-                </View>
-              )}
-            </View>
-          </LinearGradient>
-
-          {/* Settings button overlay */}
-          <TouchableOpacity style={styles.settingsOverlay}>
-            <SettingsIcon size={20} color={COLORS.colorWhite} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Display Name */}
-        <AppText variant="title2" style={styles.username}>
-          {user?.displayName || user?.username || "User"}
-        </AppText>
-        {user?.username && user?.displayName && user.displayName !== user.username && (
-          <AppText variant="notes" style={styles.displayName}>
-            @{user.username}
-          </AppText>
-        )}
-
-        {/* Stats Row */}
-        <View style={styles.statsRow}>
-          {loading ? (
-            <ActivityIndicator size="small" color={COLORS.primary1} />
-          ) : (
-            <>
-              <StatBadge
-                icon={<CheckIcon size={16} color={COLORS.colorWhite} />}
-                value={stats.tasks}
-                label="Tasks"
-                color={COLORS.primary6}
-              />
-              <StatBadge
-                icon={<TrophyIcon size={16} color={COLORS.colorWhite} />}
-                value={stats.points}
-                label="Points"
-                color={COLORS.primary5}
-              />
-              <StatBadge
-                icon={<FlameIcon size={16} color={COLORS.colorWhite} />}
-                value={stats.streak}
-                label="Days Streak"
-                color={COLORS.primary4}
-              />
-            </>
-          )}
-        </View>
-      </View>
-
       {/* Progress Section */}
-      <Box title="My Progress" titleColor={COLORS.primary3}>
+      <Box title="My Progress">
         <View style={styles.progressContent}>
           {loading ? (
             <ActivityIndicator size="small" color={COLORS.primary3} style={{ marginVertical: SPACING.lg }} />
@@ -259,21 +239,27 @@ export default function UserProfileScreen() {
                     <AppText variant="boldText" style={styles.progressSummaryValue}>
                       {taskProgress.today.completed}/{taskProgress.today.total}
                     </AppText>
-                    <AppText variant="notes" style={styles.progressSummaryLabel}>Today</AppText>
+                    <AppText variant="notes" style={styles.progressSummaryLabel}>
+                      Today
+                    </AppText>
                   </View>
                   <View style={styles.progressSummaryDivider} />
                   <View style={styles.progressSummaryItem}>
                     <AppText variant="boldText" style={styles.progressSummaryValue}>
                       {taskProgress.today.percentage}%
                     </AppText>
-                    <AppText variant="notes" style={styles.progressSummaryLabel}>Completed</AppText>
+                    <AppText variant="notes" style={styles.progressSummaryLabel}>
+                      Completed
+                    </AppText>
                   </View>
                   <View style={styles.progressSummaryDivider} />
                   <View style={styles.progressSummaryItem}>
                     <AppText variant="boldText" style={styles.progressSummaryValue}>
                       {taskProgress.week.completed}
                     </AppText>
-                    <AppText variant="notes" style={styles.progressSummaryLabel}>This Week</AppText>
+                    <AppText variant="notes" style={styles.progressSummaryLabel}>
+                      This Week
+                    </AppText>
                   </View>
                 </View>
               )}
@@ -287,36 +273,6 @@ export default function UserProfileScreen() {
           </AppText>
         </View>
       </Box>
-
-      {/* Friends Section */}
-      <View style={styles.friendsSection}>
-        <LinearGradient
-          colors={[COLORS.primary3, COLORS.primary1]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.friendsGradient}
-        >
-          {/* Title */}
-          <View style={styles.friendsHeader}>
-            <AppText variant="title3" style={styles.friendsTitle}>
-              My Friends
-            </AppText>
-          </View>
-
-          {/* Friends list */}
-          <View style={styles.friendsList}>
-            {MOCK_FRIENDS.map((friend) => (
-              <FriendListItem
-                key={friend.id}
-                name={friend.name}
-                avatar={friend.avatar}
-                stats={friend.stats}
-                isOnline={friend.isOnline}
-              />
-            ))}
-          </View>
-        </LinearGradient>
-      </View>
 
       {/* Logout Button */}
       <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
@@ -334,6 +290,48 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: SPACING.lg,
     paddingBottom: SPACING.xlg * 2,
+  },
+
+  // Header Profile Styles
+  headerProfileSection: {
+    alignItems: "center",
+    paddingVertical: SPACING.md,
+    gap: SPACING.sm,
+  },
+  headerAvatarWrapper: {
+    width: moderateScale(110),
+    height: moderateScale(110),
+    borderRadius: moderateScale(55),
+    overflow: "hidden",
+    backgroundColor: COLORS.white2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerAvatarImage: {
+    width: "100%",
+    height: "100%",
+  },
+  headerAvatarPlaceholder: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: COLORS.white2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerUsername: {
+    color: COLORS.primary1,
+    textAlign: "center",
+    marginTop: SPACING.sm,
+  },
+  headerDisplayName: {
+    color: COLORS.grayLight,
+    textAlign: "center",
+  },
+  headerStatsRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: SPACING.sm,
+    marginTop: SPACING.sm,
   },
 
   // Profile Section
