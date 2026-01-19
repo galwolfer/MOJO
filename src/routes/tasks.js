@@ -508,6 +508,9 @@ router.get("/", taskController.getTasks);
 // Get subtasks for a task
 router.get("/:id/subtasks", taskController.getSubTasksForTask);
 
+// Get task progress with subtasks and schedule details
+router.get("/:id/progress", taskController.getTaskProgress);
+
 // Get a single subtask by ID
 router.get("/:taskId/subtasks/:subId", taskController.getSubTaskById);
 

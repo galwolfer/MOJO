@@ -18,6 +18,7 @@
 
 import { Task } from "../models/Task.js";
 import { TaskSchedule } from "../models/TaskSchedule.js";
+import { SubTask } from "../models/SubTask.js";
 import { BusyBlock } from "../models/BusyBlock.js";
 import { startOfDay, addDays } from "../utils/dateUtils.js";
 import { logEvent } from "./telemetryService.js";
@@ -194,12 +195,62 @@ export function describeRoutineWindows(blocks = DEFAULT_ROUTINE_BLOCKS) {
 // =============================================================================
 
 /**
+ * Helper: Assign subtask indices to schedule slots for split tasks.
+ * 
+ * For tasks with type "in_parts" or "leaky", this function maps schedule blocks
+ * to their corresponding SubTask indices sequentially.
+ * 
+ * @param {Array} plan - Array of schedule slots
+ * @returns {Promise<Array>} Plan with subtaskIndex populated for split tasks
+ */
+async function assignSubtaskIndices(plan) {
+  if (!plan.length) return plan;
+
+  // Group plan slots by taskId to track which subtask index to assign next
+  const taskSlotMap = new Map();
+  for (const slot of plan) {
+    const taskIdStr = slot.taskId.toString();
+    if (!taskSlotMap.has(taskIdStr)) {
+      taskSlotMap.set(taskIdStr, []);
+    }
+    taskSlotMap.get(taskIdStr).push(slot);
+  }
+
+  // For each task, check if it's split and assign subtask indices
+  const taskIds = Array.from(taskSlotMap.keys());
+  const tasks = await Task.find({
+    _id: { $in: taskIds },
+    taskType: { $in: ["in_parts", "leaky"] },
+  }).lean();
+
+  const splitTaskIds = new Set(tasks.map((t) => t._id.toString()));
+
+  // Assign subtaskIndex sequentially for each split task's slots
+  for (const slot of plan) {
+    const taskIdStr = slot.taskId.toString();
+    if (splitTaskIds.has(taskIdStr)) {
+      // Get current slot's position among this task's slots
+      const slots = taskSlotMap.get(taskIdStr);
+      const slotIndex = slots.indexOf(slot);
+      // Assign subtask index (1-indexed)
+      slot.subtaskIndex = slotIndex + 1;
+    }
+  }
+
+  return plan;
+}
+
+/**
  * Persist a generated plan to the database.
  * Clears existing future planned/skipped sessions before saving new ones.
  * Also cleans up orphan schedules (where task no longer exists).
+ * Automatically assigns subtask indices for split tasks.
  */
 export async function persistPlan(userId, plan) {
   const now = new Date();
+
+  // Assign subtask indices before persisting
+  const planWithSubtasks = await assignSubtaskIndices(plan);
 
   // Clean up orphan schedules (taskId references deleted tasks)
   const existingTaskIds = await Task.find({ userId }).distinct("_id");
@@ -219,11 +270,12 @@ export async function persistPlan(userId, plan) {
     status: { $ne: "completed" },
   });
 
-  if (!plan.length) return;
+  if (!planWithSubtasks.length) return;
 
-  const docs = plan.map((slot) => ({
+  const docs = planWithSubtasks.map((slot) => ({
     userId,
     taskId: slot.taskId,
+    subtaskIndex: slot.subtaskIndex || null, // Only set if assigned
     start: slot.start,
     end: slot.end,
     minutes: slot.minutes,

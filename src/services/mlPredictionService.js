@@ -204,6 +204,9 @@ export async function trainTask(task) {
       throw new Error('Task missing estimatedDuration or actualCompletionMinutes');
     }
 
+    // Get userId early - needed for both deadline reward and training
+    const userId = task.userId.toString();
+
     // Convert Task to ML input format
     const mlInput = taskToMLInput(task);
 
@@ -263,7 +266,6 @@ export async function trainTask(task) {
     }
 
     // Build subcategory map from user's custom subcategories
-    const userId = task.userId.toString();
     const subcategoryMap = await buildSubcategoryMap(userId);
 
     // Prepare payload: task input + subcategory_map

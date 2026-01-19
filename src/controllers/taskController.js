@@ -611,6 +611,33 @@ export async function getSubTasksForTask(req, res) {
 }
 
 /**
+ * Get detailed progress for a task with split parts
+ * GET /api/tasks/:id/progress
+ * 
+ * Returns:
+ * - Task details
+ * - All subtasks with their schedule blocks
+ * - Progress metrics (completed parts, total parts, percentage)
+ */
+export async function getTaskProgress(req, res) {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params; // task id
+
+    const progress = await taskService.getTaskProgress(userId, id);
+
+    if (!progress) {
+      return res.status(404).json({ success: false, error: "Task not found" });
+    }
+
+    return res.status(200).json({ success: true, data: progress });
+  } catch (error) {
+    logger.error("Error in getTaskProgress controller:", error);
+    return res.status(500).json({ success: false, error: "Failed to get task progress" });
+  }
+}
+
+/**
  * Get a single subtask by ID
  * GET /api/tasks/:taskId/subtasks/:subId
  */

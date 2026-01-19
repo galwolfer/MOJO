@@ -29,4 +29,47 @@ subTaskSchema.methods.markIncomplete = function () {
   return this.save();
 };
 
+// Helper: Sync parent Task's progress percentage when subtask changes
+async function syncParentTaskProgress(subtaskDoc) {
+  try {
+    const Task = mongoose.model("Task");
+    const task = await Task.findById(subtaskDoc.taskId);
+    if (!task) return;
+
+    // Only sync for split tasks
+    if (!["in_parts", "leaky"].includes(task.taskType)) return;
+
+    // Get all subtasks for this task
+    const subtasks = await SubTask.find({ taskId: task._id }).lean();
+    if (subtasks.length === 0) {
+      task.progressPercentage = 0;
+    } else {
+      const completedCount = subtasks.filter((st) => st.status === "done").length;
+      task.progressPercentage = Math.round((completedCount / subtasks.length) * 100);
+    }
+
+    await task.save();
+  } catch (err) {
+    console.error("⚠️  syncParentTaskProgress failed:", err && err.message ? err.message : err);
+  }
+}
+
+// Sync parent progress after subtask is saved
+subTaskSchema.post("save", async function () {
+  await syncParentTaskProgress(this);
+});
+
+// Sync parent progress after subtask is deleted
+subTaskSchema.post("deleteOne", async function () {
+  await syncParentTaskProgress(this);
+});
+
+// Also handle bulk operations
+subTaskSchema.post("updateOne", async function () {
+  const docToUpdate = await SubTask.findOne(this.getQuery());
+  if (docToUpdate) {
+    await syncParentTaskProgress(docToUpdate);
+  }
+});
+
 export const SubTask = mongoose.model("SubTask", subTaskSchema);
