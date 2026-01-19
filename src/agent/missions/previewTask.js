@@ -16,30 +16,23 @@ function parseRelativeDate(dateString) {
   const lowerStr = dateString.toLowerCase().trim();
 
   // Handle: "tomorrow"
-  if (lowerStr === "tomorrow" || lowerStr === "מחר") {
+  if (lowerStr === "tomorrow") {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
     return tomorrow.toISOString().split("T")[0];
   }
 
   // Handle: "today"
-  if (lowerStr === "today" || lowerStr === "היום") {
+  if (lowerStr === "today") {
     return today.toISOString().split("T")[0];
   }
 
   // Handle: "next Thursday", "this Thursday", "Thursday", etc.
   const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-  const hebrewDays = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
   for (let i = 0; i < days.length; i++) {
     const engDay = days[i];
-    const hebDay = hebrewDays[i];
-    if (
-      lowerStr.includes(engDay) ||
-      lowerStr.includes(hebDay) ||
-      lowerStr.includes(`ליום ${hebDay}`) ||
-      lowerStr.includes(`ל${hebDay}`)
-    ) {
+    if (lowerStr.includes(engDay)) {
       // Calculate days until next occurrence of this day
       let daysToAdd = (i - dayOfWeek + 7) % 7;
 
@@ -49,7 +42,7 @@ function parseRelativeDate(dateString) {
       }
 
       // If user says "next" explicitly
-      if (lowerStr.includes("next") || lowerStr.includes("הקרוב")) {
+      if (lowerStr.includes("next")) {
         if (daysToAdd === 0) daysToAdd = 7; // Ensure it's in the future
       }
 
@@ -61,8 +54,7 @@ function parseRelativeDate(dateString) {
 
   // Handle: "in 3 days", "in 1 week", etc.
   const relativeRegex = /in\s+(\d+)\s+(days?|weeks?|hours?)/i;
-  const hebrewRelativeRegex = /בעוד\s+(\d+)\s+(ימים?|שבועות?|שעות?)/i;
-  let match = lowerStr.match(relativeRegex) || lowerStr.match(hebrewRelativeRegex);
+  const match = lowerStr.match(relativeRegex);
   if (match) {
     const amount = parseInt(match[1]);
     const unit = match[2].toLowerCase();
@@ -206,7 +198,7 @@ const previewTaskMission = new GuidedMission({
         return `ok=false\nerr="effort_required"\nmsg="Assistant must select an effort (integer 1-5) based on task duration, category, and complexity, and include it in the preview_task call."`;
       }
 
-      // If importance was not explicitly provided by the caller, use user's per-category priority mapping (#categorise entity)
+      // If importance was not explicitly provided by the caller, use user's per-category priority mapping (#categories entity)
       if (importance === undefined || importance === null) {
         try {
           const { getUserCategoryImportance } = await import("../../services/userPreferenceService.js");
@@ -265,11 +257,8 @@ const previewTaskMission = new GuidedMission({
 
       const userLang = detectLangFromText(taskname || description || categoryDisplay);
 
-      // Build a short confirmation message localized to userLang. Keep it concise.
-      const confirmationMessage =
-        userLang === "he"
-          ? "הטיוטה מוכנה. אפשר לאשר, לערוך או לבטל."
-          : "Here is your draft. You can confirm, edit, or cancel.";
+      // Confirmation message (always English)
+      const confirmationMessage = "Here is your draft. You can confirm, edit, or cancel.";
 
       const widgetPayload = {
         id: "draft-" + Date.now(),
