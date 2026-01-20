@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontWeight: "600",
-    marginBottom: SPACING.xs,
+    marginBottom: SPACING.sm,
   },
   scheduleList: {
     gap: SPACING.sm,
