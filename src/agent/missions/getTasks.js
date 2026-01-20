@@ -2,14 +2,15 @@ import { z } from "zod";
 import { LightMission } from "./LightMission.js";
 import * as taskService from "../../services/taskService.js";
 import { fetchScheduledSessionsByTask, getScheduleWindow } from "./taskScheduleUtils.js";
+import { buildTaskDetailData } from "./taskPayloads.js";
 
 const getTasksMission = new LightMission({
   name: "get_tasks",
   group: "task",
   description: "Fetch tasks (filters/search). Keep your message brief - widget shows the details.",
   missionInfo:
-    "Retrieve tasks. Write short intro before widget (e.g., 'Here are your tasks:'). Don't list details in text.",
-  widgets: ["task_list"],
+    "Retrieve tasks. Write short intro before widget (e.g., 'Here are your tasks:'). If only one task found, it shows details. Don't list details in text.",
+  widgets: ["task_list", "task_detail"],
   schema: z.object({
     search: z.string().optional().describe("Search query to find tasks by name/title"),
     category: z.string().optional().describe("Filter by category"),
@@ -35,6 +36,20 @@ const getTasksMission = new LightMission({
 
       if (tasks.length === 0) {
         return `ok=true\ncount=0`;
+      }
+
+      // If exactly one task found, return full details using shared helper
+      if (tasks.length === 1) {
+        const task = tasks[0];
+        const scheduledByTaskId = await fetchScheduledSessionsByTask({
+          userId,
+          taskIds: [task._id],
+          includeSubtasks: true,
+        });
+
+        const detail = buildTaskDetailData(task, scheduledByTaskId.get(task._id.toString()) || []);
+        const { buildWidgetString } = await import("../widgets/widgetUtils.js");
+        return buildWidgetString("task_detail", { task: detail });
       }
 
       const { start, end } = getScheduleWindow(7);
