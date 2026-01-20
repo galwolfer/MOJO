@@ -106,9 +106,9 @@ export function inferSplittingParams(taskType, duration) {
  */
 export function getTaskFieldInstructions() {
   // Build a mapping of display names to string values for the prompt
-  const categoryMapping = CATEGORY_STRING_VALUES.map(
-    (key) => `"${CATEGORY_DISPLAY_NAMES[key]}" (use: ${key})`
-  ).join(", ");
+  const categoryMapping = CATEGORY_STRING_VALUES.map((key) => `"${CATEGORY_DISPLAY_NAMES[key]}" (use: ${key})`).join(
+    ", ",
+  );
 
   return `TASK FIELDS:
 - REQUIRED: ${TASK_CONFIG.required_fields.join(", ")}
