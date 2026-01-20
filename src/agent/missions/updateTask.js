@@ -5,6 +5,7 @@ import { CATEGORY_STRING_VALUES, getDisplayName } from "../../config/categories.
 import { TASK_CONFIG } from "../taskRules.js";
 import { getIllegalDisplayFields, getIllegalCharsErrorMessage } from "../../utils/illegalChars.js";
 import { fetchScheduledSessionsByTask, getScheduleWindow } from "./taskScheduleUtils.js";
+import { updateTaskViaController, saveSubcategoryToProfile } from "../missionControllerHelpers.js";
 
 const updateTaskMission = new GuidedMission({
   name: "update_task",
@@ -193,14 +194,14 @@ const updateTaskMission = new GuidedMission({
 
       if (completed !== undefined) updates.status = completed ? "done" : "todo";
 
-      // Update in database
-      const result = await taskService.updateTask({ userId, taskId: resolvedTaskId, updates });
+      // Update through controller (which automatically triggers scheduling)
+      const result = await updateTaskViaController(userId, resolvedTaskId, updates);
 
-      if (!result.success) {
-        return `ok=false\nerr="${result.error}"`;
+      if (!result) {
+        return `ok=false\nerr="task_update_failed"`;
       }
 
-      const task = result.task;
+      const task = result;
       const { start, end } = getScheduleWindow(7);
       const scheduledByTaskId = await fetchScheduledSessionsByTask({
         userId,

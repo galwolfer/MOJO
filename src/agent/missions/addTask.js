@@ -4,6 +4,7 @@ import * as taskService from "../../services/taskService.js";
 import { TASK_CONFIG, inferTaskProperties, inferSplittingParams } from "../taskRules.js";
 import { CATEGORY_STRING_VALUES } from "../../config/categories.js";
 import { getIllegalDisplayFields, getIllegalCharsErrorMessage } from "../../utils/illegalChars.js";
+import { createTaskViaController, saveSubcategoryToProfile } from "../missionControllerHelpers.js";
 
 const addTaskMission = new GuidedMission({
   name: "add_task",
@@ -27,7 +28,7 @@ const addTaskMission = new GuidedMission({
     subcategory: z
       .string()
       .describe(
-        "REQUIRED: Specific subcategory (MUST call get_subcategories first to select from existing or confirm new)"
+        "REQUIRED: Specific subcategory (MUST call get_subcategories first to select from existing or confirm new)",
       ),
     canSplit: z.boolean().optional().describe("Can be split into chunks?"),
     minChunk: z.number().optional().describe("Minimum chunk size in minutes when splitting"),
@@ -88,8 +89,8 @@ const addTaskMission = new GuidedMission({
         // Will fetch user's category priority below after we have finalCategory
         finalImportance = null; // placeholder, will be set after category priority lookup
       }
-      const finalEffort = effort !== undefined && effort !== null ? effort : inferred.effort ?? null;
-      const finalDuration = duration !== undefined && duration !== null ? duration : inferred.duration ?? null;
+      const finalEffort = effort !== undefined && effort !== null ? effort : (inferred.effort ?? null);
+      const finalDuration = duration !== undefined && duration !== null ? duration : (inferred.duration ?? null);
       const finalCategory = category || inferred.category || "";
       const finalSubcategory = subcategory || inferred.subcategory || "";
 
@@ -194,10 +195,15 @@ const addTaskMission = new GuidedMission({
         };
       }
 
-      // Create task in database
-      const task = await taskService.createTask(taskData);
+      // Create task through controller (which automatically triggers scheduling)
+      const task = await createTaskViaController(userId, taskData);
+
+      if (!task) {
+        return `ok=false\nerr="task_creation_failed"\nmsg="Failed to create task"`;
+      }
 
       console.log(`[LOG] Task created: ${task._id} ${recurrence ? "(recurring)" : ""}`);
+      console.log(`[LOG] Schedule updated via controller after task creation`);
 
       // Return structured result only (LLM will generate user-facing confirmation)
       return `ok=true\nmsg="Task created"\nid="${task._id}"`;

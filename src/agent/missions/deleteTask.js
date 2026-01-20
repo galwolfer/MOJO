@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { GuidedMission } from "./GuidedMission.js";
 import * as taskService from "../../services/taskService.js";
+import { deleteTaskViaController } from "../missionControllerHelpers.js";
 
 const deleteTaskMission = new GuidedMission({
   name: "delete_task",
@@ -17,9 +18,10 @@ const deleteTaskMission = new GuidedMission({
     try {
       if (!confirm) return `ok=false\nerr="confirmation_required"`;
 
-      const result = await taskService.deleteTask({ taskId, userId });
-      if (!result.success) {
-        return `ok=false\nerr="${result.error}"`;
+      // Delete through controller (which automatically triggers scheduling)
+      const success = await deleteTaskViaController(userId, taskId);
+      if (!success) {
+        return `ok=false\nerr="task_deletion_failed"`;
       }
       return `ok=true\nid="${taskId}"`;
     } catch (error) {
