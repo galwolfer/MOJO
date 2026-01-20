@@ -266,33 +266,61 @@ export class AgentController {
             const widgetBlock = captureWidgetBlock(result);
             if (widgetBlock) {
               lastWidgetResult = widgetBlock;
-            }
 
-            // Persist and add to messages so LLM can craft a natural response referencing it
-            await memoryStore.addToolResult(sessionId, userId, callId, getTasksTool.name, result);
-            currentMessages.push(
-              new ToolMessage({
-                content: result,
-                tool_call_id: callId,
-                name: getTasksTool.name,
-              }),
-            );
-
-            // Extract entities from the result so recent entities are available
-            this._extractAndTrackEntities(sessionId, getTasksTool.name, {}, result);
-
-            // Let the LLM generate the final assistant message referencing the widget/tool result
-            try {
-              const toolResponse = await llmWithTools.invoke(currentMessages);
-              if (!(toolResponse.tool_calls && toolResponse.tool_calls.length > 0)) {
-                finalResponse =
-                  typeof toolResponse.content === "string" ? toolResponse.content : toolResponse.text || "";
+              // SPECIAL CASE: If the tool result is ONLY a widget with no surrounding text,
+              // skip LLM processing and return it directly. This prevents the LLM from
+              // extracting and re-outputting the raw JSON inside the widget tags.
+              const resultWithoutWidget = result.replace(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/i, "").trim();
+              if (!resultWithoutWidget || resultWithoutWidget === "") {
+                console.log(
+                  `[AgentController] get_tasks shortcut returned ONLY a widget. Skipping LLM and returning directly.`,
+                );
+                finalResponse = widgetBlock;
+                await memoryStore.addToolResult(sessionId, userId, callId, getTasksTool.name, result);
+                // Skip LLM invocation for widget-only responses
               } else {
-                // If the model still asks for additional tool calls, fall back to normal loop
-                currentMessages.push(toolResponse);
+                // Persist and add to messages so LLM can craft a natural response referencing it
+                await memoryStore.addToolResult(sessionId, userId, callId, getTasksTool.name, result);
+                currentMessages.push(
+                  new ToolMessage({
+                    content: result,
+                    tool_call_id: callId,
+                    name: getTasksTool.name,
+                  }),
+                );
+
+                // Extract entities from the result so recent entities are available
+                this._extractAndTrackEntities(sessionId, getTasksTool.name, {}, result);
+
+                // Let the LLM generate the final assistant message referencing the widget/tool result
+                try {
+                  const toolResponse = await llmWithTools.invoke(currentMessages);
+                  if (!(toolResponse.tool_calls && toolResponse.tool_calls.length > 0)) {
+                    finalResponse =
+                      typeof toolResponse.content === "string" ? toolResponse.content : toolResponse.text || "";
+                  } else {
+                    // If the model still asks for additional tool calls, fall back to normal loop
+                    currentMessages.push(toolResponse);
+                  }
+                } catch (err) {
+                  console.warn(
+                    `[AgentController] Shortcut LLM invoke failed, falling back to agent loop: ${err.message}`,
+                  );
+                }
               }
-            } catch (err) {
-              console.warn(`[AgentController] Shortcut LLM invoke failed, falling back to agent loop: ${err.message}`);
+            } else {
+              // No widget found, continue with normal shortcut flow
+              await memoryStore.addToolResult(sessionId, userId, callId, getTasksTool.name, result);
+              currentMessages.push(
+                new ToolMessage({
+                  content: result,
+                  tool_call_id: callId,
+                  name: getTasksTool.name,
+                }),
+              );
+
+              // Extract entities from the result so recent entities are available
+              this._extractAndTrackEntities(sessionId, getTasksTool.name, {}, result);
             }
           }
         }
@@ -458,6 +486,19 @@ export class AgentController {
                   const widgetBlock = captureWidgetBlock(result);
                   if (widgetBlock) {
                     lastWidgetResult = widgetBlock;
+
+                    // SPECIAL CASE: If the tool result is ONLY a widget with no surrounding text,
+                    // skip LLM processing and return it directly. This prevents the LLM from
+                    // extracting and re-outputting the raw JSON inside the widget tags.
+                    const resultWithoutWidget = result.replace(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/i, "").trim();
+                    if (!resultWithoutWidget || resultWithoutWidget === "") {
+                      console.log(
+                        `[AgentController] Tool ${toolCall.name} returned ONLY a widget. Skipping LLM and returning directly.`,
+                      );
+                      finalResponse = widgetBlock;
+                      await memoryStore.addToolResult(sessionId, userId, toolCall.id, toolCall.name, result);
+                      break; // Exit tool loop and skip LLM invocation
+                    }
                   }
 
                   // Add the tool result to the message history and persist it
@@ -571,10 +612,7 @@ export class AgentController {
             // Decide if surrounding text is too terse (few words or just punctuation)
             const words = surrounding.split(/\s+/).filter(Boolean);
             if (words.length < 3) {
-              const isHebrew = /[\u0590-\u05FF]/.test(userMessage);
-              const pre = isHebrew ? "הנה הטיוטה שלך." : "Here is your draft for your mission.";
-              const post = isHebrew ? "אפשר לאשר, לערוך או לבטל." : "You can confirm, edit, or cancel.";
-              finalResponse = `${pre}\n${widgetBlock}\n${post}`;
+              // Removed robotic fallback text - let LLM generate natural response
             }
           }
         } catch (e) {

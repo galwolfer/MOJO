@@ -79,6 +79,17 @@ export function splitTextAndWidget(text: string): {
   const widgetMatch = normalized.match(/([\s\S]*?)<WIDGET_JSON>([\s\S]*?)<\/WIDGET_JSON>([\s\S]*)/);
 
   if (!widgetMatch) {
+    // Check for incomplete widget (streaming) - hide the raw JSON part so user doesn't see code typing out
+    const openMatch = normalized.match(/([\s\S]*?)<WIDGET_JSON>([\s\S]*)/);
+    if (openMatch) {
+      const [, beforeText] = openMatch;
+      return {
+        beforeText: beforeText.trim(),
+        widget: null,
+        afterText: "",
+      };
+    }
+
     return {
       beforeText: text,
       widget: null,

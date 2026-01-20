@@ -363,9 +363,12 @@ const TextBouble: React.FC<Props> = ({
     }
     const { beforeText, widget, afterText } = splitTextAndWidget(rawText);
     return {
-      displayText: widget ? beforeText || null : rawText,
+      // Use beforeText as the display text unconditionally when in agent mode,
+      // because splitTextAndWidget handles both partial (streaming) and full widgets
+      // by returning the cleaned text in beforeText.
+      displayText: beforeText,
       widget,
-      afterText: widget ? afterText || null : null,
+      afterText: afterText || null,
     };
   }, [rawText, mode]);
 
@@ -638,8 +641,8 @@ const TextBouble: React.FC<Props> = ({
   }, [isTyping, fullText, typingSpeedCps, handleTypingDone]);
 
   // Render full content (used as invisible placeholder during typing to reserve space)
-  // For agent mode with widgets, use displayText (stripped of widget JSON)
-  const textToDisplay = mode === "agent" && parsedContent.widget ? parsedContent.displayText : null;
+  // For agent mode, always use parsedContent.displayText (which strips widget JSON even if widget is partial/streaming)
+  const textToDisplay = mode === "agent" ? parsedContent.displayText : null;
 
   // Helper to render the text part with proper AppText styling
   const renderTextContent = (text: string | null) => {
@@ -708,7 +711,11 @@ const TextBouble: React.FC<Props> = ({
           // Render typed content inline so the container height follows the
           // currently visible text. Non-text elements will not occupy space
           // until they become visible (so the box grows as typing advances).
-          <>{cloneChildrenWithTyping(children, typedChars)}</>
+          textToDisplay !== null ? (
+            <>{cloneChildrenWithTyping(<AppText variant="bodyText">{textToDisplay}</AppText>, typedChars)}</>
+          ) : (
+            <>{cloneChildrenWithTyping(children, typedChars)}</>
+          )
         ) : (
           fullContent
         )}
