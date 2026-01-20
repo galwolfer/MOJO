@@ -3,6 +3,7 @@ import { GuidedMission } from "./GuidedMission.js";
 import { TASK_CONFIG, inferTaskProperties, inferSplittingParams } from "../taskRules.js";
 import { getDisplayName } from "../../config/categories.js";
 import { getIllegalDisplayFields, getIllegalCharsErrorMessage } from "../../utils/illegalChars.js";
+import { okFalse, okTrue } from "../lib/errorFormatter.js";
 
 /**
  * Parse relative date strings like "next Thursday", "tomorrow", "in 3 days"
@@ -152,7 +153,7 @@ const previewTaskMission = new GuidedMission({
         subcategory,
       });
       if (illegalFields.length > 0) {
-        return `ok=false\nerr="illegal_characters"\nmsg="${getIllegalCharsErrorMessage(illegalFields)}"`;
+        return okFalse("illegal_characters", { msg: getIllegalCharsErrorMessage(illegalFields) });
       }
 
       // Parse relative dates (e.g., "next Thursday", "tomorrow", "in 3 days") to ISO format
@@ -162,7 +163,7 @@ const previewTaskMission = new GuidedMission({
       } catch (e) {
         // If parsing fails, try to use it as-is (might be ISO format already)
         if (!/^\d{4}-\d{2}-\d{2}$/.test(deadline)) {
-          return `ok=false\nerr="Invalid deadline format: ${deadline}. Use 'YYYY-MM-DD', 'tomorrow', 'next Thursday', etc."`;
+          return okFalse(`Invalid deadline format: ${deadline}. Use 'YYYY-MM-DD', 'tomorrow', 'next Thursday', etc.`);
         }
         finalDeadline = deadline;
       }
@@ -170,7 +171,7 @@ const previewTaskMission = new GuidedMission({
       // Validate deadline is a valid date
       const deadlineDate = new Date(finalDeadline);
       if (isNaN(deadlineDate.getTime())) {
-        return `ok=false\nerr="Invalid deadline date: ${finalDeadline}"`;
+        return okFalse(`Invalid deadline date: ${finalDeadline}`);
       }
 
       // Infer properties from task name if not provided
@@ -184,7 +185,7 @@ const previewTaskMission = new GuidedMission({
 
       // If duration isn't provided, request it from the user
       if (!finalDuration || typeof finalDuration !== "number" || isNaN(finalDuration) || finalDuration <= 0) {
-        return `ok=false\nerr="duration_required"\nmsg="Please ask the user: 'How many minutes will this task take?'"`;
+        return okFalse("duration_required", { msg: "Please ask the user: 'How many minutes will this task take?'" });
       }
 
       // Enforce effort must be provided by the assistant (LLM) — pick integer 1-5 based on duration/category
@@ -195,7 +196,9 @@ const previewTaskMission = new GuidedMission({
         finalEffort < 1 ||
         finalEffort > 5
       ) {
-        return `ok=false\nerr="effort_required"\nmsg="Assistant must select an effort (integer 1-5) based on task duration, category, and complexity, and include it in the preview_task call."`;
+        return okFalse("effort_required", {
+          msg: "Assistant must select an effort (integer 1-5) based on task duration, category, and complexity, and include it in the preview_task call.",
+        });
       }
 
       // If importance was not explicitly provided by the caller, use user's per-category priority mapping (#categories entity)
@@ -321,7 +324,7 @@ const previewTaskMission = new GuidedMission({
         );
       }
     } catch (error) {
-      return `ok=false\nerr="Failed to generate preview: ${error.message}"`;
+      return okFalse(`Failed to generate preview: ${error.message}`);
     }
   },
 });

@@ -1,4 +1,4 @@
-import { CATEGORY_STRING_VALUES } from "../config/categories.js";
+import { CATEGORY_STRING_VALUES, CATEGORY_DISPLAY_NAMES } from "../config/categories.js";
 
 /**
  * ========================================
@@ -105,13 +105,20 @@ export function inferSplittingParams(taskType, duration) {
  * Helper to generate system prompt instructions regarding task fields
  */
 export function getTaskFieldInstructions() {
+  // Build a mapping of display names to string values for the prompt
+  const categoryMapping = CATEGORY_STRING_VALUES.map(
+    (key) => `"${CATEGORY_DISPLAY_NAMES[key]}" (use: ${key})`
+  ).join(", ");
+
   return `TASK FIELDS:
 - REQUIRED: ${TASK_CONFIG.required_fields.join(", ")}
 - OPTIONAL: ${TASK_CONFIG.optional_fields.join(", ")}
 - DEFAULTS: importance=${TASK_CONFIG.defaults.importance}/5, effort=${
     TASK_CONFIG.defaults.effort
   }/5 (estimatedDuration must be provided by the user)
-- CATEGORIES: You MUST use one of these 18 categories: ${CATEGORY_STRING_VALUES.join(", ")}.
+- CATEGORIES: You MUST use one of these 18 categories: ${categoryMapping}.
+- CATEGORY USAGE: When talking to the user in conversational text, use the display names (e.g., "Study & Education", "Work & Career"). When making tool calls or populating widgets, use the string values (e.g., "study_and_education", "work_and_career").
+- INVALID CATEGORY HANDLING: If the user provides a category name not in the list, DO NOT simply list all available categories. Instead, ask if they meant to use that name as a SUBCATEGORY within a relevant main category (and suggest 1-2 likely candidates using display names).
 
 SUBCATEGORY WORKFLOW (IMPORTANT):
 1. After the user chooses or you infer a category, ALWAYS call get_subcategories(category=<category_index>) to see what subcategories the user has saved and historical task labels.

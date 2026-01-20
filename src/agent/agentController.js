@@ -10,6 +10,7 @@ import { validateToolCall, validateWidgetPayload } from "./security.js";
 import { extractWidgetFromText } from "./widgets/widgetUtils.js";
 import { PromptManager } from "./promptManager.js";
 import { TOKEN_BUDGET, LOGGING_FIELDS } from "./tokenBudget.js";
+import { okFalse, okTrue } from "./lib/errorFormatter.js";
 import { User } from "../models/index.js";
 import { config } from "../config/env.js";
 
@@ -83,17 +84,6 @@ export class AgentController {
     try {
       console.log(`[AgentController] Processing message for user: ${userId}, session: ${sessionId}`);
       let lastWidgetResult = null;
-      const captureWidgetBlock = (raw) => {
-        if (typeof raw !== "string") return null;
-        const match = raw.match(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/);
-        return match ? match[0] : null;
-      };
-      const normalizeWidgetTags = (text) => {
-        if (typeof text !== "string") return text;
-        return text.replace(/<\s*\/?\s*W[^>]*JSON\s*>/gi, (m) =>
-          m.includes("</") ? "</WIDGET_JSON>" : "<WIDGET_JSON>",
-        );
-      };
 
       // STEP 1: SAVE USER MESSAGE
       // Store the user's message in the session for later retrieval
@@ -242,85 +232,41 @@ export class AgentController {
             const callId = `direct_get_tasks_${Date.now()}`;
             let result = await getTasksTool.func({});
 
-            // Validate widget payload like normal tool execution
-            if (typeof result === "string" && result.includes("<WIDGET_JSON>")) {
-              const widgetValidation = validateWidgetPayload(result);
-              if (!widgetValidation.valid) {
-                if (
-                  widgetValidation.reason === "Empty task list" &&
-                  widgetValidation.widget?.widget_type === "task_list"
-                ) {
-                  result = `ok=true\ncount=0`;
-                } else {
-                  await memoryStore.addToolResult(
-                    sessionId,
-                    userId,
-                    callId,
-                    getTasksTool.name,
-                    `ok=false\nerr="Widget validation failed: ${widgetValidation.reason}"`,
-                  );
-                  result = `ok=false\nerr="Widget validation failed: ${widgetValidation.reason}"`;
-                }
-              }
-            }
-            const widgetBlock = captureWidgetBlock(result);
-            if (widgetBlock) {
-              lastWidgetResult = widgetBlock;
+            // Use centralized handler for widget validation/persistence and message adding
+            const processed = await this._handleToolExecutionResult(
+              sessionId,
+              userId,
+              { id: callId, name: getTasksTool.name, args: {} },
+              getTasksTool,
+              result,
+              currentMessages,
+            );
 
-              // SPECIAL CASE: If the tool result is ONLY a widget with no surrounding text,
-              // skip LLM processing and return it directly. This prevents the LLM from
-              // extracting and re-outputting the raw JSON inside the widget tags.
-              const resultWithoutWidget = result.replace(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/i, "").trim();
-              if (!resultWithoutWidget || resultWithoutWidget === "") {
+            if (processed.lastWidget) lastWidgetResult = processed.lastWidget;
+
+            if (processed.stop) {
+              // Stop means we should return the finalResponse directly (widget-only or returnDirect)
+              if (processed.finalResponse) {
                 console.log(
                   `[AgentController] get_tasks shortcut returned ONLY a widget. Skipping LLM and returning directly.`,
                 );
-                finalResponse = widgetBlock;
-                await memoryStore.addToolResult(sessionId, userId, callId, getTasksTool.name, result);
-                // Skip LLM invocation for widget-only responses
-              } else {
-                // Persist and add to messages so LLM can craft a natural response referencing it
-                await memoryStore.addToolResult(sessionId, userId, callId, getTasksTool.name, result);
-                currentMessages.push(
-                  new ToolMessage({
-                    content: result,
-                    tool_call_id: callId,
-                    name: getTasksTool.name,
-                  }),
-                );
-
-                // Extract entities from the result so recent entities are available
-                this._extractAndTrackEntities(sessionId, getTasksTool.name, {}, result);
-
-                // Let the LLM generate the final assistant message referencing the widget/tool result
-                try {
-                  const toolResponse = await llmWithTools.invoke(currentMessages);
-                  if (!(toolResponse.tool_calls && toolResponse.tool_calls.length > 0)) {
-                    finalResponse =
-                      typeof toolResponse.content === "string" ? toolResponse.content : toolResponse.text || "";
-                  } else {
-                    // If the model still asks for additional tool calls, fall back to normal loop
-                    currentMessages.push(toolResponse);
-                  }
-                } catch (err) {
-                  console.warn(
-                    `[AgentController] Shortcut LLM invoke failed, falling back to agent loop: ${err.message}`,
-                  );
-                }
+                finalResponse = processed.finalResponse;
               }
             } else {
-              // No widget found, continue with normal shortcut flow
-              await memoryStore.addToolResult(sessionId, userId, callId, getTasksTool.name, result);
-              currentMessages.push(
-                new ToolMessage({
-                  content: result,
-                  tool_call_id: callId,
-                  name: getTasksTool.name,
-                }),
-              );
-
-              // Extract entities from the result so recent entities are available
-              this._extractAndTrackEntities(sessionId, getTasksTool.name, {}, result);
+              // Otherwise, let the LLM craft a natural response referencing the added tool result
+              try {
+                const toolResponse = await llmWithTools.invoke(currentMessages);
+                if (!(toolResponse.tool_calls && toolResponse.tool_calls.length > 0)) {
+                  finalResponse =
+                    typeof toolResponse.content === "string" ? toolResponse.content : toolResponse.text || "";
+                } else {
+                  currentMessages.push(toolResponse);
+                }
+              } catch (err) {
+                console.warn(
+                  `[AgentController] Shortcut LLM invoke failed, falling back to agent loop: ${err.message}`,
+                );
+              }
             }
           }
         }
@@ -446,76 +392,23 @@ export class AgentController {
                   // Execute the tool with the arguments provided by the LLM
                   let result = await tool.func(toolCall.args);
 
-                  // ENTITY CONTEXT: Extract and track entities from tool results
-                  this._extractAndTrackEntities(sessionId, toolCall.name, toolCall.args, result);
-
-                  // If result contains a widget payload, validate it
-                  if (typeof result === "string" && result.includes("<WIDGET_JSON>")) {
-                    const widgetValidation = validateWidgetPayload(result);
-                    if (!widgetValidation.valid) {
-                      console.warn(
-                        `[AgentController] Widget validation failed for ${toolCall.name}: ${widgetValidation.reason}`,
-                      );
-
-                      // Special-case: empty task list -> return structured empty result instead of showing empty widget
-                      if (
-                        widgetValidation.reason === "Empty task list" &&
-                        widgetValidation.widget?.widget_type === "task_list"
-                      ) {
-                        console.log(`[AgentController] Replacing empty task_list widget with structured empty result`);
-                        result = `ok=true\ncount=0`;
-                      } else if (toolCall.name === "preview_task") {
-                        // For preview_task, do NOT show an invalid widget — return a friendly fallback message
-                        console.warn(`[AgentController] Replacing invalid preview_task widget with fallback message`);
-                        result =
-                          "I’m sorry — I ran into a problem generating a preview for the task. " +
-                          "I can still create the task for you with the details you provided, or make any edits you want before I create it.";
-                      } else {
-                        // Persist failure for auditing
-                        await memoryStore.addToolResult(
-                          sessionId,
-                          userId,
-                          toolCall.id,
-                          toolCall.name,
-                          `ok=false\nerr="Widget validation failed: ${widgetValidation.reason}"`,
-                        );
-                        result = `ok=false\nerr="Widget validation failed: ${widgetValidation.reason}"`;
-                      }
-                    }
-                  }
-                  const widgetBlock = captureWidgetBlock(result);
-                  if (widgetBlock) {
-                    lastWidgetResult = widgetBlock;
-
-                    // SPECIAL CASE: If the tool result is ONLY a widget with no surrounding text,
-                    // skip LLM processing and return it directly. This prevents the LLM from
-                    // extracting and re-outputting the raw JSON inside the widget tags.
-                    const resultWithoutWidget = result.replace(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/i, "").trim();
-                    if (!resultWithoutWidget || resultWithoutWidget === "") {
-                      console.log(
-                        `[AgentController] Tool ${toolCall.name} returned ONLY a widget. Skipping LLM and returning directly.`,
-                      );
-                      finalResponse = widgetBlock;
-                      await memoryStore.addToolResult(sessionId, userId, toolCall.id, toolCall.name, result);
-                      break; // Exit tool loop and skip LLM invocation
-                    }
-                  }
-
-                  // Add the tool result to the message history and persist it
-                  currentMessages.push(
-                    new ToolMessage({
-                      content: result,
-                      tool_call_id: toolCall.id,
-                      name: toolCall.name || toolCall.id || "unknown",
-                    }),
+                  // Use centralized helper to validate widget, persist results, and add messages
+                  const processed = await this._handleToolExecutionResult(
+                    sessionId,
+                    userId,
+                    toolCall,
+                    tool,
+                    result,
+                    currentMessages,
                   );
-                  await memoryStore.addToolResult(sessionId, userId, toolCall.id, toolCall.name, result);
 
-                  // CHECK FOR RETURN DIRECT
-                  if (tool.returnDirect) {
-                    console.log(`[AgentController] Tool ${toolCall.name} requested returnDirect`);
-                    finalResponse = result;
-                    break; // Break the tool loop
+                  if (processed.lastWidget) lastWidgetResult = processed.lastWidget;
+
+                  if (processed.stop) {
+                    if (processed.finalResponse) {
+                      finalResponse = processed.finalResponse;
+                    }
+                    break; // Exit tool loop and skip LLM invocation
                   }
 
                   console.log(`[AgentController] Tool ${toolCall.name} executed successfully`);
@@ -573,7 +466,7 @@ export class AgentController {
       // Store the final response in the session
       if (finalResponse) {
         finalResponse = this._sanitizeResponse(finalResponse);
-        finalResponse = normalizeWidgetTags(finalResponse);
+        finalResponse = this._normalizeWidgetTags(finalResponse);
         if (lastWidgetResult) {
           if (extractWidgetFromText(finalResponse)) {
             finalResponse = finalResponse.replace(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/i, lastWidgetResult);
@@ -782,6 +675,97 @@ export class AgentController {
     cleaned = cleaned.replace(/\n\s*\n+/g, "\n").trim();
 
     return cleaned;
+  }
+
+  // ===== Helper: capture/normalize widget strings and process tool results =====
+  _captureWidgetBlock(raw) {
+    if (typeof raw !== "string") return null;
+    const match = raw.match(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/);
+    return match ? match[0] : null;
+  }
+
+  _normalizeWidgetTags(text) {
+    if (typeof text !== "string") return text;
+    return text.replace(/<\s*\/?\s*W[^>]*JSON\s*>/gi, (m) => (m.includes("</") ? "</WIDGET_JSON>" : "<WIDGET_JSON>"));
+  }
+
+  /**
+   * Process a tool execution result: validate widgets, persist result, extract entities,
+   * and determine if we should return the widget directly (widget-only response).
+   * @private
+   */
+  async _handleToolExecutionResult(sessionId, userId, toolCall, tool, result, currentMessages) {
+    try {
+      // If result contains a widget payload, validate it
+      if (typeof result === "string" && result.includes("<WIDGET_JSON>")) {
+        const widgetValidation = validateWidgetPayload(result);
+        if (!widgetValidation.valid) {
+          // Handle empty task list -> structured empty result
+          if (widgetValidation.reason === "Empty task list" && widgetValidation.widget?.widget_type === "task_list") {
+            result = okTrue({ count: 0 });
+          } else if (toolCall.name === "preview_task") {
+            // For preview_task, return friendly fallback text
+            result =
+              "I’m sorry — I ran into a problem generating a preview for the task. " +
+              "I can still create the task for you with the details you provided, or make any edits you want before I create it.";
+          } else {
+            // Persist failure for auditing and return structured error
+            await memoryStore.addToolResult(
+              sessionId,
+              userId,
+              toolCall.id,
+              toolCall.name,
+              `ok=false\nerr="Widget validation failed: ${widgetValidation.reason}"`,
+            );
+            result = `ok=false\nerr="Widget validation failed: ${widgetValidation.reason}"`;
+          }
+        }
+      }
+
+      const widgetBlock = this._captureWidgetBlock(result);
+      if (widgetBlock) {
+        // Track last widget and check if result contains only the widget
+        const resultWithoutWidget = result.replace(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/i, "").trim();
+        if (!resultWithoutWidget || resultWithoutWidget === "") {
+          // Only widget present: persist and return widget directly
+          await memoryStore.addToolResult(sessionId, userId, toolCall.id, toolCall.name, result);
+          return { finalResponse: widgetBlock, lastWidget: widgetBlock, addedMessage: false, stop: true };
+        }
+      }
+
+      // Add the tool result to the message history and persist it
+      currentMessages.push(
+        new ToolMessage({
+          content: result,
+          tool_call_id: toolCall.id,
+          name: toolCall.name || toolCall.id || "unknown",
+        }),
+      );
+      await memoryStore.addToolResult(sessionId, userId, toolCall.id, toolCall.name, result);
+
+      // Extract and track entities from tool results
+      this._extractAndTrackEntities(sessionId, toolCall.name, toolCall.args || {}, result);
+
+      // If tool requests returnDirect, return now
+      if (tool && tool.returnDirect) {
+        return { finalResponse: result, lastWidget: null, addedMessage: true, stop: true };
+      }
+
+      return { finalResponse: null, lastWidget: widgetBlock || null, addedMessage: true, stop: false };
+    } catch (err) {
+      console.error(`[AgentController] Error processing tool result: ${err.message}`);
+      // Persist error
+      const errText = `ok=false\nerr="${err.message}"`;
+      currentMessages.push(
+        new ToolMessage({
+          content: errText,
+          tool_call_id: toolCall.id,
+          name: toolCall.name || toolCall.id || "unknown",
+        }),
+      );
+      await memoryStore.addToolResult(sessionId, userId, toolCall.id, toolCall.name, errText);
+      return { finalResponse: null, lastWidget: null, addedMessage: true, stop: false };
+    }
   }
 
   /**

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { LightMission } from "./LightMission.js";
 import * as taskService from "../../services/taskService.js";
 import { fetchScheduledSessionsByTask, getScheduleWindow } from "./taskScheduleUtils.js";
+import { okFalse, okTrue } from "../lib/errorFormatter.js";
 
 const getOverdueTasksMission = new LightMission({
   name: "get_overdue_tasks",
@@ -15,7 +16,7 @@ const getOverdueTasksMission = new LightMission({
       const tasks = await taskService.getOverdueTasks(userId);
 
       if (tasks.length === 0) {
-        return `ok=true\ncount=0`;
+        return okTrue({ count: 0 });
       }
 
       const { start, end } = getScheduleWindow(7);
@@ -57,7 +58,7 @@ const getOverdueTasksMission = new LightMission({
       const { buildWidgetString } = await import("../widgets/widgetUtils.js");
       return buildWidgetString("task_list", { tasks: widgetJson.data.tasks });
     } catch (error) {
-      return `ok=false\nerr="${error.message}"`;
+      return okFalse(error.message);
     }
   },
 });

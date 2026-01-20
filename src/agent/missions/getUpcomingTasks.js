@@ -3,6 +3,7 @@ import { LightMission } from "./LightMission.js";
 import { Task } from "../../models/Task.js";
 import { fetchScheduledSessions, getScheduleWindow, getSessionDateKey } from "./taskScheduleUtils.js";
 import { formatLocalDate } from "../../utils/dateUtils.js";
+import { okFalse, okTrue } from "../lib/errorFormatter.js";
 
 const getUpcomingTasksMission = new LightMission({
   name: "get_upcoming_tasks",
@@ -20,7 +21,7 @@ const getUpcomingTasksMission = new LightMission({
       const sessions = await fetchScheduledSessions({ userId, start, end, includeSubtasks: true });
 
       if (sessions.length === 0) {
-        return `ok=true\ncount=0`;
+        return okTrue({ count: 0 });
       }
 
       const taskIds = Array.from(new Set(sessions.map((s) => s.taskId).filter(Boolean)));
@@ -83,7 +84,7 @@ const getUpcomingTasksMission = new LightMission({
       const { buildWidgetString } = await import("../widgets/widgetUtils.js");
       return buildWidgetString("upcoming_tasks", { days, today: todayGroup, upcoming });
     } catch (error) {
-      return `ok=false\nerr="${error.message}"`;
+      return okFalse(error.message);
     }
   },
 });

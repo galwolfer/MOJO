@@ -1,13 +1,10 @@
 import { z } from "zod";
 import { LightMission } from "./LightMission.js";
-import { Task } from "../../models/Task.js";
-import { getDisplayName } from "../../config/categories.js";
 import { fetchScheduledSessionsByTask } from "./taskScheduleUtils.js";
 import { buildTaskDetailData } from "./taskPayloads.js";
-
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+import { resolveByIdOrName } from "../lib/taskResolver.js";
+import { okFalse } from "../lib/errorFormatter.js";
+import { buildWidget } from "../lib/widgetHelper.js";
 
 const getTaskDetailMission = new LightMission({
   name: "get_task_detail",
@@ -22,41 +19,16 @@ const getTaskDetailMission = new LightMission({
   execute: async ({ userId, args }) => {
     const { taskId, taskname } = args;
     try {
-      if (!taskId && !taskname) {
-        return `ok=false\nerr="task_identifier_required"`;
+      const resolved = await resolveByIdOrName(userId, { taskId, taskname });
+      if (resolved.error) {
+        if (resolved.error === "multiple_tasks_found") {
+          const list = (resolved.list || []).map((s) => `- ${s}`).join("\n");
+          return okFalse("multiple_tasks_found", { list });
+        }
+        return okFalse(resolved.error);
       }
 
-      let task = null;
-
-      if (taskId) {
-        task = await Task.findOne({ _id: taskId, userId }).lean();
-      } else if (taskname) {
-        const trimmed = taskname.trim();
-        if (!trimmed) return `ok=false\nerr="task_identifier_required"`;
-
-        let candidates = await Task.find({ userId, taskname: trimmed }).lean();
-
-        if (!candidates.length) {
-          const exact = new RegExp(`^${escapeRegExp(trimmed)}$`, "i");
-          candidates = await Task.find({ userId, taskname: exact }).lean();
-        }
-
-        if (!candidates.length) {
-          const partial = new RegExp(escapeRegExp(trimmed), "i");
-          candidates = await Task.find({ userId, taskname: partial }).lean();
-        }
-
-        if (candidates.length > 1) {
-          const list = candidates.map((c) => `- ${c.taskname} (${c._id})`).join("\n");
-          return `ok=false\nerr="multiple_tasks_found"\nlist="${list}"`;
-        }
-
-        task = candidates[0] || null;
-      }
-
-      if (!task) {
-        return `ok=false\nerr="task_not_found"`;
-      }
+      const task = resolved.task;
 
       const scheduledByTaskId = await fetchScheduledSessionsByTask({
         userId,
@@ -66,10 +38,9 @@ const getTaskDetailMission = new LightMission({
 
       const detail = buildTaskDetailData(task, scheduledByTaskId.get(task._id.toString()) || []);
 
-      const { buildWidgetString } = await import("../widgets/widgetUtils.js");
-      return buildWidgetString("task_detail", { task: detail });
+      return buildWidget("task_detail", { task: detail });
     } catch (error) {
-      return `ok=false\nerr="${error.message}"`;
+      return okFalse(error.message);
     }
   },
 });

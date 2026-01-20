@@ -6,6 +6,7 @@ import { TASK_CONFIG } from "../taskRules.js";
 import { getIllegalDisplayFields, getIllegalCharsErrorMessage } from "../../utils/illegalChars.js";
 import { fetchScheduledSessionsByTask, getScheduleWindow } from "./taskScheduleUtils.js";
 import { updateTaskViaController, saveSubcategoryToProfile } from "../missionControllerHelpers.js";
+import { okFalse, okTrue } from "../lib/errorFormatter.js";
 
 const updateTaskMission = new GuidedMission({
   name: "update_task",
@@ -74,7 +75,7 @@ const updateTaskMission = new GuidedMission({
       let resolvedTaskId = taskId;
       // Require explicit confirmation to avoid accidental changes
       if (!confirm) {
-        return `ok=false\nerr="confirmation_required"`;
+        return okFalse("confirmation_required");
       }
 
       const illegalFields = getIllegalDisplayFields({
@@ -82,19 +83,19 @@ const updateTaskMission = new GuidedMission({
         subcategory,
       });
       if (illegalFields.length > 0) {
-        return `ok=false\nerr="illegal_characters"\nmsg="${getIllegalCharsErrorMessage(illegalFields)}"`;
+        return okFalse("illegal_characters", { msg: getIllegalCharsErrorMessage(illegalFields) });
       }
 
       // If taskId not provided, try to resolve by exact task title
       if (!resolvedTaskId) {
-        if (!taskname) return `ok=false\nerr="task_identifier_required"`;
+        if (!taskname) return okFalse("task_identifier_required");
         const candidates = await taskService.getTasksForUser(userId, { taskname: taskname });
         if (!candidates || candidates.length === 0) {
-          return `ok=false\nerr="task_not_found"`;
+          return okFalse("task_not_found");
         }
         if (candidates.length > 1) {
-          const list = candidates.map((c) => `- ${c.taskname} (${c._id})`).join("\n");
-          return `ok=false\nerr="multiple_tasks_found"\nlist="${list}"`;
+          const list = candidates.map((c) => `${c.taskname} (${c._id})`);
+          return okFalse("multiple_tasks_found", { list: list.join("\n") });
         }
         resolvedTaskId = candidates[0]._id;
       }
@@ -111,7 +112,7 @@ const updateTaskMission = new GuidedMission({
       // Validate and normalize numeric and splitting-related fields similar to add_task behavior
       if (estimatedDuration !== undefined) {
         if (typeof estimatedDuration !== "number" || isNaN(estimatedDuration) || estimatedDuration <= 0) {
-          return `ok=false\nerr="Invalid estimatedDuration. Provide minutes as a positive number."`;
+          return okFalse("Invalid estimatedDuration. Provide minutes as a positive number.");
         }
         updates.estimatedDuration = estimatedDuration;
       }
@@ -169,7 +170,7 @@ const updateTaskMission = new GuidedMission({
       if (deadline !== undefined) {
         const d = new Date(deadline);
         if (isNaN(d.getTime())) {
-          return `ok=false\nerr="Invalid date format. Use ISO 8601 (YYYY-MM-DD)."`;
+          return okFalse("Invalid date format. Use ISO 8601 (YYYY-MM-DD).");
         }
         updates.dueDate = d;
       }
@@ -186,7 +187,7 @@ const updateTaskMission = new GuidedMission({
 
         // Validate endDate if provided
         if (rec.endDate && isNaN(rec.endDate.getTime())) {
-          return `ok=false\nerr="Invalid recurrence.endDate. Use ISO 8601 (YYYY-MM-DD)."`;
+          return okFalse("Invalid recurrence.endDate. Use ISO 8601 (YYYY-MM-DD).");
         }
 
         updates.recurrence = rec;
@@ -198,7 +199,7 @@ const updateTaskMission = new GuidedMission({
       const result = await updateTaskViaController(userId, resolvedTaskId, updates);
 
       if (!result) {
-        return `ok=false\nerr="task_update_failed"`;
+        return okFalse("task_update_failed");
       }
 
       const task = result;
@@ -256,7 +257,7 @@ const updateTaskMission = new GuidedMission({
       const { buildWidgetString } = await import("../widgets/widgetUtils.js");
       return buildWidgetString("task_detail", widgetJson.data);
     } catch (error) {
-      return `ok=false\nerr="${error.message}"`;
+      return okFalse(error.message);
     }
   },
 });

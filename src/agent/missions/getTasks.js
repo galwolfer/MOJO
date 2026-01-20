@@ -3,6 +3,7 @@ import { LightMission } from "./LightMission.js";
 import * as taskService from "../../services/taskService.js";
 import { fetchScheduledSessionsByTask, getScheduleWindow } from "./taskScheduleUtils.js";
 import { buildTaskDetailData } from "./taskPayloads.js";
+import { okFalse, okTrue } from "../lib/errorFormatter.js";
 
 const getTasksMission = new LightMission({
   name: "get_tasks",
@@ -35,7 +36,7 @@ const getTasksMission = new LightMission({
       const tasks = await taskService.getTasksForUser(userId, filters);
 
       if (tasks.length === 0) {
-        return `ok=true\ncount=0`;
+        return okTrue({ count: 0 });
       }
 
       // If exactly one task found, return full details using shared helper
@@ -91,7 +92,7 @@ const getTasksMission = new LightMission({
       const { buildWidgetString } = await import("../widgets/widgetUtils.js");
       return buildWidgetString("task_list", { tasks: widgetJson.data.tasks });
     } catch (error) {
-      return `ok=false\nerr="${error.message}"`;
+      return okFalse(error.message);
     }
   },
 });

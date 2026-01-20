@@ -3,6 +3,7 @@ import { LightMission } from "./LightMission.js";
 import { Task } from "../../models/Task.js";
 import { User } from "../../models/User.js";
 import { getCategoryIndex } from "../../config/categories.js";
+import { okFalse } from "../lib/errorFormatter.js";
 
 const getSubcategories = new LightMission({
   name: "get_subcategories",
@@ -44,7 +45,7 @@ const getSubcategories = new LightMission({
 
       return `ok=true\nsubcategories=${JSON.stringify(final)}`;
     } catch (error) {
-      return `ok=false\nerr="${error.message}"`;
+      return okFalse(error.message);
     }
   },
 });

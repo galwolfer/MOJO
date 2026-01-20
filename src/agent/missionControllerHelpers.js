@@ -48,6 +48,18 @@ export async function createTaskViaController(userId, taskData) {
         deadline: taskData.dueDate || taskData.deadline,
         recurrence: taskData.recurrence,
         description: taskData.description,
+        // Optional fields propagated so controller and service receive final values
+        importance: taskData.importance,
+        effort: taskData.effort,
+        estimatedDuration: taskData.estimatedDuration || taskData.duration || taskData.estimatedDuration,
+        canSplit: taskData.canSplit,
+        minChunk: taskData.minChunk,
+        chunkCount: taskData.chunkCount,
+        chunkMinutes: taskData.chunkMinutes,
+        minMinutes: taskData.minMinutes,
+        maxMinutes: taskData.maxMinutes,
+        taskType: taskData.taskType,
+        recurrence: taskData.recurrence,
       },
     };
 

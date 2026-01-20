@@ -77,9 +77,29 @@ export async function autoSaveSubcategory(userId, subcategoryName, categoryKey) 
 export async function createTask(req, res) {
   try {
     const userId = req.user.userId;
-    const { name, taskname, category, subcategory, deadline, recurrence } = req.body;
+    const {
+      name,
+      taskname,
+      category,
+      subcategory,
+      deadline,
+      recurrence,
+      // Optional mission-provided fields
+      importance,
+      effort,
+      estimatedDuration,
+      canSplit,
+      minChunk,
+      chunkCount,
+      chunkMinutes,
+      minMinutes,
+      maxMinutes,
+      taskType,
+      description: bodyDescription,
+    } = req.body;
 
     const title = (taskname || name || "").trim();
+    const descriptionValue = typeof bodyDescription === "string" ? bodyDescription : req.body.description || "";
 
     // Validation
     if (!title) {
@@ -134,6 +154,18 @@ export async function createTask(req, res) {
       subCategory: subcategory ? { label: subcategory, source: "user", confidence: 1, updatedAt: new Date() } : null,
       dueDate: deadline ? new Date(deadline) : null,
       recurrence,
+      // Pass through optional fields from mission helpers so final values are persisted
+      importance: typeof importance === "number" ? importance : undefined,
+      effort: typeof effort === "number" ? effort : undefined,
+      estimatedDuration: typeof estimatedDuration === "number" ? estimatedDuration : undefined,
+      canSplit: typeof canSplit === "boolean" ? canSplit : undefined,
+      minChunk: typeof minChunk === "number" ? minChunk : undefined,
+      chunkCount: typeof chunkCount === "number" ? chunkCount : undefined,
+      chunkMinutes: typeof chunkMinutes === "number" ? chunkMinutes : undefined,
+      minMinutes: typeof minMinutes === "number" ? minMinutes : undefined,
+      maxMinutes: typeof maxMinutes === "number" ? maxMinutes : undefined,
+      taskType: typeof taskType === "string" ? taskType : undefined,
+      description: descriptionValue,
     });
 
     // Trigger scheduler to update the plan after creating a task
