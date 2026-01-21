@@ -22,6 +22,9 @@ import {
 export interface BaseWidgetProps {
   data: Record<string, any>;
   onAction?: (actionId: string, actionData?: any) => void;
+  entranceEnabled?: boolean; // Optional signal to trigger entrance animations
+  entranceDelay?: number; // ms delay before widget entrance animation
+  entranceDuration?: number; // ms duration for widget entrance animation
 }
 
 /**
@@ -74,6 +77,9 @@ export class WidgetFactory {
 export interface WidgetRendererProps {
   widget: WidgetData;
   onAction?: (actionId: string, actionData?: any) => void;
+  entranceEnabled?: boolean;
+  entranceDelay?: number;
+  entranceDuration?: number;
 }
 
 /**
@@ -86,7 +92,13 @@ export interface WidgetRendererProps {
  * />
  * ```
  */
-export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, onAction }) => {
+export const WidgetRenderer: React.FC<WidgetRendererProps> = ({
+  widget,
+  onAction,
+  entranceEnabled,
+  entranceDelay,
+  entranceDuration,
+}) => {
   const Component = WidgetFactory.getComponent(widget.widget_type);
 
   if (!Component) {
@@ -94,7 +106,20 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, onAction
     return null;
   }
 
-  return <Component data={widget.data} onAction={onAction} />;
+  // Debug: forward entrance props to component
+  console.warn(
+    `[WidgetRenderer] forwarding entranceEnabled=${String(entranceEnabled)} delay=${entranceDelay} duration=${entranceDuration} to ${widget.widget_type}`,
+  );
+
+  return (
+    <Component
+      data={widget.data}
+      onAction={onAction}
+      entranceEnabled={entranceEnabled}
+      entranceDelay={entranceDelay}
+      entranceDuration={entranceDuration}
+    />
+  );
 };
 
 export default WidgetRenderer;

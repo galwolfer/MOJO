@@ -17,8 +17,8 @@
  * </Widget>
  * ```
  */
-import React, { useEffect, useRef } from "react";
-import { View, StyleSheet, Animated, Easing, StyleProp, ViewStyle } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { View, StyleSheet, Animated, Easing, StyleProp, ViewStyle, Text } from "react-native";
 import { COLORS, SPACING } from "../../theme";
 
 type WidgetProps = {
@@ -56,6 +56,8 @@ const Widget: React.FC<WidgetProps> = ({
   // If not mounted yet, render nothing (prevents early flash / layout shift)
   if (!mounted) return null;
 
+  const [animating, setAnimating] = useState(false);
+
   const opacity = useRef(new Animated.Value(skipAnimation ? 1 : 0)).current;
   const translateY = useRef(new Animated.Value(skipAnimation ? 0 : 8)).current;
 
@@ -64,6 +66,7 @@ const Widget: React.FC<WidgetProps> = ({
     if (skipAnimation) {
       opacity.setValue(1);
       translateY.setValue(0);
+      setAnimating(false);
       return;
     }
 
@@ -71,6 +74,7 @@ const Widget: React.FC<WidgetProps> = ({
       // If entrance is not enabled but we are mounted, make it visible immediately
       opacity.setValue(1);
       translateY.setValue(0);
+      setAnimating(false);
       return;
     }
 
@@ -78,6 +82,9 @@ const Widget: React.FC<WidgetProps> = ({
     // Reset values to start state
     opacity.setValue(0);
     translateY.setValue(8);
+
+    console.log(`[Widget] entranceEnabled changed -> animating (delay=${entranceDelay}, duration=${entranceDuration})`);
+    setAnimating(true);
 
     Animated.parallel([
       Animated.timing(opacity, {
@@ -94,7 +101,10 @@ const Widget: React.FC<WidgetProps> = ({
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
-    ]).start();
+    ]).start(() => {
+      console.log("[Widget] animation complete");
+      setAnimating(false);
+    });
   }, [entranceEnabled, entranceDelay, entranceDuration, skipAnimation, opacity, translateY]);
 
   return (
@@ -109,6 +119,11 @@ const Widget: React.FC<WidgetProps> = ({
       ]}
     >
       {children}
+      {animating ? (
+        <View style={styles.debugBadge} pointerEvents="none">
+          <Text style={styles.debugBadgeText}>anim</Text>
+        </View>
+      ) : null}
     </Animated.View>
   );
 };
@@ -119,6 +134,21 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white3,
     borderRadius: SPACING.lg,
     padding: SPACING.lg,
+  },
+  debugBadge: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    backgroundColor: "rgba(255,0,0,0.85)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    zIndex: 2000,
+  },
+  debugBadgeText: {
+    color: COLORS.colorWhite,
+    fontSize: 10,
+    fontWeight: "700",
   },
 });
 

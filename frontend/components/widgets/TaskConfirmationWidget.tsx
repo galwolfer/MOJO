@@ -3,7 +3,7 @@
  * Displays task details for user confirmation before creating/updating
  */
 
-import React from "react";
+import React, { useEffect } from "react";
 import { View, StyleSheet, ScrollView } from "react-native";
 import AppText from "../common/AppText";
 import { COLORS, SPACING } from "../../theme";
@@ -86,12 +86,23 @@ interface Subtask {
  * TaskConfirmationWidget - Renders task details for confirmation
  * Note: data comes directly from the widget, no nested 'task' object
  */
-const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({ data }) => {
+const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
+  data,
+  entranceEnabled,
+  entranceDelay,
+  entranceDuration,
+}) => {
   // Data is passed directly - use as TaskData
   const task: TaskData = data as TaskData;
 
+  useEffect(() => {
+    console.log(
+      `[TaskConfirmationWidget] entranceEnabled=${entranceEnabled} delay=${entranceDelay} duration=${entranceDuration}`,
+    );
+  }, [entranceEnabled, entranceDelay, entranceDuration]);
+
   return (
-    <Widget skipAnimation>
+    <Widget entranceEnabled={entranceEnabled} entranceDelay={entranceDelay} entranceDuration={entranceDuration}>
       <ScrollView style={styles.container} nestedScrollEnabled={true} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>

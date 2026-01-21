@@ -72,7 +72,13 @@ interface TaskDetail {
 /**
  * TaskDetailWidget - Renders detailed view of a single task
  */
-const TaskDetailWidget: React.FC<BaseWidgetProps> = ({ data, onAction, entranceEnabled }) => {
+const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
+  data,
+  onAction,
+  entranceEnabled,
+  entranceDelay,
+  entranceDuration,
+}) => {
   const task: TaskDetail = data.task || data;
   const { notifyTaskUpdate } = useTaskContext();
 
@@ -141,8 +147,12 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({ data, onAction, entranceE
 
   const categoryMeta = getCategoryMeta(task.category);
 
+  useEffect(() => {
+    console.log(`[TaskDetailWidget] entranceEnabled=${entranceEnabled}`);
+  }, [entranceEnabled]);
+
   return (
-    <Widget entranceEnabled={entranceEnabled} entranceDelay={150} entranceDuration={200}>
+    <Widget entranceEnabled={entranceEnabled} entranceDelay={entranceDelay} entranceDuration={entranceDuration}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
