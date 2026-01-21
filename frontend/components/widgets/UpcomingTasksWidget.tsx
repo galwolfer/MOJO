@@ -10,7 +10,7 @@ import AppText from "../common/AppText";
 import Widget from "../special/Widget";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
 import { COLORS, SPACING } from "../../theme";
-import { updateSubTaskStatus } from "../../services/taskService";
+import { updateSubTask } from "../../services/taskService"; 
 import { useTaskContext } from "../../context/TaskContext";
 import { Checkbox } from "../icons/Checkbox";
 
@@ -130,7 +130,7 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
     setLoadingParts((prev) => new Set(prev).add(key));
 
     try {
-      const success = await updateSubTaskStatus(taskId, key, nextCompleted ? "done" : "todo");
+      const success = await updateSubTask(taskId, key, { status: nextCompleted ? "done" : "todo" });
       if (!success) {
         throw new Error("Update failed");
       }

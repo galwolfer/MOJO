@@ -66,6 +66,20 @@ const router = Router();
 router.use(requireAuth);
 
 /* ─────────────────────────────────────────────────────────────────────────
+   TASK SUGGESTIONS
+   AI-powered suggestions for task categorization
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Suggest category and subcategory based on task name
+ * POST /api/tasks/suggest-category
+ * Body: { taskname: string }
+ * 
+ * Returns suggested category and subcategory for autofill
+ */
+router.post("/suggest-category", taskController.suggestCategory);
+
+/* ─────────────────────────────────────────────────────────────────────────
    SUBCATEGORY MANAGEMENT
    User-defined subcategories for personalized task organization
    ───────────────────────────────────────────────────────────────────────── */

@@ -56,12 +56,6 @@ function AppContent() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={outerStyle} onLayout={onLayoutRootView}>
-        {/* If user is logged in, we delegate full control to MainLayout which includes the frame logic internally if needed, 
-            OR we wrap it here. 
-            MainLayout currently implements the frame logic itself. So we should just render it directly if user is logged in.
-            However, AuthScreen needs the frame too.
-        */}
-
         {user ? (
           <MainLayout />
         ) : (

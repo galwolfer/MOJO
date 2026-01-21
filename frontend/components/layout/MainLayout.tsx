@@ -15,6 +15,7 @@ import NavBar from "../common/NavBar";
 import ChatScreen from "../../screens/chat/Chat";
 import CalendarScreen from "../../screens/Calendar";
 import UserProfileScreen from "../../screens/user/UserProfile";
+import CreateTaskScreen from "../../screens/CreateTask";
 import { COLORS, SPACING } from "../../theme";
 import { useKeyboard } from "../../hooks";
 
@@ -59,6 +60,8 @@ export default function MainLayout() {
         return <CalendarScreen />;
       case "user":
         return <UserProfileScreen />;
+      case "create":
+        return <CreateTaskScreen />;
       default:
         return <ChatScreen />;
     }

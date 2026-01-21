@@ -11,7 +11,7 @@ import { COLORS, SPACING } from "../../theme";
 import Widget from "../special/Widget";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
 import { Checkbox } from "../icons/Checkbox";
-import { updateSubTaskStatus } from "../../services/taskService";
+import { updateSubTask } from "../../services/taskService"; 
 import { useTaskContext } from "../../context/TaskContext";
 
 interface TaskDetail {
@@ -125,7 +125,7 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
     setLoadingParts((prev) => new Set(prev).add(subtaskId));
 
     try {
-      const success = await updateSubTaskStatus(task.id, subtaskId, nextCompleted ? "done" : "todo");
+      const success = await updateSubTask(task.id, subtaskId, { status: nextCompleted ? "done" : "todo" });
       if (!success) throw new Error("Update failed");
 
       notifyTaskUpdate();
