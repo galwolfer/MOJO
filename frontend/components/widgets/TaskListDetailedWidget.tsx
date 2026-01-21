@@ -51,12 +51,14 @@ const TaskListDetailedWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) =
 
   const getStatusColor = (status?: string) => {
     switch (status?.toLowerCase()) {
+      case "done":
       case "completed":
         return COLORS.primary6;
       case "in_progress":
       case "in progress":
         return COLORS.primary1;
       case "pending":
+      case "todo":
         return COLORS.primary5;
       default:
         return COLORS.darkGray;

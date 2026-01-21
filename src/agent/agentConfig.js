@@ -29,6 +29,7 @@ export function getWidgetPromptInstructions() {
   );
   lines.push("- Copy tool-returned <WIDGET_JSON>... content exactly.");
   lines.push("- Do not repeat task details in text; the widget handles that.");
+  lines.push('- For task displays, use widget_type "list" (task_confirmation is the only exception).');
   lines.push("");
   lines.push("WIDGET TYPES:");
 

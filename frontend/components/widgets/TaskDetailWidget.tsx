@@ -3,13 +3,16 @@
  * Displays detailed information about a single task
  */
 
-import React from "react";
-import { View, StyleSheet } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, StyleSheet, TouchableOpacity } from "react-native";
 import AppText from "../common/AppText";
 import AppButton from "../common/AppButton";
 import { COLORS, SPACING } from "../../theme";
 import Widget from "../special/Widget";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
+import { Checkbox } from "../icons/Checkbox";
+import { updateSubTaskStatus } from "../../services/taskService";
+import { useTaskContext } from "../../context/TaskContext";
 
 interface TaskDetail {
   id: string;
@@ -56,8 +59,10 @@ interface ScheduledSession {
   end?: string;
   status?: string;
   subtaskIndex?: number;
+  subtaskId?: string;
   subtaskTitle?: string;
-}
+  subtaskStatus?: string;
+} 
 
 interface Subtask {
   id?: string;
@@ -74,6 +79,80 @@ interface Subtask {
  */
 const TaskDetailWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
   const task: TaskDetail = data.task || data;
+  const { notifyTaskUpdate } = useTaskContext();
+
+  const [completedParts, setCompletedParts] = useState<Set<string>>(new Set());
+  const [loadingParts, setLoadingParts] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const completed = new Set<string>();
+    (task.subtasks || []).forEach((st) => {
+      if (st.id && (st.completed || st.status === "done" || st.status === "completed")) {
+        completed.add(st.id);
+      }
+    });
+    (task.scheduledSessions || []).forEach((s) => {
+      const sid = (s as any).subtaskId;
+      if (sid && (((s as any).subtaskStatus === "done") || s.status === "completed")) {
+        completed.add(sid);
+      }
+    });
+    setCompletedParts(completed);
+  }, [task]);
+
+  const getSubtaskIdFromSession = (session?: ScheduledSession) => {
+    if (!session) return undefined;
+    if ((session as any).subtaskId) return (session as any).subtaskId;
+    if (typeof session.subtaskIndex === "number" && task.subtasks) {
+      const found = task.subtasks.find((st) => st.order === session.subtaskIndex || st.order === session.subtaskIndex);
+      return found?.id;
+    }
+    return undefined;
+  };
+
+  const handleToggleSubtask = async (subtaskId?: string) => {
+    if (!subtaskId) return;
+    const isCompleted = completedParts.has(subtaskId);
+    const nextCompleted = !isCompleted;
+
+    setCompletedParts((prev) => {
+      const updated = new Set(prev);
+      if (nextCompleted) updated.add(subtaskId);
+      else updated.delete(subtaskId);
+      return updated;
+    });
+
+    setLoadingParts((prev) => new Set(prev).add(subtaskId));
+
+    try {
+      const success = await updateSubTaskStatus(task.id, subtaskId, nextCompleted ? "done" : "todo");
+      if (!success) throw new Error("Update failed");
+
+      notifyTaskUpdate();
+      onAction?.("subtask_toggled", { taskId: task.id, subtaskId, completed: nextCompleted });
+    } catch (error) {
+      // revert
+      setCompletedParts((prev) => {
+        const updated = new Set(prev);
+        if (isCompleted) updated.add(subtaskId);
+        else updated.delete(subtaskId);
+        return updated;
+      });
+    } finally {
+      setLoadingParts((prev) => {
+        const updated = new Set(prev);
+        updated.delete(subtaskId);
+        return updated;
+      });
+    }
+  };
+
+  const sessionSubtaskIds = new Set<string>();
+  (task.scheduledSessions || []).forEach((s) => {
+    const id = getSubtaskIdFromSession(s);
+    if (id) sessionSubtaskIds.add(id);
+  });
+  const remainingSubtasks = (task.subtasks || []).filter((st) => !sessionSubtaskIds.has(st.id || ""));
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return "Not set";
@@ -125,12 +204,14 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
 
   const getStatusStyle = (status?: string) => {
     switch (status?.toLowerCase()) {
+      case "done":
       case "completed":
         return COLORS.primary6;
       case "in_progress":
       case "in progress":
         return COLORS.primary1;
       case "pending":
+      case "todo":
         return COLORS.primary5;
       default:
         return COLORS.darkGray;
@@ -345,71 +426,94 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
               📅 Scheduled Sessions
             </AppText>
             <View style={styles.scheduleList}>
-              {task.scheduledSessions.map((session, index) => (
-                <View key={session.id || session.start || `session-${index}`} style={styles.scheduleCard}>
-                  <View style={styles.scheduleHeader}>
-                    <AppText variant="bodyText" style={styles.scheduleLabel}>
-                      {getSessionLabel(session, index)}
-                    </AppText>
-                    {session.status && (
-                      <View style={[styles.sessionStatusBadge, { backgroundColor: getStatusStyle(session.status) }]}>
-                        <AppText variant="notes" style={styles.sessionStatusText}>
-                          {session.status}
+              {task.scheduledSessions.map((session, index) => {
+                const subtaskId = getSubtaskIdFromSession(session);
+                const isDone = subtaskId ? completedParts.has(subtaskId) : false;
+                const canToggle = Boolean(subtaskId);
+
+                return (
+                  <TouchableOpacity
+                    key={session.id || session.start || `session-${index}`}
+                    style={[styles.scheduleCard, (!canToggle || loadingParts.has(subtaskId || "")) && styles.disabled]}
+                    activeOpacity={0.7}
+                    disabled={!canToggle || loadingParts.has(subtaskId || "")}
+                    onPress={() => canToggle && handleToggleSubtask(subtaskId)}
+                    accessibilityRole="button"
+                  >
+                    <View style={styles.scheduleHeader}>
+                      <View style={styles.scheduleLabelContainer}>
+                        {subtaskId ? (
+                          <Checkbox checked={isDone} onChange={() => canToggle && handleToggleSubtask(subtaskId)} size={18} />
+                        ) : null}
+                        <AppText variant="bodyText" style={styles.scheduleLabel}>
+                          {getSessionLabel(session, index)}
                         </AppText>
                       </View>
-                    )}
-                  </View>
-                  <AppText variant="notes" style={styles.scheduleDateTime}>
-                    {formatDateTime(session.start)}
-                  </AppText>
-                  {session.end && (
-                    <AppText variant="notes" style={styles.scheduleTime}>
-                      Duration: {formatTimeRange(session)}
+
+                      {session.status && (
+                        <View style={[styles.sessionStatusBadge, { backgroundColor: getStatusStyle(session.status) }]}>
+                          <AppText variant="notes" style={styles.sessionStatusText}>
+                            {session.status}
+                          </AppText>
+                        </View>
+                      )}
+                    </View>
+                    <AppText variant="notes" style={styles.scheduleDateTime}>
+                      {formatDateTime(session.start)}
                     </AppText>
-                  )}
-                </View>
-              ))}
+                    {session.end && (
+                      <AppText variant="notes" style={styles.scheduleTime}>
+                        Duration: {formatTimeRange(session)}
+                      </AppText>
+                    )}
+                  </TouchableOpacity>
+                );
+              })} 
             </View>
           </View>
         )}
 
         {/* Subtasks */}
-        {task.subtasks && task.subtasks.length > 0 && (
+        {remainingSubtasks && remainingSubtasks.length > 0 && (
           <View style={styles.section}>
             <AppText variant="title3" style={styles.sectionTitle}>
-              ✓ Subtasks ({task.subtasks.filter((st) => st.completed || st.status === "completed").length}/
-              {task.subtasks.length})
+              ✓ Subtasks ({(task.subtasks || []).filter((st) => st.completed || st.status === "completed" || st.status === "done").length}/{(task.subtasks || []).length})
             </AppText>
             <View style={styles.subtaskList}>
-              {task.subtasks.map((subtask, index) => (
-                <View key={subtask.id || `subtask-${index}`} style={styles.subtaskCard}>
-                  <View style={styles.subtaskHeader}>
-                    <AppText
-                      variant="bodyText"
-                      style={[
-                        styles.subtaskTitle,
-                        (subtask.completed || subtask.status === "completed") && styles.subtaskCompleted,
-                      ]}
-                    >
-                      {subtask.completed || subtask.status === "completed" ? "✓ " : "○ "}
-                      {subtask.title}
-                    </AppText>
-                  </View>
-                  {subtask.description && (
-                    <AppText variant="notes" style={styles.subtaskDescription}>
-                      {subtask.description}
-                    </AppText>
-                  )}
-                  {subtask.duration && (
-                    <AppText variant="notes" style={styles.subtaskDuration}>
-                      ⏱️ {formatDuration(subtask.duration)}
-                    </AppText>
-                  )}
-                </View>
-              ))}
+              {remainingSubtasks.map((subtask, index) => {
+                const id = subtask.id;
+                const isDone = id ? completedParts.has(id) : subtask.completed || subtask.status === "done" || subtask.status === "completed";
+                return (
+                  <TouchableOpacity
+                    key={subtask.id || `subtask-${index}`}
+                    style={[styles.subtaskCard, loadingParts.has(id || "") && styles.disabled]}
+                    activeOpacity={0.7}
+                    disabled={loadingParts.has(id || "")}
+                    onPress={() => id && handleToggleSubtask(id)}
+                    accessibilityRole="button"
+                  >
+                    <View style={styles.subtaskRow}>
+                      <Checkbox checked={isDone} onChange={() => id && handleToggleSubtask(id)} size={18} />
+                      <AppText variant="bodyText" style={[styles.subtaskTitle, isDone && styles.subtaskCompleted]}>
+                        {subtask.title}
+                      </AppText>
+                    </View>
+                    {subtask.description && (
+                      <AppText variant="notes" style={styles.subtaskDescription}>
+                        {subtask.description}
+                      </AppText>
+                    )}
+                    {subtask.duration && (
+                      <AppText variant="notes" style={styles.subtaskDuration}>
+                        ⏱️ {formatDuration(subtask.duration)}
+                      </AppText>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
-        )}
+        )} 
 
         {/* Notes */}
         {task.notes && (
@@ -493,9 +597,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 4,
   },
+  scheduleLabelContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+  },
   scheduleLabel: {
     fontWeight: "600",
     flex: 1,
+  },
+  subtaskRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
   },
   scheduleDateTime: {
     color: COLORS.primary1,
@@ -552,6 +666,9 @@ const styles = StyleSheet.create({
     color: COLORS.primary1,
     fontSize: 11,
     marginTop: 4,
+  },
+  disabled: {
+    opacity: 0.6,
   },
   // actions and actionButton styles removed while buttons are disabled
 });

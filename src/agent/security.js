@@ -93,6 +93,21 @@ export function validateWidgetPayload(raw) {
     }
   }
 
+  if (payload.widget_type === "list") {
+    const listType = payload.data?.listType || payload.data?.list_type;
+    if (!listType) {
+      return { valid: false, reason: "list payload missing listType" };
+    }
+    if (listType === "task_detail") {
+      const hasTaskId = Boolean(payload.data?.taskId);
+      const hasTaskRef =
+        Array.isArray(payload.data?.tasks) && payload.data.tasks.some((t) => t && (t.id || t.title));
+      if (!hasTaskId && !hasTaskRef) {
+        return { valid: false, reason: "task_detail list missing taskId or task ref" };
+      }
+    }
+  }
+
   // Reject empty task lists to avoid showing widgets with no useful data
   if (payload.widget_type === "task_list") {
     if (!payload.data || !Array.isArray(payload.data.tasks)) {

@@ -12,6 +12,7 @@ import { BaseWidgetProps } from "../../utils/widgetFactory";
 import { COLORS, SPACING } from "../../theme";
 import { updateSubTaskStatus } from "../../services/taskService";
 import { useTaskContext } from "../../context/TaskContext";
+import { Checkbox } from "../icons/Checkbox";
 
 type ScheduledSession = {
   id?: string;
@@ -129,7 +130,7 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
     setLoadingParts((prev) => new Set(prev).add(key));
 
     try {
-      const success = await updateSubTaskStatus(taskId, session.subtaskId, nextCompleted ? "done" : "todo");
+      const success = await updateSubTaskStatus(taskId, key, nextCompleted ? "done" : "todo");
       if (!success) {
         throw new Error("Update failed");
       }
@@ -170,7 +171,7 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
               {progressValue}
             </AppText>
             <AppText variant="notes" style={styles.ratingLabel}>
-              PROG
+              {"PROG"}
             </AppText>
           </View>
           <View style={styles.taskInfo}>
@@ -188,10 +189,13 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
         {sessions.length > 0 && (
           <View style={styles.sessionList}>
             {sessions.map((session) => {
-              const key = session.subtaskId || session.id || `${task.id}-${session.start}`;
-              const isDone = session.subtaskId ? completedParts.has(session.subtaskId) : false;
-              const canToggle = allowToggle && Boolean(session.subtaskId);
-              const isLoading = session.subtaskId ? loadingParts.has(session.subtaskId) : false;
+              const key = session.id || session.subtaskId || `${task.id}-${session.start}`;
+              const isDone = session.subtaskId ? completedParts.has(session.subtaskId) : session.status === "completed";
+              const canToggle = Boolean(session.subtaskId) || Boolean(session.id);
+              const isLoading =
+                (session.subtaskId && loadingParts.has(session.subtaskId)) ||
+                (session.id && loadingParts.has(session.id)) ||
+                false;
 
               return (
                 <TouchableOpacity
@@ -201,18 +205,16 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
                   activeOpacity={0.7}
                   disabled={!canToggle || isLoading}
                 >
-                  <View
-                    style={[
-                      styles.partCheckbox,
-                      isDone && styles.partCheckboxDone,
-                      !canToggle && styles.partCheckboxDisabled,
-                    ]}
+                  <Checkbox
+                    checked={isDone}
+                    onChange={() => canToggle && handleToggleSession(task.id, session)}
+                    size={18}
                   />
                   <View style={styles.sessionInfo}>
                     <AppText variant="notes" style={styles.sessionTime}>
                       {formatTimeRange(session)}
                     </AppText>
-                    <AppText variant="bodyText" style={styles.sessionLabel}>
+                    <AppText variant="bodyText" style={[styles.sessionLabel, isDone && styles.sessionLabelDone]}>
                       {getSessionLabel(session)}
                     </AppText>
                   </View>
@@ -224,7 +226,7 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
 
         {sessions.length === 0 && (
           <AppText variant="notes" style={styles.emptySessions}>
-            No scheduled sessions
+            {"No scheduled sessions"}
           </AppText>
         )}
       </View>
@@ -237,26 +239,26 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
         <View style={styles.header}>
           <View>
             <AppText variant="title3" style={styles.headerTitle}>
-              Upcoming Tasks
+              {"Upcoming Tasks"}
             </AppText>
             <AppText variant="notes" style={styles.headerSubtitle}>
-              Scheduled for {daysLabel}
+              {"Scheduled for " + daysLabel}
             </AppText>
           </View>
           <View style={styles.headerBadge}>
             <AppText variant="notes" style={styles.headerBadgeText}>
-              {totalToday} today
+              {totalToday + " today"}
             </AppText>
           </View>
         </View>
 
         <View style={styles.dayGroup}>
           <AppText variant="notes" style={styles.sectionTitle}>
-            Today
+            {"Today"}
           </AppText>
           {totalToday === 0 ? (
             <AppText variant="notes" style={styles.emptyText}>
-              No tasks scheduled for today
+              {"No tasks scheduled for today"}
             </AppText>
           ) : (
             (todayGroup.tasks || []).map((task) => renderTaskCard(task, true))
@@ -270,7 +272,7 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
             </AppText>
             {(group.tasks || []).length === 0 ? (
               <AppText variant="notes" style={styles.emptyText}>
-                No scheduled tasks
+                {"No scheduled tasks"}
               </AppText>
             ) : (
               (group.tasks || []).map((task) => renderTaskCard(task, false))
@@ -378,6 +380,19 @@ const styles = StyleSheet.create({
   },
   sessionRowDisabled: {
     opacity: 0.6,
+  },
+  sessionCheckContainer: {
+    width: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sessionDetails: {
+    flex: 1,
+    gap: 2,
+  },
+  sessionLabelDone: {
+    textDecorationLine: "line-through",
+    color: COLORS.darkGray,
   },
   partCheckbox: {
     width: 18,

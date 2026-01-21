@@ -1,11 +1,10 @@
 import { z } from "zod";
 import { GuidedMission } from "./GuidedMission.js";
 import * as taskService from "../../services/taskService.js";
-import { CATEGORY_STRING_VALUES, getDisplayName } from "../../config/categories.js";
+import { CATEGORY_STRING_VALUES } from "../../config/categories.js";
 import { TASK_CONFIG } from "../taskRules.js";
 import { getIllegalDisplayFields, getIllegalCharsErrorMessage } from "../../utils/illegalChars.js";
-import { fetchScheduledSessionsByTask, getScheduleWindow } from "./taskScheduleUtils.js";
-import { updateTaskViaController, saveSubcategoryToProfile } from "../missionControllerHelpers.js";
+import { updateTaskViaController } from "../missionControllerHelpers.js";
 import { okFalse, okTrue } from "../lib/errorFormatter.js";
 
 const updateTaskMission = new GuidedMission({
@@ -17,7 +16,7 @@ const updateTaskMission = new GuidedMission({
     "If changing category: call get_subcategories(category=<new>) first.",
     "Require confirm=true before applying updates.",
   ],
-  widgets: ["task_detail"],
+  widgets: ["list"],
   schema: z.object({
     taskId: z.string().optional(),
     taskname: z.string().optional().describe("Task title to identify task when taskId is not provided"),
@@ -203,59 +202,17 @@ const updateTaskMission = new GuidedMission({
       }
 
       const task = result;
-      const { start, end } = getScheduleWindow(7);
-      const scheduledByTaskId = await fetchScheduledSessionsByTask({
-        userId,
-        taskIds: [task._id],
-        start,
-        end,
-      });
-
-      // Construct task_detail widget to show the updated task
+      const id = task._id?.toString ? task._id.toString() : task._id;
+      const title = task.taskname;
       const widgetJson = {
-        version: "1.0",
-        widget_type: "task_detail",
-        data: {
-          task: {
-            id: task._id,
-            title: task.taskname,
-            description: task.description,
-            status: task.status,
-            dueDate: task.dueDate ? new Date(task.dueDate).toISOString() : null,
-            // Provide aliases and full splitting fields so widgets can display everything
-            taskname: task.taskname,
-            deadline: task.dueDate ? new Date(task.dueDate).toISOString().split("T")[0] : null,
-            estimatedDuration: task.estimatedDuration,
-            duration: task.estimatedDuration,
-            importance: task.importance,
-            effort: task.effort,
-            priorityScore: task.priorityScore || 0,
-            progressPercentage: task.progressPercentage ?? 0,
-            taskType: task.taskType || null,
-            minChunk: task.minChunk !== undefined ? task.minChunk : null,
-            chunkCount: task.chunkCount !== undefined ? task.chunkCount : null,
-            chunkMinutes: task.chunkMinutes !== undefined ? task.chunkMinutes : null,
-            minMinutes: task.minMinutes !== undefined ? task.minMinutes : null,
-            maxMinutes: task.maxMinutes !== undefined ? task.maxMinutes : null,
-            earliestStart: task.earliestStart
-              ? task.earliestStart instanceof Date
-                ? task.earliestStart.toISOString().split("T")[0]
-                : task.earliestStart
-              : null,
-            subCategory: task.subCategory || null,
-            category: task.category,
-            categoryDisplay: getDisplayName(task.category),
-            subcategoryDisplay: task.subCategory ? task.subCategory.label : null,
-            subcategory: task.subCategory ? task.subCategory.label : null,
-            canSplit: task.canSplit,
-            tags: task.tags || null,
-            scheduledSessions: scheduledByTaskId.get(task._id.toString()) || [],
-          },
-        },
+        listType: "task_detail",
+        taskId: id,
+        title,
+        tasks: [{ id, title }],
       };
 
       const { buildWidgetString } = await import("../widgets/widgetUtils.js");
-      return buildWidgetString("task_detail", widgetJson.data);
+      return buildWidgetString("list", widgetJson);
     } catch (error) {
       return okFalse(error.message);
     }

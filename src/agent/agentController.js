@@ -816,7 +816,16 @@ export class AgentController {
       // Task detail - track the shown task
       if (toolName === "get_task_detail") {
         const widget = extractWidgetFromText(result);
-        if (widget?.data?.task?.id && widget?.data?.task?.title) {
+        if (widget?.widget_type === "list") {
+          const listType = widget.data?.listType || widget.data?.list_type;
+          if (listType === "task_detail") {
+            const id = widget.data?.taskId || widget.data?.tasks?.[0]?.id;
+            const title = widget.data?.title || widget.data?.tasks?.[0]?.title;
+            if (id && title) {
+              memoryStore.addSessionEntity(sessionId, "task", id, title, { action: "detailed" });
+            }
+          }
+        } else if (widget?.data?.task?.id && widget?.data?.task?.title) {
           memoryStore.addSessionEntity(sessionId, "task", widget.data.task.id, widget.data.task.title, {
             action: "detailed",
             status: widget.data.task.status,
@@ -829,18 +838,32 @@ export class AgentController {
       if (toolName === "get_tasks" || toolName === "get_upcoming_tasks" || toolName === "get_overdue_tasks") {
         const widget = extractWidgetFromText(result);
         const taskBuckets = [];
-        if (widget?.data?.tasks && Array.isArray(widget.data.tasks)) {
-          taskBuckets.push(widget.data.tasks);
-        }
-        if (widget?.data?.today?.tasks && Array.isArray(widget.data.today.tasks)) {
-          taskBuckets.push(widget.data.today.tasks);
-        }
-        if (widget?.data?.upcoming && Array.isArray(widget.data.upcoming)) {
-          widget.data.upcoming.forEach((group) => {
-            if (group?.tasks && Array.isArray(group.tasks)) {
-              taskBuckets.push(group.tasks);
+        if (widget?.widget_type === "list") {
+          if (widget?.data?.tasks && Array.isArray(widget.data.tasks)) {
+            taskBuckets.push(widget.data.tasks);
+          }
+          const listType = widget.data?.listType || widget.data?.list_type;
+          if (listType === "task_detail") {
+            const id = widget.data?.taskId;
+            const title = widget.data?.title;
+            if (id && title) {
+              memoryStore.addSessionEntity(sessionId, "task", id, title, { action: "listed" });
             }
-          });
+          }
+        } else {
+          if (widget?.data?.tasks && Array.isArray(widget.data.tasks)) {
+            taskBuckets.push(widget.data.tasks);
+          }
+          if (widget?.data?.today?.tasks && Array.isArray(widget.data.today.tasks)) {
+            taskBuckets.push(widget.data.today.tasks);
+          }
+          if (widget?.data?.upcoming && Array.isArray(widget.data.upcoming)) {
+            widget.data.upcoming.forEach((group) => {
+              if (group?.tasks && Array.isArray(group.tasks)) {
+                taskBuckets.push(group.tasks);
+              }
+            });
+          }
         }
 
         if (taskBuckets.length > 0) {

@@ -1,7 +1,5 @@
 import { z } from "zod";
 import { LightMission } from "./LightMission.js";
-import { fetchScheduledSessionsByTask } from "./taskScheduleUtils.js";
-import { buildTaskDetailData } from "./taskPayloads.js";
 import { resolveByIdOrName } from "../lib/taskResolver.js";
 import { okFalse } from "../lib/errorFormatter.js";
 import { buildWidget } from "../lib/widgetHelper.js";
@@ -11,7 +9,7 @@ const getTaskDetailMission = new LightMission({
   group: "task",
   description: "Return detailed information for a single task. Keep message brief - widget shows details.",
   missionInfo: "Task details. If multiple tasks match, ask user to clarify which one.",
-  widgets: ["task_detail"],
+  widgets: ["list"],
   schema: z.object({
     taskId: z.string().optional(),
     taskname: z.string().optional().describe("Task title to identify the task when taskId is not provided"),
@@ -29,16 +27,15 @@ const getTaskDetailMission = new LightMission({
       }
 
       const task = resolved.task;
+      const id = task._id?.toString ? task._id.toString() : task._id;
+      const title = task.taskname;
 
-      const scheduledByTaskId = await fetchScheduledSessionsByTask({
-        userId,
-        taskIds: [task._id],
-        includeSubtasks: true,
+      return buildWidget("list", {
+        listType: "task_detail",
+        taskId: id,
+        title,
+        tasks: [{ id, title }],
       });
-
-      const detail = buildTaskDetailData(task, scheduledByTaskId.get(task._id.toString()) || []);
-
-      return buildWidget("task_detail", { task: detail });
     } catch (error) {
       return okFalse(error.message);
     }

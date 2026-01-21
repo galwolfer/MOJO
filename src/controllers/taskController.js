@@ -199,7 +199,7 @@ export async function createTask(req, res) {
 export async function getTasks(req, res) {
   try {
     const userId = req.user.userId;
-    const { tag, category, completed, dueBefore, dueAfter } = req.query;
+    const { tag, category, completed, dueBefore, dueAfter, search } = req.query;
 
     // Build filters
     const filters = {};
@@ -220,6 +220,9 @@ export async function getTasks(req, res) {
 
     if (dueAfter) {
       filters.dueAfter = dueAfter;
+    }
+    if (search) {
+      filters.search = search;
     }
 
     const tasks = await taskService.getTasks(userId, filters);
@@ -574,6 +577,40 @@ export async function getUpcomingTasks(req, res) {
     return res.status(500).json({
       success: false,
       error: "Failed to retrieve upcoming tasks",
+    });
+  }
+}
+
+/**
+ * Get scheduled tasks grouped by day (today + upcoming)
+ * GET /api/tasks/scheduled/:days?
+ */
+export async function getScheduledTasks(req, res) {
+  try {
+    const userId = req.user.userId;
+    const days = parseInt(req.params.days) || 7;
+
+    if (days < 1 || days > 365) {
+      return res.status(400).json({
+        success: false,
+        error: "Days must be between 1 and 365",
+      });
+    }
+
+    const schedule = await taskService.getScheduledTasksByDay(userId, days);
+
+    return res.status(200).json({
+      success: true,
+      days: schedule.days,
+      today: schedule.today,
+      upcoming: schedule.upcoming,
+    });
+  } catch (error) {
+    logger.error("Error in getScheduledTasks controller:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: "Failed to retrieve scheduled tasks",
     });
   }
 }

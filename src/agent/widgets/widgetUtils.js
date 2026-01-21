@@ -85,6 +85,20 @@ function normalizeUpcomingGroup(group) {
 function normalizeWidgetData(widgetType, data = {}) {
   if (!data || typeof data !== "object") return data;
 
+  if (widgetType === "list") {
+    const listType = data.listType || data.list_type || null;
+    const tasks = Array.isArray(data.tasks) ? data.tasks : [];
+    return {
+      ...data,
+      listType,
+      tasks,
+      taskId: data.taskId || null,
+      title: data.title || null,
+      days: data.days ?? null,
+      filters: data.filters || null,
+    };
+  }
+
   if (widgetType === "task_list" || widgetType === "task_list_detailed") {
     return { ...data, tasks: normalizeTaskList(data.tasks) };
   }

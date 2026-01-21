@@ -13,6 +13,7 @@ import {
   TaskDetailWidget,
   TaskListDetailedWidget,
   UpcomingTasksWidget,
+  ListWidget,
 } from "../components/widgets";
 
 /**
@@ -28,6 +29,7 @@ export interface BaseWidgetProps {
  */
 export class WidgetFactory {
   private static componentMap: Record<string, React.ComponentType<BaseWidgetProps>> = {
+    list: ListWidget,
     task_list: TaskListWidget,
     task_list_detailed: TaskListDetailedWidget,
     task_detail: TaskDetailWidget,

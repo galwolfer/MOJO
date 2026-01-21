@@ -38,6 +38,16 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
   const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
   const { notifyTaskUpdate } = useTaskContext();
 
+  React.useEffect(() => {
+    const nextChecked = new Set<string>();
+    tasks.forEach((task) => {
+      if (task.status === "done") {
+        nextChecked.add(task.id);
+      }
+    });
+    setCheckedTasks(nextChecked);
+  }, [tasks]);
+
   const handleToggleTask = async (taskId: string) => {
     // Optimistically update UI
     const newChecked = new Set(checkedTasks);
