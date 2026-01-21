@@ -173,7 +173,11 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
         }
       }
 
-      console.log("Calling updateProfile API with:", { username: editedUsername, email: editedEmail, name: editedDisplayName });
+      console.log("Calling updateProfile API with:", {
+        username: editedUsername,
+        email: editedEmail,
+        name: editedDisplayName,
+      });
 
       // Call API to update profile
       const updateData: any = {
@@ -288,7 +292,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
           },
           style: "destructive",
         },
-      ]
+      ],
     );
   };
 
@@ -329,7 +333,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                     style={styles.avatarImage}
                   />
                 ) : (
-                  <UserIcon size={40} color={COLORS.grayLight} />
+                  <UserIcon size={40} color={COLORS.lightGray} />
                 )}
               </View>
             </LinearGradient>
@@ -369,23 +373,10 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                 </View>
               </View>
 
-              <Input
-                label="Display Name"
-                value={editedDisplayName}
-                onChangeText={setEditedDisplayName}
-              />
-              <Input
-                label="Username"
-                value={editedUsername}
-                onChangeText={setEditedUsername}
-              />
-              <Input
-                label="Email"
-                value={editedEmail}
-                onChangeText={setEditedEmail}
-                type="email"
-              />
-              
+              <Input label="Display Name" value={editedDisplayName} onChangeText={setEditedDisplayName} />
+              <Input label="Username" value={editedUsername} onChangeText={setEditedUsername} />
+              <Input label="Email" value={editedEmail} onChangeText={setEditedEmail} type="email" />
+
               {/* Change Password Button */}
               <TouchableOpacity
                 style={styles.changePasswordButton}
@@ -409,23 +400,23 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                     type="password"
                     placeholder="Enter current password"
                   />
-                <Input
-                  label="New Password"
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                  type="password"
-                  placeholder="At least 6 characters"
-                />
-                <Input
-                  label="Confirm New Password"
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  type="password"
-                  placeholder="Re-enter new password"
-                />
+                  <Input
+                    label="New Password"
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    type="password"
+                    placeholder="At least 6 characters"
+                  />
+                  <Input
+                    label="Confirm New Password"
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    type="password"
+                    placeholder="Re-enter new password"
+                  />
                 </View>
               )}
-              
+
               {error && (
                 <AppText variant="notes" style={styles.errorText}>
                   {error}
@@ -616,11 +607,11 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   userUsername: {
-    color: COLORS.grayLight,
+    color: COLORS.lightGray,
     marginTop: 2,
   },
   userEmail: {
-    color: COLORS.grayLight,
+    color: COLORS.lightGray,
   },
   editButton: {
     paddingVertical: SPACING.sm,

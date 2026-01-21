@@ -7,7 +7,7 @@ import { HumanMessage, AIMessage, SystemMessage, ToolMessage } from "@langchain/
 import { memoryStore } from "../services/memoryService.js";
 import { createLangChainTools } from "./langchainTools.js";
 import { validateToolCall, validateWidgetPayload } from "./security.js";
-import { extractWidgetFromText } from "./widgets/widgetUtils.js";
+import { extractWidgetFromText, wrapRawWidgetJsonInTags } from "./widgets/widgetUtils.js";
 import { PromptManager } from "./promptManager.js";
 import { TOKEN_BUDGET, LOGGING_FIELDS } from "./tokenBudget.js";
 import { okFalse, okTrue } from "./lib/errorFormatter.js";
@@ -288,11 +288,16 @@ export class AgentController {
               `[AgentController] LLM invocation failed. Sanitized messages:`,
               currentMessages.map((m) => ({ type: m._getType && m._getType(), content: m.content })),
             );
-            // If we saw the internal TypeError (reading 'message'), perform a minimal retry
+            // If we saw an internal TypeError (reading 'message' or 'parts'), perform a minimal retry
             // to help isolate provider/formatting issues (system + last user message)
-            if (err instanceof TypeError && /reading 'message'/.test(err.message)) {
+            if (
+              err instanceof TypeError &&
+              (/reading 'message'/.test(err.message) ||
+                /reading 'parts'/.test(err.message) ||
+                /Cannot read properties of undefined \(reading 'parts'\)/.test(err.message))
+            ) {
               console.warn(
-                `[AgentController] Detected TypeError in LLM invoke (reading 'message'). Retrying with minimal messages (system + last user message).`,
+                `[AgentController] Detected TypeError in LLM invoke (possible malformed response - ${err.message}). Retrying with minimal messages (system + last user message).`,
               );
               const systemMsg = currentMessages.find((m) => m._getType && m._getType() === "system");
               const lastUser = [...currentMessages].reverse().find((m) => m._getType && m._getType() === "human");
@@ -467,6 +472,8 @@ export class AgentController {
       if (finalResponse) {
         finalResponse = this._sanitizeResponse(finalResponse);
         finalResponse = this._normalizeWidgetTags(finalResponse);
+        // Ensure any raw JSON widget payloads are wrapped with <WIDGET_JSON> tags
+        finalResponse = wrapRawWidgetJsonInTags(finalResponse);
         if (lastWidgetResult) {
           if (extractWidgetFromText(finalResponse)) {
             finalResponse = finalResponse.replace(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/i, lastWidgetResult);

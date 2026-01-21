@@ -36,7 +36,14 @@ export async function resolveByIdOrName(userId, { taskId, taskname }) {
 
   if (candidates.length > 1) {
     const list = candidates.map((c) => `${c.taskname} (${c._id})`);
-    return { task: null, error: "multiple_tasks_found", list };
+    const candidatesMinimal = candidates.map((c) => ({
+      id: c._id?.toString ? c._id.toString() : c._id,
+      title: c.taskname,
+      dueDate: c.dueDate || null,
+      importance: c.importance || null,
+      effort: c.effort || null,
+    }));
+    return { task: null, error: "multiple_tasks_found", list, candidates: candidatesMinimal };
   }
 
   return { task: candidates[0] };

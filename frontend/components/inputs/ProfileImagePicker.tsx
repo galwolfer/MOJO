@@ -224,7 +224,7 @@ const ProfileImagePicker: React.FC<ProfileImagePickerProps> = ({ imageUri, onIma
               />
             ) : (
               <View style={[styles.placeholder, { borderRadius: size / 2 }]}>
-                <UserIcon width={size * 0.5} height={size * 0.5} color={COLORS.grayLight} />
+                <UserIcon width={size * 0.5} height={size * 0.5} color={COLORS.lightGray} />
               </View>
             )}
 
@@ -245,7 +245,7 @@ const ProfileImagePicker: React.FC<ProfileImagePickerProps> = ({ imageUri, onIma
             <Image source={{ uri: imageUri }} style={[styles.image, { borderRadius: size / 2 }]} resizeMode="cover" />
           ) : (
             <View style={[styles.placeholder, { borderRadius: size / 2 }]}>
-              <UserIcon width={size * 0.5} height={size * 0.5} color={COLORS.grayLight} />
+              <UserIcon width={size * 0.5} height={size * 0.5} color={COLORS.lightGray} />
             </View>
           )}
 

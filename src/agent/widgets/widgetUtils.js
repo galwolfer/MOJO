@@ -176,6 +176,99 @@ export function buildWidgetString(widgetType, data = {}) {
 }
 
 /**
+ * Detect raw JSON blobs in free-form text and wrap them with the canonical
+ * <WIDGET_JSON>...</WIDGET_JSON> tags when they appear to be widget payloads.
+ * Behaviors:
+ * - If the text already contains a <WIDGET_JSON> tag, return it unchanged.
+ * - Scan for balanced JSON objects; when a JSON object parses and contains
+ *   a `widget_type` field (or `version` + `data`), replace that object with
+ *   a wrapped widget block.
+ * - Also tolerate common malformed variants like `WIDGET_JSON{...}/`.
+ */
+export function wrapRawWidgetJsonInTags(text) {
+  if (!text || typeof text !== "string") return text;
+
+  // If it already contains proper widget tags, nothing to do
+  if (/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/i.test(text)) return text;
+
+  let out = text;
+  const results = [];
+
+  // First, normalize bare 'WIDGET_JSON{' -> marker so we can find the JSON easily
+  out = out.replace(/WIDGET_JSON\s*\{/g, "__WIDGET_OPEN__{");
+
+  // Find JSON-looking blocks by scanning for '{' and finding the matching '}'
+  for (let i = 0; i < out.length; i++) {
+    if (out[i] !== "{") continue;
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    let j = i;
+    for (; j < out.length; j++) {
+      const ch = out[j];
+      if (inString) {
+        if (escape) {
+          escape = false;
+        } else if (ch === "\\") {
+          escape = true;
+        } else if (ch === '"') {
+          inString = false;
+        }
+      } else {
+        if (ch === '"') {
+          inString = true;
+        } else if (ch === "{") {
+          depth++;
+        } else if (ch === "}") {
+          depth--;
+          if (depth === 0) break;
+        }
+      }
+    }
+
+    if (j >= out.length) continue; // no matching close
+
+    const candidate = out.slice(i, j + 1);
+
+    // Quick guard: reject extremely large blocks
+    if (candidate.length > 20000) continue;
+
+    try {
+      const parsed = JSON.parse(candidate);
+      // Heuristic: must look like a widget payload
+      if (parsed && (parsed.widget_type || (parsed.version && parsed.data))) {
+        results.push({ start: i, end: j + 1, json: JSON.stringify(parsed) });
+      }
+    } catch (e) {
+      // Not JSON – skip
+    }
+
+    // advance position to avoid nested re-checks
+    i = j;
+  }
+
+  // Apply replacements from end to front so indices remain valid
+  if (results.length > 0) {
+    let acc = out;
+    for (let k = results.length - 1; k >= 0; k--) {
+      const r = results[k];
+      acc = acc.slice(0, r.start) + `<WIDGET_JSON>${r.json}</WIDGET_JSON>` + acc.slice(r.end);
+    }
+    out = acc;
+  }
+
+  // Fix common malformed close like '}/' or trailing '/' following JSON
+  out = out.replace(/<WIDGET_JSON>([\s\S]*?)\}\s*\//g, (m, p1) => {
+    return `<WIDGET_JSON>${p1}}<\/WIDGET_JSON>`;
+  });
+
+  // Restore any normalized marker to proper tag if left behind
+  out = out.replace(/__WIDGET_OPEN__\{/g, "<WIDGET_JSON>{");
+
+  return out;
+}
+
+/**
  * Tolerant parser/fixer for incoming LLM messages: if a message contains
  * an opening <WIDGET_JSON> but a malformed closing tag (e.g., </WWIDGET_JSON>),
  * attempt to correct it to </WIDGET_JSON> before parsing. Also validates

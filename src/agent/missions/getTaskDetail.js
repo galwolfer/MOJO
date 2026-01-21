@@ -20,8 +20,16 @@ const getTaskDetailMission = new LightMission({
       const resolved = await resolveByIdOrName(userId, { taskId, taskname });
       if (resolved.error) {
         if (resolved.error === "multiple_tasks_found") {
-          const list = (resolved.list || []).map((s) => `- ${s}`).join("\n");
-          return okFalse("multiple_tasks_found", { list });
+          // Present the multiple matches using the Task List widget so the client
+          // can show a selectable list instead of raw text.
+          const tasks = (resolved.candidates || []).map((c) => ({
+            id: c.id,
+            title: c.title,
+            dueDate: c.dueDate,
+            importance: c.importance,
+            effort: c.effort,
+          }));
+          return buildWidget("list", { listType: "task_list", tasks });
         }
         return okFalse(resolved.error);
       }

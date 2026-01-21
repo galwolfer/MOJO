@@ -1,6 +1,5 @@
 import { moderateScale, s, scale, verticalScale } from "react-native-size-matters";
 import { Platform } from "react-native";
-import { BorderlessButton } from "react-native-gesture-handler";
 
 export const COLORS = {
   // Primary colors
@@ -11,9 +10,10 @@ export const COLORS = {
   primary5: "#ECA32E",
   primary6: "#38AF4D",
   primary7: "#F43E3E",
+  lightGray: "#A1A8C8",
 
   // Bright palette
-  brightP1: "#6F86F2",
+  brightP1: "#96a7f0",
   brightP2: "#B4E6F6",
   brightP3: "#D3A7F1",
   brightP4: "#FFBCDB",
@@ -29,6 +29,7 @@ export const COLORS = {
   darkP5: "#D38911",
   darkP6: "#118826",
   darkP7: "#DA2727",
+  darkGray: "#3B3E50",
 
   // Neutrals
   white: "#F2F5FF",
@@ -36,9 +37,6 @@ export const COLORS = {
   white3: "#D8DEF7",
   colorWhite: "#FFFFFF",
   black: "#141519",
-  darkGray: "#3B3E50",
-  lightGray: "#A1A8C8",
-  grayLight: "#A1A8C8",
 
   // Misc / special
   shadow15277c14: "rgba(21, 39, 124, 0.14)",
@@ -273,27 +271,31 @@ export const TYPOGRAPHY = {
   },
 };
 
-// Returns a bright/dark color pair for a given palette index (1-7).
-// If `index` is omitted or invalid, a random index between 1 and 7 is chosen.
+const COLORS_NUM = 8;
+
+// Returns a bright/dark color pair for a given palette index (1-8).
+// If `index` is omitted or invalid, a random index between 1 and 8 is chosen.
 export function getPalettePair(index?: number) {
   const idx =
-    Number.isInteger(index) && index! >= 1 && index! <= 7 ? (index as number) : Math.floor(Math.random() * 7) + 1;
+    Number.isInteger(index) && index! >= 1 && index! <= COLORS_NUM
+      ? (index as number)
+      : Math.floor(Math.random() * COLORS_NUM) + 1;
   const brightKey = `brightP${idx}` as keyof typeof COLORS as keyof typeof COLORS;
   const darkKey = `darkP${idx}` as keyof typeof COLORS as keyof typeof COLORS;
   return { bg: COLORS[brightKey], text: COLORS[darkKey], index: idx };
 }
 
-// Deterministically map a string key to a palette index 1..7.
+// Deterministically map a string key to a palette index 1..8.
 export function paletteIndexFromKey(key?: string): number {
-  if (!key) return Math.floor(Math.random() * 7) + 1;
+  if (!key) return Math.floor(Math.random() * COLORS_NUM) + 1;
   // normalize (trim + lowercase) so keys that only differ by case/whitespace map same
   const normalized = key.trim().toLowerCase();
-  if (normalized.length === 0) return Math.floor(Math.random() * 7) + 1;
+  if (normalized.length === 0) return Math.floor(Math.random() * COLORS_NUM) + 1;
   // djb2-like hash
   let hash = 5381;
   for (let i = 0; i < normalized.length; i++) {
     hash = (hash * 33) ^ normalized.charCodeAt(i);
   }
-  const idx = Math.abs(hash) % 7;
+  const idx = Math.abs(hash) % COLORS_NUM;
   return idx + 1;
 }

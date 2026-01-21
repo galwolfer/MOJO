@@ -98,22 +98,22 @@ export const getStatusStyle = (status?: string) => {
 
 export const getImportanceLabel = (importance?: number) => {
   if (!importance) return "Not set";
-  const labels = ["", "Low", "Medium-Low", "Medium", "High", "Critical"];
+  const labels = ["", "Low ", "Medium-Low ", "Medium ", "High ", "Critical"];
   return labels[importance] || `Priority ${importance}`;
 };
 
 export const getEffortLabel = (effort?: number) => {
   if (!effort) return "Not set";
-  const labels = ["", "Minimal", "Light", "Moderate", "Heavy", "Extensive"];
+  const labels = ["", "Minimal ", "Light ", "Moderate ", "Heavy ", "Extensive "];
   return labels[effort] || `Level ${effort}`;
 };
 
 export const formatDuration = (minutes?: number) => {
   if (!minutes) return "Not set";
-  if (minutes < 60) return `${minutes} minutes`;
+  if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
-  if (mins === 0) return `${hours} hour${hours > 1 ? "s" : ""}`;
+  if (mins === 0) return `${hours}h`;
   return `${hours}h ${mins}m`;
 };
 

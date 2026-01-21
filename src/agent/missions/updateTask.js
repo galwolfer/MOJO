@@ -93,8 +93,15 @@ const updateTaskMission = new GuidedMission({
           return okFalse("task_not_found");
         }
         if (candidates.length > 1) {
-          const list = candidates.map((c) => `${c.taskname} (${c._id})`);
-          return okFalse("multiple_tasks_found", { list: list.join("\n") });
+          // Show the candidate tasks in a Task List widget so user can pick
+          const tasks = candidates.map((c) => ({
+            id: c._id?.toString ? c._id.toString() : c._id,
+            title: c.taskname,
+            dueDate: c.dueDate,
+            importance: c.importance,
+            effort: c.effort,
+          }));
+          return buildWidget("list", { listType: "task_list", tasks });
         }
         resolvedTaskId = candidates[0]._id;
       }

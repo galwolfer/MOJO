@@ -24,17 +24,10 @@ type StatBadgeProps = {
   color?: string;
 };
 
-const StatBadge: React.FC<StatBadgeProps> = ({
-  icon,
-  value,
-  label,
-  color = COLORS.primary1,
-}) => {
+const StatBadge: React.FC<StatBadgeProps> = ({ icon, value, label, color = COLORS.primary1 }) => {
   return (
     <View style={styles.container}>
-      <View style={[styles.iconCircle, { backgroundColor: color }]}>
-        {icon}
-      </View>
+      <View style={[styles.iconCircle, { backgroundColor: color }]}>{icon}</View>
       <View style={styles.textContainer}>
         <AppText variant="boldText" style={styles.value}>
           {value}
@@ -75,7 +68,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: moderateScale(10),
-    color: COLORS.grayLight,
+    color: COLORS.lightGray,
     lineHeight: moderateScale(12),
   },
 });
