@@ -812,9 +812,18 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
   if (sanitized.status === "done") sanitized.completedAt = new Date();
   if (sanitized.status === "todo") sanitized.completedAt = null;
 
-  const updated = await SubTask.findOneAndUpdate({ _id: subTaskId, userId }, { $set: sanitized }, { new: true }).lean();
+  // Use find + save instead of findOneAndUpdate to trigger Mongoose hooks
+  const subtask = await SubTask.findOne({ _id: subTaskId, userId });
+  
+  if (!subtask) return { success: false, error: "SubTask not found or access denied" };
 
-  if (!updated) return { success: false, error: "SubTask not found or access denied" };
+  // Apply updates
+  Object.assign(subtask, sanitized);
+  
+  // Save to trigger post-save hooks (which sync parent Task progress)
+  await subtask.save();
+  
+  const updated = subtask.toObject();
 
   // If all subtasks are done, optionally mark parent task as done. If some done -> in_progress
   try {
