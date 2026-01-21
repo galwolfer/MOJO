@@ -44,8 +44,8 @@ const Widget: React.FC<WidgetProps> = ({
   entranceDuration = 200,
   skipAnimation = false,
 }) => {
-  // Don't render until entrance is requested to avoid showing content early.
-  const [mounted, setMounted] = React.useState<boolean>(entranceEnabled || skipAnimation);
+  // Always mount - let parent control visibility via opacity (for chat) or use entrance animation (for auth)
+  const [mounted, setMounted] = React.useState<boolean>(true);
   // Track if this is the first time the component is being shown
   const isFirstMountRef = useRef(true);
 
@@ -68,21 +68,16 @@ const Widget: React.FC<WidgetProps> = ({
     }
 
     if (!entranceEnabled) {
-      // If entrance is not enabled but we are mounted (someone forced mount), make it visible immediately
+      // If entrance is not enabled but we are mounted, make it visible immediately
       opacity.setValue(1);
       translateY.setValue(0);
       return;
     }
 
-    // Skip animation if this is not the first mount (e.g., returning from navigation)
-    if (!isFirstMountRef.current) {
-      opacity.setValue(1);
-      translateY.setValue(0);
-      return;
-    }
-
-    // Mark that we've done the animation at least once
-    isFirstMountRef.current = false;
+    // When entranceEnabled becomes true, animate in
+    // Reset values to start state
+    opacity.setValue(0);
+    translateY.setValue(8);
 
     Animated.parallel([
       Animated.timing(opacity, {

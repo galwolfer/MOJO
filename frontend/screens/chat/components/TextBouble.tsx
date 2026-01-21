@@ -641,8 +641,8 @@ const TextBouble: React.FC<Props> = ({
   }, [isTyping, fullText, typingSpeedCps, handleTypingDone]);
 
   // Render full content (used as invisible placeholder during typing to reserve space)
-  // For agent mode, always use parsedContent.displayText (which strips widget JSON even if widget is partial/streaming)
-  const textToDisplay = mode === "agent" ? parsedContent.displayText : null;
+  // For agent mode with widgets, use displayText (stripped of widget JSON)
+  const textToDisplay = mode === "agent" && parsedContent.widget ? parsedContent.displayText : null;
 
   // Helper to render the text part with proper AppText styling
   const renderTextContent = (text: string | null) => {
@@ -711,11 +711,7 @@ const TextBouble: React.FC<Props> = ({
           // Render typed content inline so the container height follows the
           // currently visible text. Non-text elements will not occupy space
           // until they become visible (so the box grows as typing advances).
-          textToDisplay !== null ? (
-            <>{cloneChildrenWithTyping(<AppText variant="bodyText">{textToDisplay}</AppText>, typedChars)}</>
-          ) : (
-            <>{cloneChildrenWithTyping(children, typedChars)}</>
-          )
+          <>{cloneChildrenWithTyping(children, typedChars)}</>
         ) : (
           fullContent
         )}
@@ -723,7 +719,7 @@ const TextBouble: React.FC<Props> = ({
         {/* Render widget if present (agent mode only) */}
         {mode === "agent" && parsedContent.widget && widgetMounted && (
           <Animated.View style={{ opacity: nonTextOpacity, width: "100%" }}>
-            <WidgetRenderer widget={parsedContent.widget} onAction={onWidgetAction} />
+            <WidgetRenderer widget={parsedContent.widget} onAction={onWidgetAction} entranceEnabled={!isTyping} />
           </Animated.View>
         )}
         {mode === "agent" && parsedContent.widget && widgetMounted && afterText && (
