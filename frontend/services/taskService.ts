@@ -369,7 +369,7 @@ export async function suggestCategory(taskname: string): Promise<{
       category: string;
       subCategory: string | null;
     }>("/tasks/suggest-category", { taskname });
-    
+
     if (response.success) {
       return {
         category: response.category,
@@ -451,7 +451,7 @@ export async function updateSubTask(
  */
 export async function updateSubTaskStatus(taskId: string, subtaskId: string, status: SubTaskStatus): Promise<boolean> {
   return updateSubTask(taskId, subtaskId, { status });
-} 
+}
 
 /**
  * Delete a task

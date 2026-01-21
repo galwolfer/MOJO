@@ -11,7 +11,7 @@ import { COLORS, SPACING } from "../../theme";
 import Widget from "../special/Widget";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
 import { Checkbox } from "../icons/Checkbox";
-import { updateSubTask } from "../../services/taskService"; 
+import { updateSubTask } from "../../services/taskService";
 import { useTaskContext } from "../../context/TaskContext";
 
 interface TaskDetail {

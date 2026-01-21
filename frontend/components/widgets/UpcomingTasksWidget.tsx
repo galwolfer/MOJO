@@ -10,7 +10,7 @@ import AppText from "../common/AppText";
 import Widget from "../special/Widget";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
 import { COLORS, SPACING } from "../../theme";
-import { updateSubTask } from "../../services/taskService"; 
+import { updateSubTask } from "../../services/taskService";
 import { useTaskContext } from "../../context/TaskContext";
 import { Checkbox } from "../icons/Checkbox";
 
