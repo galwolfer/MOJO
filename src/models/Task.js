@@ -63,6 +63,8 @@ const taskSchema = new mongoose.Schema(
     },
     // Task progress tracking (for split tasks)
     progressPercentage: { type: Number, min: 0, max: 100, default: 0 }, // 0-100, synced from subtasks
+    // User-defined tags for categorization and filtering
+    tags: { type: [String], default: [] },
   },
   { timestamps: true },
 );
@@ -245,7 +247,8 @@ taskSchema.pre("save", async function () {
       }
 
       // Populate prediction fields (stored in MongoDB for priority calculations)
-      this.predictionScore = prediction.score;
+      // Clamp predictionScore to valid range [0, 1] to prevent validation errors
+      this.predictionScore = Math.max(0, Math.min(1, prediction.score));
       this.predictedCompletionCategory = prediction.category;
 
       console.log(`🤖 ML Prediction: score=${prediction.score.toFixed(3)}, category=${prediction.category}`);

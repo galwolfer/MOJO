@@ -68,13 +68,96 @@ async function autoSaveSubcategory(userId, subcategoryName, categoryKey) {
 }
 
 /**
+ * Suggest category and subcategory for a task name
+ * POST /api/tasks/suggest-category
+ */
+export async function suggestCategory(req, res) {
+  try {
+    const userId = req.user.userId;
+    const { taskname } = req.body;
+
+    if (!taskname || !taskname.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: "Task name is required",
+      });
+    }
+
+    // Import the category detection and subcategory generation functions
+    const { detectCategory } = await import("../algorithms/priority/categorizing.js");
+    const { generateSubCategory } = await import("../services/ml/subcategoryGenerator.js");
+    const { Task } = await import("../models/Task.js");
+
+    // Detect category from task name
+    const category = detectCategory({
+      title: taskname.trim(),
+      description: "",
+      category: "",
+    });
+
+    // Generate subcategory
+    const subCategory = await generateSubCategory({
+      userId,
+      title: taskname.trim(),
+      description: "",
+      category,
+      current: null,
+      TaskModel: Task,
+    });
+
+    return res.status(200).json({
+      success: true,
+      category,
+      subCategory: subCategory?.label || null,
+    });
+  } catch (error) {
+    logger.error("Error in suggestCategory controller:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to suggest category",
+    });
+  }
+}
+
+/**
  * Create a new task
  * POST /api/tasks
  */
 export async function createTask(req, res) {
   try {
     const userId = req.user.userId;
-    const { name, taskname, category, subcategory, deadline, recurrence } = req.body;
+    
+    // Log the entire request body for debugging
+    console.log("=== CONTROLLER RECEIVED ===");
+    console.log("req.body:", JSON.stringify(req.body, null, 2));
+    
+    const { 
+      name, 
+      taskname, 
+      category, 
+      subcategory, 
+      deadline, 
+      recurrence,
+      importance,
+      effort,
+      estimatedMinutes,
+      description,
+      tags,
+      subtasks,
+      taskType,
+      chunkCount,
+    } = req.body;
+
+    console.log("Extracted fields:", {
+      importance,
+      effort,
+      estimatedMinutes,
+      description,
+      tags,
+      subtasks,
+      taskType,
+      chunkCount,
+    });
 
     const title = (taskname || name || "").trim();
 
@@ -127,9 +210,17 @@ export async function createTask(req, res) {
     const task = await taskService.createTask({
       userId,
       taskname: title,
+      description: description || undefined,
       category: category || "",
       subCategory: subcategory ? { label: subcategory, source: "user", confidence: 1, updatedAt: new Date() } : null,
       dueDate: deadline ? new Date(deadline) : null,
+      importance: importance !== undefined ? importance : 3, // Default to 3 if not provided
+      effort: effort !== undefined ? effort : 3, // Default to 3 if not provided
+      estimatedDuration: estimatedMinutes || 60, // Default to 60 minutes if not provided
+      tags: tags || undefined,
+      subtasks: subtasks || undefined,
+      taskType: taskType || "perfect",
+      chunkCount: chunkCount || undefined,
       recurrence,
     });
 

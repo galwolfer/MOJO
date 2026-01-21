@@ -204,6 +204,62 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14): TaskPro
 }
 
 /**
+ * Create a new task
+ * POST /api/tasks
+ */
+export async function createTask(taskData: {
+  taskname: string;
+  description?: string;
+  category?: string;
+  importance?: number;
+  effort?: number;
+  deadline?: string; // Backend expects 'deadline' not 'dueDate'
+  estimatedMinutes?: number;
+  tags?: string[];
+  subtasks?: Array<{
+    title: string;
+    description?: string;
+    minutes?: number;
+  }>;
+}): Promise<Task | null> {
+  try {
+    const response = await post<{ success: boolean; task: Task }>("/tasks", taskData);
+    return response.task || null;
+  } catch (error) {
+    console.warn("Failed to create task:", error);
+    throw error;
+  }
+}
+
+/**
+ * Suggest category and subcategory based on task name
+ * POST /api/tasks/suggest-category
+ */
+export async function suggestCategory(taskname: string): Promise<{
+  category: string;
+  subCategory: string | null;
+} | null> {
+  try {
+    const response = await post<{
+      success: boolean;
+      category: string;
+      subCategory: string | null;
+    }>("/tasks/suggest-category", { taskname });
+    
+    if (response.success) {
+      return {
+        category: response.category,
+        subCategory: response.subCategory,
+      };
+    }
+    return null;
+  } catch (error) {
+    console.warn("Failed to suggest category:", error);
+    return null;
+  }
+}
+
+/**
  * Complete a task
  * POST /api/tasks/:id/complete
  */
@@ -263,6 +319,7 @@ export async function deleteTask(id: string): Promise<boolean> {
 }
 
 export default {
+  createTask,
   getTasks,
   getTaskById,
   calculateTaskProgress,
@@ -270,4 +327,5 @@ export default {
   toggleTaskCompletion,
   updateTask,
   deleteTask,
+  suggestCategory,
 };

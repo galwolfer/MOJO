@@ -6,7 +6,7 @@ import React, { createContext, useState, useContext, ReactNode } from "react";
  * Centralized navigation and header/navbar configuration for the app.
  */
 
-export type TabName = "chat" | "calendar" | "user";
+export type TabName = "chat" | "calendar" | "user" | "create";
 
 export type HeaderConfig = {
   title?: string;
