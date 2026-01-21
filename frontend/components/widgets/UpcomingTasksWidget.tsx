@@ -13,6 +13,7 @@ import { COLORS, SPACING } from "../../theme";
 import { updateSubTask } from "../../services/taskService";
 import { useTaskContext } from "../../context/TaskContext";
 import { Checkbox } from "../icons/Checkbox";
+import { formatTimeRange, getSessionLabel } from "./widgetHelpers";
 
 type ScheduledSession = {
   id?: string;
@@ -86,16 +87,6 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
     return parsed.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   };
 
-  const formatTimeRange = (session: ScheduledSession) => {
-    if (!session.start) return "Time TBD";
-    const start = new Date(session.start);
-    const end = session.end ? new Date(session.end) : null;
-    const startText = start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-    if (!end || Number.isNaN(end.getTime())) return startText;
-    const endText = end.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-    return `${startText} - ${endText}`;
-  };
-
   const getProgressValue = (value?: number) => {
     if (typeof value !== "number" || Number.isNaN(value)) return 0;
     return Math.max(0, Math.min(100, Math.round(value)));
@@ -106,12 +97,6 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
     if (progress >= 80) return COLORS.primary6;
     if (progress >= 40) return COLORS.primary5;
     return COLORS.primary7;
-  };
-
-  const getSessionLabel = (session: ScheduledSession) => {
-    if (session.subtaskTitle) return session.subtaskTitle;
-    if (session.subtaskIndex) return `Part ${session.subtaskIndex}`;
-    return "Session";
   };
 
   const handleToggleSession = async (taskId: string, session: ScheduledSession) => {

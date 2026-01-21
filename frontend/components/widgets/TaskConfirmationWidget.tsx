@@ -9,6 +9,16 @@ import AppText from "../common/AppText";
 import { COLORS, SPACING } from "../../theme";
 import Widget from "../special/Widget";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
+import {
+  formatDate,
+  formatDateTime,
+  formatTimeRange,
+  getSessionLabel,
+  getImportanceLabel,
+  getEffortLabel,
+  formatDuration,
+  getTaskTypeLabel,
+} from "./widgetHelpers";
 
 interface TaskData {
   id: string;
@@ -79,88 +89,6 @@ interface Subtask {
 const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({ data }) => {
   // Data is passed directly - use as TaskData
   const task: TaskData = data as TaskData;
-
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return "Not set";
-    try {
-      const date = new Date(dateStr);
-      return date.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
-    } catch {
-      return dateStr;
-    }
-  };
-
-  const formatDateTime = (dateStr?: string) => {
-    if (!dateStr) return "Not scheduled";
-    try {
-      const date = new Date(dateStr);
-      const dateText = date.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-      });
-      const timeText = date.toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-      });
-      return `${dateText} at ${timeText}`;
-    } catch {
-      return dateStr;
-    }
-  };
-
-  const formatTimeRange = (session?: ScheduledSession) => {
-    if (!session?.start) return "Time TBD";
-    try {
-      const start = new Date(session.start);
-      const end = session.end ? new Date(session.end) : null;
-      const startText = start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-      if (!end || Number.isNaN(end.getTime())) return startText;
-      const endText = end.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-      return `${startText} - ${endText}`;
-    } catch {
-      return "Time TBD";
-    }
-  };
-
-  const getSessionLabel = (session: ScheduledSession, index: number) => {
-    if (session.subtaskTitle) return session.subtaskTitle;
-    if (session.subtaskIndex) return `Part ${session.subtaskIndex}`;
-    return `Session ${index + 1}`;
-  };
-
-  const getImportanceLabel = (importance?: number) => {
-    if (!importance) return "Not set";
-    const labels = ["", "Low", "Medium-Low", "Medium", "High", "Critical"];
-    return labels[importance] || `Level ${importance}`;
-  };
-
-  const getEffortLabel = (effort?: number) => {
-    if (!effort) return "Not set";
-    const labels = ["", "Minimal", "Light", "Moderate", "Heavy", "Extensive"];
-    return labels[effort] || `Level ${effort}`;
-  };
-
-  const formatDuration = (minutes?: number) => {
-    if (!minutes) return "Not set";
-    if (minutes < 60) return `${minutes} minutes`;
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (mins === 0) return `${hours} hour${hours > 1 ? "s" : ""}`;
-    return `${hours}h ${mins}m`;
-  };
-
-  const getTaskTypeLabel = (taskType?: string, canSplit?: boolean) => {
-    if (taskType === "in_parts") return "Split into parts";
-    if (taskType === "leaky") return "Flexible timing";
-    if (canSplit) return "Can be split";
-    return "Single block";
-  };
 
   return (
     <Widget skipAnimation>

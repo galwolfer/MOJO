@@ -4,13 +4,29 @@
  */
 
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Image } from "react-native";
 import AppText from "../common/AppText";
 import AppButton from "../common/AppButton";
-import { COLORS, SPACING } from "../../theme";
+import { COLORS, SPACING, ICON_SIZES } from "../../theme";
 import Widget from "../special/Widget";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
 import { Checkbox } from "../icons/Checkbox";
+import { getCategoryMeta } from "../../config/categoryMeta";
+import Icon from "../icons/Icon";
+import {
+  ScheduledSession,
+  Subtask,
+  formatDate,
+  formatDateTime,
+  formatTimeRange,
+  getStatusStyle,
+  getImportanceLabel,
+  getEffortLabel,
+  formatDuration,
+  getTaskTypeLabel,
+  getSessionLabel,
+  getSubtaskIdFromSession,
+} from "./widgetHelpers";
 import { updateSubTask } from "../../services/taskService";
 import { useTaskContext } from "../../context/TaskContext";
 
@@ -53,27 +69,6 @@ interface TaskDetail {
   tags?: string[] | null;
 }
 
-interface ScheduledSession {
-  id?: string;
-  start?: string;
-  end?: string;
-  status?: string;
-  subtaskIndex?: number;
-  subtaskId?: string;
-  subtaskTitle?: string;
-  subtaskStatus?: string;
-}
-
-interface Subtask {
-  id?: string;
-  title: string;
-  description?: string;
-  status?: string;
-  completed?: boolean;
-  order?: number;
-  duration?: number;
-}
-
 /**
  * TaskDetailWidget - Renders detailed view of a single task
  */
@@ -99,16 +94,6 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
     });
     setCompletedParts(completed);
   }, [task]);
-
-  const getSubtaskIdFromSession = (session?: ScheduledSession) => {
-    if (!session) return undefined;
-    if ((session as any).subtaskId) return (session as any).subtaskId;
-    if (typeof session.subtaskIndex === "number" && task.subtasks) {
-      const found = task.subtasks.find((st) => st.order === session.subtaskIndex || st.order === session.subtaskIndex);
-      return found?.id;
-    }
-    return undefined;
-  };
 
   const handleToggleSubtask = async (subtaskId?: string) => {
     if (!subtaskId) return;
@@ -149,134 +134,27 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
 
   const sessionSubtaskIds = new Set<string>();
   (task.scheduledSessions || []).forEach((s) => {
-    const id = getSubtaskIdFromSession(s);
+    const id = getSubtaskIdFromSession(s, task.subtasks);
     if (id) sessionSubtaskIds.add(id);
   });
   const remainingSubtasks = (task.subtasks || []).filter((st) => !sessionSubtaskIds.has(st.id || ""));
 
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return "Not set";
-    try {
-      const date = new Date(dateStr);
-      return date.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
-    } catch {
-      return dateStr;
-    }
-  };
-
-  const formatDateTime = (dateStr?: string) => {
-    if (!dateStr) return "Not scheduled";
-    try {
-      const date = new Date(dateStr);
-      const dateText = date.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-      });
-      const timeText = date.toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-      });
-      return `${dateText} at ${timeText}`;
-    } catch {
-      return dateStr;
-    }
-  };
-
-  const formatTimeRange = (session?: ScheduledSession) => {
-    if (!session?.start) return "Time TBD";
-    try {
-      const start = new Date(session.start);
-      const end = session.end ? new Date(session.end) : null;
-      const startText = start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-      if (!end || Number.isNaN(end.getTime())) return startText;
-      const endText = end.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-      return `${startText} - ${endText}`;
-    } catch {
-      return "Time TBD";
-    }
-  };
-
-  const getStatusStyle = (status?: string) => {
-    switch (status?.toLowerCase()) {
-      case "done":
-      case "completed":
-        return COLORS.primary6;
-      case "in_progress":
-      case "in progress":
-        return COLORS.primary1;
-      case "pending":
-      case "todo":
-        return COLORS.primary5;
-      default:
-        return COLORS.darkGray;
-    }
-  };
-
-  const getImportanceLabel = (importance?: number) => {
-    if (!importance) return "Not set";
-    const labels = ["", "Low", "Medium-Low", "Medium", "High", "Critical"];
-    return labels[importance] || `Priority ${importance}`;
-  };
-
-  const getEffortLabel = (effort?: number) => {
-    if (!effort) return "Not set";
-    const labels = ["", "Minimal", "Light", "Moderate", "Heavy", "Extensive"];
-    return labels[effort] || `Level ${effort}`;
-  };
-
-  const formatDuration = (minutes?: number) => {
-    if (!minutes) return "Not set";
-    if (minutes < 60) return `${minutes} minutes`;
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (mins === 0) return `${hours} hour${hours > 1 ? "s" : ""}`;
-    return `${hours}h ${mins}m`;
-  };
-
-  const getTaskTypeLabel = (taskType?: string, canSplit?: boolean) => {
-    if (taskType === "in_parts") return "Split into parts";
-    if (taskType === "leaky") return "Flexible timing";
-    if (canSplit) return "Can be split";
-    return "Single block";
-  };
-
-  const getSessionLabel = (session: ScheduledSession, index: number) => {
-    if (session.subtaskTitle) return session.subtaskTitle;
-    if (session.subtaskIndex) return `Part ${session.subtaskIndex}`;
-    return `Session ${index + 1}`;
-  };
-
-  const handleEdit = () => {
-    onAction?.("edit_task", { taskId: task.id });
-  };
-
-  const handleComplete = () => {
-    onAction?.("complete_task", { taskId: task.id });
-  };
-
-  const statusColor = getStatusStyle(task.status);
+  const categoryMeta = getCategoryMeta(task.category);
 
   return (
     <Widget skipAnimation>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <AppText variant="title3" style={styles.title}>
+          <AppText variant="title2" style={styles.title}>
             {task.title}
+            <Icon
+              name={categoryMeta.icon}
+              size={ICON_SIZES.big}
+              color={categoryMeta.color}
+              style={styles.inlineIconImage}
+            />
           </AppText>
-          {task.status && (
-            <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
-              <AppText variant="notes" style={styles.statusText}>
-                {task.status.replace("_", " ").toUpperCase()}
-              </AppText>
-            </View>
-          )}
         </View>
 
         {/* Description */}
@@ -427,7 +305,7 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
             </AppText>
             <View style={styles.scheduleList}>
               {task.scheduledSessions.map((session, index) => {
-                const subtaskId = getSubtaskIdFromSession(session);
+                const subtaskId = getSubtaskIdFromSession(session, task.subtasks);
                 const isDone = subtaskId ? completedParts.has(subtaskId) : false;
                 const canToggle = Boolean(subtaskId);
 
@@ -555,8 +433,13 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   title: {
-    flex: 1,
+    color: COLORS.black,
     fontWeight: "600",
+    flexShrink: 1,
+  },
+  inlineIconImage: {
+    marginLeft: SPACING.sm,
+    marginBottom: -2,
   },
   statusBadge: {
     paddingHorizontal: SPACING.sm,

@@ -19,7 +19,7 @@ import { COLORS } from "../../theme";
 
 export type IconProps = SvgProps & { size?: number };
 
-const ICON_FILES: Record<string, string> = {
+export const ICON_FILES: Record<string, string> = {
   mentorjo: "mentorjo.svg",
   bestojo: "bestojo.svg",
   brojo: "brojo.svg",
@@ -142,7 +142,41 @@ function createIcon(svgFileName: string, debugName: string): React.FC<IconProps>
 }
 
 export const ICONS: Record<string, React.FC<IconProps>> = Object.fromEntries(
-  Object.entries(ICON_FILES).map(([key, file]) => [key, createIcon(file, key)])
+  Object.entries(ICON_FILES).map(([key, file]) => [key, createIcon(file, key)]),
 ) as Record<string, React.FC<IconProps>>;
 
 export const ICON_NAMES = Object.keys(ICONS);
+
+function encodeBase64(str: string) {
+  if (typeof btoa === "function") return btoa(str);
+  if (typeof Buffer !== "undefined") return Buffer.from(str, "utf8").toString("base64");
+  throw new Error("No base64 encoder available");
+}
+
+/**
+ * Returns a colored SVG data URI for the given icon key.
+ * Falls back to the default icon if not found.
+ */
+export function getIconDataUri(iconKey: string, color?: string) {
+  const file = ICON_FILES[iconKey] || ICON_FILES.default;
+  const dataUri = (SVG_DATA_URIS as Record<string, string>)[file];
+  if (!dataUri) return undefined;
+
+  const base64 = dataUri.split(",")[1];
+  let svg = "";
+  try {
+    svg = decodeBase64(base64);
+  } catch (e) {
+    return dataUri;
+  }
+
+  const tint = typeof color === "string" ? color : COLORS.black;
+  const colored = svg.replace(/currentColor/g, tint);
+
+  try {
+    const encoded = encodeBase64(colored);
+    return `data:image/svg+xml;base64,${encoded}`;
+  } catch (e) {
+    return dataUri;
+  }
+}
