@@ -62,7 +62,7 @@ interface ScheduledSession {
   subtaskId?: string;
   subtaskTitle?: string;
   subtaskStatus?: string;
-} 
+}
 
 interface Subtask {
   id?: string;
@@ -93,7 +93,7 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
     });
     (task.scheduledSessions || []).forEach((s) => {
       const sid = (s as any).subtaskId;
-      if (sid && (((s as any).subtaskStatus === "done") || s.status === "completed")) {
+      if (sid && ((s as any).subtaskStatus === "done" || s.status === "completed")) {
         completed.add(sid);
       }
     });
@@ -443,7 +443,11 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
                     <View style={styles.scheduleHeader}>
                       <View style={styles.scheduleLabelContainer}>
                         {subtaskId ? (
-                          <Checkbox checked={isDone} onChange={() => canToggle && handleToggleSubtask(subtaskId)} size={18} />
+                          <Checkbox
+                            checked={isDone}
+                            onChange={() => canToggle && handleToggleSubtask(subtaskId)}
+                            size={18}
+                          />
                         ) : null}
                         <AppText variant="bodyText" style={styles.scheduleLabel}>
                           {getSessionLabel(session, index)}
@@ -468,7 +472,7 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
                     )}
                   </TouchableOpacity>
                 );
-              })} 
+              })}
             </View>
           </View>
         )}
@@ -477,12 +481,19 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
         {remainingSubtasks && remainingSubtasks.length > 0 && (
           <View style={styles.section}>
             <AppText variant="title3" style={styles.sectionTitle}>
-              ✓ Subtasks ({(task.subtasks || []).filter((st) => st.completed || st.status === "completed" || st.status === "done").length}/{(task.subtasks || []).length})
+              ✓ Subtasks (
+              {
+                (task.subtasks || []).filter((st) => st.completed || st.status === "completed" || st.status === "done")
+                  .length
+              }
+              /{(task.subtasks || []).length})
             </AppText>
             <View style={styles.subtaskList}>
               {remainingSubtasks.map((subtask, index) => {
                 const id = subtask.id;
-                const isDone = id ? completedParts.has(id) : subtask.completed || subtask.status === "done" || subtask.status === "completed";
+                const isDone = id
+                  ? completedParts.has(id)
+                  : subtask.completed || subtask.status === "done" || subtask.status === "completed";
                 return (
                   <TouchableOpacity
                     key={subtask.id || `subtask-${index}`}
@@ -513,7 +524,7 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
               })}
             </View>
           </View>
-        )} 
+        )}
 
         {/* Notes */}
         {task.notes && (
