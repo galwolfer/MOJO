@@ -4,6 +4,7 @@ import { Task } from "../../models/Task.js";
 import { fetchScheduledSessions, getScheduleWindow, getSessionDateKey } from "./taskScheduleUtils.js";
 import { formatLocalDate } from "../../utils/dateUtils.js";
 import { okFalse, okTrue } from "../lib/errorFormatter.js";
+import { getDisplayName } from "../../config/categories.js";
 
 const getUpcomingTasksMission = new LightMission({
   name: "get_upcoming_tasks",
@@ -54,6 +55,7 @@ const getUpcomingTasksMission = new LightMission({
             subCategory: task.subCategory || null,
             subcategory: task.subCategory ? task.subCategory.label : null,
             category: task.category || null,
+            categoryDisplay: getDisplayName(task.category),
             tags: task.tags,
             description: task.description,
             estimatedDuration: task.estimatedDuration,

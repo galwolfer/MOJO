@@ -2,8 +2,8 @@ import { z } from "zod";
 import { LightMission } from "./LightMission.js";
 import { Task } from "../../models/Task.js";
 import { User } from "../../models/User.js";
-import { getCategoryIndex } from "../../config/categories.js";
-import { okFalse } from "../lib/errorFormatter.js";
+import { getCategoryIndex, CATEGORY_DISPLAY_NAMES } from "../../config/categories.js";
+import { okFalse, okTrue } from "../lib/errorFormatter.js";
 
 const getSubcategories = new LightMission({
   name: "get_subcategories",
@@ -16,13 +16,25 @@ const getSubcategories = new LightMission({
   execute: async ({ userId, args }) => {
     const { category } = args;
     try {
-      // Normalize incoming category key
-      const categoryKey = (category || "").toLowerCase().replace(/[^a-z_]/g, "");
+      // Normalize incoming category key or display name
+      let categoryKey = (category || "").toLowerCase().replace(/[^a-z_]/g, "");
+
+      // If it's not a valid category key, try to match display names
+      try {
+        // getCategoryIndex throws on invalid key
+        if (categoryKey) getCategoryIndex(categoryKey);
+      } catch (err) {
+        const normalize = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+        const found = Object.entries(CATEGORY_DISPLAY_NAMES).find(
+          ([, display]) => normalize(display) === normalize(category),
+        );
+        if (found) categoryKey = found[0];
+      }
 
       // 1) Get user-specific subcategories from User.subCategories (stored as {name, category})
       let userSubs = [];
       try {
-        const idx = getCategoryIndex(category);
+        const idx = getCategoryIndex(categoryKey || category);
         const user = await User.findById(userId).lean();
         if (user && Array.isArray(user.subCategories)) {
           userSubs = user.subCategories
@@ -43,7 +55,8 @@ const getSubcategories = new LightMission({
       const combined = new Set([...userSubs, ...validTaskSubs]);
       const final = Array.from(combined);
 
-      return `ok=true\nsubcategories=${JSON.stringify(final)}`;
+      // Return as a structured ok=true payload (subcategories key is JSON-encoded by okTrue)
+      return okTrue({ subcategories: final });
     } catch (error) {
       return okFalse(error.message);
     }

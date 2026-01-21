@@ -4,6 +4,7 @@ import * as taskService from "../../services/taskService.js";
 import { fetchScheduledSessionsByTask, getScheduleWindow } from "./taskScheduleUtils.js";
 import { buildTaskDetailData } from "./taskPayloads.js";
 import { okFalse, okTrue } from "../lib/errorFormatter.js";
+import { getDisplayName } from "../../config/categories.js";
 
 const getTasksMission = new LightMission({
   name: "get_tasks",
@@ -79,6 +80,7 @@ const getTasksMission = new LightMission({
             subCategory: t.subCategory || null,
             subcategory: t.subCategory ? t.subCategory.label : null,
             category: t.category || null,
+            categoryDisplay: getDisplayName(t.category),
             tags: t.tags,
             description: t.description,
             estimatedDuration: t.estimatedDuration,

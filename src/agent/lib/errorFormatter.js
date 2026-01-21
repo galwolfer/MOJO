@@ -5,6 +5,11 @@ export function okTrue(data = {}) {
   if (data.msg) parts.push(`msg="${data.msg}"`);
   if (data.id) parts.push(`id="${data.id}"`);
   if (data.count !== undefined) parts.push(`count=${data.count}`);
+  // Append any other keys as JSON-encoded payload lines (e.g., subcategories=[...])
+  for (const [k, v] of Object.entries(data)) {
+    if (["msg", "id", "count"].includes(k)) continue;
+    parts.push(`${k}=${JSON.stringify(v)}`);
+  }
   return parts.join("\n");
 }
 

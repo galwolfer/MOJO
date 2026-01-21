@@ -3,6 +3,7 @@ import { LightMission } from "./LightMission.js";
 import * as taskService from "../../services/taskService.js";
 import { fetchScheduledSessionsByTask, getScheduleWindow } from "./taskScheduleUtils.js";
 import { okFalse, okTrue } from "../lib/errorFormatter.js";
+import { getDisplayName } from "../../config/categories.js";
 
 const getOverdueTasksMission = new LightMission({
   name: "get_overdue_tasks",
@@ -45,6 +46,7 @@ const getOverdueTasksMission = new LightMission({
             subCategory: t.subCategory || null,
             subcategory: t.subCategory ? t.subCategory.label : null,
             category: t.category || null,
+            categoryDisplay: getDisplayName(t.category),
             tags: t.tags,
             description: t.description,
             estimatedDuration: t.estimatedDuration,
