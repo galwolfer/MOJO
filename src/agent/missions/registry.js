@@ -6,6 +6,7 @@ import previewTaskMission from "./previewTask.js";
 import addTaskMission from "./addTask.js";
 import getTasksMission from "./getTasks.js";
 import updateTaskMission from "./updateTask.js";
+import completeTaskMission from "./completeTask.js";
 import deleteTaskMission from "./deleteTask.js";
 import getUpcomingTasksMission from "./getUpcomingTasks.js";
 import getOverdueTasksMission from "./getOverdueTasks.js";
@@ -62,6 +63,7 @@ export const missionRegistry = new MissionRegistry([
   addTaskMission,
   getTasksMission,
   updateTaskMission,
+  completeTaskMission,
   deleteTaskMission,
   getUpcomingTasksMission,
   getOverdueTasksMission,

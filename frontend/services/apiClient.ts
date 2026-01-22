@@ -27,15 +27,49 @@ export type AuthResponse = {
     username: string;
     email?: string;
     displayName?: string;
+    profileImage?: string | null;
   };
 };
+
+// Raw API response type (what backend actually returns)
+type RawAuthResponse = {
+  success: boolean;
+  token: string;
+  user: {
+    id: string;
+    username: string;
+    email?: string;
+    profile?: {
+      name?: string;
+      profileImage?: string | null;
+    };
+  };
+};
+
+/**
+ * Transform raw API user to frontend User type
+ */
+function transformUser(raw: RawAuthResponse["user"]): AuthResponse["user"] {
+  return {
+    id: raw.id,
+    username: raw.username,
+    email: raw.email,
+    displayName: raw.profile?.name || undefined,
+    profileImage: raw.profile?.profileImage || null,
+  };
+}
 
 /**
  * Login user
  * POST /api/auth/login
  */
 export async function login(payload: LoginRequest): Promise<AuthResponse> {
-  return post<AuthResponse>("/auth/login", payload);
+  const raw = await post<RawAuthResponse>("/auth/login", payload);
+  return {
+    success: raw.success,
+    token: raw.token,
+    user: transformUser(raw.user),
+  };
 }
 
 /**
@@ -43,7 +77,12 @@ export async function login(payload: LoginRequest): Promise<AuthResponse> {
  * POST /api/auth/register
  */
 export async function register(payload: RegisterRequest): Promise<AuthResponse> {
-  return post<AuthResponse>("/auth/register", payload);
+  const raw = await post<RawAuthResponse>("/auth/register", payload);
+  return {
+    success: raw.success,
+    token: raw.token,
+    user: transformUser(raw.user),
+  };
 }
 
 /**

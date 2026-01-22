@@ -84,7 +84,6 @@ export default function UserProfileScreen() {
   const [progressData, setProgressData] = useState<number[]>(DEFAULT_PROGRESS);
   const [taskProgress, setTaskProgress] = useState<TaskProgress | null>(null);
   const [tasks, setTasksState] = useState<Task[]>([]);
-  const pollRef = useRef<NodeJS.Timeout | null>(null);
   const mountedRef = useRef(true);
 
   const SettingsIcon = ICONS.settings;
@@ -181,13 +180,8 @@ export default function UserProfileScreen() {
   useEffect(() => {
     mountedRef.current = true;
     fetchAllData();
-    pollRef.current = setInterval(fetchAllData, 5000);
     return () => {
       mountedRef.current = false;
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
     };
   }, [fetchAllData]);
 
@@ -195,10 +189,6 @@ export default function UserProfileScreen() {
     const onState = (state: AppStateStatus) => {
       if (state === "active") {
         fetchAllData();
-        if (!pollRef.current) pollRef.current = setInterval(fetchAllData, 5000);
-      } else if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
       }
     };
     const sub = AppState.addEventListener("change", onState);
