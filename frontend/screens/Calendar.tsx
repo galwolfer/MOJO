@@ -17,7 +17,7 @@ import React, { useEffect, useRef, useState } from "react";
  * <CalendarScreen />
  * ```
  */
-import { View, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Platform } from "react-native";
+import { View, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Platform, Animated } from "react-native";
 import AppText from "../components/common/AppText";
 import { COLORS, SPACING, FONT_SIZES, SHADOWS, TYPOGRAPHY, FONTS } from "../theme";
 import { useNavigation } from "../context/NavigationContext";
@@ -25,6 +25,8 @@ import { ICONS } from "../components/icons/icons";
 import { getCategoryMeta } from "../config/categoryMeta";
 import { Checkbox } from "../components/icons/Checkbox.native";
 import { ProgressIcon } from "../components/icons/ProgressIcon.native";
+import DateSelector from "../components/layout/DateSelector";
+import CalendarPicker from "../components/inputs/CalendarPicker";
 
 /**
  * Subtask interface
@@ -52,6 +54,7 @@ interface Task {
   color: string;
   category?: string;
   subtasks?: Subtask[];
+  dateString?: string; // Date in YYYY-MM-DD format for filtering
 }
 
 /**
@@ -78,11 +81,22 @@ export default function CalendarScreen() {
     setSelectedDate(stripTime(new Date()));
   }, []);
 
+  // Animation for Mojo logo rotation
+  const rotationValue = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(rotationValue, {
+        toValue: 1,
+        duration: 3000,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, [rotationValue]);
+
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [completedTasks, setCompletedTasks] = useState<Set<string>>(new Set());
   const [completedSubtasks, setCompletedSubtasks] = useState<Set<string>>(new Set());
-  
-  const daysScrollRef = useRef<ScrollView>(null);
+  const [showCalendarPicker, setShowCalendarPicker] = useState<boolean>(false);
 
   const taskGroups: TaskGroup[] = [
     {
@@ -100,6 +114,7 @@ export default function CalendarScreen() {
           completed: false,
           color: "#FF69B4",
           category: "relationship",
+          dateString: "2025-12-10",
         },
         {
           id: "2",
@@ -113,6 +128,7 @@ export default function CalendarScreen() {
           completed: false,
           color: "#FFA726",
           category: "study_and_education",
+          dateString: "2025-12-10",
           subtasks: [
             { id: "2a", title: "Exercise 1", description: "Complete binary search tree implementation", completed: true },
             { id: "2b", title: "Exercise 2", description: "Implement quicksort algorithm with optimizations", completed: true },
@@ -131,6 +147,7 @@ export default function CalendarScreen() {
           completed: false,
           color: "#66BB6A",
           category: "workout",
+          dateString: "2025-12-10",
         },
         {
           id: "4",
@@ -144,6 +161,7 @@ export default function CalendarScreen() {
           completed: false,
           color: "#AB47BC",
           category: "hobbies",
+          dateString: "2025-12-10",
         },
       ],
     },
@@ -162,6 +180,7 @@ export default function CalendarScreen() {
           completed: false,
           color: "#42A5F5",
           category: "skill_building",
+          dateString: "2025-12-11",
         },
         {
           id: "6",
@@ -175,6 +194,7 @@ export default function CalendarScreen() {
           completed: false,
           color: "#66BB6A",
           category: "workout",
+          dateString: "2025-12-11",
         },
       ],
     },
@@ -190,51 +210,89 @@ export default function CalendarScreen() {
     setActiveTab("create");
   };
 
-  const getDaysArray = () => {
-    const days = [];
-    const now = new Date();
-    const startDate = new Date(selectedDate);
-    startDate.setDate(startDate.getDate() - 2);
+  const handleEditTask = (taskToEdit: Task) => {
+    // Navigate to EditTask screen
+    // For now, we'll create a simple navigation by setting a modal state
+    // In a production app, you'd use React Navigation with route params
+    console.log("Editing task:", taskToEdit);
+    setActiveTab("edit" as any);
+  };
 
-    for (let i = 0; i < 5; i++) {
-      const date = new Date(startDate);
-      date.setDate(date.getDate() + i);
-      days.push({
-        date: date.getDate(),
-        dayName: date.toLocaleDateString("en-US", { weekday: "short" }).slice(0, 3),
-        isSelected: date.toDateString() === selectedDate.toDateString(),
-        isToday: date.toDateString() === now.toDateString(), // ✅ חדש
-        fullDate: date,
-      });
-    }
+  /**
+   * Convert local Date to YYYY-MM-DD string without UTC conversion
+   * Fixes timezone offset bugs where selecting a date can shift by one day
+   */
+  const getLocalDateString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  /**
+   * Get tasks filtered by selected date
+   */
+  const getFilteredTaskGroups = (): TaskGroup[] => {
+    const selectedDateString = getLocalDateString(selectedDate);
     
-    return days;
+    const filteredGroups: TaskGroup[] = [];
+    
+    taskGroups.forEach(group => {
+      const matchingTasks = group.tasks.filter(task => task.dateString === selectedDateString);
+      
+      if (matchingTasks.length > 0) {
+        filteredGroups.push({
+          date: group.date,
+          tasks: matchingTasks,
+        });
+      }
+    });
+    
+    return filteredGroups;
   };
 
-  const handlePrevDay = () => {
-    const newDate = new Date(selectedDate);
-    newDate.setDate(newDate.getDate() - 1);
-    setSelectedDate(newDate);
+  const filteredTaskGroups = getFilteredTaskGroups();
+
+  /**
+   * Renders empty state when no tasks exist for selected date
+   */
+  const renderEmptyState = () => {
+    const rotation = rotationValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    });
+
+    return (
+    <View style={[styles.emptyStateContainer, showCalendarPicker && styles.emptyStateContainerWithCalendar]}>
+      <View style={styles.emptyStateContent}>
+        <Animated.View style={{ transform: [{ rotate: rotation }] }}>
+          {ICONS.bestojo && React.createElement(ICONS.bestojo, {
+            size: 120,
+            color: COLORS.primary1,
+          })}
+        </Animated.View>
+        
+        <AppText style={styles.emptyStateTitle}>No Tasks Today</AppText>
+        
+        <AppText style={styles.emptyStateDescription}>
+          You have cleared your schedule!
+        </AppText>
+        
+        <AppText style={styles.emptyStateSubtext}>
+          Want to add a new task or goal for this day?
+        </AppText>
+        
+        <TouchableOpacity 
+          style={styles.emptyStateButton}
+          activeOpacity={0.8}
+          onPress={handleAddTask}
+        >
+          <AppText style={styles.emptyStateButtonText}>+ Add Task</AppText>
+        </TouchableOpacity>
+      </View>
+    </View>
+    );
   };
-
-  const handleNextDay = () => {
-    const newDate = new Date(selectedDate);
-    newDate.setDate(newDate.getDate() + 1);
-    setSelectedDate(newDate);
-  };
-
-  const days = getDaysArray();
-
-  useEffect(() => {
-    // Recalculate days inside effect to ensure we have the latest state
-    const currentDays = getDaysArray();
-    const selectedIndex = currentDays.findIndex((d) => d.isSelected);
-    if (selectedIndex < 0) return;
-
-    // For 5 days with the selected date at index 2 (middle position),
-    // no horizontal scrolling is needed as all days fit in the viewport
-    daysScrollRef.current?.scrollTo({ x: 0, animated: false });
-  }, [selectedDate]);
 
   /**
    * Calculate progress for a task with subtasks
@@ -308,7 +366,10 @@ export default function CalendarScreen() {
           <View style={[styles.expandedColorBarFull, { backgroundColor: categoryMeta?.color || task.color }]} />
 
           {/* Top-right edit button */}
-          <TouchableOpacity style={styles.expandedEditButtonTopRight}>
+          <TouchableOpacity 
+            style={styles.expandedEditButtonTopRight}
+            onPress={() => handleEditTask(task)}
+          >
             <ICONS.edit size={18} color={COLORS.darkGray} />
           </TouchableOpacity>
 
@@ -466,14 +527,16 @@ export default function CalendarScreen() {
           {task.subtasks && task.subtasks.length > 0 && (
             <ProgressIcon value={getTaskProgress(task)} size={24} />
           )}
-          {IconComponent && categoryMeta && (
-            <View style={[styles.categoryIconContainerCompact, { backgroundColor: categoryMeta.color }]}>
-              {React.createElement(IconComponent, {
-                size: 16,
-                color: COLORS.colorWhite,
-              })}
-            </View>
-          )}
+          <TouchableOpacity onPress={() => handleEditTask(task)}>
+            {IconComponent && categoryMeta && (
+              <View style={[styles.categoryIconContainerCompact, { backgroundColor: categoryMeta.color }]}>
+                {React.createElement(IconComponent, {
+                  size: 16,
+                  color: COLORS.colorWhite,
+                })}
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
@@ -559,53 +622,30 @@ export default function CalendarScreen() {
           <View style={styles.headerInnerClip}>
             <View style={styles.headerCard}>
               <View style={styles.headerTitleRow}>
-                <View style={styles.headerIcon}>
+                <TouchableOpacity 
+                  style={styles.headerIcon}
+                  onPress={() => setShowCalendarPicker(!showCalendarPicker)}
+                  activeOpacity={0.7}
+                >
                   <ICONS.calendar size={28} color={COLORS.primary1} />
-                </View>
+                </TouchableOpacity>
                 <AppText style={styles.headerTitle}>MY TASKS</AppText>
               </View>
 
-              <View style={styles.headerDaySelector}>
-                <TouchableOpacity onPress={handlePrevDay} style={[styles.navButton, styles.navCircle]}>
-                  <ICONS.left size={18} color={COLORS.colorWhite} />
-                </TouchableOpacity>
-
-                <View style={styles.daysRow}>
-                  {days.map((day, idx) => {
-                    const isToday = day.isToday;
-                    const isSelected = day.isSelected;
-
-                    const showPill = isSelected;
-                    const showDot = isToday;
-                    const dotWhite = isToday && isSelected;
-
-                    return (
-                      <TouchableOpacity
-                        key={idx}
-                        style={[styles.dayItem, showPill && styles.dayItemSelected]}
-                        onPress={() => setSelectedDate(day.fullDate)}
-                        activeOpacity={0.85}
-                      >
-                        <AppText style={[styles.dayName, showPill && styles.dayTextOnPill]}>
-                          {day.dayName}
-                        </AppText>
-
-                        <AppText style={[styles.dayDate, showPill && styles.dayTextOnPill]}>
-                          {day.date}
-                        </AppText>
-
-                        {showDot && (
-                          <View style={[styles.todayDot, dotWhite && styles.todayDotOnPill]} />
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                <TouchableOpacity onPress={handleNextDay} style={[styles.navButton, styles.navCircle]}>
-                  <ICONS.right size={18} color={COLORS.colorWhite} />
-                </TouchableOpacity>
-              </View>
+              {showCalendarPicker ? (
+                <CalendarPicker 
+                  onDateSelect={(dateString) => {
+                    const date = new Date(dateString);
+                    setSelectedDate(date);
+                  }}
+                  selectedDate={getLocalDateString(selectedDate)}
+                  allowPastDates={true}
+                  allowPreviousMonths={true}
+                  lighterPastDates={true}
+                />
+              ) : (
+                <DateSelector selectedDate={selectedDate} setSelectedDate={setSelectedDate} />
+              )}
             </View>
           </View>
         </View>
@@ -618,8 +658,11 @@ export default function CalendarScreen() {
         contentContainerStyle={styles.tasksListContent}
         showsVerticalScrollIndicator={false}
       >
-        {taskGroups.map((group, groupIdx) => (
-          <View key={groupIdx} style={styles.dayGroupContainer}>
+        {filteredTaskGroups.length === 0 ? (
+          renderEmptyState()
+        ) : (
+          filteredTaskGroups.map((group, groupIdx) => (
+            <View key={groupIdx} style={styles.dayGroupContainer}>
             {/* Tasks for this date - wrapped in container with date header inside */}
             <View style={styles.tasksGroupWrapper}>
               <View style={styles.dateHeaderInWrapper}>
@@ -631,17 +674,20 @@ export default function CalendarScreen() {
               </View>
             </View>
           </View> 
-        ))}
+        ))
+        )}
       </ScrollView>
 
-      {/* Floating ADD Button */}
-      <TouchableOpacity
-        style={styles.floatingButton}
-        activeOpacity={0.8}
-        onPress={handleAddTask}
-      >
-        <AppText style={styles.floatingButtonText}>+</AppText>
-      </TouchableOpacity>
+      {/* Floating ADD Button - Show only when there are tasks */}
+      {filteredTaskGroups.length > 0 && (
+        <TouchableOpacity
+          style={styles.floatingButton}
+          activeOpacity={0.8}
+          onPress={handleAddTask}
+        >
+          <AppText style={styles.floatingButtonText}>+</AppText>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -681,18 +727,8 @@ const styles = StyleSheet.create({
       ? (StatusBar.currentHeight ?? 0) + 6
       : 44,
 
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.sm,
-  },
-  headerDaySelector: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.sm,
-    backgroundColor: "transparent",
-    borderRadius: 20,
     paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.md,
-    alignSelf: "stretch",
+    paddingBottom: 0,
   },
   headerShadow: {
     // shadow only
@@ -705,73 +741,12 @@ const styles = StyleSheet.create({
     // חשוב: לא לחתוך צל
     overflow: "visible",
   },
-  navButton: {
-    padding: SPACING.sm,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  navCircle: {
-    backgroundColor: COLORS.primary1,
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-  },
   headerIcon: {
     marginTop: 0,
     marginRight: SPACING.sm,
     justifyContent: "center",
     alignItems: "center",
     alignSelf: "center",
-  },
-  daysScroll: {
-    flex: 1,
-    minWidth: 0,
-  },
-  daysContainer: {
-    gap: 6,
-    paddingHorizontal: 0,
-    paddingRight: 0,
-    flexGrow: 1,
-    alignItems: "center",
-  },
-  dayItem: {
-    alignItems: "center",
-    justifyContent: "center",
-    width: 40,
-    height: 72,
-    borderRadius: 28,
-    backgroundColor: "transparent",
-  },
-
-  dayItemSelected: {
-    backgroundColor: COLORS.primary1,
-    width: 70,
-    height: 72,
-    borderRadius: 28,
-  },
-
-  dayName: {
-    fontFamily: FONTS.fredokaRegular,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.primary1,
-    fontWeight: "400",
-    marginBottom: 2,
-  },
-  dayNameSelected: {
-    fontFamily: FONTS.fredokaBold,
-    color: COLORS.colorWhite,
-    fontWeight: "600",
-  },
-  dayDate: {
-    fontFamily: FONTS.fredokaSemiBold,
-    fontSize: FONT_SIZES.md,
-    color: COLORS.black,
-    fontWeight: "600",
-  },
-  dayDateSelected: {
-    fontFamily: FONTS.fredokaSemiBold,
-    color: COLORS.colorWhite,
-    fontWeight: "600",
   },
   tasksList: {
     flex: 1,
@@ -1032,6 +1007,57 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontFamily: FONTS.fredokaRegular,
     paddingHorizontal: 0,
+  },
+  // ===== EMPTY STATE STYLES =====
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: SPACING.md,
+  },
+  emptyStateContainerWithCalendar: {
+    marginTop: -80,
+  },
+  emptyStateContent: {
+    alignItems: "center",
+    gap: SPACING.lg,
+  },
+  emptyStateTitle: {
+    fontFamily: FONTS.fredokaSemiBold,
+    fontSize: FONT_SIZES.lg,
+    color: COLORS.primary1,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  emptyStateDescription: {
+    fontFamily: FONTS.fredokaRegular,
+    fontSize: FONT_SIZES.base,
+    color: COLORS.darkGray,
+    fontWeight: "500",
+    textAlign: "center",
+  },
+  emptyStateSubtext: {
+    fontFamily: FONTS.fredokaRegular,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.lightGray,
+    fontWeight: "400",
+    textAlign: "center",
+    marginBottom: SPACING.sm,
+  },
+  emptyStateButton: {
+    backgroundColor: "#2ecc71",
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: 12,
+    marginTop: SPACING.md,
+    ...SHADOWS.card,
+  },
+  emptyStateButtonText: {
+    fontFamily: FONTS.fredokaSemiBold,
+    fontSize: FONT_SIZES.base,
+    color: COLORS.white,
+    fontWeight: "600",
+    textAlign: "center",
   },
   // ===== COMPACT TASK CARD STYLES =====
   taskCardCompact: {
@@ -1411,47 +1437,12 @@ const styles = StyleSheet.create({
   detailEditButton: {
     padding: 4,
   },
-  daysRow: {
-    flex: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: SPACING.sm,
-  },
-  dayItemToday: {
-    backgroundColor: COLORS.primary1,
-  },
-  dayTextToday: {
-    color: COLORS.colorWhite,
-    fontWeight: "600",
-  },
-
-  dayTextSelected: {
-    color: COLORS.white,
-    fontWeight: "600",
-  },
-
   selectedDot: {
     marginTop: 6,
     width: 18,
     height: 6,
     borderRadius: 3,
     backgroundColor: COLORS.white,
-  },
-  dayTextOnPill: {
-    color: COLORS.colorWhite,
-    fontWeight: "600",
-  },
-  todayDot: {
-    marginTop: 6,
-    width: 18,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: COLORS.primary1,
-  },
-
-  todayDotOnPill: {
-    backgroundColor: COLORS.colorWhite,
   },
   headerOuterShadow: {
     marginBottom: 14,

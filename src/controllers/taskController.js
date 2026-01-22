@@ -513,6 +513,39 @@ export async function updateTask(req, res) {
       }
     }
 
+    // Tags
+    if (raw.tags !== undefined) {
+      if (Array.isArray(raw.tags)) {
+        // Validate each tag
+        const validTags = raw.tags
+          .filter(tag => typeof tag === "string")
+          .map(tag => tag.trim())
+          .filter(tag => tag.length > 0);
+        updates.tags = validTags;
+      }
+    }
+
+    // Subtasks
+    if (raw.subtasks !== undefined) {
+      if (Array.isArray(raw.subtasks)) {
+        // Validate each subtask
+        const validSubtasks = raw.subtasks
+          .filter(sub => sub && typeof sub === "object")
+          .map(sub => ({
+            id: sub.id || undefined,
+            title: sub.title ? String(sub.title).trim() : "",
+            description: sub.description ? String(sub.description).trim() : "",
+            minutes: sub.minutes ? Number(sub.minutes) : 30,
+            index: sub.index !== undefined ? Number(sub.index) : undefined,
+          }))
+          .filter(sub => sub.title.length > 0);
+        
+        if (validSubtasks.length > 0) {
+          updates.subtasks = validSubtasks;
+        }
+      }
+    }
+
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ success: false, error: "No valid fields to update" });
     }

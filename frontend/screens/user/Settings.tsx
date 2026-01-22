@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { View, StyleSheet, TouchableOpacity, Image, Alert } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
@@ -63,24 +63,20 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
 
   useEffect(() => {
     setHeaderConfig({
-      title: "Mojo",
       show: true,
-      icon: ICONS.mojo,
       leftElement: (
-        <TouchableOpacity onPress={onBack} style={styles.headerButton}>
-          <LeftIcon size={24} color={COLORS.primary1} />
-        </TouchableOpacity>
-      ),
-      rightElement: (
-        <View style={styles.headerButton}>
-          <ICONS.settings size={24} color={COLORS.primary1} />
-          <AppText variant="boldText" style={{ color: COLORS.primary1 }}>
-            Settings
+        <View style={{ flexDirection: "row", alignItems: "center", gap: SPACING.sm }}>
+          <TouchableOpacity onPress={onBack} style={styles.headerButton}>
+            <LeftIcon size={24} color={COLORS.primary1} />
+          </TouchableOpacity>
+          {ICONS.settings && React.createElement(ICONS.settings, { size: 24, color: COLORS.primary1 })}
+          <AppText variant="title2" style={{ color: COLORS.primary1 }}>
+            SETTINGS
           </AppText>
         </View>
       ),
     });
-  }, [onBack]);
+  }, []);
 
   const handleEditProfile = () => {
     setIsEditMode(true);
@@ -301,14 +297,6 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
       contentContainerStyle={styles.contentContainer}
       extraBottomPadding={SPACING.xlg * 3}
     >
-      {/* Settings Title */}
-      <View style={styles.titleSection}>
-        <ICONS.settings size={28} color={COLORS.primary1} />
-        <AppText variant="title2" style={styles.title}>
-          SETTINGS
-        </AppText>
-      </View>
-
       {/* Profile Settings Section */}
       <Box title="Profile Settings" titleColor={COLORS.primary1}>
         <View style={styles.profileContent}>

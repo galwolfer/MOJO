@@ -8,12 +8,15 @@
 import React, { useState, useMemo } from "react";
 import { View, StyleSheet, Pressable } from "react-native";
 import AppText from "../common/AppText";
-import { COLORS, SPACING, FONT_SIZES, SHADOWS } from "../../theme";
+import { COLORS, SPACING, FONT_SIZES, SHADOWS, FONTS } from "../../theme";
 import { ICONS } from "../icons/icons";
 
 interface CalendarPickerProps {
   onDateSelect: (date: string) => void;
   selectedDate?: string;
+  allowPastDates?: boolean;
+  allowPreviousMonths?: boolean;
+  lighterPastDates?: boolean;
 }
 
 interface DayCell {
@@ -22,7 +25,7 @@ interface DayCell {
   dateString: string;
 }
 
-const CalendarPicker: React.FC<CalendarPickerProps> = ({ onDateSelect, selectedDate }) => {
+const CalendarPicker: React.FC<CalendarPickerProps> = ({ onDateSelect, selectedDate, allowPastDates = false, allowPreviousMonths = false, lighterPastDates = false }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
 
   const monthName = currentDate.toLocaleString("en-US", { month: "long", year: "numeric" });
@@ -45,9 +48,19 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({ onDateSelect, selectedD
     let day = new Date(startDate);
 
     // Generate 6 weeks worth of days (42 days)
-    for (let i = 0; i < 42; i++) {
+    const leadingDays = firstDay.getDay();      // כמה ימים ריקים לפני ה-1 בחודש
+    const daysInMonth = lastDay.getDate();      // כמה ימים יש בחודש
+    const totalNeeded = leadingDays + daysInMonth;
+
+    const weeks = Math.ceil(totalNeeded / 7);   // כמה שורות לוח צריך (4/5/6)
+    const cellsCount = weeks * 7;               // כמה תאים באמת נדרשים
+
+    for (let i = 0; i < cellsCount; i++) {
       const isCurrentMonth = day.getMonth() === month;
-      const dateString = day.toISOString().split("T")[0]; // YYYY-MM-DD format
+      const year = day.getFullYear();
+      const month_ = String(day.getMonth() + 1).padStart(2, '0');
+      const date = String(day.getDate()).padStart(2, '0');
+      const dateString = `${year}-${month_}-${date}`;
 
       days.push({
         date: day.getDate(),
@@ -60,6 +73,7 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({ onDateSelect, selectedD
     }
 
     return days;
+
   };
 
   const calendarDays = useMemo(() => getCalendarDays(), [currentDate]);
@@ -88,6 +102,12 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({ onDateSelect, selectedD
     return date < today;
   };
 
+  const isToday = (dateString: string) => {
+    const date = new Date(dateString);
+    const today = new Date();
+    return date.toDateString() === today.toDateString();
+  };
+
   const isCurrentMonth = () => {
     const today = new Date();
     return currentDate.getMonth() === today.getMonth() && 
@@ -99,14 +119,14 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({ onDateSelect, selectedD
       {/* Header with Month/Year and Navigation */}
       <View style={styles.header}>
         <Pressable 
-          style={[styles.navButton, isCurrentMonth() && styles.navButtonDisabled]} 
+          style={[styles.navButton, !allowPreviousMonths && isCurrentMonth() && styles.navButtonDisabled]} 
           onPress={handlePrevMonth}
-          disabled={isCurrentMonth()}
+          disabled={!allowPreviousMonths && isCurrentMonth()}
         >
           {ICONS.left &&
             React.createElement(ICONS.left, {
               size: 24,
-              color: isCurrentMonth() ? "#B8B3CC" : COLORS.white,
+              color: !allowPreviousMonths && isCurrentMonth() ? "#B8B3CC" : COLORS.white,
             })}
         </Pressable>
 
@@ -134,15 +154,17 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({ onDateSelect, selectedD
       <View style={styles.calendarGrid}>
         {calendarDays.map((day, index) => {
           const isPast = isDateInPast(day.dateString);
-          const isDisabled = !day.isCurrentMonth || isPast;
-          
+          const isDisabled = !day.isCurrentMonth || (isPast && !allowPastDates);
+          const weeksCount = Math.ceil(calendarDays.length / 7);
+          const lastRowStartIndex = (weeksCount - 1) * 7;
+          const isLastRow = index >= lastRowStartIndex;
           return (
             <Pressable
               key={index}
               style={[
                 styles.dateCell,
                 !day.isCurrentMonth && styles.dateCellInactive,
-                isPast && styles.dateCellPast,
+                isPast && (lighterPastDates ? styles.dateCellPastLighter : styles.dateCellPast),
                 isDateSelected(day.dateString) && styles.dateCellSelected,
               ]}
               onPress={() => !isDisabled && handleDatePress(day.dateString)}
@@ -151,13 +173,17 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({ onDateSelect, selectedD
               <AppText
                 style={[
                   styles.dateText,
+                  !isLastRow && { marginBottom: 10 },
                   !day.isCurrentMonth && styles.dateTextInactive,
-                  isPast && styles.dateTextPast,
+                  isPast && (lighterPastDates ? styles.dateTextPastLighter : styles.dateTextPast),
                   isDateSelected(day.dateString) && styles.dateTextSelected,
                 ]}
               >
                 {day.date}
               </AppText>
+              {isToday(day.dateString) && (
+                <View style={[styles.todayDot, isDateSelected(day.dateString) && styles.todayDotSelected]} />
+              )}
             </Pressable>
           );
         })}
@@ -168,9 +194,11 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({ onDateSelect, selectedD
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.white,
+    backgroundColor: "#FFFFFF",
     borderRadius: 16,
-    padding: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.md,
+    paddingBottom: 2,
   },
   header: {
     flexDirection: "row",
@@ -198,6 +226,7 @@ const styles = StyleSheet.create({
     color: COLORS.primary1,
     textAlign: "center",
     flex: 1,
+    fontFamily: FONTS.fredokaSemiBold,
   },
   dayLabelsContainer: {
     flexDirection: "row",
@@ -218,7 +247,7 @@ const styles = StyleSheet.create({
   calendarGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    paddingHorizontal: 4,
+    // paddingHorizontal: 4,
   },
   dateCell: {
     width: "14.285%", // 7 columns (100/7)
@@ -226,13 +255,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderRadius: 10,
-    marginBottom: 16,
+    marginBottom: 5,
   },
   dateCellInactive: {
     opacity: 1,
   },
   dateCellPast: {
     opacity: 0.4,
+  },
+  dateCellPastLighter: {
+    opacity: 0.9,
   },
   dateCellSelected: {
     backgroundColor: COLORS.primary1,
@@ -251,9 +283,22 @@ const styles = StyleSheet.create({
     color: "#D0CBDF", // Very light purple-gray for past dates
     textDecorationLine: "line-through",
   },
+  dateTextPastLighter: {
+    color: "#D0CBDF",
+  },
   dateTextSelected: {
     color: COLORS.white,
+    fontFamily: FONTS.fredokaSemiBold,
     fontWeight: "500",
+  },
+  todayDot: {
+    width: 18,
+    height: 3,
+    borderRadius: 0,
+    backgroundColor: COLORS.primary1,
+  },
+  todayDotSelected: {
+    backgroundColor: COLORS.white,
   },
 });
 

@@ -398,6 +398,8 @@ export async function updateTask({ userId, taskId, updates }) {
     "category",
     "subCategory",
     "actualCompletionMinutes",
+    "tags",
+    "subtasks",
   ];
 
   const sanitizedUpdates = {};
