@@ -48,8 +48,8 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
 
   const LeftIcon = ICONS.left;
   const UserIcon = ICONS.user;
-  const EditIcon = ICONS.edit;
-  const ChatIcon = ICONS.mojo;
+  const EditIcon = ICONS.prefrences;
+  const ChatIcon = ICONS.ojo;
   const NotificationIcon = ICONS.notifications;
   const PencilIcon = ICONS.edit;
 
