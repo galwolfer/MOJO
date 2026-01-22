@@ -156,3 +156,46 @@ export const getColoredDataUri = (fileName: string, color: string) => {
 
   return `data:image/svg+xml;base64,${newBase64}`;
 };
+
+/**
+ * sessionRowData
+ * Extracts the display-friendly pieces for a scheduled session row.
+ * Keeps rendering logic in components clean and testable.
+ */
+export function sessionRowData(
+  session?: ScheduledSession,
+  subtasks?: Subtask[],
+  index?: number,
+  options?: { width?: number },
+) {
+  const subtask = session ? (subtasks || []).find((st) => st.id === (session as any).subtaskId) : undefined;
+
+  // Build a compact or full time range depending on available width
+  let timeRangeText = "";
+  if (session?.start) {
+    try {
+      const start = new Date(session.start as string);
+      const startText = start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+
+      if (!session.end) {
+        timeRangeText = startText;
+      } else if (options?.width && options.width <= 600) {
+        // compact: show only the start time when width is small
+        timeRangeText = startText;
+      } else {
+        // full range
+        timeRangeText = formatTimeRange(session);
+      }
+    } catch {
+      timeRangeText = "";
+    }
+  }
+
+  return {
+    subtask,
+    dateText: formatDate(session?.start),
+    timeRangeText,
+    label: getSessionLabel(session || ({} as ScheduledSession), index),
+    durationMinutes: subtask?.duration,
+  };
+}

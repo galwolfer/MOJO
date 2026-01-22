@@ -119,11 +119,6 @@ const Widget: React.FC<WidgetProps> = ({
       ]}
     >
       {children}
-      {animating ? (
-        <View style={styles.debugBadge} pointerEvents="none">
-          <Text style={styles.debugBadgeText}>anim</Text>
-        </View>
-      ) : null}
     </Animated.View>
   );
 };
@@ -134,21 +129,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white3,
     borderRadius: SPACING.lg,
     padding: SPACING.lg,
-  },
-  debugBadge: {
-    position: "absolute",
-    top: 6,
-    right: 6,
-    backgroundColor: "rgba(255,0,0,0.85)",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    zIndex: 2000,
-  },
-  debugBadgeText: {
-    color: COLORS.colorWhite,
-    fontSize: 10,
-    fontWeight: "700",
   },
 });
 

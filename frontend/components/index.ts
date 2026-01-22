@@ -1,5 +1,6 @@
 export { default as AppText } from "./common/AppText";
 export { default as Box } from "./layout/Box";
+export { default as List, type ListCellProps, type ListCellPart } from "./layout/List";
 export { Checkbox } from "./icons/Checkbox";
 export { Checkbox as CheckboxNative } from "./icons/Checkbox.native";
 export { ProgressIcon } from "./icons/ProgressIcon";

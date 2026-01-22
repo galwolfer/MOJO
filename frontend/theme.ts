@@ -44,6 +44,7 @@ export const COLORS = {
 };
 
 export const SPACING = {
+  xs: moderateScale(3),
   sm: moderateScale(5),
   md: moderateScale(10),
   lg: moderateScale(17),

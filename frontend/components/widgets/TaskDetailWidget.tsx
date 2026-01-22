@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet, TouchableOpacity, Image } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Image, useWindowDimensions } from "react-native";
 import AppText from "../common/AppText";
 import AppButton from "../common/AppButton";
 import { COLORS, SPACING, ICON_SIZES, paletteIndexFromKey, getPalettePair } from "../../theme";
@@ -15,6 +15,7 @@ import { ProgressIcon } from "../icons/ProgressIcon";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
 import { Checkbox } from "../icons/Checkbox";
 import { getCategoryMeta } from "../../config/categoryMeta";
+import List, { ListCellProps, ListCellPart } from "../layout/List";
 import Icon from "../icons/Icon";
 import {
   ScheduledSession,
@@ -29,6 +30,7 @@ import {
   getTaskTypeLabel,
   getSessionLabel,
   getSubtaskIdFromSession,
+  sessionRowData,
 } from "./widgetHelpers";
 import { updateSubTask } from "../../services/taskService";
 import { useTaskContext } from "../../context/TaskContext";
@@ -284,28 +286,22 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
                 <AppText variant="notes">{formatDuration(task.estimatedDuration || task.duration)}</AppText>
               </AppText>
             </View>
-            <View style={styles.scheduleList}>
-              {task.scheduledSessions.map((session, index) => {
+            <List
+              data={task.scheduledSessions.map((session, index) => {
                 const subtaskId = getSubtaskIdFromSession(session, task.subtasks);
                 const isDone = subtaskId ? completedParts.has(subtaskId) : false;
                 const canToggle = Boolean(subtaskId);
+                const isLoading = loadingParts.has(subtaskId || "");
 
-                return (
-                  <TouchableOpacity
-                    key={session.id || session.start || `session-${index}`}
-                    style={[styles.scheduleCard, (!canToggle || loadingParts.has(subtaskId || "")) && styles.disabled]}
-                    activeOpacity={0.7}
-                    disabled={!canToggle || loadingParts.has(subtaskId || "")}
-                    onPress={() => canToggle && handleToggleSubtask(subtaskId)}
-                    accessibilityRole="button"
-                  >
-                    <AppText variant="notes" style={styles.scheduleDateTime}>
-                      {formatDate(session.start)}
-                      {session.end && <AppText variant="notes"> {formatTimeRange(session)}</AppText>}
-                    </AppText>
+                // Use helper to get displayable pieces for the row (adaptive to width)
+                const { width } = useWindowDimensions();
+                const row = sessionRowData(session, task.subtasks, index, { width });
 
-                    <View style={styles.scheduleHeader}>
-                      <View style={styles.scheduleLabelContainer}>
+                return {
+                  id: session.id || session.start || `session-${index}`,
+                  content: (
+                    <View style={{ width: "100%", flexDirection: "row", alignItems: "flex-start" }}>
+                      <View style={{ width: 40, justifyContent: "center", paddingRight: SPACING.sm / 2 }}>
                         {subtaskId ? (
                           <Checkbox
                             checked={isDone}
@@ -313,15 +309,50 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
                             size={ICON_SIZES.sm}
                           />
                         ) : null}
-                        <AppText variant="bodyText" style={styles.scheduleLabel}>
-                          {getSessionLabel(session, index)}
+                      </View>
+
+                      <View style={{ flex: 1 }}>
+                        <AppText variant="notes" style={styles.scheduleDateTime}>
+                          {row.dateText}
+                          {row.timeRangeText ? (
+                            <AppText variant="notes" style={styles.scheduleTime}>
+                              {" "}
+                              {row.timeRangeText}
+                            </AppText>
+                          ) : null}
+                        </AppText>
+                        <AppText variant="bodyText" style={[styles.scheduleLabel, isDone && styles.subtaskCompleted]}>
+                          {row.label}
                         </AppText>
                       </View>
+
+                      <View
+                        style={{
+                          width: 70,
+                          paddingLeft: SPACING.sm,
+                          alignItems: "flex-end",
+                          justifyContent: "flex-start",
+                        }}
+                      >
+                        {row.durationMinutes ? (
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: SPACING.sm / 2 }}>
+                            <Icon name="clock" size={ICON_SIZES.sm} color={COLORS.lightGray} />
+                            <AppText variant="notes">{formatDuration(row.durationMinutes)}</AppText>
+                          </View>
+                        ) : (
+                          <AppText variant="notes" style={{ color: COLORS.lightGray }}>
+                            {row.timeRangeText}
+                          </AppText>
+                        )}
+                      </View>
                     </View>
-                  </TouchableOpacity>
-                );
+                  ),
+                  onPress: () => canToggle && handleToggleSubtask(subtaskId),
+                  disabled: !canToggle || isLoading,
+                  divider: true,
+                } as ListCellProps;
               })}
-            </View>
+            />
           </View>
         )}
       </View>
@@ -400,7 +431,6 @@ const styles = StyleSheet.create({
   },
   scheduleTime: {
     color: COLORS.darkGray,
-    fontSize: 12,
   },
   sectionTitle: {
     fontWeight: "600",
