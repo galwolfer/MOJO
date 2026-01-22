@@ -222,6 +222,7 @@ const userSchema = new mongoose.Schema(
           currentStreak: { type: Number, default: 0 },
           longestStreak: { type: Number, default: 0 },
           lastActiveDate: { type: Date, default: null },
+          completedTasks: { type: Number, default: 0 },
         },
         { _id: false }
       ),
@@ -230,6 +231,7 @@ const userSchema = new mongoose.Schema(
         currentStreak: 0,
         longestStreak: 0,
         lastActiveDate: null,
+        completedTasks: 0,
       },
     },
   },
