@@ -31,8 +31,8 @@ const StatBadge: React.FC<StatBadgeProps> = ({
   color = COLORS.primary1,
 }) => {
   return (
-    <View style={styles.container}>
-      <View style={[styles.iconCircle, { backgroundColor: color }]}>
+    <View style={[styles.container, { backgroundColor: color }]}>
+      <View style={styles.iconCircle}>
         {icon}
       </View>
       <View style={styles.textContainer}>
@@ -51,7 +51,6 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.white,
     borderRadius: moderateScale(25),
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.md,
@@ -64,18 +63,19 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(16),
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.3)",
   },
   textContainer: {
     alignItems: "flex-start",
   },
   value: {
     fontSize: moderateScale(14),
-    color: COLORS.black,
+    color: COLORS.colorWhite,
     lineHeight: moderateScale(16),
   },
   label: {
     fontSize: moderateScale(10),
-    color: COLORS.grayLight,
+    color: COLORS.colorWhite,
     lineHeight: moderateScale(12),
   },
 });

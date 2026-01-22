@@ -25,7 +25,7 @@ app.use("/uploads", express.static(uploadsDir));
 // Core middlewares
 app.use(helmet()); // Secure headers
 app.use(cors()); // CORS
-app.use(express.json({ limit: "100kb" })); // JSON body parsing (keep small for safety)
+app.use(express.json({ limit: "50mb" })); // JSON body parsing (increased for profile image uploads)
 app.use(morgan("dev")); // HTTP logging
 
 // Routes that are NOT blocked by expired tasks
