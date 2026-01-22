@@ -365,7 +365,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
       </View>
 
       {/* Profile Settings Section */}
-      <Box title="Profile Settings" titleColor={COLORS.primary1}>
+      <Box title="Profile" titleColor={COLORS.primary1}>
         <View style={styles.profileContent}>
           {/* User Avatar with gradient ring */}
           <View style={styles.avatarContainer}>
