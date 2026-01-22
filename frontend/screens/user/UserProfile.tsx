@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
   },
   progressSummaryValue: {
-    color: COLORS.primary3,
+    color: COLORS.primary1,
     fontSize: moderateScale(18),
   },
   progressSummaryLabel: {
