@@ -72,7 +72,7 @@ const FriendListItem: React.FC<FriendListItemProps> = ({
 
       {/* Name */}
       <View style={styles.nameContainer}>
-        <AppText variant="bodyText" style={styles.name} numberOfLines={1}>
+        <AppText variant="bodyText" style={styles.name} numberOfLines={2}>
           {name}
         </AppText>
       </View>
@@ -103,18 +103,20 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
     backgroundColor: "transparent",
     gap: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(0,0,0,0.04)",
   },
   avatarContainer: {
     position: "relative",
   },
   avatar: {
-    width: moderateScale(40),
-    height: moderateScale(40),
-    borderRadius: moderateScale(20),
+    width: moderateScale(48),
+    height: moderateScale(48),
+    borderRadius: moderateScale(24),
     borderWidth: 2,
     borderColor: COLORS.white2,
   },
@@ -139,8 +141,9 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   name: {
-    color: COLORS.colorWhite,
-    fontSize: moderateScale(14),
+    color: COLORS.darkGray,
+    fontSize: moderateScale(15),
+    fontWeight: "600",
   },
   statsRow: {
     flexDirection: "row",
@@ -149,21 +152,26 @@ const styles = StyleSheet.create({
   miniStat: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 3,
-    paddingHorizontal: 6,
-    borderRadius: moderateScale(10),
-    gap: 3,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: moderateScale(12),
+    gap: 6,
   },
   miniIcon: {
-    width: 12,
-    height: 12,
+    width: moderateScale(14),
+    height: moderateScale(14),
     alignItems: "center",
     justifyContent: "center",
   },
   miniValue: {
     color: COLORS.colorWhite,
-    fontSize: moderateScale(10),
+    fontSize: moderateScale(12),
     fontWeight: "600",
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "rgba(0,0,0,0.05)",
+    marginTop: SPACING.sm,
   },
 });
 

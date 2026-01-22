@@ -264,6 +264,17 @@ export default function UserProfileScreen() {
         </View>
       </Box>
 
+      {/* Friends Section */}
+      <Box title="Friends">
+        <View style={styles.friendsGradient}>
+          <View style={styles.friendsList}>
+            {MOCK_FRIENDS.map((friend) => (
+              <FriendListItem key={friend.id} {...friend} />
+            ))}
+          </View>
+        </View>
+      </Box>
+
       {/* Logout Button */}
       <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
         <AppText variant="boldText" style={styles.logoutText}>
