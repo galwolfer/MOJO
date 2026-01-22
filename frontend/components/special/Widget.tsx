@@ -83,7 +83,6 @@ const Widget: React.FC<WidgetProps> = ({
     opacity.setValue(0);
     translateY.setValue(8);
 
-    console.log(`[Widget] entranceEnabled changed -> animating (delay=${entranceDelay}, duration=${entranceDuration})`);
     setAnimating(true);
 
     Animated.parallel([
