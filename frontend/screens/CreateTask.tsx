@@ -731,7 +731,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.white3,
   },
   contentContainer: {
     padding: SPACING.sm,
@@ -745,7 +745,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: SPACING.xlg,
     ...(SHADOWS.card as object),
     zIndex: 100,
-    backgroundColor: COLORS.white,
+    backgroundColor: "#ffffff",
   },
   mainTitle: {
     color: COLORS.primary1,
