@@ -73,12 +73,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
         </TouchableOpacity>
       ),
       rightElement: (
-        <View style={styles.headerButton}>
-          <ICONS.settings size={24} color={COLORS.primary1} />
-          <AppText variant="boldText" style={{ color: COLORS.primary1 }}>
-            Settings
-          </AppText>
-        </View>
+        <AppButton icon="settings" mode="light" color="primary1" disabled />
       ),
     });
   }, [onBack]);
