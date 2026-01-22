@@ -131,19 +131,19 @@ export default function UserProfileScreen() {
               ) : (
                 <>
                   <StatBadge
-                    icon={<CheckIcon size={16} color={COLORS.colorWhite} />}
+                    icon={<CheckIcon size={28} color={COLORS.colorWhite} />}
                     value={stats.tasks}
                     label="Tasks"
                     color={COLORS.primary6}
                   />
                   <StatBadge
-                    icon={<TrophyIcon size={16} color={COLORS.colorWhite} />}
+                    icon={<TrophyIcon size={28} color={COLORS.colorWhite} />}
                     value={stats.points}
                     label="Points"
                     color={COLORS.primary5}
                   />
                   <StatBadge
-                    icon={<FlameIcon size={16} color={COLORS.colorWhite} />}
+                    icon={<FlameIcon size={28} color={COLORS.colorWhite} />}
                     value={stats.streak}
                     label="Days Streak"
                     color={COLORS.primary4}
