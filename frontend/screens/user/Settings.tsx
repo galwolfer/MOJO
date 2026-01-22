@@ -73,7 +73,9 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
         </TouchableOpacity>
       ),
       rightElement: (
-        <AppButton icon="settings" mode="light" color="primary1" disabled />
+        <View style={styles.headerRight}>
+          <AppButton icon="settings" mode="light" color="primary1" disabled />
+        </View>
       ),
     });
   }, [onBack]);
@@ -621,6 +623,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+  },
+  headerRight: {
+    width: moderateScale(44),
+    height: moderateScale(44),
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   // Profile Content

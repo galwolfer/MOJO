@@ -154,7 +154,9 @@ export default function UserProfileScreen() {
           </View>
         ),
         rightElement: (
-          <AppButton icon="settings" mode="light" color="primary1" onPress={() => setCurrentScreen("settings")} />
+          <View style={styles.headerRight}>
+            <AppButton icon="settings" mode="light" color="primary1" onPress={() => setCurrentScreen("settings")} />
+          </View>
         ),
       });
     }
@@ -333,6 +335,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: SPACING.sm,
     marginTop: SPACING.sm,
+  },
+
+  headerRight: {
+    width: moderateScale(44),
+    height: moderateScale(44),
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   // Profile Section
