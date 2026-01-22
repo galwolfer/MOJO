@@ -9,6 +9,7 @@ import { connectDatabase } from "./config/database.js";
 import { logger } from "./utils/logger.js";
 import { startPriorityScheduler } from "./services/schedulingService.js";
 import { startExpiredTaskChecker } from "./services/taskService.js";
+import { startStreakChecker } from "./services/streakService.js";
 import { initializeOjoTypes } from "./utils/ojoTypeUtils.js";
 
 const server = createServer(app);
@@ -26,6 +27,10 @@ connectDatabase()
       // Start expired task checker (runs every hour)
       // Sends push notifications when tasks expire
       startExpiredTaskChecker();
+
+      // Start streak checker (runs daily at midnight)
+      // Resets streaks for users who didn't complete tasks yesterday
+      startStreakChecker();
     });
   })
   .catch((error) => {

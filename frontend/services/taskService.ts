@@ -389,10 +389,15 @@ export async function suggestCategory(taskname: string): Promise<{
  */
 export async function completeTask(id: string): Promise<Task | null> {
   try {
-    const response = await post<{ success: boolean; task: Task }>(`/tasks/${id}/complete`, {});
+    console.log(`[taskService] Completing task: ${id}`);
+    const response = await post<{ success: boolean; task: Task; gamification?: any }>(`/tasks/${id}/complete`, {});
+    console.log(`[taskService] Complete response:`, response);
+    if (response.gamification) {
+      console.log(`[taskService] Gamification updated:`, response.gamification);
+    }
     return response.task || null;
   } catch (error) {
-    console.warn("Failed to complete task:", error);
+    console.error("[taskService] Failed to complete task:", error);
     return null;
   }
 }

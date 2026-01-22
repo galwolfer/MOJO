@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet, TouchableOpacity, Image, Alert } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Image, Alert, Platform } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
 import AppText from "../../components/common/AppText";
 import Input from "../../components/inputs/Input";
 import AppButton from "../../components/common/AppButton";
+import ProfilePhotoWidget from "../../components/special/ProfilePhotoWidget";
 import { COLORS, SPACING, SHADOWS } from "../../theme";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigation } from "../../context/NavigationContext";
@@ -42,13 +43,13 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editedProfileImage, setEditedProfileImage] = useState<string | null>(user?.profileImage || null);
-  const [newProfileImage, setNewProfileImage] = useState<{ uri: string; base64: string } | null>(null);
+  const [newProfileImage, setNewProfileImage] = useState<string | File | null>(null);
   const [showPasswordSection, setShowPasswordSection] = useState(false);
 
   const LeftIcon = ICONS.left;
   const UserIcon = ICONS.user;
-  const EditIcon = ICONS.edit;
-  const ChatIcon = ICONS.mojo;
+  const EditIcon = ICONS.prefrences;
+  const ChatIcon = ICONS.ojo;
   const NotificationIcon = ICONS.notifications;
   const PencilIcon = ICONS.edit;
 
@@ -72,11 +73,8 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
         </TouchableOpacity>
       ),
       rightElement: (
-        <View style={styles.headerButton}>
-          <ICONS.settings size={24} color={COLORS.primary1} />
-          <AppText variant="boldText" style={{ color: COLORS.primary1 }}>
-            Settings
-          </AppText>
+        <View style={styles.headerRight}>
+          <AppButton icon="settings" mode="light" color="primary1" disabled />
         </View>
       ),
     });
@@ -111,16 +109,12 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
-        base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
         console.log("Image picked:", asset.uri);
-        setNewProfileImage({
-          uri: asset.uri,
-          base64: asset.base64 || "",
-        });
+        setNewProfileImage(asset.uri);
         setEditedProfileImage(asset.uri);
       }
     } catch (err: any) {
@@ -132,7 +126,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
   const handleDeleteProfileImage = () => {
     console.log("handleDeleteProfileImage called");
     setEditedProfileImage(null);
-    setNewProfileImage({ uri: "", base64: "" }); // Mark as deleted
+    setNewProfileImage(""); // Mark as deleted
   };
 
   const handleSave = async () => {
@@ -192,14 +186,72 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
         updateData.newPassword = newPassword;
       }
 
-      // Add profile image if changed or deleted
-      if (newProfileImage) {
-        if (newProfileImage.uri === "") {
-          // Delete image
-          updateData.deleteProfileImage = true;
-        } else if (newProfileImage.base64) {
-          // Upload new image
-          updateData.profileImage = newProfileImage.base64;
+      // Handle profile image upload or deletion (same as signup flow)
+      if (newProfileImage !== null) {
+        if (newProfileImage === "") {
+          // Delete image - set to null
+          updateData.profileImage = null;
+        } else if (newProfileImage instanceof File) {
+          // Web: profileImage is a File
+          if (newProfileImage.size && newProfileImage.size > 400 * 1024) {
+            setError("Profile image too large. Please choose a smaller image.");
+            setIsSaving(false);
+            return;
+          }
+
+          try {
+            const uploadResp = await (
+              await import("../../services/apiClient")
+            ).uploadProfileImage(newProfileImage as File);
+            if (uploadResp && uploadResp.url) {
+              updateData.profileImage = uploadResp.url;
+            } else {
+              setError("Failed to upload profile image. Please try again.");
+              setIsSaving(false);
+              return;
+            }
+          } catch (err: any) {
+            console.error("Image upload error:", err);
+            setError(String(err?.message || "Failed to upload image"));
+            setIsSaving(false);
+            return;
+          }
+        } else if (typeof newProfileImage === "string") {
+          // Native: profileImage is a file URI string
+          try {
+            if (Platform.OS !== "web") {
+              const { getInfoAsync } = await import("expo-file-system/legacy");
+              const info = await getInfoAsync(newProfileImage as string, { size: true } as any);
+
+              if (!info.exists) {
+                setError("Selected profile image could not be found. Please re-select the image.");
+                setIsSaving(false);
+                return;
+              }
+
+              if (info.size && info.size > 400 * 1024) {
+                setError("Profile image too large. Please choose a smaller image.");
+                setIsSaving(false);
+                return;
+              }
+            }
+
+            const uploadResp = await (
+              await import("../../services/apiClient")
+            ).uploadProfileImage(newProfileImage as string);
+            if (uploadResp && uploadResp.url) {
+              updateData.profileImage = uploadResp.url;
+            } else {
+              setError("Failed to upload profile image. Please try again.");
+              setIsSaving(false);
+              return;
+            }
+          } catch (err: any) {
+            console.error("Image upload error:", err);
+            setError(String(err?.message || "Failed to upload image"));
+            setIsSaving(false);
+            return;
+          }
         }
       }
 
@@ -314,7 +366,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
       </View>
 
       {/* Profile Settings Section */}
-      <Box title="Profile Settings" titleColor={COLORS.primary1}>
+      <Box title="Profile" titleColor={COLORS.primary1}>
         <View style={styles.profileContent}>
           {/* User Avatar with gradient ring */}
           <View style={styles.avatarContainer}>
@@ -354,23 +406,37 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                 <AppText variant="boldText" style={styles.imageSectionTitle}>
                   Profile Picture
                 </AppText>
-                <View style={styles.imageButtonsRow}>
-                  <TouchableOpacity style={styles.imageButton} onPress={handlePickImage}>
-                    <AppText variant="boldText" style={styles.imageButtonText}>
-                      Upload Photo
+                <ProfilePhotoWidget
+                  imageUri={newProfileImage ?? editedProfileImage ?? null}
+                  onImageSelected={(val) => {
+                    try {
+                      if (val instanceof File) {
+                        setNewProfileImage(val);
+                        const url = URL.createObjectURL(val);
+                        setEditedProfileImage(url);
+                      } else if (typeof val === "string") {
+                        setNewProfileImage(val);
+                        setEditedProfileImage(val);
+                      } else {
+                        setNewProfileImage(null);
+                        setEditedProfileImage(null);
+                      }
+                    } catch (e) {
+                      console.warn("Failed to preview selected image", e);
+                      if (typeof val === "string") setEditedProfileImage(val);
+                    }
+                  }}
+                  size={96}
+                  title="Profile Photo"
+                  subtitle="Tap to select or change your avatar"
+                />
+                {editedProfileImage ? (
+                  <TouchableOpacity style={[styles.imageButton, styles.deleteImageButton]} onPress={handleDeleteProfileImage}>
+                    <AppText variant="boldText" style={styles.deleteImageButtonText}>
+                      Delete Photo
                     </AppText>
                   </TouchableOpacity>
-                  {editedProfileImage && (
-                    <TouchableOpacity
-                      style={[styles.imageButton, styles.deleteImageButton]}
-                      onPress={handleDeleteProfileImage}
-                    >
-                      <AppText variant="boldText" style={styles.deleteImageButtonText}>
-                        Delete Photo
-                      </AppText>
-                    </TouchableOpacity>
-                  )}
-                </View>
+                ) : null}
               </View>
 
               <Input label="Display Name" value={editedDisplayName} onChangeText={setEditedDisplayName} />
@@ -548,6 +614,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+  },
+  headerRight: {
+    width: moderateScale(44),
+    height: moderateScale(44),
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   // Profile Content

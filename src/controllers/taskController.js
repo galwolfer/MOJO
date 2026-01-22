@@ -721,19 +721,35 @@ export async function toggleTaskCompletion(req, res) {
     const userId = req.user.userId;
     const { id } = req.params;
 
-    const task = await taskService.toggleTaskCompletion(id, userId);
+    const result = await taskService.toggleTaskCompletion(id, userId);
 
-    if (!task) {
+    if (!result || !result.task) {
       return res.status(404).json({
         success: false,
         error: "Task not found",
       });
     }
 
+    const { task, wasNewCompletion } = result;
+
+    // If toggled to completed (and was a NEW completion), award points and update streak
+    let gamification = null;
+    if (wasNewCompletion) {
+      try {
+        const { awardTaskCompletionPoints } = await import("./userController.js");
+        const reward = await awardTaskCompletionPoints(userId, task);
+        logger.info(`Awarded ${reward.points} points to user ${userId} for completing task ${id} via toggle`);
+        gamification = reward.gamification;
+      } catch (pointsError) {
+        logger.warn("Failed to award points on toggle completion:", pointsError.message);
+      }
+    }
+
     return res.status(200).json({
       success: true,
       task,
-      message: `Task marked as ${task.completed ? "completed" : "incomplete"}`,
+      gamification,
+      message: `Task marked as ${task.status === "done" ? "completed" : "incomplete"}`,
     });
   } catch (error) {
     logger.error("Error in toggleTaskCompletion controller:", error);
@@ -1077,25 +1093,36 @@ export async function completeTask(req, res) {
     const userId = req.user.userId;
     const { id } = req.params;
 
+    logger.info(`[completeTask] User ${userId} completing task ${id}`);
+
     const result = await taskService.completeTask({ taskId: id, userId });
 
+    logger.info(`[completeTask] Task service result: success=${result?.success}, wasAlreadyCompleted=${result?.wasAlreadyCompleted}`);
+
     if (!result || result.success === false) {
+      logger.warn(`[completeTask] Task not found or error: ${result?.error}`);
       return res.status(404).json({
         success: false,
         error: result?.error || "Task not found",
       });
     }
 
-    // Award points for task completion
+    // Award points for task completion (only if not already completed)
     let gamification = null;
-    try {
-      const { awardTaskCompletionPoints } = await import("./userController.js");
-      const reward = await awardTaskCompletionPoints(userId, result.task);
-      logger.info(`Awarded ${reward.points} points to user ${userId} for completing task ${id}`);
-      gamification = reward.gamification;
-    } catch (pointsError) {
-      logger.warn("Failed to award points for task completion:", pointsError.message);
+    if (!result.wasAlreadyCompleted) {
+      try {
+        const { awardTaskCompletionPoints } = await import("./userController.js");
+        const reward = await awardTaskCompletionPoints(userId, result.task);
+        logger.info(`[completeTask] Awarded ${reward.points} points to user ${userId} for completing task ${id}`);
+        gamification = reward.gamification;
+      } catch (pointsError) {
+        logger.warn("[completeTask] Failed to award points for task completion:", pointsError.message);
+      }
+    } else {
+      logger.info(`[completeTask] Task ${id} was already completed, not awarding points`);
     }
+
+    logger.info(`[completeTask] Returning gamification:`, gamification);
 
     return res.status(200).json({
       success: true,
@@ -1105,7 +1132,7 @@ export async function completeTask(req, res) {
       message: "Task completed successfully",
     });
   } catch (error) {
-    logger.error("Error in completeTask controller:", error);
+    logger.error("[completeTask] Error:", error);
 
     return res.status(500).json({
       success: false,

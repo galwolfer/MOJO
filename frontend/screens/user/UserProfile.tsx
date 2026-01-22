@@ -84,7 +84,6 @@ export default function UserProfileScreen() {
   const [progressData, setProgressData] = useState<number[]>(DEFAULT_PROGRESS);
   const [taskProgress, setTaskProgress] = useState<TaskProgress | null>(null);
   const [tasks, setTasksState] = useState<Task[]>([]);
-  const pollRef = useRef<NodeJS.Timeout | null>(null);
   const mountedRef = useRef(true);
 
   const SettingsIcon = ICONS.settings;
@@ -132,19 +131,19 @@ export default function UserProfileScreen() {
               ) : (
                 <>
                   <StatBadge
-                    icon={<CheckIcon size={16} color={COLORS.colorWhite} />}
+                    icon={<CheckIcon size={28} color={COLORS.colorWhite} />}
                     value={stats.tasks}
                     label="Tasks"
                     color={COLORS.primary6}
                   />
                   <StatBadge
-                    icon={<TrophyIcon size={16} color={COLORS.colorWhite} />}
+                    icon={<TrophyIcon size={28} color={COLORS.colorWhite} />}
                     value={stats.points}
                     label="Points"
                     color={COLORS.primary5}
                   />
                   <StatBadge
-                    icon={<FlameIcon size={16} color={COLORS.colorWhite} />}
+                    icon={<FlameIcon size={28} color={COLORS.colorWhite} />}
                     value={stats.streak}
                     label="Days Streak"
                     color={COLORS.primary4}
@@ -155,7 +154,9 @@ export default function UserProfileScreen() {
           </View>
         ),
         rightElement: (
-          <AppButton icon="settings" mode="light" color="primary1" onPress={() => setCurrentScreen("settings")} />
+          <View style={styles.headerRight}>
+            <AppButton icon="settings" mode="light" color="primary1" onPress={() => setCurrentScreen("settings")} />
+          </View>
         ),
       });
     }
@@ -181,13 +182,8 @@ export default function UserProfileScreen() {
   useEffect(() => {
     mountedRef.current = true;
     fetchAllData();
-    pollRef.current = setInterval(fetchAllData, 5000);
     return () => {
       mountedRef.current = false;
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
     };
   }, [fetchAllData]);
 
@@ -195,10 +191,6 @@ export default function UserProfileScreen() {
     const onState = (state: AppStateStatus) => {
       if (state === "active") {
         fetchAllData();
-        if (!pollRef.current) pollRef.current = setInterval(fetchAllData, 5000);
-      } else if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
       }
     };
     const sub = AppState.addEventListener("change", onState);
@@ -274,6 +266,17 @@ export default function UserProfileScreen() {
         </View>
       </Box>
 
+      {/* Friends Section */}
+      <Box title="Friends">
+        <View style={styles.friendsGradient}>
+          <View style={styles.friendsList}>
+            {MOCK_FRIENDS.map((friend) => (
+              <FriendListItem key={friend.id} {...friend} />
+            ))}
+          </View>
+        </View>
+      </Box>
+
       {/* Logout Button */}
       <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
         <AppText variant="boldText" style={styles.logoutText}>
@@ -332,6 +335,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: SPACING.sm,
     marginTop: SPACING.sm,
+  },
+
+  headerRight: {
+    width: moderateScale(44),
+    height: moderateScale(44),
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   // Profile Section
@@ -425,7 +435,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
   },
   progressSummaryValue: {
-    color: COLORS.primary3,
+    color: COLORS.primary1,
     fontSize: moderateScale(18),
   },
   progressSummaryLabel: {

@@ -10,11 +10,12 @@ import { okFalse, okTrue } from "../lib/errorFormatter.js";
 const updateTaskMission = new GuidedMission({
   name: "update_task",
   group: "task",
-  description: "Update a task; requires confirm=true. Keep message brief - widget shows updated details.",
-  missionInfo: "Modify task. Write short confirmation (e.g., 'Task updated:'). Don't list all changes in text.",
+  description: "Update task properties (name, deadline, category, etc). CANNOT mark as done - use complete_task for that. Requires confirm=true.",
+  missionInfo: "Modify task properties. Write short confirmation (e.g., 'Task updated:'). Don't list all changes in text.",
   behavior: [
     "If changing category: call get_subcategories(category=<new>) first.",
     "Require confirm=true before applying updates.",
+    "For completing tasks, use complete_task tool instead.",
   ],
   widgets: ["list"],
   schema: z.object({
@@ -45,7 +46,7 @@ const updateTaskMission = new GuidedMission({
         count: z.number().optional(),
       })
       .optional(),
-    completed: z.boolean().optional(),
+    completed: z.boolean().optional().describe("DEPRECATED: Use complete_task tool instead to mark tasks as done (awards points)"),
     confirm: z.boolean().optional().describe("Must be true to perform the update"),
   }),
   execute: async ({ userId, args }) => {
@@ -71,6 +72,11 @@ const updateTaskMission = new GuidedMission({
       recurrence,
     } = args;
     try {
+      // If user is trying to complete a task, redirect to complete_task
+      if (completed === true) {
+        return `ok=false\nerr="To mark a task as done, use the complete_task tool instead. It awards points and updates your streak!"`;
+      }
+
       let resolvedTaskId = taskId;
       // Require explicit confirmation to avoid accidental changes
       if (!confirm) {
@@ -199,7 +205,8 @@ const updateTaskMission = new GuidedMission({
         updates.recurrence = rec;
       }
 
-      if (completed !== undefined) updates.status = completed ? "done" : "todo";
+      // Note: completed status change is handled by complete_task tool, not here
+      // This prevents bypassing gamification
 
       // Update through controller (which automatically triggers scheduling)
       const result = await updateTaskViaController(userId, resolvedTaskId, updates);

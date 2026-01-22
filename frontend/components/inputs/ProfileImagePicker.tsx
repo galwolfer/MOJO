@@ -73,6 +73,7 @@ async function compressImageFileWeb(file: File, maxBytes = 200 * 1024): Promise<
 
 const ProfileImagePicker: React.FC<ProfileImagePickerProps> = ({ imageUri, onImageSelected, size = 100 }) => {
   const UserIcon = ICONS.user;
+  const PlusIcon = ICONS.plus;
   const inputRef = useRef<any>(null);
   const [webPreview, setWebPreview] = useState<string | null>(null);
 
@@ -229,9 +230,7 @@ const ProfileImagePicker: React.FC<ProfileImagePickerProps> = ({ imageUri, onIma
             )}
 
             <View style={[styles.editBadge, { bottom: 0, right: 0 }]}>
-              <AppText variant="notes" style={styles.editText}>
-                +
-              </AppText>
+              <PlusIcon width={16} height={16} color={COLORS.white} />
             </View>
           </TouchableOpacity>
         </React.Fragment>
@@ -250,9 +249,7 @@ const ProfileImagePicker: React.FC<ProfileImagePickerProps> = ({ imageUri, onIma
           )}
 
           <View style={[styles.editBadge, { bottom: 0, right: 0 }]}>
-            <AppText variant="notes" style={styles.editText}>
-              +
-            </AppText>
+            <PlusIcon width={16} height={16} color={COLORS.white} />
           </View>
         </TouchableOpacity>
       )}
@@ -293,12 +290,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 2,
     borderColor: COLORS.white,
-  },
-  editText: {
-    color: COLORS.white,
-    fontSize: 18,
-    fontWeight: "bold",
-    lineHeight: 18,
   },
 });
 

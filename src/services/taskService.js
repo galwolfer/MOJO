@@ -805,6 +805,9 @@ export async function completeTask({ taskId, userId }) {
       return { success: false, error: "Task not found or you don't have permission." };
     }
 
+    // Check if task was already completed
+    const wasAlreadyCompleted = task.status === "done";
+
     // Calculate actual completion time by summing all completed work sessions
     const completedSessions = await TaskSchedule.find({
       taskId,
@@ -877,10 +880,50 @@ export async function completeTask({ taskId, userId }) {
       });
     }
 
-    return { success: true, task: updated, actualCompletionMinutes };
+    return { success: true, task: updated, actualCompletionMinutes, wasAlreadyCompleted };
   } catch (error) {
     return { success: false, error: error.message };
   }
+}
+
+/**
+ * Toggle task completion status.
+ * If marking as done, set status="done"; if already done, revert to "todo".
+ * Returns { task, wasNewCompletion } where wasNewCompletion indicates if this toggle resulted in a new completion.
+ */
+export async function toggleTaskCompletion(taskId, userId) {
+  if (!taskId) {
+    return null;
+  }
+
+  const task = await Task.findOne({ _id: taskId, userId });
+  if (!task) return null;
+
+  const wasIncomplete = task.status !== "done";
+  const nextStatus = task.status === "done" ? "todo" : "done";
+
+  const updated = await Task.findByIdAndUpdate(
+    taskId,
+    {
+      $set: {
+        status: nextStatus,
+      },
+    },
+    { new: true }
+  ).lean();
+
+  await logEvent({
+    type: nextStatus === "done" ? "task_completed_toggle" : "task_uncompleted_toggle",
+    userId,
+    payload: {
+      taskId: taskId.toString(),
+      taskname: task.taskname,
+      status: nextStatus,
+    },
+  });
+
+  // Return both the task and whether this was a NEW completion (not already done before)
+  return { task: updated, wasNewCompletion: wasIncomplete && nextStatus === "done" };
 }
 // -----------------------------
 // Subtask helpers

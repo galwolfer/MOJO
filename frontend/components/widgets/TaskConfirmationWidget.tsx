@@ -95,11 +95,44 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
   // Data is passed directly - use as TaskData
   const task: TaskData = data as TaskData;
 
-  useEffect(() => {
-    console.log(
-      `[TaskConfirmationWidget] entranceEnabled=${entranceEnabled} delay=${entranceDelay} duration=${entranceDuration}`,
-    );
-  }, [entranceEnabled, entranceDelay, entranceDuration]);
+  // Debug: Log the received data to see what's coming from the backend
+  console.log("[TaskConfirmationWidget] Received data:", JSON.stringify(data, null, 2));
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return "Not set";
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const getImportanceLabel = (importance?: number) => {
+    if (!importance) return "Not set";
+    const labels = ["", "Low", "Medium-Low", "Medium", "High", "Critical"];
+    return labels[importance] || `Level ${importance}`;
+  };
+
+  const getEffortLabel = (effort?: number) => {
+    if (!effort) return "Not set";
+    const labels = ["", "Minimal", "Light", "Moderate", "Heavy", "Extensive"];
+    return labels[effort] || `Level ${effort}`;
+  };
+
+  const formatDuration = (minutes?: number) => {
+    if (!minutes) return "Not set";
+    if (minutes < 60) return `${minutes} minutes`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (mins === 0) return `${hours} hour${hours > 1 ? "s" : ""}`;
+    return `${hours}h ${mins}m`;
+  };
 
   return (
     <Widget entranceEnabled={entranceEnabled} entranceDelay={entranceDelay} entranceDuration={entranceDuration}>

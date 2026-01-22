@@ -67,9 +67,12 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
       // Call API to toggle/complete the task
       if (!wasChecked) {
         // Completing the task
-        await completeTask(taskId);
+        console.log(`[TaskListWidget] Completing task with ID: ${taskId}`);
+        const result = await completeTask(taskId);
+        console.log(`[TaskListWidget] Complete result:`, result);
       } else {
         // Uncompleting - use toggle
+        console.log(`[TaskListWidget] Toggling task with ID: ${taskId}`);
         await toggleTaskCompletion(taskId);
       }
       

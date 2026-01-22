@@ -34,4 +34,17 @@ export async function connectDatabase() {
   }
 }
 
+/**
+ * Disconnect from MongoDB
+ */
+export async function disconnectDatabase() {
+  try {
+    await mongoose.disconnect();
+    console.log("🔌 MongoDB disconnected successfully");
+  } catch (error) {
+    console.error("❌ Failed to disconnect MongoDB:", error);
+    throw error;
+  }
+}
+
 export default mongoose;

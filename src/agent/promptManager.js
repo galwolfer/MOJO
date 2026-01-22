@@ -41,6 +41,9 @@ export class PromptManager {
     // This forces the model to ignore stale data in history and rely on tools for current state
     systemPrompt += `\n\nCRITICAL: If the user asks to see/list tasks, you MUST call the "get_tasks" tool. Do NOT answer from memory or history. Your internal knowledge is STALE. Always fetch fresh data.`;
 
+    // Add instruction for task completion - must use complete_task to award points
+    systemPrompt += `\n\nIMPORTANT: When user wants to complete/finish/mark a task as done, ALWAYS use the "complete_task" tool (NOT "update_task"). The complete_task tool awards points and updates the user's streak. Using update_task for completion will NOT award points.`;
+
     const messages = [new SystemMessage(systemPrompt)];
 
     // Convert and add history
