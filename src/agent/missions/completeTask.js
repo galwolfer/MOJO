@@ -3,6 +3,7 @@ import { LightMission } from "./LightMission.js";
 import * as taskService from "../../services/taskService.js";
 import { awardTaskCompletionPoints } from "../../controllers/userController.js";
 import { buildWidgetString } from "../widgets/widgetUtils.js";
+import { getDisplayName } from "../../config/categories.js";
 
 const completeTaskMission = new LightMission({
   name: "complete_task",
@@ -68,22 +69,40 @@ const completeTaskMission = new LightMission({
 
       const task = result.task;
 
-      // Build confirmation widget showing the completion
+      // Build task_detail widget showing the completed task (like old updateTask)
       const widgetData = {
-        title: "Task Completed! 🎉",
-        message: `"${task.taskname}" has been marked as done.`,
-        details: pointsAwarded > 0 ? [
-          `+${pointsAwarded} points earned!`,
-          gamification?.currentStreak ? `🔥 ${gamification.currentStreak} day streak!` : null,
-        ].filter(Boolean) : [],
         task: {
           id: task._id,
           title: task.taskname,
+          description: task.description,
           status: "done",
+          dueDate: task.dueDate ? new Date(task.dueDate).toISOString() : null,
+          taskname: task.taskname,
+          deadline: task.dueDate ? new Date(task.dueDate).toISOString().split("T")[0] : null,
+          estimatedDuration: task.estimatedDuration,
+          duration: task.estimatedDuration,
+          importance: task.importance,
+          priorityScore: task.priorityScore || 0,
+          taskType: task.taskType || null,
+          minChunk: task.minChunk !== undefined ? task.minChunk : null,
+          chunkCount: task.chunkCount !== undefined ? task.chunkCount : null,
+          chunkMinutes: task.chunkMinutes !== undefined ? task.chunkMinutes : null,
+          minMinutes: task.minMinutes !== undefined ? task.minMinutes : null,
+          maxMinutes: task.maxMinutes !== undefined ? task.maxMinutes : null,
+          earliestStart: task.earliestStart
+            ? task.earliestStart instanceof Date
+              ? task.earliestStart.toISOString().split("T")[0]
+              : task.earliestStart
+            : null,
+          subCategory: task.subCategory || null,
+          category: task.category,
+          categoryDisplay: getDisplayName(task.category),
+          subcategoryDisplay: task.subCategory ? task.subCategory.label : null,
+          canSplit: task.canSplit,
         },
       };
 
-      const widgetString = buildWidgetString("confirmation", widgetData);
+      const widgetString = buildWidgetString("task_detail", widgetData);
 
       // Return success with gamification info
       const statsLine = pointsAwarded > 0 
