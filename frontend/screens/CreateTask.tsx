@@ -30,7 +30,7 @@ import Box from "../components/layout/Box";
 import { ICONS } from "../components/icons/icons";
 import NavBar from "../components/common/NavBar";
 import { CATEGORY_KEYS, getCategoryMeta, CATEGORY_META } from "../config/categoryMeta";
-import { createTask, suggestCategory } from "../services/taskService";
+import { createTask, suggestCategory, createTaskSchedule } from "../services/taskService";
 import { useNavigation } from "../context/NavigationContext";
 
 interface Subtask {
@@ -341,27 +341,67 @@ const CreateTask: React.FC = () => {
       console.log("Result:", JSON.stringify(result, null, 2));
 
       if (result) {
-        Alert.alert("Success!", "Task created successfully", [
-          {
-            text: "OK",
-            onPress: () => {
-              // Reset form after success
-              setFormState({
-                taskName: "",
-                timeToComplete: "",
-                effort: 3,
-                importance: 3,
-                category: CATEGORY_KEYS[0] || "uncategorized",
-                tags: [],
-                description: "",
-                estimatedMinutes: "",
-                numSubtasks: 1,
-                subtasks: [],
-              });
-              setTagInput("");
-            },
-          },
-        ]);
+        // Now automatically generate a schedule for the task
+        console.log("=== SCHEDULING TASK ===");
+        const schedule = await createTaskSchedule(result._id, {
+          planningHorizonDays: 14,
+        });
+
+        if (schedule?.success) {
+          console.log(`✅ Task scheduled with ${schedule.scheduledCount} sessions`);
+          Alert.alert(
+            "Success!",
+            `Task created and scheduled with ${schedule.scheduledCount} session(s)!`,
+            [
+              {
+                text: "OK",
+                onPress: () => {
+                  // Reset form after success
+                  setFormState({
+                    taskName: "",
+                    timeToComplete: "",
+                    effort: 3,
+                    importance: 3,
+                    category: CATEGORY_KEYS[0] || "uncategorized",
+                    tags: [],
+                    description: "",
+                    estimatedMinutes: "",
+                    numSubtasks: 1,
+                    subtasks: [],
+                  });
+                  setTagInput("");
+                },
+              },
+            ]
+          );
+        } else {
+          console.warn("⚠️ Task created but scheduling failed");
+          Alert.alert(
+            "Success!",
+            "Task created successfully (scheduling failed, but that's okay!)",
+            [
+              {
+                text: "OK",
+                onPress: () => {
+                  // Reset form after success
+                  setFormState({
+                    taskName: "",
+                    timeToComplete: "",
+                    effort: 3,
+                    importance: 3,
+                    category: CATEGORY_KEYS[0] || "uncategorized",
+                    tags: [],
+                    description: "",
+                    estimatedMinutes: "",
+                    numSubtasks: 1,
+                    subtasks: [],
+                  });
+                  setTagInput("");
+                },
+              },
+            ]
+          );
+        }
       } else {
         Alert.alert("Error", "Failed to create task. Please try again.");
       }

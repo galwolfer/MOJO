@@ -543,6 +543,75 @@ router.patch("/:taskId/subtasks/:subId/status", taskController.updateSubTaskStat
 // Bulk update task with subtasks in one call
 router.patch("/:id/full", taskController.bulkUpdateTaskWithSubtasks);
 
+/* ─────────────────────────────────────────────────────────────────────────
+   SCHEDULED SESSIONS RETRIEVAL
+   Get scheduled sessions for a date range
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Get all scheduled sessions for a user within a date range
+ * GET /api/tasks/schedule/sessions?startDate=ISO&endDate=ISO
+ * 
+ * Query parameters:
+ * - startDate: ISO string for start of range
+ * - endDate: ISO string for end of range
+ * 
+ * Response:
+ * {
+ *   success: boolean,
+ *   sessions: Array<{
+ *     _id, start, end, minutes, taskId, status, subtaskIndex,
+ *     taskId: { populated task data }
+ *   }>
+ * }
+ */
+router.get("/schedule/sessions", requireAuth, async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+    const { startDate, endDate } = req.query;
+
+    // Validate date parameters
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        error: "startDate and endDate query parameters are required"
+      });
+    }
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid date format. Use ISO string format (YYYY-MM-DDTHH:mm:ss.sssZ)"
+      });
+    }
+
+    // Fetch scheduled sessions for the date range, filtering by user via the task reference
+    const sessions = await TaskSchedule.find({
+      start: { $gte: start, $lte: end }
+    })
+      .populate({
+        path: "taskId",
+        match: { userId }, // Only include sessions for tasks owned by this user
+        select: "taskname description category tags dueDate subTasks"
+      })
+      .sort({ start: 1 })
+      .lean();
+
+    // Filter out sessions where the task doesn't belong to the user
+    const userSessions = sessions.filter(session => session.taskId !== null);
+
+    res.json({
+      success: true,
+      sessions: userSessions
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Get a single task by ID
 router.get("/:id", taskController.getTaskById);
 
@@ -557,5 +626,101 @@ router.post("/:id/toggle", taskController.toggleTaskCompletion);
 
 // Complete a task (with ML training)
 router.post("/:id/complete", taskController.completeTask);
+
+/* ─────────────────────────────────────────────────────────────────────────
+   TASK SCHEDULING
+   Generate and save automatic plans for tasks
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Generate and save an automatic schedule/plan for a task
+ * POST /api/tasks/:id/schedule
+ * 
+ * Generates an optimal schedule using CSP algorithm considering:
+ * - Task estimated duration
+ * - User's working hours and daily capacity
+ * - Routine blocks (sleep, meals, etc.)
+ * - Existing busy blocks and completed sessions
+ * 
+ * Body (optional): 
+ * {
+ *   planningHorizonDays?: number (default 14),
+ *   includeSubtasks?: boolean (default true)
+ * }
+ * 
+ * Response: 
+ * {
+ *   success: boolean,
+ *   message: string,
+ *   plan: Array<{ start, end, minutes, taskId, subtaskIndex }>,
+ *   unscheduled: Array<{ taskId, reason }>,
+ *   scheduledCount: number
+ * }
+ */
+router.post("/:id/schedule", async (req, res, next) => {
+  try {
+    const { id: taskId } = req.params;
+    const { planningHorizonDays = 14 } = req.body;
+    const userId = req.user.userId;
+
+    // Import scheduling service
+    const { generatePlan, savePlan } = await import("../services/schedulingService.js");
+
+    // Verify task exists and belongs to user
+    const task = await Task.findOne({ _id: taskId, userId });
+    if (!task) {
+      return res.status(404).json({ 
+        success: false, 
+        error: "Task not found" 
+      });
+    }
+
+    // Get user profile for scheduling preferences
+    const user = await User.findById(userId).select("profile subCategories").lean();
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        error: "User not found" 
+      });
+    }
+
+    // Generate plan
+    const { plan, unscheduled } = await generatePlan({ 
+      userId, 
+      profile: user.profile,
+      planningHorizonDays 
+    });
+
+    if (!plan || plan.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Unable to generate schedule. Task may already be fully scheduled or no available time slots.",
+        unscheduled
+      });
+    }
+
+    // Save plan to database
+    await savePlan({ userId, plan, unscheduled });
+
+    logger.info(`Generated schedule for task ${taskId}: ${plan.length} sessions planned`);
+
+    res.status(201).json({
+      success: true,
+      message: `Schedule created successfully. ${plan.length} session(s) scheduled.`,
+      scheduledCount: plan.length,
+      unscheduledCount: unscheduled.length,
+      plan: plan.map(p => ({
+        start: p.start,
+        end: p.end,
+        minutes: p.minutes,
+        taskId: p.taskId,
+        subtaskIndex: p.subtaskIndex || null
+      })),
+      unscheduled
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 export default router;

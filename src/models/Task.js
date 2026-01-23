@@ -65,6 +65,8 @@ const taskSchema = new mongoose.Schema(
     progressPercentage: { type: Number, min: 0, max: 100, default: 0 }, // 0-100, synced from subtasks
     // User-defined tags for categorization and filtering
     tags: { type: [String], default: [] },
+    // Temporary storage for subtask data provided during task creation (not persisted)
+    _pendingSubtasks: { type: [Object], default: [] },
   },
   { timestamps: true },
 );
@@ -82,59 +84,90 @@ async function syncSubTasksForTask(taskDoc) {
       return;
     }
 
-    // Determine desired count of subtasks:
-    // Prefer explicit chunkCount, otherwise estimate from estimatedDuration and minChunk/default
-    const minChunk = taskDoc.minChunk || 30;
-    const desiredCount =
-      taskDoc.chunkCount && Number.isInteger(taskDoc.chunkCount) && taskDoc.chunkCount > 0
-        ? taskDoc.chunkCount
-        : Math.max(1, Math.ceil((taskDoc.estimatedDuration || minChunk) / minChunk));
+    // Check if we have explicit subtask data from task creation
+    const pendingSubtasks = taskDoc._pendingSubtasks && taskDoc._pendingSubtasks.length > 0 
+      ? taskDoc._pendingSubtasks 
+      : null;
 
-    const existing = await SubTask.find({ taskId: taskDoc._id }).sort({ index: 1 });
-
-    // If there are fewer than desired, create missing
-    if (existing.length < desiredCount) {
-      const toCreate = desiredCount - existing.length;
-      const startIndex = existing.length + 1;
-      const createOps = [];
-      for (let i = 0; i < toCreate; i++) {
-        const idx = startIndex + i;
-        createOps.push({
-          taskId: taskDoc._id,
-          userId: taskDoc.userId,
-          index: idx,
-          title: `Part ${idx}`,
-          minutes: taskDoc.chunkMinutes || Math.round((taskDoc.estimatedDuration || minChunk) / desiredCount),
-        });
-      }
+    if (pendingSubtasks) {
+      // Use the provided subtask data
+      const desiredCount = pendingSubtasks.length;
+      
+      // Remove all existing subtasks first
+      await SubTask.deleteMany({ taskId: taskDoc._id }).catch(() => {});
+      
+      // Create subtasks with the exact provided data
+      const createOps = pendingSubtasks.map((subtask, index) => ({
+        taskId: taskDoc._id,
+        userId: taskDoc.userId,
+        index: index + 1,
+        title: subtask.title || `Part ${index + 1}`,
+        description: subtask.description || "",
+        minutes: subtask.minutes ? parseInt(subtask.minutes, 10) : 0,
+      }));
+      
       if (createOps.length) {
         await SubTask.insertMany(createOps);
       }
-    }
+      
+      // Clear pending subtasks after use
+      taskDoc._pendingSubtasks = [];
+    } else {
+      // Original auto-generation logic when no explicit subtasks provided
+      // Determine desired count of subtasks:
+      // Prefer explicit chunkCount, otherwise estimate from estimatedDuration and minChunk/default
+      const minChunk = taskDoc.minChunk || 30;
+      const desiredCount =
+        taskDoc.chunkCount && Number.isInteger(taskDoc.chunkCount) && taskDoc.chunkCount > 0
+          ? taskDoc.chunkCount
+          : Math.max(1, Math.ceil((taskDoc.estimatedDuration || minChunk) / minChunk));
 
-    // If there are more than desired, remove the extras (highest indexes)
-    if (existing.length > desiredCount) {
-      const toRemove = existing.slice(desiredCount).map((s) => s._id);
-      if (toRemove.length) {
-        await SubTask.deleteMany({ _id: { $in: toRemove } });
-      }
-    }
+      const existing = await SubTask.find({ taskId: taskDoc._id }).sort({ index: 1 });
 
-    // If counts match, ensure indexes are sequential and titles are "Part N" if empty
-    const updatedList = await SubTask.find({ taskId: taskDoc._id }).sort({ index: 1 });
-    for (let i = 0; i < updatedList.length; i++) {
-      const desiredIndex = i + 1;
-      const s = updatedList[i];
-      let changed = false;
-      if (s.index !== desiredIndex) {
-        s.index = desiredIndex;
-        changed = true;
+      // If there are fewer than desired, create missing
+      if (existing.length < desiredCount) {
+        const toCreate = desiredCount - existing.length;
+        const startIndex = existing.length + 1;
+        const createOps = [];
+        for (let i = 0; i < toCreate; i++) {
+          const idx = startIndex + i;
+          createOps.push({
+            taskId: taskDoc._id,
+            userId: taskDoc.userId,
+            index: idx,
+            title: `Part ${idx}`,
+            minutes: taskDoc.chunkMinutes || Math.round((taskDoc.estimatedDuration || minChunk) / desiredCount),
+          });
+        }
+        if (createOps.length) {
+          await SubTask.insertMany(createOps);
+        }
       }
-      if (!s.title || s.title.trim() === "") {
-        s.title = `Part ${desiredIndex}`;
-        changed = true;
+
+      // If there are more than desired, remove the extras (highest indexes)
+      if (existing.length > desiredCount) {
+        const toRemove = existing.slice(desiredCount).map((s) => s._id);
+        if (toRemove.length) {
+          await SubTask.deleteMany({ _id: { $in: toRemove } });
+        }
       }
-      if (changed) await s.save();
+
+      // If counts match, ensure indexes are sequential and titles are "Part N" if empty
+      const updatedList = await SubTask.find({ taskId: taskDoc._id }).sort({ index: 1 });
+      for (let i = 0; i < updatedList.length; i++) {
+        const desiredIndex = i + 1;
+        const s = updatedList[i];
+        let changed = false;
+        if (s.index !== desiredIndex) {
+          s.index = desiredIndex;
+          changed = true;
+        }
+        if (!s.title || s.title.trim() === "") {
+          s.title = `Part ${desiredIndex}`;
+          changed = true;
+        }
+        if (changed) await s.save();
+      }
     }
   } catch (err) {
     console.error("⚠️  syncSubTasksForTask failed:", err && err.message ? err.message : err);

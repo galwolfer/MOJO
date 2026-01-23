@@ -9,6 +9,8 @@ const taskScheduleSchema = new mongoose.Schema(
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     taskId: { type: mongoose.Schema.Types.ObjectId, ref: "Task", required: true },
     subtaskIndex: { type: Number, min: 1 }, // optional: links to SubTask.index (e.g., Part 1, Part 2)
+    subtaskTitle: { type: String }, // Subtask title (e.g., "Research", "Writing", "Editing")
+    description: { type: String }, // Subtask description (e.g., "its harddd")
     start: { type: Date, required: true },
     end: { type: Date, required: true },
     minutes: { type: Number, required: true },

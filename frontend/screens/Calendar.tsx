@@ -17,7 +17,7 @@ import React, { useEffect, useRef, useState } from "react";
  * <CalendarScreen />
  * ```
  */
-import { View, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Platform, Animated } from "react-native";
+import { View, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Platform, Animated, ActivityIndicator } from "react-native";
 import AppText from "../components/common/AppText";
 import { COLORS, SPACING, FONT_SIZES, SHADOWS, TYPOGRAPHY, FONTS } from "../theme";
 import { useNavigation } from "../context/NavigationContext";
@@ -27,6 +27,8 @@ import { Checkbox } from "../components/icons/Checkbox.native";
 import { ProgressIcon } from "../components/icons/ProgressIcon.native";
 import DateSelector from "../components/layout/DateSelector";
 import CalendarPicker from "../components/inputs/CalendarPicker";
+import { getTasksForDate, getScheduledSessionsForDate, transformTasksToCalendarGroups, updateTask, toggleTaskCompletion, CalendarTaskGroup } from "../services/taskService";
+import { useTaskContext } from "../context/TaskContext";
 
 /**
  * Subtask interface
@@ -36,6 +38,7 @@ interface Subtask {
   title: string;
   description?: string;
   completed: boolean;
+  timeRange?: string; // Time interval for scheduled sessions (e.g., "09:00 AM - 10:30 AM")
 }
 
 /**
@@ -55,6 +58,9 @@ interface Task {
   category?: string;
   subtasks?: Subtask[];
   dateString?: string; // Date in YYYY-MM-DD format for filtering
+  partNumber?: number; // Part number for multi-day tasks
+  totalParts?: number; // Total parts for multi-day tasks
+  parentTaskName?: string; // Parent task name for multi-day subtasks
 }
 
 /**
@@ -74,9 +80,14 @@ interface TaskGroup {
  */
 export default function CalendarScreen() {
   const { setHeaderConfig, setActiveTab } = useNavigation();
+  const { notifyTaskUpdate, subscribeToTaskUpdates } = useTaskContext();
 
   const stripTime = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const [selectedDate, setSelectedDate] = useState<Date>(() => stripTime(new Date()));
+  const [taskGroups, setTaskGroups] = useState<TaskGroup[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
   useEffect(() => {
     setSelectedDate(stripTime(new Date()));
   }, []);
@@ -98,107 +109,146 @@ export default function CalendarScreen() {
   const [completedSubtasks, setCompletedSubtasks] = useState<Set<string>>(new Set());
   const [showCalendarPicker, setShowCalendarPicker] = useState<boolean>(false);
 
-  const taskGroups: TaskGroup[] = [
-    {
-      date: "WEDNESDAY, DECEMBER 10, 2025",
-      tasks: [
-        {
-          id: "1",
-          time: "09:00",
-          endTime: "10:00",
-          title: "BUY FLOWERS",
-          emoji: "❤️",
-          tags: ["Relationships"],
-          dueDate: "Due to: 11/2/2025",
-          description: "Go to the nearest flower and buy flowers",
-          completed: false,
-          color: "#FF69B4",
-          category: "relationship",
-          dateString: "2025-12-10",
-        },
-        {
-          id: "2",
-          time: "09:30",
-          endTime: "11:30",
-          title: "Finish 3 out of 4 exercises in Advanced Algorithms",
-          emoji: "📚",
-          tags: ["Study & Education"],
-          dueDate: "Due to: 12/15/2025",
-          description: "Complete the remaining exercises in the Advanced Algorithms course",
-          completed: false,
-          color: "#FFA726",
-          category: "study_and_education",
-          dateString: "2025-12-10",
-          subtasks: [
-            { id: "2a", title: "Exercise 1", description: "Complete binary search tree implementation", completed: true },
-            { id: "2b", title: "Exercise 2", description: "Implement quicksort algorithm with optimizations", completed: true },
-            { id: "2c", title: "Exercise 3", description: "Solve dynamic programming problem", completed: false },
-          ],
-        },
-        {
-          id: "3",
-          time: "10:30",
-          endTime: "11:30",
-          title: "Go for a run in the park",
-          emoji: "🌿",
-          tags: ["Workout", "Health"],
-          dueDate: "Due to: 12/10/2025",
-          description: "Run for 30-40 minutes in the morning at the park",
-          completed: false,
-          color: "#66BB6A",
-          category: "workout",
-          dateString: "2025-12-10",
-        },
-        {
-          id: "4",
-          time: "15:30",
-          endTime: "20:30",
-          title: "Watch Mission Impossible with friends",
-          emoji: "🎬",
-          tags: ["Entertainment", "Social"],
-          dueDate: "Due to: 12/10/2025",
-          description: "Watch Mission Impossible at the cinema with friends. Remember to book tickets in advance",
-          completed: false,
-          color: "#AB47BC",
-          category: "hobbies",
-          dateString: "2025-12-10",
-        },
-      ],
-    },
-    {
-      date: "THURSDAY, DECEMBER 11, 2025",
-      tasks: [
-        {
-          id: "5",
-          time: "10:00",
-          endTime: "14:30",
-          title: "Machine Learning exercise",
-          emoji: "🤖",
-          tags: ["Skill Building", "ML"],
-          dueDate: "Due to: 12/12/2025",
-          description: "Complete the machine learning assignment and submit code to GitHub",
-          completed: false,
-          color: "#42A5F5",
-          category: "skill_building",
-          dateString: "2025-12-11",
-        },
-        {
-          id: "6",
-          time: "17:00",
-          endTime: "18:30",
-          title: "Upper body workout session",
-          emoji: "🌿",
-          tags: ["Workout", "Fitness"],
-          dueDate: "Due to: 12/11/2025",
-          description: "Focus on chest, shoulders, and arms. 3 sets of 10 reps each",
-          completed: false,
-          color: "#66BB6A",
-          category: "workout",
-          dateString: "2025-12-11",
-        },
-      ],
-    },
-  ];
+  /**
+   * Fetch both regular tasks and scheduled sessions from API for the selected date
+   */
+  const fetchTasksForDate = async (date: Date) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Fetch both regular tasks and scheduled sessions in parallel
+      const [taskGroups, scheduledGroups] = await Promise.all([
+        getTasksForDate(date),
+        getScheduledSessionsForDate(date)
+      ]);
+      
+      // Merge scheduled sessions with regular tasks
+      // If there are scheduled sessions for this date, show those instead
+      // Otherwise show regular tasks
+      if (scheduledGroups.length > 0) {
+        setTaskGroups(scheduledGroups);
+      } else {
+        setTaskGroups(taskGroups);
+      }
+    } catch (err) {
+      console.error("Failed to load tasks:", err);
+      setError("Failed to load tasks. Please try again.");
+      setTaskGroups([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Handle task completion toggle
+   * Persists to API and refreshes the UI
+   */
+  const handleTaskCompletionToggle = async (taskId: string, checked: boolean) => {
+    try {
+      // Optimistically update local state
+      const newCompleted = new Set(completedTasks);
+      const newSubtasksCompleted = new Set(completedSubtasks);
+      
+      if (checked) {
+        newCompleted.add(taskId);
+        // Check all subtasks
+        const task = taskGroups
+          .flatMap((g) => g.tasks)
+          .find((t) => t.id === taskId);
+        if (task?.subtasks) {
+          task.subtasks.forEach((st) => newSubtasksCompleted.add(st.id));
+        }
+      } else {
+        newCompleted.delete(taskId);
+        // Uncheck all subtasks
+        const task = taskGroups
+          .flatMap((g) => g.tasks)
+          .find((t) => t.id === taskId);
+        if (task?.subtasks) {
+          task.subtasks.forEach((st) => newSubtasksCompleted.delete(st.id));
+        }
+      }
+      
+      setCompletedTasks(newCompleted);
+      setCompletedSubtasks(newSubtasksCompleted);
+      
+      // Persist to API
+      await updateTask(taskId, {
+        status: checked ? "done" : "todo",
+        completed: checked,
+      });
+      
+      // Notify other parts of app and refetch
+      notifyTaskUpdate();
+    } catch (err) {
+      console.error("Failed to update task completion:", err);
+      // Revert optimistic update on error
+      fetchTasksForDate(selectedDate);
+    }
+  };
+
+  /**
+   * Handle subtask completion toggle
+   * Persists to API via parent task update
+   */
+  const handleSubtaskCompletionToggle = async (
+    taskId: string,
+    subtaskId: string,
+    checked: boolean
+  ) => {
+    try {
+      // Optimistically update local state
+      const newSubtasksCompleted = new Set(completedSubtasks);
+      
+      if (checked) {
+        newSubtasksCompleted.add(subtaskId);
+      } else {
+        newSubtasksCompleted.delete(subtaskId);
+      }
+      
+      setCompletedSubtasks(newSubtasksCompleted);
+      
+      // Find the task and update it with new subtask states
+      const task = taskGroups
+        .flatMap((g) => g.tasks)
+        .find((t) => t.id === taskId);
+      
+      if (task?.subtasks) {
+        // Note: Subtask completion is tracked locally in the UI
+        // Backend will sync subtask states when we call getTasks() again
+        
+        // Persist to API - trigger a refetch on the backend
+        await updateTask(taskId, {
+          status: task.completed ? "done" : "todo",
+        });
+        
+        // Notify other parts of app and refetch
+        notifyTaskUpdate();
+      }
+    } catch (err) {
+      console.error("Failed to update subtask completion:", err);
+      // Revert optimistic update on error
+      fetchTasksForDate(selectedDate);
+    }
+  };
+
+  /**
+   * Subscribe to task updates and refetch when tasks change elsewhere in the app
+   */
+  useEffect(() => {
+    const unsubscribe = subscribeToTaskUpdates(() => {
+      fetchTasksForDate(selectedDate);
+    });
+    return unsubscribe;
+  }, [selectedDate, subscribeToTaskUpdates]);
+
+  /**
+   * Fetch tasks when component mounts or selected date changes
+   */
+  useEffect(() => {
+    fetchTasksForDate(selectedDate);
+  }, [selectedDate]);
 
   useEffect(() => {
     setHeaderConfig({
@@ -304,29 +354,31 @@ export default function CalendarScreen() {
     return completedCount / task.subtasks.length;
   };
 
-  const renderSubtask = (subtask: Subtask) => (
+  const renderSubtask = (subtask: Subtask, parentTaskId: string) => (
     <View key={subtask.id} style={styles.subtaskContainer}>
       <View style={styles.subtaskRow}>
         <Checkbox 
           checked={completedSubtasks.has(subtask.id)}
           onChange={(checked) => {
-            const newCompleted = new Set(completedSubtasks);
-            if (checked) {
-              newCompleted.add(subtask.id);
-
-            } else {
-              newCompleted.delete(subtask.id);
-            }
-            setCompletedSubtasks(newCompleted);
+            handleSubtaskCompletionToggle(parentTaskId, subtask.id, checked);
           }}
           size={18}
         />
-        <AppText 
-          variant="notes"
-          style={[styles.subtaskText, completedSubtasks.has(subtask.id) && styles.subtaskTextCompleted]}
-        >
-          {subtask.title}
-        </AppText>
+        <View style={{ flex: 1 }}>
+          <AppText 
+            variant="notes"
+            style={[styles.subtaskText, completedSubtasks.has(subtask.id) && styles.subtaskTextCompleted]}
+          >
+            {subtask.title}
+          </AppText>
+          {subtask.timeRange && (
+            <AppText 
+              style={[styles.subtaskTimeRange, completedSubtasks.has(subtask.id) && styles.subtaskTimeRangeCompleted]}
+            >
+              {subtask.timeRange}
+            </AppText>
+          )}
+        </View>
       </View>
       {subtask.description && (
         <AppText 
@@ -391,25 +443,7 @@ export default function CalendarScreen() {
                 <Checkbox 
                   checked={completedTasks.has(task.id)}
                   onChange={(checked) => {
-                    const newCompleted = new Set(completedTasks);
-                    const newSubtasksCompleted = new Set(completedSubtasks);
-                    
-                    if (checked) {
-                      newCompleted.add(task.id);
-                      // Check all subtasks
-                      if (task.subtasks) {
-                        task.subtasks.forEach(st => newSubtasksCompleted.add(st.id));
-                      }
-                    } else {
-                      newCompleted.delete(task.id);
-                      // Uncheck all subtasks
-                      if (task.subtasks) {
-                        task.subtasks.forEach(st => newSubtasksCompleted.delete(st.id));
-                      }
-                    }
-                    
-                    setCompletedTasks(newCompleted);
-                    setCompletedSubtasks(newSubtasksCompleted);
+                    handleTaskCompletionToggle(task.id, checked);
                   }}
                   size={24}
                 />
@@ -447,8 +481,8 @@ export default function CalendarScreen() {
                 )}
               </View>
 
-              {/* Due Date */}
-              {task.dueDate && (
+              {/* Due Date - Hide for scheduled sessions since subtasks show times */}
+              {task.dueDate && !(task as any).isScheduled && (
                 <AppText style={styles.expandedDueDate}>{task.dueDate}</AppText>
               )}
 
@@ -460,7 +494,7 @@ export default function CalendarScreen() {
               {/* Subtasks */}
               {task.subtasks && task.subtasks.length > 0 && (
                 <View style={styles.expandedSubtasksContainer}>
-                  {task.subtasks.map(renderSubtask)}
+                  {task.subtasks.map((subtask) => renderSubtask(subtask, task.id))}
                 </View>
               )}
             </View>
@@ -491,25 +525,7 @@ export default function CalendarScreen() {
             <Checkbox 
               checked={completedTasks.has(task.id)}
               onChange={(checked) => {
-                const newCompleted = new Set(completedTasks);
-                const newSubtasksCompleted = new Set(completedSubtasks);
-                
-                if (checked) {
-                  newCompleted.add(task.id);
-                  // Check all subtasks
-                  if (task.subtasks) {
-                    task.subtasks.forEach(st => newSubtasksCompleted.add(st.id));
-                  }
-                } else {
-                  newCompleted.delete(task.id);
-                  // Uncheck all subtasks
-                  if (task.subtasks) {
-                    task.subtasks.forEach(st => newSubtasksCompleted.delete(st.id));
-                  }
-                }
-                
-                setCompletedTasks(newCompleted);
-                setCompletedSubtasks(newSubtasksCompleted);
+                handleTaskCompletionToggle(task.id, checked);
               }}
               size={20}
             />
@@ -521,6 +537,40 @@ export default function CalendarScreen() {
             )}
             <AppText style={styles.taskTitleCompact}>{task.title}</AppText>
           </View>
+          
+          {/* Part info for multi-day tasks - only show if there's 1 subtask on this day AND it's a multi-day task */}
+          {task.partNumber && task.totalParts && task.totalParts > 1 && task.subtasks?.length === 1 && (
+            <AppText style={styles.partInfoText}>
+              Part {task.partNumber}/{task.totalParts} for {task.parentTaskName}
+            </AppText>
+          )}
+          
+          {/* Subtasks - Display individual subtasks with checkboxes */}
+          {task.subtasks && task.subtasks.length > 0 && (
+            <View style={styles.subtasksContainerCompact}>
+              {task.subtasks.map((subtask) => (
+                <View key={subtask.id} style={styles.subtaskRowCompact}>
+                  <Checkbox 
+                    checked={completedSubtasks.has(subtask.id)}
+                    onChange={(checked) => {
+                      handleSubtaskCompletionToggle(task.id, subtask.id, checked);
+                    }}
+                    size={16}
+                  />
+                  <View style={{flex: 1}}>
+                    <AppText style={[styles.subtaskTextCompact, completedSubtasks.has(subtask.id) && styles.subtaskTextCompactCompleted]}>
+                      {subtask.title}
+                    </AppText>
+                    {subtask.description && (
+                      <AppText style={[styles.subtaskDescriptionCompact, completedSubtasks.has(subtask.id) && styles.subtaskDescriptionCompactCompleted]}>
+                        {subtask.description}
+                      </AppText>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
 
         <View style={styles.taskCompactRight}>
@@ -580,7 +630,7 @@ export default function CalendarScreen() {
           
           {task.subtasks && task.subtasks.length > 0 && (
             <View style={styles.subtasksContainer}>
-              {task.subtasks.map(renderSubtask)}
+              {task.subtasks.map((subtask) => renderSubtask(subtask, task.id))}
             </View>
           )}
           
@@ -658,7 +708,24 @@ export default function CalendarScreen() {
         contentContainerStyle={styles.tasksListContent}
         showsVerticalScrollIndicator={false}
       >
-        {filteredTaskGroups.length === 0 ? (
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary1} />
+            <AppText style={styles.loadingText}>Loading tasks...</AppText>
+          </View>
+        ) : error ? (
+          <View style={styles.errorContainer}>
+            <AppText style={styles.errorTitle}>Unable to Load Tasks</AppText>
+            <AppText style={styles.errorMessage}>{error}</AppText>
+            <TouchableOpacity 
+              style={styles.retryButton}
+              onPress={() => fetchTasksForDate(selectedDate)}
+              activeOpacity={0.8}
+            >
+              <AppText style={styles.retryButtonText}>Retry</AppText>
+            </TouchableOpacity>
+          </View>
+        ) : filteredTaskGroups.length === 0 ? (
           renderEmptyState()
         ) : (
           filteredTaskGroups.map((group, groupIdx) => (
@@ -934,6 +1001,17 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     fontWeight: "400",
   },
+  subtaskTimeRange: {
+    fontFamily: FONTS.fredokaRegular,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.darkGray,
+    fontWeight: "400",
+    marginTop: 2,
+  },
+  subtaskTimeRangeCompleted: {
+    textDecorationLine: "line-through",
+    color: COLORS.lightGray,
+  },
   subtaskDescription: {
     fontFamily: FONTS.fredokaRegular,
     fontSize: FONT_SIZES.sm,
@@ -1122,6 +1200,59 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     flexShrink: 1,
     minWidth: 0,
+  },
+  partInfoText: {
+    fontFamily: FONTS.fredokaRegular,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.lightGray,
+    fontWeight: "400",
+    marginTop: 2,
+    marginLeft: 38, // Align with text after checkbox/icon
+  },
+  subtasksContainerCompact: {
+    marginTop: SPACING.sm,
+    gap: SPACING.sm,
+    paddingLeft: SPACING.md,
+  },
+  subtaskRowCompact: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: SPACING.sm,
+  },
+  subtaskContentCompact: {
+    flex: 1,
+    gap: 2,
+  },
+  subtaskTextCompact: {
+    fontFamily: FONTS.fredokaRegular,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.black,
+    fontWeight: "400",
+  },
+  subtaskTextCompactCompleted: {
+    textDecorationLine: "line-through",
+    color: COLORS.lightGray,
+  },
+  subtaskDescriptionCompact: {
+    fontFamily: FONTS.fredokaRegular,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.lightGray,
+    fontWeight: "400",
+    marginTop: 2,
+  },
+  subtaskDescriptionCompactCompleted: {
+    textDecorationLine: "line-through",
+    color: COLORS.lightGray,
+  },
+  subtaskTimeRangeCompact: {
+    fontFamily: FONTS.fredokaRegular,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.darkGray,
+    fontWeight: "400",
+  },
+  subtaskTimeRangeCompactCompleted: {
+    textDecorationLine: "line-through",
+    color: COLORS.lightGray,
   },
   taskCompactRight: {
     flexDirection: "row",
@@ -1468,6 +1599,63 @@ const styles = StyleSheet.create({
 
     // IMPORTANT: clip content corners ONLY here
     overflow: "hidden",
+  },
+
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: SPACING.xlg,
+    gap: SPACING.md,
+  },
+
+  loadingText: {
+    fontFamily: FONTS.fredokaRegular,
+    fontSize: FONT_SIZES.base,
+    color: COLORS.lightGray,
+    fontWeight: "500",
+  },
+
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xlg,
+    gap: SPACING.md,
+  },
+
+  errorTitle: {
+    fontFamily: FONTS.fredokaSemiBold,
+    fontSize: FONT_SIZES.lg,
+    color: COLORS.primary1,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+
+  errorMessage: {
+    fontFamily: FONTS.fredokaRegular,
+    fontSize: FONT_SIZES.base,
+    color: COLORS.darkGray,
+    fontWeight: "400",
+    textAlign: "center",
+    lineHeight: 20,
+  },
+
+  retryButton: {
+    backgroundColor: COLORS.primary1,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: 12,
+    marginTop: SPACING.md,
+  },
+
+  retryButtonText: {
+    fontFamily: FONTS.fredokaSemiBold,
+    fontSize: FONT_SIZES.base,
+    color: COLORS.colorWhite,
+    fontWeight: "600",
+    textAlign: "center",
   },
 
 });

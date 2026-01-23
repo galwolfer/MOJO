@@ -2,9 +2,11 @@
  * Task Service
  *
  * Handles task-related API calls and progress calculations.
+ * Also provides transformations for converting API tasks to Calendar format.
  */
 
 import { get, post, patch, del } from "./httpClient";
+import { getCategoryMeta } from "../config/categoryMeta";
 
 // Types
 export type TaskStatus = "todo" | "in_progress" | "done";
@@ -15,6 +17,7 @@ export type Task = {
   taskname: string;
   description?: string;
   category?: string;
+  tags?: string[];
   subCategory?: {
     label: string;
     source: string;
@@ -334,3 +337,604 @@ export default {
   deleteTask,
   suggestCategory,
 };
+
+/**
+ * =============================================================================
+ * CALENDAR-SPECIFIC TYPES AND TRANSFORMATIONS
+ * =============================================================================
+ * These helpers transform API Task objects into the Calendar screen's format.
+ * This keeps the Calendar screen independent of API changes.
+ */
+
+/**
+ * Calendar Subtask interface (matches Calendar.tsx expectations)
+ */
+export interface CalendarSubtask {
+  id: string;
+  title: string;
+  description?: string;
+  completed: boolean;
+}
+
+/**
+ * Calendar Task interface (matches Calendar.tsx expectations)
+ */
+export interface CalendarTask {
+  id: string;
+  time: string;
+  endTime?: string;
+  title: string;
+  emoji: string;
+  tags: string[];
+  dueDate: string;
+  description: string;
+  completed: boolean;
+  color: string;
+  category?: string;
+  subtasks?: CalendarSubtask[];
+  dateString?: string; // Date in YYYY-MM-DD format for filtering
+}
+
+/**
+ * Calendar Task Group (organized by date)
+ */
+export interface CalendarTaskGroup {
+  date: string;
+  tasks: CalendarTask[];
+}
+
+/**
+ * API SubTask response (from backend)
+ */
+export interface ApiSubTask {
+  _id: string;
+  taskId: string;
+  userId: string;
+  index: number;
+  title: string;
+  description?: string;
+  minutes?: number;
+  status: "todo" | "done";
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Extended Task type that includes populated subtasks
+ */
+export interface TaskWithSubtasks extends Task {
+  subTasks?: ApiSubTask[];
+}
+
+/**
+ * Get locale-specific day and date string (e.g., "WEDNESDAY, DECEMBER 10, 2025")
+ */
+function getFormattedDateString(date: Date): string {
+  return date.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).toUpperCase();
+}
+
+/**
+ * Get date string in YYYY-MM-DD format (for filtering)
+ */
+function getLocalDateString(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Extract time from dueDate (or return default if no time available)
+ * Since API doesn't store explicit time, we use dueDate hour or default to "09:00"
+ */
+function extractTimeFromDate(dueDate?: string): string {
+  if (!dueDate) return "09:00";
+  try {
+    const date = new Date(dueDate);
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    return `${hours}:${minutes}`;
+  } catch {
+    return "09:00";
+  }
+}
+
+/**
+ * Transform API SubTask to Calendar Subtask
+ */
+function transformSubtask(subTask: ApiSubTask): CalendarSubtask {
+  return {
+    id: subTask._id,
+    title: subTask.title || "",
+    description: subTask.description,
+    completed: subTask.status === "done",
+  };
+}
+
+/**
+ * Transform API Task to Calendar Task format
+ * Handles emoji selection from category, time extraction, etc.
+ */
+export function transformTaskToCalendarFormat(apiTask: TaskWithSubtasks): CalendarTask {
+  const categoryMeta = apiTask.category ? getCategoryMeta(apiTask.category) : null;
+  
+  // Use category emoji or fallback to default
+  const emoji = categoryMeta ? "📌" : "📝"; // Placeholder - you may have emojis in categoryMeta
+  
+  // Get color from category metadata
+  const color = categoryMeta?.color || "#999999";
+  
+  // Extract time from dueDate or use default
+  const time = extractTimeFromDate(apiTask.dueDate);
+  
+  // Format due date for display
+  const dueDateObj = apiTask.dueDate ? new Date(apiTask.dueDate) : null;
+  const dueDate = dueDateObj
+    ? `Due to: ${dueDateObj.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "2-digit" })}`
+    : "No due date";
+  
+  // Get date string in YYYY-MM-DD format for filtering
+  const dateString = dueDateObj ? getLocalDateString(dueDateObj) : getLocalDateString(new Date());
+  
+  // Transform subtasks if they exist
+  const subtasks = apiTask.subTasks
+    ? apiTask.subTasks.map(transformSubtask)
+    : undefined;
+  
+  return {
+    id: apiTask._id,
+    time,
+    title: apiTask.taskname,
+    emoji,
+    tags: apiTask.tags || [],
+    dueDate,
+    description: apiTask.description || "",
+    completed: apiTask.status === "done" || apiTask.completed === true,
+    color,
+    category: apiTask.category,
+    subtasks,
+    dateString,
+  };
+}
+
+/**
+ * Transform multiple API Tasks and group by date
+ * Returns tasks organized in TaskGroup format ready for Calendar display
+ */
+export function transformTasksToCalendarGroups(apiTasks: TaskWithSubtasks[]): CalendarTaskGroup[] {
+  // First, transform all tasks
+  const calendarTasks = apiTasks.map(transformTaskToCalendarFormat);
+  
+  // Group by dateString
+  const groups: Record<string, CalendarTask[]> = {};
+  const dateOrder: string[] = [];
+  
+  calendarTasks.forEach((task) => {
+    const dateStr = task.dateString || getLocalDateString(new Date());
+    
+    if (!groups[dateStr]) {
+      groups[dateStr] = [];
+      dateOrder.push(dateStr);
+    }
+    groups[dateStr].push(task);
+  });
+  
+  // Sort dates chronologically and convert to TaskGroup array
+  return dateOrder
+    .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+    .map((dateStr) => {
+      const dateObj = new Date(dateStr);
+      return {
+        date: getFormattedDateString(dateObj),
+        tasks: groups[dateStr],
+      };
+    });
+}
+
+/**
+ * Get tasks for a specific date range, transformed to Calendar format
+ * Useful for fetching tasks for a specific week or month
+ */
+export async function getTasksForDateRange(
+  startDate: Date,
+  endDate: Date
+): Promise<CalendarTaskGroup[]> {
+  try {
+    const dueAfter = startDate.toISOString();
+    const dueBefore = endDate.toISOString();
+    
+    const tasks = await getTasks({
+      dueAfter,
+      dueBefore,
+    });
+    
+    return transformTasksToCalendarGroups(tasks as TaskWithSubtasks[]);
+  } catch (error) {
+    console.warn("Failed to fetch tasks for date range:", error);
+    return [];
+  }
+}
+
+/**
+ * Get tasks for a single date, transformed to Calendar format
+ */
+export async function getTasksForDate(date: Date): Promise<CalendarTaskGroup[]> {
+  const startOfDay = new Date(date);
+  startOfDay.setHours(0, 0, 0, 0);
+  
+  const endOfDay = new Date(date);
+  endOfDay.setHours(23, 59, 59, 999);
+  
+  return getTasksForDateRange(startOfDay, endOfDay);
+}
+
+/**
+ * Get scheduled sessions for a specific date
+ * Fetches TaskSchedule documents and transforms them to Calendar format
+ * Shows what the user is scheduled to work on for that day
+ * For multi-day tasks, shows subtask name with parent task context and progress
+ */
+export async function getScheduledSessionsForDate(date: Date): Promise<CalendarTaskGroup[]> {
+  try {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    // Build URL with query parameters for THIS DATE
+    const params = new URLSearchParams({
+      startDate: startOfDay.toISOString(),
+      endDate: endOfDay.toISOString(),
+    });
+    
+    // Fetch scheduled sessions for this date from the API
+    const response = await get<any>(`/tasks/schedule/sessions?${params.toString()}`);
+    
+    if (!response || !response.sessions) {
+      return [];
+    }
+    
+    // For each task in the response, we need to get its total session count across all dates
+    // To do this efficiently, we'll fetch a broader date range to count all sessions per task
+    const allSessionsParams = new URLSearchParams({
+      startDate: new Date(date.getFullYear(), date.getMonth(), 1).toISOString(), // Start of month
+      endDate: new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999).toISOString(), // End of month
+    });
+    
+    const allSessionsResponse = await get<any>(`/tasks/schedule/sessions?${allSessionsParams.toString()}`);
+    const allSessions = allSessionsResponse?.sessions || [];
+    
+    // Count total sessions per task across the month
+    const taskSessionCounts: Record<string, number> = {};
+    const taskSessionDates: Record<string, Set<string>> = {}; // Track unique dates per task
+    
+    allSessions.forEach((session: any) => {
+      const taskId = session.taskId?._id || 'unknown';
+      taskSessionCounts[taskId] = (taskSessionCounts[taskId] || 0) + 1;
+      
+      if (!taskSessionDates[taskId]) {
+        taskSessionDates[taskId] = new Set();
+      }
+      const sessionDate = new Date(session.start).toISOString().split('T')[0];
+      taskSessionDates[taskId].add(sessionDate);
+    });
+    
+    // Create a map of sessions per task for calculating part numbers
+    const taskSessionMap: Record<string, any[]> = {};
+    allSessions.forEach((session: any) => {
+      const taskId = session.taskId?._id || 'unknown';
+      if (!taskSessionMap[taskId]) {
+        taskSessionMap[taskId] = [];
+      }
+      taskSessionMap[taskId].push(session);
+    });
+    
+    // Transform sessions from TODAY and add part information
+    const calendarTasks = response.sessions.map((session: any) => {
+      const task = session.taskId || {};
+      const taskId = task._id || 'unknown';
+      const categoryMeta = task.category ? getCategoryMeta(task.category) : getCategoryMeta(undefined);
+      
+      const startTime = new Date(session.start);
+      const endTime = new Date(session.end);
+      
+      // Format times
+      const timeStr = startTime.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: true 
+      });
+      const endTimeStr = endTime.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: true 
+      });
+      
+      // Map icon to emoji
+      const iconEmoji = mapIconToEmoji(categoryMeta.icon);
+      
+      // Find which part this session is (based on all sessions of this task, sorted by date)
+      const taskSessions = taskSessionMap[taskId] || [];
+      taskSessions.sort((a: any, b: any) => new Date(a.start).getTime() - new Date(b.start).getTime());
+      
+      const partNumber = taskSessions.findIndex((s: any) => s._id === session._id) + 1;
+      const totalParts = taskSessionCounts[taskId] || 1;
+      const uniqueDatesCount = taskSessionDates[taskId]?.size || 1;
+      
+      // Check if this is a multi-day task (sessions on different days)
+      const isMultiDay = uniqueDatesCount > 1;
+      
+      // Get subtask info if available
+      // For multi-day tasks, the subtask info comes from session.subtaskTitle and session.description
+      const subtaskIndex = session.subtaskIndex;
+      let subtaskTitle = session.subtaskTitle || null;
+      let subtaskDescription = session.description || null;
+      
+      // Fallback: try to get from task.subTasks array if not in session
+      if (!subtaskTitle && subtaskIndex !== undefined && subtaskIndex !== null) {
+        const subtask = task.subTasks?.[subtaskIndex - 1]; // subtaskIndex is 1-indexed
+        if (subtask) {
+          subtaskTitle = subtask.title;
+          subtaskDescription = subtask.description;
+        }
+      }
+      
+      // For multi-day tasks, get the actual subtask description from the task's subTasks array
+      let actualSubtaskDescription = null;
+      if (isMultiDay && subtaskIndex !== undefined && subtaskIndex !== null) {
+        const subtask = task.subTasks?.[subtaskIndex - 1]; // subtaskIndex is 1-indexed
+        if (subtask) {
+          actualSubtaskDescription = subtask.description || '';
+        }
+      }
+      
+      // Calculate progress percentage from task
+      const taskProgress = task.progress || 0;
+      const progressStr = taskProgress > 0 ? ` • ${taskProgress}% complete` : '';
+      
+      // Format title based on whether it's multi-day and has subtask
+      let title: string;
+      if (isMultiDay && subtaskTitle) {
+        // Multi-day: show subtask title only (part info goes in subtitle)
+        title = `${subtaskTitle}${progressStr}`;
+      } else {
+        // Single-day or no subtask: just show task name
+        title = `${task.taskname || 'Scheduled Session'}${progressStr}`;
+      }
+      
+      return {
+        id: session._id,
+        time: timeStr,
+        endTime: endTimeStr,
+        title,
+        emoji: iconEmoji,
+        tags: task.tags || [],
+        dueDate: task.dueDate ? new Date(task.dueDate).toLocaleDateString() : '',
+        description: isMultiDay ? (actualSubtaskDescription || '') : (subtaskDescription || task.description || ''),
+        completed: false,
+        color: categoryMeta.color || '#3498db',
+        category: task.category,
+        // For multi-day tasks, use session data; for single-day tasks, use task.subTasks
+        subtasks: isMultiDay && subtaskTitle 
+          ? [{
+              id: session._id,
+              title: subtaskTitle,
+              description: actualSubtaskDescription || '',
+              completed: false,
+            }]
+          : (task.subTasks ? task.subTasks.map((st: any) => ({
+              id: st._id,
+              title: st.title,
+              description: st.description,
+              completed: st.status === 'done',
+            })) : []),
+        dateString: startTime.toISOString().split('T')[0],
+        isScheduled: true,
+        taskId: taskId,
+        partNumber,
+        totalParts,
+        parentTaskName: task.taskname,
+        subtaskIndex: session.subtaskIndex,
+      } as CalendarTask & { taskId: string; partNumber: number; totalParts: number; parentTaskName: string };
+    });
+    
+    // Group by date
+    const groupedByDate: Record<string, CalendarTask[]> = {};
+    
+    // First, group sessions by task + date
+    const sessionsByTaskAndDate: Record<string, any[]> = {};
+    calendarTasks.forEach((task: any) => {
+      const key = `${task.taskId}-${task.dateString}`;
+      if (!sessionsByTaskAndDate[key]) {
+        sessionsByTaskAndDate[key] = [];
+      }
+      sessionsByTaskAndDate[key].push(task);
+    });
+    
+    // Helper function to parse time string to minutes since midnight
+    const parseTimeToMinutes = (timeStr: string): number => {
+      // timeStr is formatted like "09:00 AM" or "9:00 AM"
+      const parts = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+      if (!parts) return 0;
+      
+      let hours = parseInt(parts[1], 10);
+      const minutes = parseInt(parts[2], 10);
+      const period = parts[3]?.toUpperCase();
+      
+      if (period === 'PM' && hours !== 12) hours += 12;
+      if (period === 'AM' && hours === 12) hours = 0;
+      
+      return hours * 60 + minutes;
+    };
+    
+    // Now transform grouped sessions into combined cards when multiple parts on same day
+    Object.values(sessionsByTaskAndDate).forEach((sessionsGroup: any[]) => {
+      if (sessionsGroup.length > 1) {
+        // Multiple sessions of the same task on the same day - combine them
+        const firstSession = sessionsGroup[0];
+        const dateKey = firstSession.dateString;
+        
+        // Get all subtask info with full details (description and time interval)
+        const subtasksInfo = sessionsGroup
+          .map((s: any, idx: number) => ({
+            id: s.id,
+            title: s.description ? s.description.split('\n')[0] : `Part ${s.partNumber}`,
+            description: s.description || '',
+            completed: false,
+            index: s.subtaskIndex !== undefined ? s.subtaskIndex : idx,
+            timeRange: `${s.time} - ${s.endTime}`, // Add time interval for each subtask
+          }))
+          .sort((a: any, b: any) => a.index - b.index);
+        
+        // Sort sessions by time to get earliest start and latest end
+        const sortedSessions = [...sessionsGroup].sort((a: any, b: any) => {
+          return parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time);
+        });
+        
+        const earliestSession = sortedSessions[0];
+        const latestSession = sortedSessions[sortedSessions.length - 1];
+        
+        // Create combined card
+        // The firstSession.title is already just the subtask title (no part info)
+        // parentTaskName is already set from firstSession
+        const combinedTask = {
+          ...firstSession,
+          time: earliestSession.time,
+          endTime: latestSession.endTime,
+          title: firstSession.title, // Already the subtask title
+          subtasks: subtasksInfo,
+          isGrouped: true,
+          groupedSessions: sessionsGroup,
+          parentTaskName: firstSession.parentTaskName, // Already set correctly
+          partNumber: firstSession.partNumber,
+          totalParts: firstSession.totalParts,
+        };
+        
+        if (!groupedByDate[dateKey]) {
+          groupedByDate[dateKey] = [];
+        }
+        groupedByDate[dateKey].push(combinedTask);
+      } else {
+        // Single session - add as-is
+        const session = sessionsGroup[0];
+        const dateKey = session.dateString;
+        
+        // For multi-day tasks (totalParts > 1), only show the current subtask in the details
+        if (session.totalParts && session.totalParts > 1 && session.subtaskIndex !== undefined && session.subtaskIndex !== null) {
+          // Get the current subtask
+          const currentSubtaskIndex = session.subtaskIndex - 1; // Convert to 0-indexed
+          if (session.subtasks && session.subtasks[currentSubtaskIndex]) {
+            const currentSubtask = session.subtasks[currentSubtaskIndex];
+            session.subtasks = [{
+              id: currentSubtask.id,
+              title: currentSubtask.title,
+              description: currentSubtask.description || '', // Use actual subtask description
+              completed: currentSubtask.completed,
+            }];
+          }
+        }
+        
+        if (!groupedByDate[dateKey]) {
+          groupedByDate[dateKey] = [];
+        }
+        groupedByDate[dateKey].push(session);
+      }
+    });
+    
+    // Sort sessions by time within each date
+    Object.keys(groupedByDate).forEach((key) => {
+      groupedByDate[key].sort((a: any, b: any) => {
+        const timeA = parseTimeToMinutes(a.time);
+        const timeB = parseTimeToMinutes(b.time);
+        return timeA - timeB;
+      });
+    });
+    
+    return Object.entries(groupedByDate).map(([dateString, tasks]) => ({
+      date: new Date(dateString).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }),
+      tasks,
+    }));
+  } catch (error) {
+    console.warn("Failed to fetch scheduled sessions:", error);
+    return [];
+  }
+}
+
+/**
+ * Helper function to map icon key to emoji
+ * This provides a visual representation for the scheduled session
+ */
+function mapIconToEmoji(icon: string): string {
+  const iconMap: Record<string, string> = {
+    study: '📚',
+    skills: '🎯',
+    workout: '💪',
+    reflection: '🧘',
+    home: '🏠',
+    family: '👨‍👩‍👧‍👦',
+    settings: '⚙️',
+    work: '💼',
+    creative: '🎨',
+    hobbies: '🎭',
+    heart: '❤️',
+    goals: '🎯',
+    mindfulness: '🧘',
+    health: '🏥',
+    friends: '👥',
+    explore: '🔍',
+    repeat: '🔄',
+    other: '📋',
+  };
+  
+  return iconMap[icon] || '📋';
+}
+
+/**
+ * Create an automatic schedule/plan for a task
+ * POST /api/tasks/:id/schedule
+ * 
+ * Generates an optimal schedule using CSP algorithm
+ */
+export async function createTaskSchedule(
+  taskId: string,
+  options?: {
+    planningHorizonDays?: number;
+  }
+): Promise<{
+  success: boolean;
+  message: string;
+  scheduledCount: number;
+  plan?: Array<{
+    start: string;
+    end: string;
+    minutes: number;
+    taskId: string;
+    subtaskIndex?: number;
+  }>;
+} | null> {
+  try {
+    const response = await post<any>(`/tasks/${taskId}/schedule`, {
+      planningHorizonDays: options?.planningHorizonDays || 14,
+    });
+    
+    if (response.success) {
+      return {
+        success: true,
+        message: response.message,
+        scheduledCount: response.scheduledCount,
+        plan: response.plan,
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error("Failed to create task schedule:", error);
+    return null;
+  }
+}

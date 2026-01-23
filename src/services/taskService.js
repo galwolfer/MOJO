@@ -138,6 +138,7 @@ export async function createTask({
     subCategory,
     recurrence,
     tags: tags || [],
+    _pendingSubtasks: subtasks && subtasks.length > 0 ? subtasks : undefined,
   });
 
   // Note: SubTask documents are automatically created by the Task model's post-save hook
