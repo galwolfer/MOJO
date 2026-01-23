@@ -381,7 +381,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                     style={styles.avatarImage}
                   />
                 ) : (
-                  <UserIcon size={40} color={COLORS.grayLight} />
+                  <UserIcon size={moderateScale(35)} color={COLORS.grayLight} />
                 )}
               </View>
             </LinearGradient>
