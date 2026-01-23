@@ -16,10 +16,10 @@ test("preview_task returns widget JSON containing all expected fields and uses u
   });
 
   const args = {
-    taskname: "שיעורי בית בלמידת מכונה",
+    taskname: "Machine Learning Homework",
     deadline: "2026-01-29",
     category: "study_and_education",
-    subcategory: "שיעורי בית בבינה מלאכותית",
+    subcategory: "AI Homework",
     duration: 300,
     canSplit: true,
     chunkCount: 5,
@@ -49,7 +49,4 @@ test("preview_task returns widget JSON containing all expected fields and uses u
 
   // Importance should be filled from user's per-category priority (5)
   assert.strictEqual(data.importance, 5);
-
-  // Confirmation message should be a string (inside `data`)
-  assert.ok(typeof data.confirmationMessage === "string");
 });

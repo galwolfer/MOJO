@@ -13,11 +13,11 @@ test("preview widget includes shortDescription and categoryDisplay and keeps sum
   const res = await previewMission.execute({
     userId: user._id.toString(),
     args: {
-      taskname: "שיעורי בית בחישוביות",
+      taskname: "Computability Homework",
       deadline: "2026-01-12",
       duration: 360,
       category: "study_and_education",
-      subcategory: "חישוביות",
+      subcategory: "Computability",
       effort: 4,
       // importance omitted so user's category priority should be applied by mission
       canSplit: true,
@@ -41,14 +41,13 @@ test("preview widget includes shortDescription and categoryDisplay and keeps sum
   // Do NOT expose a separate priority string; use numeric 'importance' only
   assert.ok(
     !Object.prototype.hasOwnProperty.call(widget.data, "priority"),
-    "widget should not include 'priority' field"
+    "widget should not include 'priority' field",
   );
   assert.ok(typeof widget.data.importance === "number", "importance should be present as numeric value");
 
-  // Confirmation message: ask user to confirm creation or indicate edits (Hebrew)
+  // We no longer include a separate confirmationMessage field; UI uses surrounding text instead
   assert.ok(
-    typeof widget.data.confirmationMessage === "string" && widget.data.confirmationMessage.length > 0,
-    "confirmationMessage should be present"
+    !Object.prototype.hasOwnProperty.call(widget.data, "confirmationMessage"),
+    "confirmationMessage should not be present",
   );
-  assert.ok(widget.data.confirmationMessage.length < 200, "confirmationMessage should be brief");
 });
