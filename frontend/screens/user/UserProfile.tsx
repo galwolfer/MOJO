@@ -19,7 +19,8 @@ import { useTaskContext } from "../../context/TaskContext";
 import { ICONS } from "../../components/icons/icons";
 import ScrollableContent from "../../components/layout/ScrollableContent";
 import Box from "../../components/layout/Box";
-import { StatBadge, ProgressGraph, FriendListItem } from "./components";
+import { StatBadge, ProgressGraph } from "./components";
+import FriendsList from "./components/FriendsList";
 import { moderateScale } from "react-native-size-matters";
 import { getUserStats } from "../../services/userService";
 import { getTasks, calculateTaskProgress, type Task, type TaskProgress } from "../../services/taskService";
@@ -109,7 +110,7 @@ export default function UserProfileScreen() {
                 />
               ) : (
                 <View style={styles.headerAvatarPlaceholder}>
-                  <UserIcon size={50} color={COLORS.grayLight} />
+                  <UserIcon size={moderateScale(40)} color={COLORS.grayLight} />
                 </View>
               )}
             </View>
@@ -268,13 +269,7 @@ export default function UserProfileScreen() {
 
       {/* Friends Section */}
       <Box title="Friends">
-        <View style={styles.friendsGradient}>
-          <View style={styles.friendsList}>
-            {MOCK_FRIENDS.map((friend) => (
-              <FriendListItem key={friend.id} {...friend} />
-            ))}
-          </View>
-        </View>
+        <FriendsList friends={MOCK_FRIENDS} />
       </Box>
 
       {/* Logout Button */}
