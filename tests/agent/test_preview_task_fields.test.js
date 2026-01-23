@@ -49,4 +49,10 @@ test("preview_task returns widget JSON containing all expected fields and uses u
 
   // Importance should be filled from user's per-category priority (5)
   assert.strictEqual(data.importance, 5);
+
+  // Draft previews must not expose progressPercentage
+  assert.ok(
+    data.progressPercentage === null || data.progressPercentage === undefined,
+    "Draft preview must not include progressPercentage",
+  );
 });

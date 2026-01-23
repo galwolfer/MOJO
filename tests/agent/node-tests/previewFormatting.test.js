@@ -50,4 +50,10 @@ test("preview widget includes shortDescription and categoryDisplay and keeps sum
     !Object.prototype.hasOwnProperty.call(widget.data, "confirmationMessage"),
     "confirmationMessage should not be present",
   );
+
+  // Preview widgets (draft) must not show progress
+  assert.ok(
+    widget.data.progressPercentage === null || widget.data.progressPercentage === undefined,
+    "preview widget should not include progressPercentage",
+  );
 });

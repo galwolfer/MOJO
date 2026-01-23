@@ -109,8 +109,15 @@ function normalizeWidgetData(widgetType, data = {}) {
 
   if (widgetType === "task_confirmation") {
     const normalized = normalizeTaskItem(data);
-    if (normalized.progressPercentage === null || normalized.progressPercentage === undefined) {
+    // Do not expose progress for draft previews; only default progress for non-draft tasks
+    if (
+      normalized.status !== "draft" &&
+      (normalized.progressPercentage === null || normalized.progressPercentage === undefined)
+    ) {
       normalized.progressPercentage = 0;
+    } else {
+      // Ensure missing progress remains null for drafts
+      if (normalized.status === "draft") normalized.progressPercentage = null;
     }
     return normalized;
   }
