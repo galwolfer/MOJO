@@ -119,7 +119,7 @@ export default function UserProfileScreen() {
             <AppText variant="title2" style={styles.headerUsername}>
               {user?.displayName || user?.username || "User"}
             </AppText>
-            {user?.username && user?.displayName && user.displayName !== user.username && (
+            {user?.username && (
               <AppText variant="notes" style={styles.headerDisplayName}>
                 @{user.username}
               </AppText>
