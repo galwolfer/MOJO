@@ -37,12 +37,11 @@ test("get_upcoming_tasks groups scheduled sessions and returns widget", async ()
   const res = await getUpcomingTasksMission.execute({ userId: user._id.toString(), args: { days: 7 } });
   const payload = extractWidgetFromText(res);
   assert.ok(payload, "Expected widget payload");
-  assert.strictEqual(payload.widget_type, "upcoming_tasks");
+  // Unified 'list' widget is used for upcoming tasks
+  assert.strictEqual(payload.widget_type, "list");
+  assert.strictEqual(payload.data.listType, "upcoming_tasks");
 
-  // Find task in today's/tomorrow groups
-  const today = payload.data.today;
-  const upcoming = payload.data.upcoming;
-  // Either today or upcoming contain the scheduled date
-  const found = (today.tasks || []).concat(...upcoming.map((g) => g.tasks)).some((t) => t.id === task._id.toString());
-  assert.ok(found, "Scheduled task should appear in upcoming groups");
+  // The unified 'list' widget returns a flat tasks array for upcoming range
+  assert.ok(Array.isArray(payload.data.tasks), "Expected tasks array in widget data");
+  assert.ok(payload.data.tasks.some((t) => t.id === task._id.toString()), "Scheduled task should appear in upcoming tasks");
 });

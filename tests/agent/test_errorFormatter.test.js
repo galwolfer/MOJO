@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert";
-import { okTrue, okFalse } from "../../agent/lib/errorFormatter.js";
+import { okTrue, okFalse } from "../../src/agent/lib/errorFormatter.js";
 
 test("okTrue formatting", () => {
   const s = okTrue({ msg: "Saved", id: "123", count: 2 });

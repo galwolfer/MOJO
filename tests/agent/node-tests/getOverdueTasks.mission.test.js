@@ -25,7 +25,9 @@ test("get_overdue_tasks returns overdue tasks in widget", async () => {
   const res = await getOverdueTasksMission.execute({ userId: user._id.toString(), args: {} });
   const payload = extractWidgetFromText(res);
   assert.ok(payload, "Expected widget payload");
-  assert.strictEqual(payload.widget_type, "task_list");
+  // New unified list widget: check top-level widget type and listType
+  assert.strictEqual(payload.widget_type, "list");
+  assert.strictEqual(payload.data.listType, "overdue_tasks");
   assert.strictEqual(payload.data.tasks.length, 1);
   assert.strictEqual(payload.data.tasks[0].id, task._id.toString());
 });

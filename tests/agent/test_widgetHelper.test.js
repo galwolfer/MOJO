@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert";
-import { buildWidget } from "../../agent/lib/widgetHelper.js";
+import { buildWidget } from "../../src/agent/lib/widgetHelper.js";
 
 test("buildWidget returns well-formed widget string", async () => {
   const s = buildWidget("task_detail", { task: { id: "t1", title: "Test" } });

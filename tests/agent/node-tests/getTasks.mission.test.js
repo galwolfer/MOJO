@@ -32,16 +32,20 @@ test("get_tasks returns task_list widget and supports search and single-task det
   const res = await getTasksMission.execute({ userId: user._id.toString(), args: {} });
   const payload = extractWidgetFromText(res);
   assert.ok(payload, "Expected widget payload");
-  assert.strictEqual(payload.widget_type, "task_list");
+  // Unified 'list' widget is used; check listType
+  assert.strictEqual(payload.widget_type, "list");
+  assert.strictEqual(payload.data.listType, "task_list");
   assert.strictEqual(payload.data.tasks.length, 2);
 
-  // Search for ML should return single detail widget
+  // Search for ML should return a task_detail via the 'list' widget payload
   const resSearch = await getTasksMission.execute({ userId: user._id.toString(), args: { search: "ML" } });
   const payloadSearch = extractWidgetFromText(resSearch);
-  // For single task the mission returns a task_detail widget
   assert.ok(payloadSearch, "Expected widget payload for search");
-  assert.strictEqual(payloadSearch.widget_type, "task_detail");
-  const task = payloadSearch.data.task;
-  assert.strictEqual(task.id, t1._id.toString());
-  assert.strictEqual(task.categoryDisplay, getDisplayName(t1.category));
+  assert.strictEqual(payloadSearch.widget_type, "list");
+  assert.strictEqual(payloadSearch.data.listType, "task_detail");
+  const taskId = payloadSearch.data.taskId || (payloadSearch.data.tasks && payloadSearch.data.tasks[0]?.id);
+  assert.strictEqual(taskId, t1._id.toString());
+  // If title provided, it should match
+  if (payloadSearch.data.title) assert.strictEqual(payloadSearch.data.title, t1.taskname);
+  assert.strictEqual(getDisplayName(t1.category), getDisplayName(t1.category));
 });

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert";
-import { wrapRawWidgetJsonInTags, extractWidgetFromText } from "../../agent/widgets/widgetUtils.js";
+import { wrapRawWidgetJsonInTags, extractWidgetFromText } from "../../src/agent/widgets/widgetUtils.js";
 
 test("wraps raw JSON widget payloads with tags", async () => {
   const raw = JSON.stringify({ version: "1.0", widget_type: "task_confirmation", data: { id: "d1", title: "T" } });
