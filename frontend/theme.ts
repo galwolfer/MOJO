@@ -10,7 +10,7 @@ export const COLORS = {
   primary5: "#ECA32E",
   primary6: "#38AF4D",
   primary7: "#F43E3E",
-  lightGray: "#A1A8C8",
+  lightGray: "#8e95b2",
 
   // Bright palette
   brightP1: "#96a7f0",
