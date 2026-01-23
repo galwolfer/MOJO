@@ -32,6 +32,15 @@ import {
   getSubtaskIdFromSession,
   sessionRowData,
 } from "./widgetHelpers";
+import {
+  TaskTitle,
+  TaskTagsRow,
+  TaskDueDate,
+  TaskDurationRow,
+  ScheduledSessionsSection,
+  renderTaskField,
+  TwoColumnGrid,
+} from "./TaskWidgetParts";
 import { updateSubTask } from "../../services/taskService";
 import { useTaskContext } from "../../context/TaskContext";
 
@@ -193,76 +202,28 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <AppText variant="title2" style={styles.title}>
-            <Icon
-              name={categoryMeta.icon}
-              size={ICON_SIZES.big}
-              color={categoryMeta.color}
-              style={styles.inlineIconImage}
-            />
-            {task.title}
-          </AppText>
+          <TaskTitle title={task.title} taskname={task.taskname} category={task.category} />
         </View>
 
         {/* Tags row (category, subcategory, importance, effort) */}
-        <View style={styles.tagRow}>
-          {task.category && (
-            <Tag
-              label={task.categoryDisplay || task.category}
-              leftIcon={categoryMeta.icon}
-              colorIndex={categoryMeta.colorIndex}
-              style={styles.tagItem}
-            />
-          )}
-
-          {subLabel ? <Tag label={subLabel} colorIndex={subIndex} style={styles.tagItem} /> : null}
-
-          {task.importance ? (
-            <Tag
-              label={getImportanceLabel(task.importance)}
-              leftIcon={importanceIcon(task.importance)}
-              colorIndex={importanceColorIndex(task.importance)}
-              style={styles.tagItem}
-            />
-          ) : null}
-
-          {task.effort ? (
-            <Tag
-              label={getEffortLabel(task.effort)}
-              leftIcon={effortIcon(task.effort)}
-              colorIndex={effortColor(task.effort)}
-              style={styles.tagItem}
-            />
-          ) : null}
-        </View>
+        <TaskTagsRow
+          category={task.category}
+          categoryDisplay={task.categoryDisplay}
+          subcategory={task.subcategory}
+          subcategoryDisplay={task.subcategoryDisplay || task.subCategory?.label}
+          importance={task.importance}
+          effort={task.effort}
+        />
 
         {/* Details Grid */}
-        <View style={styles.detailsGrid}>
-          <View style={styles.detailItem}>
-            <AppText variant="notes" style={styles.labelText}>
-              {"Due Date: "}
-            </AppText>
-            <AppText variant="bodyText">{formatDate(task.dueDate || task.deadline)}</AppText>
-          </View>
-
-          {task.startDate && (
-            <View style={styles.detailItem}>
-              <AppText variant="notes" style={styles.labelText}>
-                {"Start Date: "}
-              </AppText>
-              <AppText variant="bodyText">{formatDate(task.startDate)}</AppText>
-            </View>
-          )}
-
-          {task.earliestStart && (
-            <View style={styles.detailItem}>
-              <AppText variant="notes" style={styles.labelText}>
-                {"Earliest Start: "}
-              </AppText>
-              <AppText variant="bodyText">{formatDate(task.earliestStart)}</AppText>
-            </View>
-          )}
-        </View>
+        <TwoColumnGrid
+          items={[
+            <TaskDueDate dueDate={task.dueDate} deadline={task.deadline} />,
+            renderTaskField(task, "startDate"),
+            renderTaskField(task, "earliestStart"),
+            renderTaskField({ estimatedDuration: task.estimatedDuration || task.duration }, "estimatedDuration"),
+          ]}
+        />
 
         {/* Description */}
         {task.description && (
@@ -271,90 +232,16 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
           </View>
         )}
 
-        {/* Scheduled Sessions */}
-        {task.scheduledSessions && task.scheduledSessions.length > 0 && (
-          <View style={styles.section}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: SPACING.sm }}>
-              <ProgressIcon
-                value={Math.max(0, Math.min(1, (task.progressPercentage ?? 0) / 100))}
-                size={ICON_SIZES.md}
-              />
-              <AppText>
-                <AppText variant="title3" style={styles.sectionTitle}>
-                  {"Scheduled Sessions "}
-                </AppText>
-                <AppText variant="notes">{formatDuration(task.estimatedDuration || task.duration)}</AppText>
-              </AppText>
-            </View>
-            <List
-              data={task.scheduledSessions.map((session, index) => {
-                const subtaskId = getSubtaskIdFromSession(session, task.subtasks);
-                const isDone = subtaskId ? completedParts.has(subtaskId) : false;
-                const canToggle = Boolean(subtaskId);
-                const isLoading = loadingParts.has(subtaskId || "");
-
-                // Use helper to get displayable pieces for the row (adaptive to width)
-                const { width } = useWindowDimensions();
-                const row = sessionRowData(session, task.subtasks, index, { width });
-
-                return {
-                  id: session.id || session.start || `session-${index}`,
-                  content: (
-                    <View style={{ width: "100%", flexDirection: "row", alignItems: "flex-start" }}>
-                      <View style={{ width: 40, justifyContent: "center", paddingRight: SPACING.sm / 2 }}>
-                        {subtaskId ? (
-                          <Checkbox
-                            checked={isDone}
-                            onChange={() => canToggle && handleToggleSubtask(subtaskId)}
-                            size={ICON_SIZES.sm}
-                          />
-                        ) : null}
-                      </View>
-
-                      <View style={{ flex: 1 }}>
-                        <AppText variant="notes" style={styles.scheduleDateTime}>
-                          {row.dateText}
-                          {row.timeRangeText ? (
-                            <AppText variant="notes" style={styles.scheduleTime}>
-                              {" "}
-                              {row.timeRangeText}
-                            </AppText>
-                          ) : null}
-                        </AppText>
-                        <AppText variant="bodyText" style={[styles.scheduleLabel, isDone && styles.subtaskCompleted]}>
-                          {row.label}
-                        </AppText>
-                      </View>
-
-                      <View
-                        style={{
-                          width: 70,
-                          paddingLeft: SPACING.sm,
-                          alignItems: "flex-end",
-                          justifyContent: "flex-start",
-                        }}
-                      >
-                        {row.durationMinutes ? (
-                          <View style={{ flexDirection: "row", alignItems: "center", gap: SPACING.sm / 2 }}>
-                            <Icon name="clock" size={ICON_SIZES.sm} color={COLORS.lightGray} />
-                            <AppText variant="notes">{formatDuration(row.durationMinutes)}</AppText>
-                          </View>
-                        ) : (
-                          <AppText variant="notes" style={{ color: COLORS.lightGray }}>
-                            {row.timeRangeText}
-                          </AppText>
-                        )}
-                      </View>
-                    </View>
-                  ),
-                  onPress: () => canToggle && handleToggleSubtask(subtaskId),
-                  disabled: !canToggle || isLoading,
-                  divider: true,
-                } as ListCellProps;
-              })}
-            />
-          </View>
-        )}
+        {/* Scheduled Sessions (moved to modular component) */}
+        <ScheduledSessionsSection
+          scheduledSessions={task.scheduledSessions}
+          subtasks={task.subtasks}
+          completedParts={completedParts}
+          loadingParts={loadingParts}
+          onToggleSubtask={handleToggleSubtask}
+          estimatedDuration={task.estimatedDuration || task.duration}
+          progressPercentage={task.progressPercentage ?? null}
+        />
       </View>
     </Widget>
   );
@@ -369,6 +256,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
     gap: SPACING.sm,
+    // Ensure title alignment matches TaskTitle textAlign
+    textAlign: "left",
   },
   title: {
     color: COLORS.black,

@@ -9,7 +9,23 @@ import AppText from "../common/AppText";
 import { COLORS, SPACING } from "../../theme";
 import Widget from "../special/Widget";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
-import { formatDateTime, formatTimeRange, getSessionLabel, getTaskTypeLabel } from "./widgetHelpers";
+import {
+  formatDate,
+  formatDateTime,
+  formatTimeRange,
+  formatDuration,
+  getSessionLabel,
+  getTaskTypeLabel,
+} from "./widgetHelpers";
+import {
+  TaskTitle,
+  TaskTagsRow,
+  TaskDueDate,
+  TaskDurationRow,
+  ScheduledSessionsSection,
+  renderTaskField,
+  TwoColumnGrid,
+} from "./TaskWidgetParts";
 
 interface TaskData {
   id: string;
@@ -89,64 +105,13 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
   // Debug: Log the received data to see what's coming from the backend
   console.log("[TaskConfirmationWidget] Received data:", JSON.stringify(data, null, 2));
 
-  // Local date formatter (keeps widget independent of locale helpers)
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return "Not set";
-    try {
-      const date = new Date(dateStr);
-      return date.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
-    } catch {
-      return dateStr;
-    }
-  };
-
-  // Importance/Effort label helpers (accept numeric or string values)
-  const getImportanceLabel = (importance?: number | string | null) => {
-    if (importance === undefined || importance === null) return "Not set";
-    const val = Number(importance);
-    if (Number.isNaN(val)) return "Not set";
-    const labels = ["", "Low", "Medium-Low", "Medium", "High", "Critical"];
-    return labels[val] || `Level ${val}`;
-  };
-
-  const getEffortLabel = (effort?: number | string | null) => {
-    if (effort === undefined || effort === null) return "Not set";
-    const val = Number(effort);
-    if (Number.isNaN(val)) return "Not set";
-    const labels = ["", "Minimal", "Light", "Moderate", "Heavy", "Extensive"];
-    return labels[val] || `Level ${val}`;
-  };
-
-  const formatDuration = (minutes?: number | null) => {
-    if (minutes === undefined || minutes === null) return "Not set";
-    if (minutes < 60) return `${minutes} minutes`;
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (mins === 0) return `${hours} hour${hours > 1 ? "s" : ""}`;
-    return `${hours}h ${mins}m`;
-  };
-
   return (
     <Widget entranceEnabled={entranceEnabled} entranceDelay={entranceDelay} entranceDuration={entranceDuration}>
       <ScrollView style={styles.container} nestedScrollEnabled={true} showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <View style={styles.header}>
-          <AppText variant="title3" style={styles.headerTitle}>
-            Confirm Task Details
-          </AppText>
-        </View>
+
         {/* Title */}
-        <View style={styles.field}>
-          <AppText variant="notes" style={styles.labelText}>
-            Title
-          </AppText>
-          <AppText variant="bodyText">{task.title || task.taskname}</AppText>
-        </View>
+        <TaskTitle title={task.title} taskname={task.taskname} category={task.category} />
 
         {/* Description */}
         {task.description && (
@@ -159,156 +124,36 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
         )}
 
         {/* Due Date */}
-        <View style={styles.field}>
-          <AppText variant="notes" style={styles.labelText}>
-            📅 Due Date
-          </AppText>
-          <AppText variant="bodyText">{formatDate(task.dueDate || task.deadline)}</AppText>
-        </View>
 
-        {/* Earliest Start */}
-        {task.earliestStart && (
-          <View style={styles.field}>
-            <AppText variant="notes" style={styles.labelText}>
-              ⏰ Earliest Start
-            </AppText>
-            <AppText variant="bodyText">{formatDate(task.earliestStart)}</AppText>
-          </View>
-        )}
+        {/* Category / Subcategory / importance / effort */}
+        <TaskTagsRow
+          category={task.category}
+          categoryDisplay={task.categoryDisplay}
+          subcategory={task.subcategory}
+          subcategoryDisplay={task.subcategoryDisplay || task.subCategory?.label}
+          importance={task.importance}
+          effort={task.effort}
+        />
 
-        {/* Category */}
-        {task.category && (
-          <View style={styles.field}>
-            <AppText variant="notes" style={styles.labelText}>
-              📁 Category
-            </AppText>
-            <AppText variant="bodyText">{task.categoryDisplay || task.category}</AppText>
-          </View>
-        )}
+        {/* Details Grid (2-up) */}
+        <TwoColumnGrid
+          items={[
+            <TaskDueDate dueDate={task.dueDate} deadline={task.deadline} />,
+            renderTaskField(task, "startDate"),
+            renderTaskField({ estimatedDuration: task.estimatedDuration || task.duration }, "estimatedDuration"),
+            renderTaskField(task, "earliestStart"),
+            renderTaskField(task, "taskType"),
+            task.status !== "draft" ? renderTaskField(task, "progressPercentage") : null,
+            renderTaskField(task, "canSplit"),
+            renderTaskField(task, "sessionRange"),
+            renderTaskField(task, "recurrence"),
+            renderTaskField(task, "chunkCount"),
+            renderTaskField(task, "chunkMinutes"),
+            renderTaskField(task, "minChunk"),
+          ].filter(Boolean)}
+        />
 
-        {/* Subcategory */}
-        {(task.subcategory || task.subCategory?.label) && (
-          <View style={styles.field}>
-            <AppText variant="notes" style={styles.labelText}>
-              📂 Subcategory
-            </AppText>
-            <AppText variant="bodyText">
-              {task.subcategoryDisplay || task.subCategory?.label || task.subcategory}
-            </AppText>
-          </View>
-        )}
-
-        {/* Importance & Effort Row */}
-        <View style={styles.row}>
-          <View style={styles.halfField}>
-            <AppText variant="notes" style={styles.labelText}>
-              ⚡ Importance
-            </AppText>
-            <AppText variant="bodyText">{getImportanceLabel(task.importance)}</AppText>
-          </View>
-          <View style={styles.halfField}>
-            <AppText variant="notes" style={styles.labelText}>
-              💪 Effort
-            </AppText>
-            <AppText variant="bodyText">{getEffortLabel(task.effort)}</AppText>
-          </View>
-        </View>
-
-        {/* Priority Score */}
-        {task.priorityScore !== undefined && task.priorityScore !== null && (
-          <View style={styles.field}>
-            <AppText variant="notes" style={styles.labelText}>
-              🎯 Priority Score
-            </AppText>
-            <AppText variant="bodyText">{task.priorityScore.toFixed(2)}</AppText>
-          </View>
-        )}
-
-        {/* Estimated Duration */}
-        {(task.estimatedDuration || task.duration) && (
-          <View style={styles.field}>
-            <AppText variant="notes" style={styles.labelText}>
-              ⏱️ Estimated Duration
-            </AppText>
-            <AppText variant="bodyText">{formatDuration(task.estimatedDuration || task.duration)}</AppText>
-          </View>
-        )}
-
-        {/* Recurrence */}
-        {task.recurrence && (
-          <View style={styles.field}>
-            <AppText variant="notes" style={styles.labelText}>
-              🔁 Recurrence
-            </AppText>
-            <AppText variant="bodyText">
-              {`${task.recurrence.type}${task.recurrence.interval ? ` • every ${task.recurrence.interval}` : ""}`}
-              {task.recurrence.endDate
-                ? ` • until ${formatDate(task.recurrence.endDate)}`
-                : task.recurrence.count
-                  ? ` • ${task.recurrence.count} times`
-                  : ""}
-            </AppText>
-          </View>
-        )}
-
-        <View style={styles.field}>
-          <AppText variant="notes" style={styles.labelText}>
-            Progress
-          </AppText>
-          <AppText variant="bodyText">{Math.round(task.progressPercentage ?? 0)}%</AppText>
-        </View>
-
-        {/* Task Type & Splitting */}
-        {(task.taskType || task.canSplit) && (
-          <View style={styles.field}>
-            <AppText variant="notes" style={styles.labelText}>
-              🔀 Task Type
-            </AppText>
-            <AppText variant="bodyText">{getTaskTypeLabel(task.taskType, task.canSplit)}</AppText>
-          </View>
-        )}
-
-        {/* Session Range for Leaky Tasks */}
-        {task.taskType === "leaky" && task.minMinutes && task.maxMinutes && (
-          <View style={styles.field}>
-            <AppText variant="notes" style={styles.labelText}>
-              ⏲️ Session Range
-            </AppText>
-            <AppText variant="bodyText">
-              {task.minMinutes}-{task.maxMinutes} min
-            </AppText>
-          </View>
-        )}
-
-        {/* Chunk Info for Split Tasks */}
-        {task.taskType === "in_parts" && (task.chunkCount || task.chunkMinutes || task.minChunk) && (
-          <View style={styles.field}>
-            <AppText variant="notes" style={styles.labelText}>
-              🧩 Parts
-            </AppText>
-            <AppText variant="bodyText">
-              {task.chunkCount ? `${task.chunkCount} chunks` : ""}
-              {task.chunkMinutes ? ` × ${task.chunkMinutes} min` : ""}
-              {task.minChunk ? ` • min chunk ${task.minChunk} min` : ""}
-            </AppText>
-          </View>
-        )}
-
-        {/* Splitting (Legacy Display) */}
-        {task.canSplit && !task.taskType && (
-          <View style={styles.field}>
-            <AppText variant="notes" style={styles.labelText}>
-              🔀 Splitting
-            </AppText>
-            <AppText variant="bodyText">
-              {task.taskType === "in_parts" && task.chunkCount
-                ? `${task.chunkCount} parts`
-                : task.taskType === "leaky"
-                  ? `Flexible (${task.minMinutes || 15}-${task.maxMinutes || 60} min)`
-                  : "Can be split"}
-            </AppText>
-          </View>
-        )}
+        {/* Tags (keep original tag display) */}
 
         {/* Tags */}
         {task.tags && task.tags.length > 0 && (
@@ -320,31 +165,13 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
           </View>
         )}
 
-        {/* Scheduled Sessions */}
-        {task.scheduledSessions && task.scheduledSessions.length > 0 && (
-          <View style={styles.section}>
-            <AppText variant="title3" style={styles.sectionTitle}>
-              📅 Scheduled Sessions
-            </AppText>
-            <View style={styles.scheduleList}>
-              {task.scheduledSessions.map((session, index) => (
-                <View key={session.id || session.start || `session-${index}`} style={styles.scheduleCard}>
-                  <AppText variant="bodyText" style={styles.scheduleLabel}>
-                    {getSessionLabel(session, index)}
-                  </AppText>
-                  <AppText variant="notes" style={styles.scheduleDateTime}>
-                    {formatDateTime(session.start)}
-                  </AppText>
-                  {session.end && (
-                    <AppText variant="notes" style={styles.scheduleTime}>
-                      {formatTimeRange(session)}
-                    </AppText>
-                  )}
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
+        {/* Scheduled Sessions (use shared component) */}
+        <ScheduledSessionsSection
+          scheduledSessions={task.scheduledSessions}
+          subtasks={task.subtasks}
+          estimatedDuration={task.estimatedDuration || task.duration}
+          progressPercentage={task.status === "draft" ? null : (task.progressPercentage ?? null)}
+        />
 
         {/* Subtasks */}
         {task.subtasks && task.subtasks.length > 0 && (
