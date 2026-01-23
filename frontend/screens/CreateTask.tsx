@@ -19,7 +19,7 @@
  */
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import { View, StyleSheet, ScrollView, Pressable, Modal, Alert } from "react-native";
+import { View, StyleSheet, ScrollView, Pressable, Modal, Alert, SafeAreaView } from "react-native";
 import { COLORS, SPACING, TYPOGRAPHY, SHADOWS, FONT_SIZES } from "../theme";
 import AppText from "../components/common/AppText";
 import AppButton from "../components/common/AppButton";
@@ -59,9 +59,11 @@ interface TaskFormState {
  *
  * Main screen for creating new tasks with comprehensive form fields.
  */
+
 const CreateTask: React.FC = () => {
   const { setHeaderConfig } = useNavigation();
-  
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const [navbarHeight, setNavbarHeight] = useState(0);
   const [formState, setFormState] = useState<TaskFormState>({
     taskName: "",
     timeToComplete: "",
@@ -79,7 +81,7 @@ const CreateTask: React.FC = () => {
   const [isCategoryModalVisible, setIsCategoryModalVisible] = useState(false);
   const [isCalendarModalVisible, setIsCalendarModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // Ref to track if category was manually changed by user
   const categoryManuallyChanged = useRef(false);
   // Ref to track the auto-generated subcategory tag
@@ -384,15 +386,30 @@ const CreateTask: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* Sticky Header Section */}
-      <View style={styles.headerSection}>
+      <View
+        style={styles.headerSection}
+        onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
+      >
         <AppText variant="title2" style={styles.mainTitle}>
           + CREATE A TASK
         </AppText>
       </View>
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[
+          styles.contentContainer,
+          {
+            paddingTop: headerHeight + SPACING.sm,
+            paddingBottom: navbarHeight + SPACING.lg,
+          },
+        ]}
+        scrollIndicatorInsets={{ top: headerHeight, bottom: navbarHeight }}
+      >
+
+
       {/* Task Details Box */}
       <Box title="TASK DETAILS" style={styles.boxContent}>
         {/* Task Name Input */}
@@ -669,7 +686,13 @@ const CreateTask: React.FC = () => {
       </ScrollView>
 
       {/* Sticky NavBar at Bottom */}
-      <NavBar />
+      <View
+        onLayout={(e) => setNavbarHeight(e.nativeEvent.layout.height)}
+        style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}
+      >
+        <NavBar />
+      </View>
+
 
       {/* Category Selection Modal */}
       <Modal
@@ -721,7 +744,7 @@ const CreateTask: React.FC = () => {
           </View>
         </Pressable>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -732,20 +755,26 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.white3,
+    flexDirection: "column",
   },
   contentContainer: {
     padding: SPACING.sm,
-    paddingBottom: SPACING.md,
   },
   headerSection: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    elevation: 10, // Android
     paddingTop: SPACING.xlg,
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.lg,
     borderBottomLeftRadius: SPACING.xlg,
     borderBottomRightRadius: SPACING.xlg,
     ...(SHADOWS.card as object),
-    zIndex: 100,
     backgroundColor: "#ffffff",
+    justifyContent: "center",
   },
   mainTitle: {
     color: COLORS.primary1,
