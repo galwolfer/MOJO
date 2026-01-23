@@ -32,7 +32,6 @@ export function buildTaskDetailData(task, scheduledSessions = []) {
     subcategoryDisplay: task.subCategory ? task.subCategory.label : null,
     subcategory: task.subCategory ? task.subCategory.label : null,
     canSplit: task.canSplit,
-    tags: task.tags || null,
     scheduledSessions: scheduledSessions || [],
   };
 }

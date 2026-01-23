@@ -144,22 +144,32 @@ export async function createTask(req, res) {
       importance,
       effort,
       estimatedMinutes,
+      estimatedDuration,
+      canSplit,
+      minChunk,
       description,
-      tags,
       subtasks,
       taskType,
       chunkCount,
+      chunkMinutes,
+      minMinutes,
+      maxMinutes,
     } = req.body;
 
     console.log("Extracted fields:", {
       importance,
       effort,
       estimatedMinutes,
+      estimatedDuration,
+      canSplit,
+      minChunk,
       description,
-      tags,
       subtasks,
       taskType,
       chunkCount,
+      chunkMinutes,
+      minMinutes,
+      maxMinutes,
     });
 
     const title = (taskname || name || "").trim();
@@ -208,36 +218,42 @@ export async function createTask(req, res) {
 
     // Auto-save subcategory to user profile if provided
     if (subcategory && category) {
+      console.log("[taskController.createTask] Auto-saving subcategory:", { subcategory, category, userId });
       await autoSaveSubcategory(userId, subcategory, category);
     }
+
+    // Use estimatedDuration (from agent) OR estimatedMinutes (from frontend)
+    const finalEstimatedDuration = estimatedDuration || estimatedMinutes || 60;
+
+    console.log("[taskController.createTask] Creating task with:", {
+      taskname: title,
+      category,
+      subcategory,
+      subCategoryObject: subcategory ? { label: subcategory, source: "user", confidence: 1 } : null,
+    });
+
+    // Preserve explicit nulls for minChunk (to allow clearing); only use default when undefined
+    const finalMinChunk = minChunk === null ? null : typeof minChunk === "number" && minChunk > 0 ? minChunk : 30;
 
     const task = await taskService.createTask({
       userId,
       taskname: title,
-      description: description || undefined,
+      description: descriptionValue,
       category: category || "",
       subCategory: subcategory ? { label: subcategory, source: "user", confidence: 1, updatedAt: new Date() } : null,
       dueDate: deadline ? new Date(deadline) : null,
-      importance: importance !== undefined ? importance : 3, // Default to 3 if not provided
-      effort: effort !== undefined ? effort : 3, // Default to 3 if not provided
-      estimatedDuration: estimatedMinutes || 60, // Default to 60 minutes if not provided
-      tags: tags || undefined,
-      subtasks: subtasks || undefined,
+      importance: importance !== undefined ? importance : 3,
+      effort: effort !== undefined ? effort : 3,
+      estimatedDuration: finalEstimatedDuration,
+      canSplit: canSplit !== undefined ? canSplit : true,
+      minChunk: finalMinChunk,
       taskType: taskType || "perfect",
-      chunkCount: chunkCount || undefined,
-      recurrence,
-      // Pass through optional fields from mission helpers so final values are persisted
-      importance: typeof importance === "number" ? importance : undefined,
-      effort: typeof effort === "number" ? effort : undefined,
-      estimatedDuration: typeof estimatedDuration === "number" ? estimatedDuration : undefined,
-      canSplit: typeof canSplit === "boolean" ? canSplit : undefined,
-      minChunk: typeof minChunk === "number" ? minChunk : undefined,
       chunkCount: typeof chunkCount === "number" ? chunkCount : undefined,
       chunkMinutes: typeof chunkMinutes === "number" ? chunkMinutes : undefined,
       minMinutes: typeof minMinutes === "number" ? minMinutes : undefined,
       maxMinutes: typeof maxMinutes === "number" ? maxMinutes : undefined,
-      taskType: typeof taskType === "string" ? taskType : undefined,
-      description: descriptionValue,
+      recurrence,
+      subtasks: subtasks || undefined,
     });
 
     // Trigger scheduler to update the plan after creating a task
@@ -464,47 +480,75 @@ export async function updateTask(req, res) {
 
     // Chunk settings (for in_parts/leaky tasks)
     if (raw.chunkCount !== undefined) {
-      const cc = Number(raw.chunkCount);
-      if (!Number.isInteger(cc) || cc < 1) {
-        return res.status(400).json({ success: false, error: "Chunk count must be at least 1" });
+      // Accept explicit null to clear stored chunk count when switching types
+      if (raw.chunkCount === null) {
+        updates.chunkCount = null;
+      } else {
+        const cc = Number(raw.chunkCount);
+        if (!Number.isInteger(cc) || cc < 1) {
+          return res.status(400).json({ success: false, error: "Chunk count must be at least 1" });
+        }
+        updates.chunkCount = cc;
       }
-      updates.chunkCount = cc;
     }
 
     if (raw.chunkMinutes !== undefined) {
-      const cm = Number(raw.chunkMinutes);
-      if (isNaN(cm) || cm < 1) {
-        return res.status(400).json({ success: false, error: "Chunk minutes must be at least 1" });
+      if (raw.chunkMinutes === null) {
+        updates.chunkMinutes = null;
+      } else {
+        const cm = Number(raw.chunkMinutes);
+        if (isNaN(cm) || cm < 1) {
+          return res.status(400).json({ success: false, error: "Chunk minutes must be at least 1" });
+        }
+        updates.chunkMinutes = Math.round(cm);
       }
-      updates.chunkMinutes = Math.round(cm);
     }
 
     if (raw.minMinutes !== undefined) {
-      const min = Number(raw.minMinutes);
-      if (isNaN(min) || min < 1) {
-        return res.status(400).json({ success: false, error: "Min minutes must be at least 1" });
+      if (raw.minMinutes === null) {
+        updates.minMinutes = null;
+      } else {
+        const min = Number(raw.minMinutes);
+        if (isNaN(min) || min < 1) {
+          return res.status(400).json({ success: false, error: "Min minutes must be at least 1" });
+        }
+        updates.minMinutes = Math.round(min);
       }
-      updates.minMinutes = Math.round(min);
     }
 
     if (raw.maxMinutes !== undefined) {
-      const max = Number(raw.maxMinutes);
-      if (isNaN(max) || max < 1) {
-        return res.status(400).json({ success: false, error: "Max minutes must be at least 1" });
+      if (raw.maxMinutes === null) {
+        updates.maxMinutes = null;
+      } else {
+        const max = Number(raw.maxMinutes);
+        if (isNaN(max) || max < 1) {
+          return res.status(400).json({ success: false, error: "Max minutes must be at least 1" });
+        }
+        updates.maxMinutes = Math.round(max);
       }
-      updates.maxMinutes = Math.round(max);
     }
 
     if (raw.minChunk !== undefined) {
-      const mc = Number(raw.minChunk);
-      if (isNaN(mc) || mc < 15) {
-        return res.status(400).json({ success: false, error: "Min chunk must be at least 15 minutes" });
+      // Allow explicit null to clear stored minChunk
+      if (raw.minChunk === null) {
+        updates.minChunk = null;
+      } else {
+        const mc = Number(raw.minChunk);
+        if (isNaN(mc) || mc < 15) {
+          return res.status(400).json({ success: false, error: "Min chunk must be at least 15 minutes" });
+        }
+        updates.minChunk = Math.round(mc);
       }
-      updates.minChunk = Math.round(mc);
     }
 
-    // Validate min/max relationship
-    if (updates.minMinutes && updates.maxMinutes && updates.minMinutes > updates.maxMinutes) {
+    // Validate min/max relationship (when both provided and not null)
+    if (
+      updates.minMinutes !== undefined &&
+      updates.maxMinutes !== undefined &&
+      updates.minMinutes !== null &&
+      updates.maxMinutes !== null &&
+      updates.minMinutes > updates.maxMinutes
+    ) {
       return res.status(400).json({ success: false, error: "Min minutes cannot exceed max minutes" });
     }
 
@@ -533,6 +577,25 @@ export async function updateTask(req, res) {
         }
         updates.dueDate = d;
       }
+    }
+
+    // Recurrence
+    if (raw.recurrence !== undefined) {
+      const rec = {
+        type: raw.recurrence.type,
+        interval: raw.recurrence.interval || 1,
+        endDate: raw.recurrence.endDate ? new Date(raw.recurrence.endDate) : null,
+        count: raw.recurrence.count || null,
+        completedDates: [],
+      };
+
+      if (rec.endDate && isNaN(rec.endDate.getTime())) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Invalid recurrence.endDate. Use ISO 8601 (YYYY-MM-DD)." });
+      }
+
+      updates.recurrence = rec;
     }
 
     if (Object.keys(updates).length === 0) {
@@ -1097,7 +1160,9 @@ export async function completeTask(req, res) {
 
     const result = await taskService.completeTask({ taskId: id, userId });
 
-    logger.info(`[completeTask] Task service result: success=${result?.success}, wasAlreadyCompleted=${result?.wasAlreadyCompleted}`);
+    logger.info(
+      `[completeTask] Task service result: success=${result?.success}, wasAlreadyCompleted=${result?.wasAlreadyCompleted}`,
+    );
 
     if (!result || result.success === false) {
       logger.warn(`[completeTask] Task not found or error: ${result?.error}`);

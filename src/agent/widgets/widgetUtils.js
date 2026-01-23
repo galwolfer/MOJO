@@ -28,7 +28,6 @@ const TASK_FIELDS = [
   "subcategoryDisplay",
   "subCategory",
   "canSplit",
-  "tags",
   "scheduledSessions",
 ];
 
@@ -286,10 +285,45 @@ export function extractWidgetFromText(text) {
   const match = fixed.match(/<WIDGET_JSON>([\s\S]*?)<\/WIDGET_JSON>/);
   if (!match) return null;
 
+  let jsonStr = match[1].trim();
+
   try {
-    return JSON.parse(match[1].trim());
+    return JSON.parse(jsonStr);
   } catch (err) {
-    console.warn("[widgetUtils] Failed to parse widget JSON:", err.message);
-    return null;
+    // Try to repair common JSON issues
+    console.warn("[widgetUtils] Initial parse failed, attempting repair:", err.message);
+
+    // Attempt 1: Add missing closing brace if needed
+    if (!jsonStr.endsWith("}")) {
+      try {
+        const repaired = jsonStr + "}";
+        console.log("[widgetUtils] Trying with added closing brace");
+        return JSON.parse(repaired);
+      } catch (e) {
+        // Continue to next attempt
+      }
+    }
+
+    // Attempt 2: Remove trailing commas before closing braces
+    try {
+      const repaired = jsonStr.replace(/,\s*([}\]])/g, "$1");
+      console.log("[widgetUtils] Trying with removed trailing commas");
+      return JSON.parse(repaired);
+    } catch (e) {
+      // Continue
+    }
+
+    // Attempt 3: Both fixes
+    try {
+      let repaired = jsonStr.replace(/,\s*([}\]])/g, "$1");
+      if (!repaired.endsWith("}")) {
+        repaired += "}";
+      }
+      console.log("[widgetUtils] Trying with both fixes");
+      return JSON.parse(repaired);
+    } catch (e) {
+      console.error("[widgetUtils] All repair attempts failed");
+      return null;
+    }
   }
 }

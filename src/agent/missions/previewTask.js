@@ -286,7 +286,6 @@ const previewTaskMission = new GuidedMission({
         maxMinutes: displayMaxMinutes,
         earliestStart: finalEarliestStart,
         recurrence: recurrence || null,
-        tags: null,
         progressPercentage: 0,
         scheduledSessions: [],
         // Small human-readable short description for listing/preview

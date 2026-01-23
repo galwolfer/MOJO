@@ -140,7 +140,6 @@ export async function createTask({
   category = "",
   subCategory = null,
   recurrence = null,
-  tags = [],
   subtasks = [],
 }) {
   const illegalFields = getIllegalDisplayFields({
@@ -170,7 +169,6 @@ export async function createTask({
     category,
     subCategory,
     recurrence,
-    tags: tags || [],
   });
 
   // Note: SubTask documents are automatically created by the Task model's post-save hook
