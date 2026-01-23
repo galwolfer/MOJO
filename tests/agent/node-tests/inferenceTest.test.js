@@ -45,7 +45,10 @@ test("splitting fields are intelligently inferred based on taskType and duration
   assert.ok(widget1.data.maxMinutes >= 80 && widget1.data.maxMinutes <= 120, "maxMinutes should be 80-120");
 
   // Confirm in_parts fields are null for leaky (minChunk may be null or default)
-  assert.ok(widget1.data.minChunk === null || widget1.data.minChunk === TASK_CONFIG.defaults.minChunk, "minChunk should be null or default");
+  assert.ok(
+    widget1.data.minChunk === null || widget1.data.minChunk === TASK_CONFIG.defaults.minChunk,
+    "minChunk should be null or default",
+  );
   assert.strictEqual(widget1.data.chunkCount, null);
 
   // Add persists the inferred leaky bounds

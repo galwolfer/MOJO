@@ -9,16 +9,7 @@ import AppText from "../common/AppText";
 import { COLORS, SPACING } from "../../theme";
 import Widget from "../special/Widget";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
-import {
-  formatDate,
-  formatDateTime,
-  formatTimeRange,
-  getSessionLabel,
-  getImportanceLabel,
-  getEffortLabel,
-  formatDuration,
-  getTaskTypeLabel,
-} from "./widgetHelpers";
+import { formatDateTime, formatTimeRange, getSessionLabel, getTaskTypeLabel } from "./widgetHelpers";
 
 interface TaskData {
   id: string;
@@ -98,6 +89,7 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
   // Debug: Log the received data to see what's coming from the backend
   console.log("[TaskConfirmationWidget] Received data:", JSON.stringify(data, null, 2));
 
+  // Local date formatter (keeps widget independent of locale helpers)
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return "Not set";
     try {
@@ -113,20 +105,25 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
     }
   };
 
-  const getImportanceLabel = (importance?: number) => {
-    if (!importance) return "Not set";
+  // Importance/Effort label helpers (accept numeric or string values)
+  const getImportanceLabel = (importance?: number | string | null) => {
+    if (importance === undefined || importance === null) return "Not set";
+    const val = Number(importance);
+    if (Number.isNaN(val)) return "Not set";
     const labels = ["", "Low", "Medium-Low", "Medium", "High", "Critical"];
-    return labels[importance] || `Level ${importance}`;
+    return labels[val] || `Level ${val}`;
   };
 
-  const getEffortLabel = (effort?: number) => {
-    if (!effort) return "Not set";
+  const getEffortLabel = (effort?: number | string | null) => {
+    if (effort === undefined || effort === null) return "Not set";
+    const val = Number(effort);
+    if (Number.isNaN(val)) return "Not set";
     const labels = ["", "Minimal", "Light", "Moderate", "Heavy", "Extensive"];
-    return labels[effort] || `Level ${effort}`;
+    return labels[val] || `Level ${val}`;
   };
 
-  const formatDuration = (minutes?: number) => {
-    if (!minutes) return "Not set";
+  const formatDuration = (minutes?: number | null) => {
+    if (minutes === undefined || minutes === null) return "Not set";
     if (minutes < 60) return `${minutes} minutes`;
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
@@ -143,13 +140,12 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
             Confirm Task Details
           </AppText>
         </View>
-
         {/* Title */}
         <View style={styles.field}>
           <AppText variant="notes" style={styles.labelText}>
             Title
           </AppText>
-          <AppText variant="bodyText">{task.title}</AppText>
+          <AppText variant="bodyText">{task.title || task.taskname}</AppText>
         </View>
 
         {/* Description */}
@@ -238,6 +234,23 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
           </View>
         )}
 
+        {/* Recurrence */}
+        {task.recurrence && (
+          <View style={styles.field}>
+            <AppText variant="notes" style={styles.labelText}>
+              🔁 Recurrence
+            </AppText>
+            <AppText variant="bodyText">
+              {`${task.recurrence.type}${task.recurrence.interval ? ` • every ${task.recurrence.interval}` : ""}`}
+              {task.recurrence.endDate
+                ? ` • until ${formatDate(task.recurrence.endDate)}`
+                : task.recurrence.count
+                  ? ` • ${task.recurrence.count} times`
+                  : ""}
+            </AppText>
+          </View>
+        )}
+
         <View style={styles.field}>
           <AppText variant="notes" style={styles.labelText}>
             Progress
@@ -268,14 +281,15 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
         )}
 
         {/* Chunk Info for Split Tasks */}
-        {task.taskType === "in_parts" && task.chunkCount && (
+        {task.taskType === "in_parts" && (task.chunkCount || task.chunkMinutes || task.minChunk) && (
           <View style={styles.field}>
             <AppText variant="notes" style={styles.labelText}>
               🧩 Parts
             </AppText>
             <AppText variant="bodyText">
-              {task.chunkCount} chunks
+              {task.chunkCount ? `${task.chunkCount} chunks` : ""}
               {task.chunkMinutes ? ` × ${task.chunkMinutes} min` : ""}
+              {task.minChunk ? ` • min chunk ${task.minChunk} min` : ""}
             </AppText>
           </View>
         )}
@@ -410,9 +424,6 @@ const styles = StyleSheet.create({
   confirmMessage: {
     marginVertical: SPACING.md,
     alignItems: "center",
-  },
-  confirmText: {
-    color: COLORS.darkGray,
   },
   section: {
     marginTop: SPACING.md,

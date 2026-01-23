@@ -43,5 +43,8 @@ test("get_upcoming_tasks groups scheduled sessions and returns widget", async ()
 
   // The unified 'list' widget returns a flat tasks array for upcoming range
   assert.ok(Array.isArray(payload.data.tasks), "Expected tasks array in widget data");
-  assert.ok(payload.data.tasks.some((t) => t.id === task._id.toString()), "Scheduled task should appear in upcoming tasks");
+  assert.ok(
+    payload.data.tasks.some((t) => t.id === task._id.toString()),
+    "Scheduled task should appear in upcoming tasks",
+  );
 });

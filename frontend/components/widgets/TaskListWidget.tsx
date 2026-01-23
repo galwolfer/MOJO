@@ -52,17 +52,17 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
     // Optimistically update UI
     const newChecked = new Set(checkedTasks);
     const wasChecked = newChecked.has(taskId);
-    
+
     if (wasChecked) {
       newChecked.delete(taskId);
     } else {
       newChecked.add(taskId);
     }
     setCheckedTasks(newChecked);
-    
+
     // Track loading state
     setLoadingTasks((prev) => new Set(prev).add(taskId));
-    
+
     try {
       // Call API to toggle/complete the task
       if (!wasChecked) {
@@ -75,10 +75,10 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
         console.log(`[TaskListWidget] Toggling task with ID: ${taskId}`);
         await toggleTaskCompletion(taskId);
       }
-      
+
       // Notify other components (like UserProfile) to refresh
       notifyTaskUpdate();
-      
+
       // Also call the onAction callback for any additional handling
       onAction?.("task_toggled", { taskId, checked: !wasChecked });
     } catch (error) {
@@ -190,7 +190,7 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
                     {formatTimeRange(task.scheduledSessions[0]) || "Time TBD"}
                   </AppText>
                 )}
-                {task.importance && (
+                {task.importance !== undefined && task.importance !== null && (
                   <View style={[styles.importanceBadge, { backgroundColor: getImportanceColor(task.importance) }]}>
                     <AppText variant="notes" style={styles.importanceText}>
                       P{task.importance}

@@ -260,28 +260,33 @@ const previewTaskMission = new GuidedMission({
 
       const userLang = detectLangFromText(taskname || description || categoryDisplay);
 
-      // Confirmation message (always English)
-      const confirmationMessage = "Here is your draft. You can confirm, edit, or cancel.";
-
       const widgetPayload = {
         id: "draft-" + Date.now(),
+        // Keep both `title` and `taskname` for compatibility with callers
         title: taskname,
+        taskname: taskname,
+        // Include human-consumable deadline and machine ISO dueDate
+        deadline: finalDeadline,
+        dueDate: new Date(finalDeadline).toISOString(),
         description: description || "",
         status: "draft",
-        dueDate: new Date(finalDeadline).toISOString(),
         // Use internal category key for the 'category' field (for internal operations)
         category: category || "",
         // Provide user-facing display name separately
         categoryDisplay: categoryDisplay,
         subcategory: subcategory || "",
+        subcategoryDisplay: subcategory || "",
         importance: finalImportance,
         effort: finalEffort,
+        // Provide both canonical duration and an estimatedDuration alias
+        duration: finalDuration,
         estimatedDuration: finalDuration,
         canSplit: finalCanSplit,
         taskType: finalTaskType,
         // Splitting parameters (only include when relevant)
         minChunk: displayMinChunk,
         chunkCount: displayChunkCount,
+        chunkMinutes: displayChunkMinutes,
         minMinutes: displayMinMinutes,
         maxMinutes: displayMaxMinutes,
         earliestStart: finalEarliestStart,
@@ -290,8 +295,6 @@ const previewTaskMission = new GuidedMission({
         scheduledSessions: [],
         // Small human-readable short description for listing/preview
         shortDescription,
-        // Confirmation message to show near the widget (localized)
-        confirmationMessage,
         // Store internal category key for task creation
         _categoryKey: category || "",
       };

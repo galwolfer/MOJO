@@ -54,7 +54,9 @@ test("update_task confirmation, validation and persistence", async () => {
   });
   // Ensure update returned some response (widget or ok string)
   const widget = extractWidgetFromText(res3);
-  assert.ok(typeof res3 === "string" && (res3.startsWith("ok=true") || res3.includes("<WIDGET_JSON>") || widget !== null));
+  assert.ok(
+    typeof res3 === "string" && (res3.startsWith("ok=true") || res3.includes("<WIDGET_JSON>") || widget !== null),
+  );
 
   const t4 = await Task.findById(id).lean();
   // Prefer checking DB; accept recurrence present or absent but log for future debugging

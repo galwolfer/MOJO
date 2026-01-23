@@ -13,6 +13,7 @@ import { TOKEN_BUDGET, LOGGING_FIELDS } from "./tokenBudget.js";
 import { okFalse, okTrue } from "./lib/errorFormatter.js";
 import { User } from "../models/index.js";
 import { config } from "../config/env.js";
+import { isValidCategory, CATEGORY_DISPLAY_NAMES } from "../config/categories.js";
 
 /**
  * ========================================
@@ -729,8 +730,60 @@ export class AgentController {
         }
       }
 
-      const widgetBlock = this._captureWidgetBlock(result);
+      let widgetBlock = this._captureWidgetBlock(result);
       if (widgetBlock) {
+        // Attempt to normalize/repair widget payloads for task_confirmation
+        try {
+          const payload = extractWidgetFromText(result);
+          if (payload && payload.widget_type === "task_confirmation" && payload.data) {
+            const data = payload.data;
+
+            // Fix common misspelling 'importance' -> 'importance'
+            if (data.importance !== undefined && data.importance === undefined) {
+              data.importance = data.importance;
+              delete data.importance;
+            }
+
+            // If importance missing/invalid, try to fetch user's per-category importance
+            if (data.importance === undefined || data.importance === null || Number.isNaN(Number(data.importance))) {
+              try {
+                const { getUserCategoryImportance } = await import("../services/userPreferenceService.js");
+                // Derive a category key we can pass to preference service
+                let catKey = data.category || data._categoryKey || data.categoryDisplay || "";
+                // If value looks like a human display name (e.g., 'Study & Education'), map to key
+                if (!isValidCategory(catKey)) {
+                  const candidate = String(catKey || "")
+                    .toLowerCase()
+                    .trim();
+                  let found = null;
+                  Object.entries(CATEGORY_DISPLAY_NAMES).forEach(([k, v]) => {
+                    if (!found && String(v).toLowerCase().trim() === candidate) found = k;
+                  });
+                  if (found) catKey = found;
+                }
+                const imp = await getUserCategoryImportance(userId, catKey || "");
+                data.importance = imp;
+              } catch (e) {
+                // fallback to neutral importance
+                data.importance = 3;
+              }
+            }
+
+            // Rebuild canonical widget block with the corrected data
+            try {
+              const { buildWidgetString } = await import("./widgets/widgetUtils.js");
+              const newBlock = buildWidgetString("task_confirmation", data);
+              result = result.replace(widgetBlock, newBlock);
+              widgetBlock = newBlock;
+            } catch (e) {
+              // Non-fatal - keep original widget block if rebuild fails
+              console.warn("[AgentController] Failed to rebuild widget block:", e.message);
+            }
+          }
+        } catch (err) {
+          console.warn("[AgentController] Failed to normalize widget payload:", err.message);
+        }
+
         // Track last widget and check if result contains only the widget
         const resultWithoutWidget = result.replace(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/i, "").trim();
         if (!resultWithoutWidget || resultWithoutWidget === "") {

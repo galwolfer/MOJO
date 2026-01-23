@@ -1,22 +1,9 @@
-/**
- * Widget Parser Utility
- * Extracts and parses <WIDGET_JSON> blocks from agent messages
- */
-
-export interface WidgetData {
-  version?: string;
-  widget_type: string;
-  data: Record<string, any>;
-}
-
-function normalizeWidgetTags(text: string): string {
-  return text.replace(/<\s*\/?\s*W[^>]*JSON\s*>/gi, (m) => (m.includes("</") ? "</WIDGET_JSON>" : "<WIDGET_JSON>"));
-}
+// Test for widget parser with malformed JSON (missing closing brace)
 
 /**
  * Attempts to parse JSON, trying to fix common errors like missing closing braces
  */
-function safeJsonParse(jsonString: string): any {
+function safeJsonParse(jsonString) {
   try {
     return JSON.parse(jsonString);
   } catch (e) {
@@ -35,27 +22,10 @@ function safeJsonParse(jsonString: string): any {
 }
 
 /**
- * Detects if a text contains a widget JSON block
- */
-export function hasWidget(text: string): boolean {
-  const normalized = normalizeWidgetTags(text);
-  return /<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/.test(normalized);
-}
-
-/**
- * Extracts the raw JSON string from <WIDGET_JSON> tags
- */
-function extractWidgetJsonString(text: string): string | null {
-  const normalized = normalizeWidgetTags(text);
-  const match = normalized.match(/<WIDGET_JSON>([\s\S]*?)<\/WIDGET_JSON>/);
-  return match ? match[1].trim() : null;
-}
-
-/**
  * Parses the widget JSON and returns structured widget data
  * Returns null if parsing fails
  */
-export function parseWidget(text: string): WidgetData | null {
+function parseWidget(text) {
   try {
     const jsonString = extractWidgetJsonString(text);
     if (!jsonString) return null;
@@ -80,22 +50,23 @@ export function parseWidget(text: string): WidgetData | null {
 }
 
 /**
- * Removes the <WIDGET_JSON> block from text, returning only the text content
+ * Extracts the raw JSON string from <WIDGET_JSON> tags
  */
-export function stripWidgetJson(text: string): string {
+function extractWidgetJsonString(text) {
   const normalized = normalizeWidgetTags(text);
-  return normalized.replace(/<WIDGET_JSON>[\s\S]*?<\/WIDGET_JSON>/g, "").trim();
+  const match = normalized.match(/<WIDGET_JSON>([\s\S]*?)<\/WIDGET_JSON>/);
+  return match ? match[1].trim() : null;
+}
+
+function normalizeWidgetTags(text) {
+  return text.replace(/<\s*\/?\s*W[^>]*JSON\s*>/gi, (m) => (m.includes("</") ? "</WIDGET_JSON>" : "<WIDGET_JSON>"));
 }
 
 /**
  * Splits text into parts: before widget, widget data, after widget
  * Returns { beforeText, widget, afterText }
  */
-export function splitTextAndWidget(text: string): {
-  beforeText: string;
-  widget: WidgetData | null;
-  afterText: string;
-} {
+function splitTextAndWidget(text) {
   const normalized = normalizeWidgetTags(text);
   const widgetMatch = normalized.match(/([\s\S]*?)<WIDGET_JSON>([\s\S]*?)<\/WIDGET_JSON>([\s\S]*)/);
 
@@ -122,7 +93,7 @@ export function splitTextAndWidget(text: string): {
 
   try {
     const parsed = safeJsonParse(jsonString.trim());
-    const widget: WidgetData = {
+    const widget = {
       version: parsed.version || "1.0",
       widget_type: parsed.widget_type,
       data: parsed.data || parsed,
@@ -141,4 +112,40 @@ export function splitTextAndWidget(text: string): {
       afterText: "",
     };
   }
+}
+
+// Mock console.warn to keep output clean or to assert
+const originalWarn = console.warn;
+console.warn = (...args) => console.log("WARN:", ...args);
+
+// The user's malformed JSON (missing closing brace)
+const malformedInput = `
+Here is the widget:
+<WIDGET_JSON>
+{
+  "widget_type": "task_confirmation",
+  "taskname": "כדורגל",
+  "deadline": "2026-01-24",
+  "category": "hobbies",
+  "subcategory": "כדורגל",
+  "duration": 120,
+  "canSplit": false,
+  "effort": 4
+</WIDGET_JSON>
+And some text after.
+`;
+
+console.log("Testing parseWidget with malformed input...");
+const result = parseWidget(malformedInput);
+console.log("Result:", JSON.stringify(result, null, 2));
+
+console.log("\nTesting splitTextAndWidget with malformed input...");
+const splitResult = splitTextAndWidget(malformedInput);
+console.log("Split Result:", JSON.stringify(splitResult, null, 2));
+
+if (result && result.widget_type === "task_confirmation" && result.data.effort === 4) {
+  console.log("\nSUCCESS: Parsed malformed widget correctly!");
+} else {
+  console.log("\nFAILURE: Could not parse malformed widget.");
+  process.exit(1);
 }

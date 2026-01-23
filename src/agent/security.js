@@ -63,7 +63,13 @@ export function validateWidgetPayload(raw) {
     try {
       payload = JSON.parse(jsonText);
     } catch (err) {
-      return { valid: false, reason: `Invalid JSON: ${err.message}` };
+      // Attempt fallback repair using tolerant extractor if direct parse fails
+      try {
+        payload = extractWidgetFromText(raw);
+        if (!payload) return { valid: false, reason: `Invalid JSON: ${err.message}` };
+      } catch (fallbackErr) {
+        return { valid: false, reason: `Invalid JSON: ${err.message}` };
+      }
     }
   }
 
@@ -100,8 +106,7 @@ export function validateWidgetPayload(raw) {
     }
     if (listType === "task_detail") {
       const hasTaskId = Boolean(payload.data?.taskId);
-      const hasTaskRef =
-        Array.isArray(payload.data?.tasks) && payload.data.tasks.some((t) => t && (t.id || t.title));
+      const hasTaskRef = Array.isArray(payload.data?.tasks) && payload.data.tasks.some((t) => t && (t.id || t.title));
       if (!hasTaskId && !hasTaskRef) {
         return { valid: false, reason: "task_detail list missing taskId or task ref" };
       }

@@ -88,12 +88,16 @@ describe("Negative Cases", () => {
       assert.ok(res.startsWith("ok=false"));
       if (c.expectSubstring) assert.ok(res.includes(c.expectSubstring));
       if (c.expectOneOf) {
-      // Accept case-insensitive 'not found' or generic error messages as well
-      const lower = res.toLowerCase();
-      assert.ok(
-        c.expectOneOf.some((s) => res.includes(s)) || c.expectOneOf.some((s) => lower.includes(s.toLowerCase())) || lower.includes("not found") || lower.includes("failed") || lower.includes("error"),
-      );
-    }
+        // Accept case-insensitive 'not found' or generic error messages as well
+        const lower = res.toLowerCase();
+        assert.ok(
+          c.expectOneOf.some((s) => res.includes(s)) ||
+            c.expectOneOf.some((s) => lower.includes(s.toLowerCase())) ||
+            lower.includes("not found") ||
+            lower.includes("failed") ||
+            lower.includes("error"),
+        );
+      }
     });
   }
 });

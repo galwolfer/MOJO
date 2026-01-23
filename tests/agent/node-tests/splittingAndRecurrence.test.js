@@ -85,7 +85,10 @@ test("splitting and recurrence reflection & persistence", async () => {
   assert.strictEqual(widget3.data.minMinutes, 30);
   assert.strictEqual(widget3.data.maxMinutes, 90);
   assert.strictEqual(widget3.data.earliestStart, "2026-01-11");
-  assert.ok(widget3.data.recurrence && (widget3.data.recurrence.endDate === "2026-02-28" || widget3.data.recurrence.endDate === null));
+  assert.ok(
+    widget3.data.recurrence &&
+      (widget3.data.recurrence.endDate === "2026-02-28" || widget3.data.recurrence.endDate === null),
+  );
 
   // Add with fallback persistence
   const res4 = await addMission.execute({
