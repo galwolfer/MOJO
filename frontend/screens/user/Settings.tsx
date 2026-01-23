@@ -389,7 +389,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
             {/* Edit button overlay */}
             {!isEditMode && (
               <TouchableOpacity style={styles.editOverlay} onPress={handleEditProfile}>
-                <PencilIcon size={20} color={COLORS.colorWhite} />
+                <PencilIcon size={32} color={COLORS.colorWhite} />
               </TouchableOpacity>
             )}
           </View>
@@ -551,7 +551,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
           {/* Edit my preferences */}
           <TouchableOpacity style={styles.preferenceItem} onPress={handleEditPreferences}>
             <View style={styles.preferenceIcon}>
-              <EditIcon size={20} color={COLORS.primary2} />
+              <EditIcon size={40} color={COLORS.primary2} />
             </View>
             <AppText variant="bodyText" style={styles.preferenceText}>
               Edit my prefrences
@@ -561,7 +561,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
           {/* Chat settings */}
           <TouchableOpacity style={styles.preferenceItem} onPress={handleChatSettings}>
             <View style={styles.preferenceIcon}>
-              <ChatIcon size={20} color={COLORS.primary1} />
+              <ChatIcon size={40} color={COLORS.primary1} />
             </View>
             <AppText variant="bodyText" style={styles.preferenceText}>
               Chat settings
@@ -571,7 +571,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
           {/* Notifications */}
           <TouchableOpacity style={styles.preferenceItem} onPress={handleNotifications}>
             <View style={styles.preferenceIcon}>
-              <NotificationIcon size={20} color={COLORS.primary5} />
+              <NotificationIcon size={40} color={COLORS.primary5} />
             </View>
             <AppText variant="bodyText" style={styles.preferenceText}>
               Notifications
