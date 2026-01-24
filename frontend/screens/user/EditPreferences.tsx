@@ -166,9 +166,17 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
       {/* Priorities */}
       <Box title="Your Goals & Priorities" titleColor={COLORS.primary1}>
         <View style={styles.stepContent}>
-          <AppText variant="bodyText" style={styles.description}>
-            Update how important each area of your life is to you right now. This helps Mojo prioritize and 
-            suggest tasks that align with your current goals. Tap a category to adjust its priority.
+          <View style={styles.descriptionBlock}>
+            <AppText variant="bodyText" style={styles.description}>
+              Update how important each area of your life is to you right now.
+            </AppText>
+            <AppText variant="bodyText" style={[styles.description, styles.descriptionSecondary]}>
+              This helps Mojo prioritize and suggest tasks that align with your current goals.
+            </AppText>
+          </View>
+
+          <AppText variant="boldText" style={styles.instruction}>
+            Tap a category to adjust its priority.
           </AppText>
 
           <View style={{ width: "100%" }}>
@@ -248,10 +256,33 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
     gap: SPACING.md,
   },
-  description: {
+  descriptionBlock: {
+    width: "100%",
+    alignItems: "center",
+    gap: SPACING.sm, // Replaced xs with sm
     marginBottom: SPACING.md,
-    lineHeight: FONT_SIZES.base * 1.5,
-    textAlign: "center",
+  },
+  description: {
+    marginBottom: 0,
+    maxWidth: 360,
+    fontSize: FONT_SIZES.base * 0.92,
+    lineHeight: FONT_SIZES.base * 1.4,
+    textAlign: "left",
+    alignSelf: "center",
+    letterSpacing: 0.1,
+  },
+  descriptionSecondary: {
+    marginBottom: 0,
+  },
+  instruction: {
+    marginTop: SPACING.md,
+    marginBottom: SPACING.md,
+    maxWidth: 360,
+    fontSize: FONT_SIZES.base * 0.96,
+    lineHeight: FONT_SIZES.base * 1.35,
+    textAlign: "left",
+    alignSelf: "center",
+    letterSpacing: 0.08,
   },
   headerButton: {
     flexDirection: "row",

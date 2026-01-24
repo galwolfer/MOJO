@@ -157,10 +157,14 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
       {/* OjoType Selection */}
       <Box title="Choose Your Ojo" titleColor={COLORS.primary1}>
         <View style={styles.stepContent}>
-          <AppText variant="bodyText" style={styles.description}>
-            Your Ojo guides you toward your goals with a unique personality. Change how your Ojo communicates 
-            with you by selecting a different style below.
-          </AppText>
+          <View style={styles.descriptionBlock}>
+            <AppText variant="bodyText" style={styles.description}>
+              Your Ojo guides you toward your goals with a unique personality.
+            </AppText>
+            <AppText variant="bodyText" style={[styles.description, styles.descriptionSecondary]}>
+              Change how your Ojo communicates with you by selecting a different style below.
+            </AppText>
+          </View>
 
           <View style={styles.gridContainer}>
             {allOjoTypes.map((ojo, index) => {
@@ -282,10 +286,23 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
     gap: SPACING.md,
   },
+  descriptionBlock: {
+    width: "100%",
+    alignItems: "center",
+    gap: SPACING.sm,
+    marginBottom: SPACING.xlg,
+  },
   description: {
-    marginBottom: SPACING.md,
-    lineHeight: FONT_SIZES.base * 1.5,
-    textAlign: "center",
+    marginBottom: 0,
+    maxWidth: 360,
+    fontSize: FONT_SIZES.base * 0.92,
+    lineHeight: FONT_SIZES.base * 1.4,
+    textAlign: "left",
+    alignSelf: "center",
+    letterSpacing: 0.1,
+  },
+  descriptionSecondary: {
+    marginBottom: 0,
   },
   headerButton: {
     flexDirection: "row",
