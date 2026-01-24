@@ -25,6 +25,8 @@ import { moderateScale } from "react-native-size-matters";
 import { getUserStats } from "../../services/userService";
 import { getTasks, calculateTaskProgress, type Task, type TaskProgress } from "../../services/taskService";
 import SettingsScreen from "./Settings";
+import EditPreferencesScreen from "./EditPreferences";
+import ChatSettingsScreen from "./ChatSettings";
 
 /**
  * UserProfileScreen
@@ -78,7 +80,7 @@ export default function UserProfileScreen() {
   const { subscribeToTaskUpdates } = useTaskContext();
 
   // Screen navigation state
-  const [currentScreen, setCurrentScreen] = useState<"profile" | "settings">("profile");
+  const [currentScreen, setCurrentScreen] = useState<"profile" | "settings" | "edit-preferences" | "chat-settings">("profile");
 
   const [stats, setStats] = useState({ tasks: 0, points: 0, streak: 0 });
   const [loading, setLoading] = useState(true);
@@ -207,7 +209,39 @@ export default function UserProfileScreen() {
 
   // If on Settings screen, render SettingsScreen
   if (currentScreen === "settings") {
-    return <SettingsScreen onBack={() => setCurrentScreen("profile")} />;
+    return (
+      <SettingsScreen
+        onBack={() => setCurrentScreen("profile")}
+        onEditPreferences={() => setCurrentScreen("edit-preferences")}
+        onChatSettings={() => setCurrentScreen("chat-settings")}
+      />
+    );
+  }
+
+  // If on Edit Preferences screen, render EditPreferencesScreen
+  if (currentScreen === "edit-preferences") {
+    return (
+      <EditPreferencesScreen
+        onBack={() => setCurrentScreen("settings")}
+        onSave={() => {
+          // Optionally refresh data after preferences are saved
+          fetchAllData();
+        }}
+      />
+    );
+  }
+
+  // If on Chat Settings screen, render ChatSettingsScreen
+  if (currentScreen === "chat-settings") {
+    return (
+      <ChatSettingsScreen
+        onBack={() => setCurrentScreen("settings")}
+        onSave={() => {
+          // Optionally refresh data after chat settings are saved
+          fetchAllData();
+        }}
+      />
+    );
   }
 
   return (

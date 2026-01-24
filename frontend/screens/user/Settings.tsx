@@ -27,9 +27,11 @@ import type { User } from "../../context/AuthContext";
 
 type SettingsScreenProps = {
   onBack: () => void;
+  onEditPreferences?: () => void;
+  onChatSettings?: () => void;
 };
 
-export default function SettingsScreen({ onBack }: SettingsScreenProps) {
+export default function SettingsScreen({ onBack, onEditPreferences, onChatSettings }: SettingsScreenProps) {
   const { user, signOut, signIn, token } = useAuth();
   const { setHeaderConfig } = useNavigation();
 
@@ -298,13 +300,19 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
   };
 
   const handleEditPreferences = () => {
-    // TODO: Navigate to preferences screen
-    console.log("Edit preferences pressed");
+    if (onEditPreferences) {
+      onEditPreferences();
+    } else {
+      console.log("Edit preferences pressed - no handler provided");
+    }
   };
 
   const handleChatSettings = () => {
-    // TODO: Navigate to chat settings screen
-    console.log("Chat settings pressed");
+    if (onChatSettings) {
+      onChatSettings();
+    } else {
+      console.log("Chat settings pressed - no handler provided");
+    }
   };
 
   const handleNotifications = () => {
