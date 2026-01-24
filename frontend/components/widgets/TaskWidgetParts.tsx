@@ -56,7 +56,13 @@ export const TwoColumnGrid: React.FC<{ items: React.ReactNode[] }> = ({ items })
     <View style={styles.gridContainer}>
       {visible.map((it, i) => (
         <View key={i} style={styles.gridItem}>
-          {it}
+          {typeof it === "string" || typeof it === "number"
+            ? (() => {
+                // Debug: if we received a primitive here, log it with a stack trace to locate the source
+                console.debug("TwoColumnGrid: primitive item", String(it), new Error().stack);
+                return <AppText>{String(it)}</AppText>;
+              })()
+            : it}
         </View>
       ))}
     </View>
@@ -144,6 +150,7 @@ export const renderTaskField = (task: any, key: string) => {
     if (
       trimmed === "" ||
       trimmed === "-" ||
+      trimmed === "." ||
       trimmed === "Not set" ||
       trimmed === "Not scheduled" ||
       trimmed === "Time TBD"
@@ -159,16 +166,19 @@ export const renderTaskField = (task: any, key: string) => {
   );
 };
 
-export const TaskTitle: React.FC<{ title?: string; taskname?: string; category?: string }> = ({
-  title,
-  taskname,
-  category,
-}) => {
+export const TaskTitle: React.FC<{
+  title?: string;
+  taskname?: string;
+  category?: string;
+  size?: "sm" | "md" | "lg";
+}> = ({ title, taskname, category, size = "lg" }) => {
   const meta = getCategoryMeta(category);
+  const iconSize = size === "sm" ? ICON_SIZES.sm : size === "md" ? ICON_SIZES.md : ICON_SIZES.big;
+  const titleVariant = size === "sm" ? "bodyText" : size === "md" ? "boldText" : "title3";
   return (
     <View style={styles.titleRow}>
-      {meta?.icon ? <Icon name={meta.icon} size={ICON_SIZES.big} color={meta.color} style={styles.icon} /> : null}
-      <AppText variant="title3" style={styles.titleText} numberOfLines={3}>
+      {meta?.icon ? <Icon name={meta.icon} size={iconSize} color={meta.color} style={styles.icon} /> : null}
+      <AppText variant={titleVariant} style={styles.titleText} numberOfLines={3}>
         {title || taskname}
       </AppText>
     </View>

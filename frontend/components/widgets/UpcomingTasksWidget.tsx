@@ -3,46 +3,42 @@
  * Shows scheduled tasks for today and the next N days, with part completion.
  */
 
-import React, { useEffect, useState } from "react";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
+import React, { useEffect, useMemo, useState } from "react";
+import { View, StyleSheet, useWindowDimensions } from "react-native";
 import AppText from "../common/AppText";
 import Widget from "../special/Widget";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
-import { COLORS, SPACING } from "../../theme";
+import { COLORS, ICON_SIZES, SPACING } from "../../theme";
 import { updateSubTask } from "../../services/taskService";
 import { useTaskContext } from "../../context/TaskContext";
+import { ProgressIcon } from "../icons/ProgressIcon";
 import { Checkbox } from "../icons/Checkbox";
-import { formatTimeRange, getSessionLabel } from "./widgetHelpers";
-
-type ScheduledSession = {
-  id?: string;
-  taskId?: string;
-  start?: string;
-  end?: string;
-  minutes?: number;
-  status?: string;
-  subtaskIndex?: number;
-  subtaskId?: string;
-  subtaskTitle?: string;
-  subtaskStatus?: string;
-};
+import Icon from "../icons/Icon";
+import List, { ListCellProps } from "../layout/List";
+import { getCategoryMeta } from "../../config/categoryMeta";
+import { ScheduledSession, Subtask, formatDate, formatDuration, getSubtaskIdFromSession } from "./widgetHelpers";
 
 type TaskItem = {
   id: string;
   title: string;
+  taskname?: string;
   status?: string;
   dueDate?: string;
   importance?: number;
   effort?: number;
   category?: string;
+  categoryDisplay?: string;
   subcategory?: string;
+  subcategoryDisplay?: string;
   progressPercentage?: number;
+  estimatedDuration?: number;
+  earliestStart?: string | null;
   scheduledSessions?: ScheduledSession[];
+  subtasks?: Subtask[];
 };
 
 type DayGroup = {
-  date?: string;
+  date?: string | null;
   tasks?: TaskItem[];
 };
 
@@ -55,53 +51,62 @@ type UpcomingTasksData = {
 const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
   const payload = data as UpcomingTasksData;
   const { notifyTaskUpdate } = useTaskContext();
+  const { width } = useWindowDimensions();
+
   const [completedParts, setCompletedParts] = useState<Set<string>>(new Set());
   const [loadingParts, setLoadingParts] = useState<Set<string>>(new Set());
 
-  const todayGroup = payload.today || { date: undefined, tasks: [] };
-  const upcomingGroups = payload.upcoming || [];
+  const todayGroup = useMemo(() => payload.today || { date: undefined, tasks: [] }, [payload.today]);
+  const upcomingGroups = useMemo(() => payload.upcoming || [], [payload.upcoming]);
   const daysLabel = payload.days ? `${payload.days} days` : "next days";
 
   useEffect(() => {
     const completed = new Set<string>();
+
     const collect = (tasks?: TaskItem[]) => {
       tasks?.forEach((task) => {
-        task.scheduledSessions?.forEach((session) => {
-          if (session.subtaskId && session.subtaskStatus === "done") {
-            completed.add(session.subtaskId);
+        task.scheduledSessions?.forEach((session, index) => {
+          const subtaskId = getSubtaskIdFromSession(session, task.subtasks);
+          const key = subtaskId || session.id || `${task.id}-${session.start || `session-${index}`}`;
+          const isDone = session.subtaskStatus === "done" || session.status === "completed";
+
+          if (isDone) {
+            completed.add(key);
           }
         });
       });
     };
+
     collect(todayGroup.tasks);
     upcomingGroups.forEach((group) => collect(group.tasks));
     setCompletedParts(completed);
   }, [todayGroup.tasks, upcomingGroups]);
 
   const totalToday = todayGroup.tasks?.length || 0;
+  const completedToday =
+    todayGroup.tasks?.filter((task) => task.status === "done" || task.status === "completed").length || 0;
+  const todayProgress = totalToday > 0 ? Math.max(0, Math.min(1, completedToday / Math.max(1, totalToday))) : null;
 
-  const formatDateLabel = (dateKey?: string) => {
+  const formatDayLabel = (dateKey?: string | null) => {
     if (!dateKey) return "Unknown date";
-    const parsed = new Date(`${dateKey}T00:00:00`);
-    if (Number.isNaN(parsed.getTime())) return dateKey;
-    return parsed.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+    return formatDate(`${dateKey}T00:00:00`);
   };
 
-  const getProgressValue = (value?: number) => {
-    if (typeof value !== "number" || Number.isNaN(value)) return 0;
-    return Math.max(0, Math.min(100, Math.round(value)));
+  const getSessionKey = (taskId: string, session: ScheduledSession, index: number, subtasks?: Subtask[]) => {
+    const subtaskId = getSubtaskIdFromSession(session, subtasks);
+    return subtaskId || session.id || `${taskId}-${session.start || `session-${index}`}`;
   };
 
-  const getProgressColor = (value?: number) => {
-    const progress = getProgressValue(value);
-    if (progress >= 80) return COLORS.primary6;
-    if (progress >= 40) return COLORS.primary5;
-    return COLORS.primary7;
-  };
+  const handleToggleSession = async (
+    taskId: string,
+    session: ScheduledSession,
+    index: number,
+    subtasks?: Subtask[],
+  ) => {
+    const subtaskId = getSubtaskIdFromSession(session, subtasks);
+    const key = getSessionKey(taskId, session, index, subtasks);
+    const canPersist = Boolean(subtaskId);
 
-  const handleToggleSession = async (taskId: string, session: ScheduledSession) => {
-    const key = session.subtaskId;
-    if (!key) return;
     const isCompleted = completedParts.has(key);
     const nextCompleted = !isCompleted;
 
@@ -112,20 +117,24 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
       return updated;
     });
 
-    setLoadingParts((prev) => new Set(prev).add(key));
+    if (canPersist) setLoadingParts((prev) => new Set(prev).add(key));
 
     try {
-      const success = await updateSubTask(taskId, key, { status: nextCompleted ? "done" : "todo" });
-      if (!success) {
-        throw new Error("Update failed");
+      if (canPersist && subtaskId) {
+        const success = await updateSubTask(taskId, subtaskId, {
+          status: nextCompleted ? "done" : "todo",
+        });
+        if (!success) throw new Error("Update failed");
+        await new Promise((resolve) => setTimeout(resolve, 300));
       }
 
-      notifyTaskUpdate();
+      notifyTaskUpdate({ taskId });
       onAction?.("part_toggled", {
         taskId,
         sessionId: session.id,
-        subtaskId: session.subtaskId,
+        subtaskId: subtaskId || null,
         completed: nextCompleted,
+        synthetic: !canPersist,
       });
     } catch (error) {
       setCompletedParts((prev) => {
@@ -135,150 +144,224 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
         return updated;
       });
     } finally {
-      setLoadingParts((prev) => {
-        const updated = new Set(prev);
-        updated.delete(key);
-        return updated;
-      });
+      if (canPersist)
+        setLoadingParts((prev) => {
+          const updated = new Set(prev);
+          updated.delete(key);
+          return updated;
+        });
     }
   };
 
-  const renderTaskCard = (task: TaskItem, allowToggle: boolean) => {
-    const sessions = task.scheduledSessions || [];
-    const progressValue = getProgressValue(task.progressPercentage);
-    const progressColor = getProgressColor(task.progressPercentage);
+  const getTimeParts = (dateStr?: string) => {
+    if (!dateStr) return { time: "", ampm: "" };
+    try {
+      const date = new Date(dateStr);
+      const minutes = date.getMinutes();
+      const rawHours = date.getHours();
+      const ampm = rawHours >= 12 ? "PM" : "AM";
+      const hours12 = rawHours % 12 === 0 ? 12 : rawHours % 12;
+      const time = `${hours12}:${minutes.toString().padStart(2, "0")}`;
+      return { time, ampm };
+    } catch {
+      return { time: "", ampm: "" };
+    }
+  };
 
+  const buildSessionCells = (task: TaskItem): ListCellProps[] => {
+    const sessions = task.scheduledSessions || [];
+    if (sessions.length === 0) return [];
+
+    const categoryMeta = getCategoryMeta(task.category);
+    const taskTitle = task.title || task.taskname || "Untitled task";
+
+    return sessions.map((session, index) => {
+      const subtaskId = getSubtaskIdFromSession(session, task.subtasks);
+      const key = getSessionKey(task.id, session, index, task.subtasks);
+      const isDone = completedParts.has(key);
+      const canToggle = Boolean(subtaskId) || Boolean(session.id);
+      const isLoading = loadingParts.has(key);
+      const startParts = getTimeParts(session.start);
+      const endParts = getTimeParts(session.end);
+
+      return {
+        id: key,
+        content: (
+          <View style={styles.sessionRow}>
+            <View style={styles.sessionTimeBlock}>
+              <View style={[styles.sessionTimeLine, { backgroundColor: categoryMeta?.color || COLORS.primary1 }]} />
+              <View style={styles.sessionTimeColumn}>
+                <AppText variant="notes" style={styles.sessionHourText}>
+                  {session.start ? (
+                    <>
+                      {startParts.time || "Time"}
+                      {startParts.ampm ? (
+                        <AppText variant="notes" style={styles.sessionAmPm}>
+                          {" " + startParts.ampm}
+                        </AppText>
+                      ) : null}
+                    </>
+                  ) : (
+                    "Time"
+                  )}
+                </AppText>
+                <AppText variant="notes" style={styles.sessionHourText}>
+                  {session.end ? (
+                    <>
+                      {endParts.time || ""}
+                      {endParts.ampm ? (
+                        <AppText variant="notes" style={styles.sessionAmPm}>
+                          {" " + endParts.ampm}
+                        </AppText>
+                      ) : null}
+                    </>
+                  ) : (
+                    ""
+                  )}
+                </AppText>
+              </View>
+            </View>
+            <View style={styles.sessionCheckbox}>
+              {canToggle ? (
+                <Checkbox
+                  checked={isDone}
+                  onChange={() => handleToggleSession(task.id, session, index, task.subtasks)}
+                  size={ICON_SIZES.sm}
+                />
+              ) : (
+                <View style={styles.checkboxSpacer} />
+              )}
+            </View>
+
+            <View style={styles.sessionInfo}>
+              <View style={styles.sessionTitleRow}>
+                <AppText
+                  variant="bodyText"
+                  style={[styles.sessionTitleText, isDone && styles.sessionLabelDone]}
+                  ellipsizeMode="tail"
+                >
+                  <AppText variant="boldText" style={styles.sessionSubtask}>
+                    {session.subtaskTitle || `Part ${session.subtaskIndex ?? index + 1}`}
+                  </AppText>
+                  <AppText variant="bodyText" style={styles.sessionTask}>
+                    {" - " + taskTitle}
+                  </AppText>
+                </AppText>
+              </View>
+            </View>
+          </View>
+        ),
+        onPress: canToggle ? () => handleToggleSession(task.id, session, index, task.subtasks) : undefined,
+        disabled: isLoading || !canToggle,
+        divider: true,
+      } as ListCellProps;
+    });
+  };
+
+  const buildTaskCell = (task: TaskItem): ListCellProps => {
+    const sessionCells = buildSessionCells(task);
+
+    const content = (
+      <View style={styles.taskCard}>
+        {sessionCells.length > 0 ? (
+          <View style={styles.sessionList}>
+            <List data={sessionCells} />
+          </View>
+        ) : (
+          <AppText variant="notes" style={styles.emptySessions}>
+            No scheduled sessions
+          </AppText>
+        )}
+      </View>
+    );
+
+    return {
+      id: task.id,
+      content,
+      onPress: undefined,
+    } as ListCellProps;
+  };
+
+  const renderDaySection = (
+    group: DayGroup,
+    label: string,
+    emptyLabel: string,
+    options?: { emptyProgress?: number },
+  ) => {
+    const tasks = group.tasks || [];
+    const isSessionDone = (task: TaskItem, session: ScheduledSession, index: number) => {
+      const key = getSessionKey(task.id, session, index, task.subtasks);
+      if (completedParts.has(key)) return true;
+      return session.subtaskStatus === "done" || session.status === "completed";
+    };
+
+    const completedCount = tasks.filter((task) => {
+      if (task.status === "done" || task.status === "completed") return true;
+      const sessions = task.scheduledSessions || [];
+      if (sessions.length === 0) return false;
+      return sessions.every((session, index) => isSessionDone(task, session, index));
+    }).length;
+
+    const progressValue = tasks.length > 0 ? completedCount / Math.max(1, tasks.length) : (options?.emptyProgress ?? 0);
     return (
-      <View key={task.id} style={styles.taskCard}>
-        <View style={styles.taskHeader}>
-          <View style={[styles.ratingBox, { borderColor: progressColor }]}>
-            <AppText variant="title3" style={styles.ratingValue}>
-              {progressValue}
-            </AppText>
-            <AppText variant="notes" style={styles.ratingLabel}>
-              {"PROG"}
+      <View style={styles.dayGroup}>
+        <View style={styles.dayHeader}>
+          <View style={styles.dayHeaderTitle}>
+            <ProgressIcon value={progressValue} size={ICON_SIZES.sm} />
+            <AppText variant="notes" style={styles.sectionTitle}>
+              {label}
             </AppText>
           </View>
-          <View style={styles.taskInfo}>
-            <AppText variant="bodyText" numberOfLines={2} style={styles.taskTitle}>
-              {task.title}
-            </AppText>
-            {task.category && (
-              <AppText variant="notes" style={styles.taskMeta}>
-                {task.category}
-              </AppText>
-            )}
-          </View>
+          <AppText variant="notes" style={styles.sectionCount}>
+            {tasks.length} task{tasks.length === 1 ? "" : "s"}
+          </AppText>
         </View>
 
-        {sessions.length > 0 && (
-          <View style={styles.sessionList}>
-            {sessions.map((session) => {
-              const key = session.id || session.subtaskId || `${task.id}-${session.start}`;
-              const isDone = session.subtaskId ? completedParts.has(session.subtaskId) : session.status === "completed";
-              const canToggle = Boolean(session.subtaskId) || Boolean(session.id);
-              const isLoading =
-                (session.subtaskId && loadingParts.has(session.subtaskId)) ||
-                (session.id && loadingParts.has(session.id)) ||
-                false;
-
-              return (
-                <TouchableOpacity
-                  key={key}
-                  style={[styles.sessionRow, !canToggle && styles.sessionRowDisabled]}
-                  onPress={() => canToggle && handleToggleSession(task.id, session)}
-                  activeOpacity={0.7}
-                  disabled={!canToggle || isLoading}
-                >
-                  <Checkbox
-                    checked={isDone}
-                    onChange={() => canToggle && handleToggleSession(task.id, session)}
-                    size={18}
-                  />
-                  <View style={styles.sessionInfo}>
-                    <AppText variant="notes" style={styles.sessionTime}>
-                      {formatTimeRange(session)}
-                    </AppText>
-                    <AppText variant="bodyText" style={[styles.sessionLabel, isDone && styles.sessionLabelDone]}>
-                      {getSessionLabel(session)}
-                    </AppText>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
-
-        {sessions.length === 0 && (
-          <AppText variant="notes" style={styles.emptySessions}>
-            {"No scheduled sessions"}
+        {tasks.length === 0 ? (
+          <AppText variant="notes" style={styles.emptyText}>
+            {emptyLabel}
           </AppText>
+        ) : (
+          <List data={tasks.map((task) => buildTaskCell(task))} />
         )}
       </View>
     );
   };
 
   return (
-    <Widget skipAnimation style={styles.widget}>
-      <LinearGradient colors={[COLORS.brightP5, COLORS.primary5, COLORS.darkP5]} style={styles.gradient}>
-        <View style={styles.header}>
-          <View>
-            <AppText variant="title3" style={styles.headerTitle}>
-              {"Upcoming Tasks"}
-            </AppText>
-            <AppText variant="notes" style={styles.headerSubtitle}>
-              {"Scheduled for " + daysLabel}
-            </AppText>
-          </View>
-          <View style={styles.headerBadge}>
-            <AppText variant="notes" style={styles.headerBadgeText}>
-              {totalToday + " today"}
-            </AppText>
-          </View>
-        </View>
-
-        <View style={styles.dayGroup}>
-          <AppText variant="notes" style={styles.sectionTitle}>
-            {"Today"}
+    <Widget>
+      <View style={styles.header}>
+        <View>
+          <AppText variant="notes" style={styles.headerSubtitle}>
+            Scheduled for {daysLabel}
           </AppText>
-          {totalToday === 0 ? (
-            <AppText variant="notes" style={styles.emptyText}>
-              {"No tasks scheduled for today"}
-            </AppText>
-          ) : (
-            (todayGroup.tasks || []).map((task) => renderTaskCard(task, true))
-          )}
         </View>
+        <View style={styles.headerBadge}>
+          <AppText variant="notes" style={styles.headerBadgeText}>
+            {totalToday} today
+          </AppText>
+        </View>
+        {typeof todayProgress === "number" ? (
+          <ProgressIcon value={todayProgress} size={ICON_SIZES.md} />
+        ) : (
+          <View style={styles.headerProgressSpacer} />
+        )}
+      </View>
 
-        {upcomingGroups.map((group, index) => (
-          <View key={group.date || `upcoming-${index}`} style={styles.dayGroup}>
-            <AppText variant="notes" style={styles.sectionTitle}>
-              {formatDateLabel(group.date)}
-            </AppText>
-            {(group.tasks || []).length === 0 ? (
-              <AppText variant="notes" style={styles.emptyText}>
-                {"No scheduled tasks"}
-              </AppText>
-            ) : (
-              (group.tasks || []).map((task) => renderTaskCard(task, false))
-            )}
-          </View>
-        ))}
-      </LinearGradient>
+      {renderDaySection(todayGroup, "Today", "No tasks scheduled for today")}
+
+      {upcomingGroups.map((group, index) => (
+        <View key={group.date || `upcoming-${index}`}>
+          {renderDaySection(group, formatDayLabel(group.date) || `Day ${index + 1}`, "No scheduled tasks", {
+            emptyProgress: 1,
+          })}
+        </View>
+      ))}
     </Widget>
   );
 };
 
 const styles = StyleSheet.create({
-  widget: {
-    padding: 0,
-    backgroundColor: "transparent",
-  },
-  gradient: {
-    borderRadius: SPACING.lg,
-    padding: SPACING.lg,
-    gap: SPACING.lg,
-  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -303,106 +386,130 @@ const styles = StyleSheet.create({
     color: COLORS.darkGray,
     fontWeight: "600",
   },
+  headerProgressSpacer: {
+    width: ICON_SIZES.md,
+    height: ICON_SIZES.md,
+  },
   dayGroup: {
+    alignItems: "stretch",
     gap: SPACING.md,
+    marginTop: SPACING.md,
+    width: "100%",
+  },
+  dayHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    width: "100%",
+  },
+  dayHeaderTitle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
   },
   sectionTitle: {
-    color: COLORS.darkGray,
+    color: COLORS.primary1,
     textTransform: "uppercase",
-    letterSpacing: 1,
+  },
+  sectionCount: {
+    color: COLORS.lightGray,
   },
   taskCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: SPACING.md,
-    padding: SPACING.md,
+    backgroundColor: "transparent",
+    borderRadius: 0,
+    paddingVertical: SPACING.sm,
     gap: SPACING.sm,
-    shadowColor: COLORS.shadow15277c14,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 1,
-    shadowRadius: 6,
-    elevation: 3,
+    width: "100%",
   },
   taskHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: SPACING.md,
   },
-  ratingBox: {
-    width: 58,
-    height: 58,
-    borderRadius: 12,
-    borderWidth: 2,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: COLORS.white2,
-  },
-  ratingValue: {
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  ratingLabel: {
-    color: COLORS.darkGray,
-    letterSpacing: 1,
-  },
-  taskInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  taskTitle: {
-    fontWeight: "600",
-  },
-  taskMeta: {
-    color: COLORS.darkGray,
-  },
   sessionList: {
-    gap: SPACING.sm,
+    marginTop: SPACING.sm,
+    width: "100%",
   },
   sessionRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: SPACING.sm,
     paddingVertical: 4,
+    width: "100%",
   },
-  sessionRowDisabled: {
-    opacity: 0.6,
+  sessionTimeBlock: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.xs,
   },
-  sessionCheckContainer: {
-    width: 28,
+  sessionTimeColumn: {
+    alignItems: "flex-end",
+    gap: SPACING.xs,
+    minWidth: 46,
+  },
+  sessionHourText: {
+    color: COLORS.lightGray,
+  },
+  sessionAmPm: {
+    fontSize: 10,
+    color: COLORS.lightGray,
+  },
+  sessionTimeLine: {
+    width: SPACING.xs,
+    alignSelf: "stretch",
+    borderRadius: 999,
+  },
+  sessionCheckbox: {
+    width: 32,
     alignItems: "center",
     justifyContent: "center",
-  },
-  sessionDetails: {
-    flex: 1,
-    gap: 2,
-  },
-  sessionLabelDone: {
-    textDecorationLine: "line-through",
-    color: COLORS.darkGray,
-  },
-  partCheckbox: {
-    width: 18,
-    height: 18,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: COLORS.darkGray,
-    backgroundColor: COLORS.white,
-  },
-  partCheckboxDone: {
-    backgroundColor: COLORS.primary6,
-    borderColor: COLORS.primary6,
-  },
-  partCheckboxDisabled: {
-    borderColor: COLORS.lightGray,
+    paddingTop: 2,
   },
   sessionInfo: {
     flex: 1,
     gap: 2,
   },
+  sessionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "nowrap",
+    gap: SPACING.xs,
+  },
   sessionTime: {
+    color: COLORS.primary1,
+    fontWeight: "600",
+  },
+  sessionLabelDone: {
+    textDecorationLine: "line-through",
     color: COLORS.darkGray,
   },
-  sessionLabel: {
-    fontWeight: "500",
+  sessionTitleText: {
+    flexShrink: 1,
+  },
+  sessionSubtask: {
+    fontWeight: "600",
+  },
+  sessionTask: {
+    color: COLORS.black,
+  },
+  inlineIcon: {
+    marginLeft: 4,
+    marginBottom: -1,
+  },
+  checkboxSpacer: {
+    width: ICON_SIZES.sm,
+    height: ICON_SIZES.sm,
+  },
+  sessionMeta: {
+    minWidth: 70,
+    alignItems: "flex-end",
+    justifyContent: "flex-start",
+  },
+  sessionDuration: {
+    color: COLORS.darkGray,
+  },
+  sessionDate: {
+    color: COLORS.lightGray,
   },
   emptyText: {
     color: COLORS.darkGray,

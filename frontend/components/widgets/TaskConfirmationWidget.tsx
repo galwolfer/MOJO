@@ -102,9 +102,6 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
   // Data is passed directly - use as TaskData
   const task: TaskData = data as TaskData;
 
-  // Debug: Log the received data to see what's coming from the backend
-  console.log("[TaskConfirmationWidget] Received data:", JSON.stringify(data, null, 2));
-
   return (
     <Widget entranceEnabled={entranceEnabled} entranceDelay={entranceDelay} entranceDuration={entranceDuration}>
       <ScrollView style={styles.container} nestedScrollEnabled={true} showsVerticalScrollIndicator={false}>

@@ -193,13 +193,30 @@ export async function getOverdueTasks(): Promise<Task[]> {
  * GET /api/tasks/:id/progress
  */
 export async function getTaskProgress(id: string): Promise<TaskProgressData | null> {
-  try {
-    const response = await get<TaskProgressResponse>(`/tasks/${id}/progress`);
-    return response.data || null;
-  } catch (error) {
-    console.warn("Failed to fetch task progress:", error);
-    return null;
+  const maxRetries = 2; // number of retries after first failure
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await get<TaskProgressResponse>(`/tasks/${id}/progress`);
+      return response.data || null;
+    } catch (error: any) {
+      const msg = error instanceof Error ? error.message : String(error);
+      const isNotFound = error?.name === "ServerError" && (msg.includes("Task not found") || msg.includes("404"));
+
+      // Retry a couple of times for transient 404s (eventual consistency after updates)
+      if (isNotFound && attempt < maxRetries) {
+        const delay = 150 * (attempt + 1);
+        await new Promise((res) => setTimeout(res, delay));
+        continue;
+      }
+
+      // Otherwise log at debug level for diagnostics and return null
+      console.debug(`Failed to fetch task progress for ${id}:`, error);
+      return null;
+    }
   }
+
+  return null;
 }
 
 /**

@@ -189,7 +189,8 @@ const ListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
           setError(message);
           setViewData(null);
         } else {
-          console.warn("ListWidget: silent load failed:", message);
+          // Use debug to avoid noisy warnings for expected transient failures (e.g., eventual consistency after updates)
+          console.debug("ListWidget: silent load failed:", message);
         }
       } finally {
         if (!silent) setLoading(false);
@@ -203,7 +204,19 @@ const ListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
   }, [loadData]);
 
   // Use a silent refresh on task updates so we don't replace the visible UI
-  useTaskUpdateSubscription(() => loadData({ silent: true }));
+  // If payload contains a taskId and it doesn't match our resolved detail id, skip refresh.
+  useTaskUpdateSubscription((payload) => {
+    try {
+      const resolved = resolveTaskId();
+      if (resolved && payload?.taskId && payload.taskId !== resolved) {
+        // Not relevant to this widget instance
+        return;
+      }
+    } catch (e) {
+      // fallback to refreshing
+    }
+    loadData({ silent: true });
+  });
 
   if (loading) {
     return (

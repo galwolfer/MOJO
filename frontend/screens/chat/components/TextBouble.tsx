@@ -735,9 +735,7 @@ const TextBouble: React.FC<Props> = ({
             {/* Debug: log rendering state for widget */}
             {(() => {
               const wt = parsedContent.widget?.widget_type || "unknown";
-              console.log(
-                `[TextBouble] rendering widget type=${wt} — isTyping=${isTyping}, widgetMounted=${widgetMounted}, entranceEnabled=${!isTyping}`,
-              );
+
               return null;
             })()}
             <WidgetRenderer

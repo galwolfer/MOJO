@@ -76,8 +76,8 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
         await toggleTaskCompletion(taskId);
       }
 
-      // Notify other components (like UserProfile) to refresh
-      notifyTaskUpdate();
+      // Notify other components (like UserProfile) to refresh (scope update to this task)
+      notifyTaskUpdate({ taskId });
 
       // Also call the onAction callback for any additional handling
       onAction?.("task_toggled", { taskId, checked: !wasChecked });

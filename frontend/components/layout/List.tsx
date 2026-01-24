@@ -5,6 +5,7 @@
 
 import React, { ReactNode } from "react";
 import { View, StyleSheet, ViewStyle } from "react-native";
+import AppText from "../common/AppText";
 import { COLORS, SPACING, DIVIDER, COMPONENT_STYLES } from "../../theme";
 
 export interface ListCellPart {
@@ -62,15 +63,29 @@ export const ListCell: React.FC<ListCellProps> = ({
         accessibilityRole={onPress ? "button" : undefined}
       >
         <View style={styles.rowInner}>
-          {content ? (
-            <View style={styles.contentContainer}>{content}</View>
-          ) : (
-            partsToRender.map((part) => (
-              <View key={part.id} style={[styles.part, { flex: part.flex ?? 1 }, part.style]}>
-                {part.content}
-              </View>
-            ))
-          )}
+          {content
+            ? (() => {
+                if (typeof content === "string" || typeof content === "number") {
+                  // Debug - capture origin when a primitive is used as the `content` prop
+                  console.debug("ListCell: primitive content", String(content), new Error().stack);
+                  return (
+                    <View style={styles.contentContainer}>
+                      <AppText>{String(content)}</AppText>
+                    </View>
+                  );
+                }
+
+                return <View style={styles.contentContainer}>{content}</View>;
+              })()
+            : partsToRender.map((part) => (
+                <View key={part.id} style={[styles.part, { flex: part.flex ?? 1 }, part.style]}>
+                  {typeof part.content === "string" || typeof part.content === "number"
+                    ? // Wrap primitive content in Text to avoid react-native-web View text-node errors
+                      (console.debug("ListCell: primitive part.content", String(part.content), new Error().stack),
+                      (<AppText>{String(part.content)}</AppText>))
+                    : part.content}
+                </View>
+              ))}
         </View>
       </TouchableOpacity>
       {divider && <View style={styles.dividerLine} />}

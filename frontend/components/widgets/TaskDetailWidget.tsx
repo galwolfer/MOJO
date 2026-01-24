@@ -133,7 +133,7 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
       const success = await updateSubTask(task.id, subtaskId, { status: nextCompleted ? "done" : "todo" });
       if (!success) throw new Error("Update failed");
 
-      notifyTaskUpdate();
+      notifyTaskUpdate({ taskId: task.id });
       onAction?.("subtask_toggled", { taskId: task.id, subtaskId, completed: nextCompleted });
     } catch (error) {
       // revert
