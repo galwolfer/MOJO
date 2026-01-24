@@ -161,10 +161,11 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
             <AppText variant="bodyText" style={styles.description}>
               Your Ojo guides you toward your goals with a unique personality.
             </AppText>
-            <AppText variant="bodyText" style={[styles.description, styles.descriptionSecondary]}>
-              Change how your Ojo communicates with you by selecting a different style below.
-            </AppText>
           </View>
+
+          <AppText variant="boldText" style={styles.instruction}>
+            Change how your Ojo communicates with you by selecting a different style below.
+          </AppText>
 
           <View style={styles.gridContainer}>
             {allOjoTypes.map((ojo, index) => {
@@ -290,19 +291,29 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "center",
     gap: SPACING.sm,
-    marginBottom: SPACING.xlg,
+    marginBottom: SPACING.md,
   },
   description: {
     marginBottom: 0,
     maxWidth: 360,
-    fontSize: FONT_SIZES.base * 0.92,
-    lineHeight: FONT_SIZES.base * 1.4,
+    fontSize: FONT_SIZES.sm,
+    lineHeight: FONT_SIZES.base * 1.1,
     textAlign: "left",
     alignSelf: "center",
     letterSpacing: 0.1,
   },
   descriptionSecondary: {
     marginBottom: 0,
+  },
+  instruction: {
+    marginTop: SPACING.md,
+    marginBottom: SPACING.sm,
+    maxWidth: 360,
+    fontSize: FONT_SIZES.sm,
+    lineHeight: FONT_SIZES.base,
+    textAlign: "left",
+    alignSelf: "center",
+    letterSpacing: 0.08,
   },
   headerButton: {
     flexDirection: "row",
