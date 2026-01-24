@@ -700,12 +700,13 @@ export async function getScheduledSessionsForDate(date: Date): Promise<CalendarT
       const progressStr = taskProgress > 0 ? ` • ${taskProgress}% complete` : '';
       
       // Format title based on whether it's multi-day and has subtask
+      // For multi-day tasks, show parent task name as the main title and keep the subtask title separately
       let title: string;
       if (isMultiDay && subtaskTitle) {
-        // Multi-day: show subtask title only (part info goes in subtitle)
-        title = `${subtaskTitle}${progressStr}`;
+        // Multi-day: show parent task name as title
+        title = `${task.taskname || 'Scheduled Session'}${progressStr}`;
       } else {
-        // Single-day or no subtask: just show task name
+        // Single-day or no subtask: show task name (or subtask inferred)
         title = `${task.taskname || 'Scheduled Session'}${progressStr}`;
       }
       
@@ -714,10 +715,14 @@ export async function getScheduledSessionsForDate(date: Date): Promise<CalendarT
         time: timeStr,
         endTime: endTimeStr,
         title,
+        // Include subtaskTitle explicitly for the UI to show as subtitle
+        subtaskTitle: subtaskTitle || null,
         emoji: iconEmoji,
         tags: task.tags || [],
         dueDate: task.dueDate ? new Date(task.dueDate).toLocaleDateString() : '',
+        // For multi-day tasks, description should show the actual subtask description; otherwise show task/subtask description
         description: isMultiDay ? (actualSubtaskDescription || '') : (subtaskDescription || task.description || ''),
+        mainTaskDescription: isMultiDay ? (task.description || '') : '',
         completed: false,
         color: categoryMeta.color || '#3498db',
         category: task.category,
@@ -726,7 +731,7 @@ export async function getScheduledSessionsForDate(date: Date): Promise<CalendarT
           ? [{
               id: session._id,
               title: subtaskTitle,
-              description: actualSubtaskDescription || '',
+              description: session.description || actualSubtaskDescription || '',
               completed: false,
             }]
           : (task.subTasks ? task.subTasks.map((st: any) => ({

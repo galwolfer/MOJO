@@ -456,13 +456,15 @@ export default function CalendarScreen() {
                 <AppText style={styles.expandedTitleInline}>{task.title}</AppText>
               </View>
 
+              {/* Part info for multi-day tasks (show in expanded view) */}
+              {task.partNumber && task.totalParts && task.totalParts > 1 && task.subtasks?.length === 1 && (
+                <AppText style={styles.expandedPartInfoText}>
+                  Part {task.partNumber}/{task.totalParts} for {task.parentTaskName}
+                </AppText>
+              )}
+
               {/* Progress Circle and Tags Row */}
               <View style={styles.expandedProgressAndTagsRow}>
-                {/* Progress Circle for Subtasks */}
-                {task.subtasks && task.subtasks.length > 0 && (
-                  <ProgressIcon value={getTaskProgress(task)} size={24} />
-                )}
-                
                 {/* Tags */}
                 {task.tags.length > 0 && (
                   <View style={styles.expandedTagsContainer}>
@@ -479,6 +481,11 @@ export default function CalendarScreen() {
                     ))}
                   </View>
                 )}
+                
+                {/* Progress Circle for Subtasks */}
+                {task.subtasks && task.subtasks.length > 0 && (
+                  <ProgressIcon value={getTaskProgress(task)} size={24} />
+                )}
               </View>
 
               {/* Due Date - Hide for scheduled sessions since subtasks show times */}
@@ -486,7 +493,12 @@ export default function CalendarScreen() {
                 <AppText style={styles.expandedDueDate}>{task.dueDate}</AppText>
               )}
 
-              {/* Description */}
+              {/* Main Task Description */}
+              {(task as any).mainTaskDescription && (
+                <AppText style={styles.expandedDescription}>{(task as any).mainTaskDescription}</AppText>
+              )}
+
+              {/* Description (Subtask description for multi-day, or task description) */}
               {task.description && (
                 <AppText style={styles.expandedDescription}>{task.description}</AppText>
               )}
@@ -520,58 +532,70 @@ export default function CalendarScreen() {
           )}
         </View>
 
-        <View style={styles.taskCompactMiddle}>
-          <View style={styles.taskTitleRowCompact}>
-            <Checkbox 
-              checked={completedTasks.has(task.id)}
-              onChange={(checked) => {
-                handleTaskCompletionToggle(task.id, checked);
-              }}
-              size={20}
-            />
-            {IconComponent && categoryMeta && (
-              React.createElement(IconComponent, {
-                size: 18,
-                color: categoryMeta.color,
-              })
-            )}
-            <AppText style={styles.taskTitleCompact}>{task.title}</AppText>
-          </View>
-          
-          {/* Part info for multi-day tasks - only show if there's 1 subtask on this day AND it's a multi-day task */}
-          {task.partNumber && task.totalParts && task.totalParts > 1 && task.subtasks?.length === 1 && (
-            <AppText style={styles.partInfoText}>
-              Part {task.partNumber}/{task.totalParts} for {task.parentTaskName}
-            </AppText>
-          )}
-          
-          {/* Subtasks - Display individual subtasks with checkboxes */}
-          {task.subtasks && task.subtasks.length > 0 && (
-            <View style={styles.subtasksContainerCompact}>
-              {task.subtasks.map((subtask) => (
-                <View key={subtask.id} style={styles.subtaskRowCompact}>
-                  <Checkbox 
-                    checked={completedSubtasks.has(subtask.id)}
-                    onChange={(checked) => {
-                      handleSubtaskCompletionToggle(task.id, subtask.id, checked);
-                    }}
-                    size={16}
-                  />
-                  <View style={{flex: 1}}>
-                    <AppText style={[styles.subtaskTextCompact, completedSubtasks.has(subtask.id) && styles.subtaskTextCompactCompleted]}>
-                      {subtask.title}
-                    </AppText>
-                    {subtask.description && (
-                      <AppText style={[styles.subtaskDescriptionCompact, completedSubtasks.has(subtask.id) && styles.subtaskDescriptionCompactCompleted]}>
-                        {subtask.description}
-                      </AppText>
-                    )}
-                  </View>
-                </View>
-              ))}
+        {/* Check if this is a multi-day task with subtasks - if so, use new layout; otherwise use simple layout */}
+        {task.subtasks && task.subtasks.length > 0 && task.partNumber && task.totalParts && task.totalParts > 1 ? (
+          // Multi-day subtask layout
+          <View style={styles.taskCompactMiddle}>
+            <View style={styles.taskTitleRowCompact}>
+              <Checkbox 
+                checked={completedTasks.has(task.id)}
+                onChange={(checked) => {
+                  handleTaskCompletionToggle(task.id, checked);
+                }}
+                size={20}
+              />
+              {IconComponent && categoryMeta && (
+                React.createElement(IconComponent, {
+                  size: 18,
+                  color: categoryMeta.color,
+                })
+              )}
+              <AppText style={styles.taskTitleCompact}>{task.title}</AppText>
             </View>
-          )}
-        </View>
+
+            {/* Subtasks - Display individual subtasks with checkboxes */}
+            {task.subtasks && task.subtasks.length > 0 && (
+              <View style={styles.subtasksContainerCompact}>
+                {task.subtasks.map((subtask) => (
+                  <View key={subtask.id} style={styles.subtaskRowCompact}>
+                    <Checkbox 
+                      checked={completedSubtasks.has(subtask.id)}
+                      onChange={(checked) => {
+                        handleSubtaskCompletionToggle(task.id, subtask.id, checked);
+                      }}
+                      size={16}
+                    />
+                    <View style={{flex: 1}}>
+                      <AppText style={[styles.subtaskTextCompact, completedSubtasks.has(subtask.id) && styles.subtaskTextCompactCompleted]}>
+                        {subtask.title}
+                      </AppText>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        ) : (
+          // Simple single-task layout (no subtasks or single-day task)
+          <View style={styles.taskCompactMiddle}>
+            <View style={styles.taskTitleRowCompact}>
+              <Checkbox 
+                checked={completedTasks.has(task.id)}
+                onChange={(checked) => {
+                  handleTaskCompletionToggle(task.id, checked);
+                }}
+                size={20}
+              />
+              {IconComponent && categoryMeta && (
+                React.createElement(IconComponent, {
+                  size: 18,
+                  color: categoryMeta.color,
+                })
+              )}
+              <AppText style={styles.taskTitleCompact}>{task.title}</AppText>
+            </View>
+          </View>
+        )}
 
         <View style={styles.taskCompactRight}>
           {task.subtasks && task.subtasks.length > 0 && (
@@ -1244,6 +1268,20 @@ const styles = StyleSheet.create({
     textDecorationLine: "line-through",
     color: COLORS.lightGray,
   },
+  subtaskSubtitleCompact: {
+    fontFamily: FONTS.fredokaRegular,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.darkGray,
+    fontWeight: "500",
+    marginTop: 2,
+  },
+  expandedSubtaskTitle: {
+    fontFamily: FONTS.fredokaRegular,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.darkGray,
+    fontWeight: "600",
+    marginTop: 4,
+  },
   subtaskTimeRangeCompact: {
     fontFamily: FONTS.fredokaRegular,
     fontSize: FONT_SIZES.sm,
@@ -1389,6 +1427,13 @@ const styles = StyleSheet.create({
     color: COLORS.darkGray,
     fontWeight: "400",
     lineHeight: 18,
+  },
+  expandedPartInfoText: {
+    fontFamily: FONTS.fredokaRegular,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.lightGray,
+    fontWeight: "400",
+    marginTop: 2,
   },
   expandedSubtasksContainer: {
     gap: SPACING.sm,
