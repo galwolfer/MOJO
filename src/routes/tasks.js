@@ -8,6 +8,7 @@ import { requireAuth } from "../middlewares/auth.js";
 import * as taskController from "../controllers/taskController.js";
 import { Task } from "../models/Task.js";
 import { TaskSchedule } from "../models/TaskSchedule.js";
+import { SubTask } from "../models/SubTask.js";
 import { User } from "../models/User.js";
 import { logger } from "../utils/logger.js";
 import { getCategoryIndex, isValidCategory, getDisplayName } from "../config/categories.js";
@@ -602,6 +603,42 @@ router.get("/schedule/sessions", requireAuth, async (req, res, next) => {
 
     // Filter out sessions where the task doesn't belong to the user
     const userSessions = sessions.filter(session => session.taskId !== null);
+
+    console.log(`[schedule/sessions] Found ${userSessions.length} sessions for user`);
+    userSessions.forEach(session => {
+      console.log(`  - Session ${session._id}: taskId=${session.taskId._id}, subtaskIndex=${session.subtaskIndex}, start=${new Date(session.start).toISOString()}`);
+    });
+
+    // Manually populate subtasks for ALL tasks with userId filter
+    // This ensures we have subtask data when needed
+    const taskIds = userSessions.map(session => session.taskId._id);
+    if (taskIds.length > 0) {
+      const subtasks = await SubTask.find({ userId, taskId: { $in: taskIds } }).lean();
+      console.log(`[schedule/sessions] Found ${subtasks.length} subtasks`);
+      subtasks.forEach(st => {
+        console.log(`  - Subtask ${st._id} for task ${st.taskId} index=${st.index} (${st.title})`);
+      });
+      
+      // Group subtasks by taskId
+      const subtasksByTaskId = {};
+      subtasks.forEach(subtask => {
+        if (!subtasksByTaskId[subtask.taskId]) {
+          subtasksByTaskId[subtask.taskId] = [];
+        }
+        subtasksByTaskId[subtask.taskId].push(subtask);
+      });
+      
+      // Attach subtasks to taskId in sessions
+      userSessions.forEach(session => {
+        if (subtasksByTaskId[session.taskId._id]) {
+          session.taskId.subTasks = subtasksByTaskId[session.taskId._id];
+          console.log(`[schedule/sessions] Attached ${session.taskId.subTasks.length} subtasks to task ${session.taskId._id}`);
+        } else {
+          session.taskId.subTasks = []; // Ensure empty array if no subtasks
+          console.log(`[schedule/sessions] No subtasks for task ${session.taskId._id}`);
+        }
+      });
+    }
 
     res.json({
       success: true,

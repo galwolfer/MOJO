@@ -35,7 +35,7 @@ export type Task = {
 export type TasksResponse = {
   success: boolean;
   count: number;
-  tasks: Task[];
+  tasks: TaskWithSubtasks[];
 };
 
 export type TaskProgress = {
@@ -62,7 +62,7 @@ export async function getTasks(filters?: {
   completed?: boolean;
   dueBefore?: string;
   dueAfter?: string;
-}): Promise<Task[]> {
+}): Promise<TaskWithSubtasks[]> {
   try {
     const params = new URLSearchParams();
     if (filters?.category) params.append("category", filters.category);
@@ -73,8 +73,22 @@ export async function getTasks(filters?: {
     const queryString = params.toString();
     const endpoint = queryString ? `/tasks?${queryString}` : "/tasks";
 
+    console.log("[getTasks] Fetching from:", endpoint);
     const response = await get<TasksResponse>(endpoint);
-    return response.tasks || [];
+    console.log("[getTasks] Raw response:", JSON.stringify(response, null, 2));
+    const tasks = response.tasks || [];
+    console.log("[getTasks] Tasks count:", tasks.length);
+    tasks.forEach((task: any) => {
+      console.log(`\n[getTasks] Task:`, {
+        id: task._id,
+        name: task.taskname,
+        taskType: task.taskType,
+        hasSubTasks: !!task.subTasks,
+        subTasksCount: task.subTasks?.length || 0,
+        subTasksArray: task.subTasks,
+      });
+    });
+    return tasks;
   } catch (error) {
     console.warn("Failed to fetch tasks:", error);
     return [];
@@ -373,6 +387,8 @@ export interface CalendarTask {
   category?: string;
   subtasks?: CalendarSubtask[];
   dateString?: string; // Date in YYYY-MM-DD format for filtering
+  // Optional authoritative progress percentage provided by server (0-100)
+  progressPercentage?: number;
 }
 
 /**
@@ -405,6 +421,8 @@ export interface ApiSubTask {
  */
 export interface TaskWithSubtasks extends Task {
   subTasks?: ApiSubTask[];
+  // Optional authoritative progress percentage provided by server (0-100)
+  progressPercentage?: number;
 }
 
 /**
@@ -487,6 +505,8 @@ export function transformTaskToCalendarFormat(apiTask: TaskWithSubtasks): Calend
     ? apiTask.subTasks.map(transformSubtask)
     : undefined;
   
+  console.log(`[transformTaskToCalendarFormat] Task ${apiTask._id} (${apiTask.taskname}): subTasks=${apiTask.subTasks?.length || 0}, transformed subtasks=${subtasks?.length || 0}`);
+  
   return {
     id: apiTask._id,
     time,
@@ -500,6 +520,8 @@ export function transformTaskToCalendarFormat(apiTask: TaskWithSubtasks): Calend
     category: apiTask.category,
     subtasks,
     dateString,
+    // expose server progress percentage (0-100) for Calendar UI
+    progressPercentage: typeof apiTask.progressPercentage === 'number' ? apiTask.progressPercentage : undefined,
   };
 }
 
@@ -554,7 +576,7 @@ export async function getTasksForDateRange(
       dueBefore,
     });
     
-    return transformTasksToCalendarGroups(tasks as TaskWithSubtasks[]);
+    return transformTasksToCalendarGroups(tasks);
   } catch (error) {
     console.warn("Failed to fetch tasks for date range:", error);
     return [];
@@ -614,16 +636,38 @@ export async function getScheduledSessionsForDate(date: Date): Promise<CalendarT
     // Count total sessions per task across the month
     const taskSessionCounts: Record<string, number> = {};
     const taskSessionDates: Record<string, Set<string>> = {}; // Track unique dates per task
-    
+    const taskSessionMapForDebug: Record<string, string[]> = {};
+
     allSessions.forEach((session: any) => {
       const taskId = session.taskId?._id || 'unknown';
       taskSessionCounts[taskId] = (taskSessionCounts[taskId] || 0) + 1;
-      
+
       if (!taskSessionDates[taskId]) {
         taskSessionDates[taskId] = new Set();
       }
-      const sessionDate = new Date(session.start).toISOString().split('T')[0];
+      // Use local date string (YYYY-MM-DD) to avoid UTC shift issues when grouping by date
+      const sDate = new Date(session.start);
+      const sessionDate = `${sDate.getFullYear()}-${String(sDate.getMonth() + 1).padStart(2, '0')}-${String(sDate.getDate()).padStart(2, '0')}`;
       taskSessionDates[taskId].add(sessionDate);
+
+      if (!taskSessionMapForDebug[taskId]) taskSessionMapForDebug[taskId] = [];
+      taskSessionMapForDebug[taskId].push(sessionDate);
+    });
+
+    // Diagnostics: detect 'perfect' (single-part) tasks that have scheduled sessions on dates different from their dueDate
+    Object.keys(taskSessionMapForDebug).forEach((taskId) => {
+      const scheduledDates = Array.from(new Set(taskSessionMapForDebug[taskId]));
+      // Find the task object in this month's sessions list
+      const anySession = allSessions.find((s: any) => (s.taskId?._id || '') === taskId);
+      const taskObj = anySession?.taskId;
+      if (taskObj && taskObj.taskType === 'perfect' && taskObj.dueDate) {
+        const dueDate = (() => {
+          try { const d = new Date(taskObj.dueDate); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; } catch { return null; }
+        })();
+        if (dueDate && scheduledDates.some((d) => d !== dueDate)) {
+          console.warn('[getScheduledSessionsForDate] Warning: perfect task has schedule on different date(s) than dueDate', { taskId, dueDate, scheduledDates });
+        }
+      }
     });
     
     // Create a map of sessions per task for calculating part numbers
@@ -695,9 +739,11 @@ export async function getScheduledSessionsForDate(date: Date): Promise<CalendarT
         }
       }
       
-      // Calculate progress percentage from task
-      const taskProgress = task.progress || 0;
-      const progressStr = taskProgress > 0 ? ` • ${taskProgress}% complete` : '';
+      // Calculate progress percentage from task (use server value when present, fallback to calculating from subtasks)
+      const taskProgress = (typeof task.progressPercentage === 'number')
+        ? task.progressPercentage
+        : (task.subTasks ? Math.round((task.subTasks.filter((st: any) => st.status === 'done').length / (task.subTasks.length || 1)) * 100) : 0);
+      const progressStr = '';
       
       // Format title based on whether it's multi-day and has subtask
       // For multi-day tasks, show parent task name as the main title and keep the subtask title separately
@@ -727,20 +773,17 @@ export async function getScheduledSessionsForDate(date: Date): Promise<CalendarT
         color: categoryMeta.color || '#3498db',
         category: task.category,
         // For multi-day tasks, use session data; for single-day tasks, use task.subTasks
-        subtasks: isMultiDay && subtaskTitle 
-          ? [{
-              id: session._id,
-              title: subtaskTitle,
-              description: session.description || actualSubtaskDescription || '',
-              completed: false,
-            }]
-          : (task.subTasks ? task.subTasks.map((st: any) => ({
-              id: st._id,
-              title: st.title,
-              description: st.description,
-              completed: st.status === 'done',
-            })) : []),
-        dateString: startTime.toISOString().split('T')[0],
+        subtasks: task.subTasks ? task.subTasks.map((st: any) => ({
+            id: st._id,
+            title: st.title,
+            description: st.description,
+            completed: st.status === 'done',
+          })) : [],
+        // Expose authoritative progress percentage for frontend to use (0-100)
+        // Use the computed taskProgress so the UI (title + icon) are consistent
+        progressPercentage: taskProgress,
+        // Use local date string (YYYY-MM-DD) so grouping aligns with user local date selection
+        dateString: `${startTime.getFullYear()}-${String(startTime.getMonth() + 1).padStart(2, '0')}-${String(startTime.getDate()).padStart(2, '0')}`,
         isScheduled: true,
         taskId: taskId,
         partNumber,
@@ -784,19 +827,27 @@ export async function getScheduledSessionsForDate(date: Date): Promise<CalendarT
       if (sessionsGroup.length > 1) {
         // Multiple sessions of the same task on the same day - combine them
         const firstSession = sessionsGroup[0];
-        const dateKey = firstSession.dateString;
+        const dateKey = firstSession.dateString; // already in local YYYY-MM-DD format
         
-        // Get all subtask info with full details (description and time interval)
-        const subtasksInfo = sessionsGroup
-          .map((s: any, idx: number) => ({
-            id: s.id,
-            title: s.description ? s.description.split('\n')[0] : `Part ${s.partNumber}`,
-            description: s.description || '',
-            completed: false,
-            index: s.subtaskIndex !== undefined ? s.subtaskIndex : idx,
-            timeRange: `${s.time} - ${s.endTime}`, // Add time interval for each subtask
-          }))
-          .sort((a: any, b: any) => a.index - b.index);
+        // Get all subtask info with full details (description and time interval) from the calendar task object
+        console.log(`[getScheduledSessionsForDate] Creating grouped subtasks for task ${firstSession.taskId}, has subtasks array length: ${firstSession.subtasks?.length}`);
+        // Only include subtasks that are actually scheduled for this day (by subtaskIndex)
+        const scheduledIndices = Array.from(new Set(sessionsGroup.map((s: any) => s.subtaskIndex).filter((i: any) => i !== undefined && i !== null))).sort((a: number, b: number) => a - b);
+        const subtasksInfo = scheduledIndices.map((idx: number) => {
+            const st = firstSession.subtasks ? firstSession.subtasks[idx - 1] : undefined;
+            const timeRange = sessionsGroup.find((s: any) => s.subtaskIndex === idx)
+              ? `${sessionsGroup.find((s: any) => s.subtaskIndex === idx).time} - ${sessionsGroup.find((s: any) => s.subtaskIndex === idx).endTime}`
+              : undefined;
+
+            return {
+              id: st ? st.id : `unknown-${idx}`,
+              title: st ? st.title : `Part ${idx}`,
+              description: st ? (st.description || '') : '',
+              completed: !!st?.completed,
+              index: idx,
+              timeRange,
+            };
+          }); 
         
         // Sort sessions by time to get earliest start and latest end
         const sortedSessions = [...sessionsGroup].sort((a: any, b: any) => {
@@ -820,6 +871,8 @@ export async function getScheduledSessionsForDate(date: Date): Promise<CalendarT
           parentTaskName: firstSession.parentTaskName, // Already set correctly
           partNumber: firstSession.partNumber,
           totalParts: firstSession.totalParts,
+          // Override completed based on progressPercentage (100% = completed)
+          completed: (typeof firstSession.progressPercentage === 'number' && firstSession.progressPercentage === 100) ? true : firstSession.completed,
         };
         
         if (!groupedByDate[dateKey]) {
@@ -828,8 +881,8 @@ export async function getScheduledSessionsForDate(date: Date): Promise<CalendarT
         groupedByDate[dateKey].push(combinedTask);
       } else {
         // Single session - add as-is
-        const session = sessionsGroup[0];
-        const dateKey = session.dateString;
+        let session = sessionsGroup[0];
+        const dateKey = session.dateString; // session.dateString now uses local date format (YYYY-MM-DD)
         
         // For multi-day tasks (totalParts > 1), only show the current subtask in the details
         if (session.totalParts && session.totalParts > 1 && session.subtaskIndex !== undefined && session.subtaskIndex !== null) {
@@ -845,6 +898,12 @@ export async function getScheduledSessionsForDate(date: Date): Promise<CalendarT
             }];
           }
         }
+        
+        // Override completed based on progressPercentage (100% = completed)
+        session = {
+          ...session,
+          completed: (typeof session.progressPercentage === 'number' && session.progressPercentage === 100) ? true : session.completed,
+        };
         
         if (!groupedByDate[dateKey]) {
           groupedByDate[dateKey] = [];
@@ -941,5 +1000,69 @@ export async function createTaskSchedule(
   } catch (error) {
     console.error("Failed to create task schedule:", error);
     return null;
+  }
+}
+
+/**
+ * Get subtasks for a task
+ * GET /api/tasks/:taskId/subtasks
+ */
+export async function getSubTasksForTask(taskId: string): Promise<ApiSubTask[]> {
+  try {
+    const response = await get<{ success: boolean; count: number; subtasks: ApiSubTask[] }>(`/tasks/${taskId}/subtasks`);
+    return response.subtasks || [];
+  } catch (error) {
+    console.warn("Failed to fetch subtasks:", error);
+    return [];
+  }
+}
+
+/**
+ * Mark a subtask as complete
+ * POST /api/tasks/:taskId/subtasks/:subId/complete
+ */
+export async function markSubTaskComplete(taskId: string, subTaskId: string): Promise<{ success: boolean; subtask?: ApiSubTask; message?: string }> {
+  try {
+    console.log(`[markSubTaskComplete] Marking subtask complete - taskId: ${taskId}, subTaskId: ${subTaskId}`);
+    console.log(`[markSubTaskComplete] Full request URL will be: /tasks/${taskId}/subtasks/${subTaskId}/complete`);
+    const response = await post<{ success: boolean; subtask: ApiSubTask; message: string }>(`/tasks/${taskId}/subtasks/${subTaskId}/complete`);
+    console.log(`[markSubTaskComplete] Response:`, response);
+    return response;
+  } catch (error) {
+    console.error("Failed to mark subtask complete:", error);
+    console.error("[markSubTaskComplete] Error details:", error);
+    return { success: false };
+  }
+}
+
+/**
+ * Mark a subtask as todo
+ * POST /api/tasks/:taskId/subtasks/:subId/todo
+ */
+export async function markSubTaskTodo(taskId: string, subTaskId: string): Promise<{ success: boolean; subtask?: ApiSubTask; message?: string }> {
+  try {
+    const response = await post<{ success: boolean; subtask: ApiSubTask; message: string }>(`/tasks/${taskId}/subtasks/${subTaskId}/todo`);
+    return response;
+  } catch (error) {
+    console.error("Failed to mark subtask todo:", error);
+    return { success: false };
+  }
+}
+
+/**
+ * Update subtask status
+ * PATCH /api/tasks/:taskId/subtasks/:subId/status
+ */
+export async function updateSubTaskStatus(
+  taskId: string, 
+  subTaskId: string, 
+  status: "todo" | "done"
+): Promise<{ success: boolean; subtask?: ApiSubTask; message?: string }> {
+  try {
+    const response = await patch<{ success: boolean; subtask: ApiSubTask; message: string }>(`/tasks/${taskId}/subtasks/${subTaskId}/status`, { status });
+    return response;
+  } catch (error) {
+    console.error("Failed to update subtask status:", error);
+    return { success: false };
   }
 }

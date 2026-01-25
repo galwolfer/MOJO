@@ -68,7 +68,7 @@ const taskSchema = new mongoose.Schema(
     // Temporary storage for subtask data provided during task creation (not persisted)
     _pendingSubtasks: { type: [Object], default: [] },
   },
-  { timestamps: true },
+  { timestamps: true, toJSON: { virtuals: true } },
 );
 
 // (add/edit) after each task save
@@ -77,8 +77,11 @@ import { SubTask } from "./SubTask.js";
 // Helper: Synchronize subtasks to match the task's chunkCount when taskType is in_parts or leaky
 async function syncSubTasksForTask(taskDoc) {
   try {
+    console.log(`[syncSubTasksForTask] Task ${taskDoc._id} (${taskDoc.taskname}) taskType: ${taskDoc.taskType}`);
+    
     // Only relevant for "in_parts" or "leaky"
     if (!["in_parts", "leaky"].includes(taskDoc.taskType)) {
+      console.log(`[syncSubTasksForTask] Task type is "${taskDoc.taskType}", not creating subtasks. Deleting any existing...`);
       // If switching to "perfect", remove any existing subtasks
       await SubTask.deleteMany({ taskId: taskDoc._id }).catch(() => {});
       return;
@@ -90,29 +93,36 @@ async function syncSubTasksForTask(taskDoc) {
       : null;
 
     if (pendingSubtasks) {
-      // Use the provided subtask data
-      const desiredCount = pendingSubtasks.length;
-      
-      // Remove all existing subtasks first
-      await SubTask.deleteMany({ taskId: taskDoc._id }).catch(() => {});
-      
-      // Create subtasks with the exact provided data
-      const createOps = pendingSubtasks.map((subtask, index) => ({
-        taskId: taskDoc._id,
-        userId: taskDoc.userId,
-        index: index + 1,
-        title: subtask.title || `Part ${index + 1}`,
-        description: subtask.description || "",
-        minutes: subtask.minutes ? parseInt(subtask.minutes, 10) : 0,
-      }));
-      
-      if (createOps.length) {
-        await SubTask.insertMany(createOps);
+      const existing = await SubTask.find({ taskId: taskDoc._id });
+      if (existing.length === 0) {
+        console.log(`[syncSubTasksForTask] Creating ${pendingSubtasks.length} subtasks from pending data`);
+        // Use the provided subtask data
+        const desiredCount = pendingSubtasks.length;
+        
+        // Remove all existing subtasks first
+        await SubTask.deleteMany({ taskId: taskDoc._id }).catch(() => {});
+        
+        // Create subtasks with the exact provided data
+        const createOps = pendingSubtasks.map((subtask, index) => ({
+          taskId: taskDoc._id,
+          userId: taskDoc.userId,
+          index: index + 1,
+          title: subtask.title || `Part ${index + 1}`,
+          description: subtask.description || "",
+          minutes: subtask.minutes ? parseInt(subtask.minutes, 10) : 0,
+        }));
+        
+        if (createOps.length) {
+          const created = await SubTask.insertMany(createOps);
+          console.log(`[syncSubTasksForTask] Created ${created.length} subtasks: ${created.map(st => st._id).join(", ")}`);
+        }
+      } else {
+        console.log(`[syncSubTasksForTask] Task already has ${existing.length} subtasks, skipping pending data processing`);
       }
-      
-      // Clear pending subtasks after use
-      taskDoc._pendingSubtasks = [];
+      // Clear _pendingSubtasks from DB
+      await Task.updateOne({ _id: taskDoc._id }, { $unset: { _pendingSubtasks: 1 } });
     } else {
+      console.log(`[syncSubTasksForTask] No pending subtasks, using auto-generation logic`);
       // Original auto-generation logic when no explicit subtasks provided
       // Determine desired count of subtasks:
       // Prefer explicit chunkCount, otherwise estimate from estimatedDuration and minChunk/default

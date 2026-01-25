@@ -27,7 +27,7 @@ import { Checkbox } from "../components/icons/Checkbox.native";
 import { ProgressIcon } from "../components/icons/ProgressIcon.native";
 import DateSelector from "../components/layout/DateSelector";
 import CalendarPicker from "../components/inputs/CalendarPicker";
-import { getTasksForDate, getScheduledSessionsForDate, transformTasksToCalendarGroups, updateTask, toggleTaskCompletion, CalendarTaskGroup } from "../services/taskService";
+import { getTasksForDate, getScheduledSessionsForDate, transformTasksToCalendarGroups, updateTask, toggleTaskCompletion, CalendarTaskGroup, getSubTasksForTask, markSubTaskComplete, markSubTaskTodo } from "../services/taskService";
 import { useTaskContext } from "../context/TaskContext";
 
 /**
@@ -123,14 +123,83 @@ export default function CalendarScreen() {
         getScheduledSessionsForDate(date)
       ]);
       
+      console.log("[Calendar] Fetched taskGroups:", taskGroups);
+      console.log("[Calendar] Fetched scheduledGroups:", scheduledGroups);
+      
       // Merge scheduled sessions with regular tasks
       // If there are scheduled sessions for this date, show those instead
       // Otherwise show regular tasks
+      let groupsToUse: TaskGroup[];
       if (scheduledGroups.length > 0) {
-        setTaskGroups(scheduledGroups);
+        groupsToUse = scheduledGroups;
+        console.log("[Calendar] Using scheduled groups");
       } else {
-        setTaskGroups(taskGroups);
+        groupsToUse = taskGroups;
+        console.log("[Calendar] Using task groups");
       }
+      
+      // Seed completedSubtasks and completedTasks sets from server state so UI reflects authoritative data
+      const doneSubtasks = new Set<string>();
+      const doneTasks = new Set<string>();
+      groupsToUse.forEach((group) => {
+        group.tasks.forEach((t) => {
+          const taskIdToUse = (t as any).taskId || t.id;
+
+          // ✅ ADD THIS BLOCK (handles tasks with NO subtasks)
+          if (!t.subtasks || t.subtasks.length === 0) {
+            if ((t as any).completed === true || (t as any).status === "done") {
+              doneTasks.add(taskIdToUse);
+            }
+            return; // stop here, nothing else to evaluate
+          }
+
+          // existing logic for tasks WITH subtasks
+          t.subtasks.forEach((st) => {
+            if ((st as any).completed) doneSubtasks.add((st as any).id);
+          });
+
+          const serverProg = (t as any).progressPercentage;
+
+          if (typeof serverProg === 'number' && serverProg === 100) {
+            doneTasks.add(taskIdToUse);
+          } else {
+            const totalParts = (t as any).totalParts;
+            const isFullRepresentation = totalParts
+              ? (t.subtasks.length === totalParts)
+              : true;
+
+            if (isFullRepresentation && t.subtasks.every((s) => (s as any).completed)) {
+              doneTasks.add(taskIdToUse);
+            }
+          }
+        });
+      });
+
+
+      setCompletedSubtasks(doneSubtasks);
+      setCompletedTasks(doneTasks);
+      
+      console.log("[Calendar] groupsToUse:", groupsToUse);
+      
+      // Initialize completedSubtasks from the fetched data
+      const newCompletedSubtasks = new Set<string>();
+      groupsToUse.forEach((group, groupIdx) => {
+        console.log(`[Calendar] Group ${groupIdx}:`, group);
+        group.tasks.forEach((task, taskIdx) => {
+          console.log(`[Calendar]   Task ${taskIdx}: id=${task.id}, title=${task.title}, subtasks=${task.subtasks?.length || 0}`);
+          if (task.subtasks) {
+            task.subtasks.forEach((subtask, subIdx) => {
+              console.log(`[Calendar]     Subtask ${subIdx}: id=${subtask.id}, title=${subtask.title}, completed=${subtask.completed}`);
+              if (subtask.completed) {
+                newCompletedSubtasks.add(subtask.id);
+              }
+            });
+          }
+        });
+      });
+      setCompletedSubtasks(newCompletedSubtasks);
+      
+      setTaskGroups(groupsToUse);
     } catch (err) {
       console.error("Failed to load tasks:", err);
       setError("Failed to load tasks. Please try again.");
@@ -146,44 +215,66 @@ export default function CalendarScreen() {
    */
   const handleTaskCompletionToggle = async (taskId: string, checked: boolean) => {
     try {
-      // Optimistically update local state
+      // Optimistically update local state for task checkbox
       const newCompleted = new Set(completedTasks);
-      const newSubtasksCompleted = new Set(completedSubtasks);
-      
       if (checked) {
         newCompleted.add(taskId);
-        // Check all subtasks
-        const task = taskGroups
-          .flatMap((g) => g.tasks)
-          .find((t) => t.id === taskId);
-        if (task?.subtasks) {
-          task.subtasks.forEach((st) => newSubtasksCompleted.add(st.id));
-        }
       } else {
         newCompleted.delete(taskId);
-        // Uncheck all subtasks
-        const task = taskGroups
-          .flatMap((g) => g.tasks)
-          .find((t) => t.id === taskId);
-        if (task?.subtasks) {
-          task.subtasks.forEach((st) => newSubtasksCompleted.delete(st.id));
+      }
+
+      // Locate the task card (may be a scheduled session card)
+      const allTasksFlat = taskGroups.flatMap((g) => g.tasks);
+      const card: any = allTasksFlat.find((t: any) => t.id === taskId || t.taskId === taskId);
+      const parentTaskId = card?.taskId || card?.id || taskId;
+
+      // Also keep parentTaskId flagged in completedTasks so other session cards reflect state
+      if (parentTaskId && parentTaskId !== taskId) {
+        if (checked) newCompleted.add(parentTaskId);
+        else newCompleted.delete(parentTaskId);
+      }
+      setCompletedTasks(newCompleted);
+
+      // If parent task has subtasks, toggle all of them (use authoritative list from server)
+      if (card?.subtasks && card.subtasks.length > 0) {
+        let subtaskIds: string[] = [];
+        try {
+          const full = await getSubTasksForTask(parentTaskId);
+          subtaskIds = full.map((s) => s._id);
+        } catch (e) {
+          // fallback to whatever subtasks the card has
+          subtaskIds = card.subtasks.map((s: any) => s.id);
+        }
+
+        const newSubtasksCompleted = new Set(completedSubtasks);
+        if (checked) {
+          subtaskIds.forEach((id) => newSubtasksCompleted.add(id));
+        } else {
+          subtaskIds.forEach((id) => newSubtasksCompleted.delete(id));
+        }
+        setCompletedSubtasks(newSubtasksCompleted);
+
+        // Persist each subtask change in parallel
+        const ops = subtaskIds.map((stId) => (checked ? markSubTaskComplete(parentTaskId, stId) : markSubTaskTodo(parentTaskId, stId)));
+        const results = await Promise.allSettled(ops);
+        const failed = results.some((r) => r.status === 'rejected' || (r.status === 'fulfilled' && !(r as any).value?.success));
+        if (failed) {
+          console.error('[handleTaskCompletionToggle] Failed to update one or more subtasks', results);
+          // revert to authoritative server state
+          fetchTasksForDate(selectedDate);
         }
       }
-      
-      setCompletedTasks(newCompleted);
-      setCompletedSubtasks(newSubtasksCompleted);
-      
-      // Persist to API
-      await updateTask(taskId, {
-        status: checked ? "done" : "todo",
-        completed: checked,
-      });
-      
-      // Notify other parts of app and refetch
+
+      // Persist parent task status update
+      await updateTask(parentTaskId, { status: checked ? 'done' : 'todo' });
+
+      // Notify other app components to refresh
       notifyTaskUpdate();
+      
+      // Revalidate to ensure UI reflects authoritative server state
+      await fetchTasksForDate(selectedDate);
     } catch (err) {
-      console.error("Failed to update task completion:", err);
-      // Revert optimistic update on error
+      console.error('Failed to update task completion:', err);
       fetchTasksForDate(selectedDate);
     }
   };
@@ -209,27 +300,35 @@ export default function CalendarScreen() {
       
       setCompletedSubtasks(newSubtasksCompleted);
       
-      // Find the task and update it with new subtask states
-      const task = taskGroups
-        .flatMap((g) => g.tasks)
-        .find((t) => t.id === taskId);
+      // Call the appropriate API endpoint
+      const result = checked 
+        ? await markSubTaskComplete(taskId, subtaskId)
+        : await markSubTaskTodo(taskId, subtaskId);
       
-      if (task?.subtasks) {
-        // Note: Subtask completion is tracked locally in the UI
-        // Backend will sync subtask states when we call getTasks() again
-        
-        // Persist to API - trigger a refetch on the backend
-        await updateTask(taskId, {
-          status: task.completed ? "done" : "todo",
-        });
-        
-        // Notify other parts of app and refetch
+      if (!result.success) {
+        // Revert optimistic update on error
+        const revertSubtasksCompleted = new Set(completedSubtasks);
+        if (checked) {
+          revertSubtasksCompleted.delete(subtaskId);
+        } else {
+          revertSubtasksCompleted.add(subtaskId);
+        }
+        setCompletedSubtasks(revertSubtasksCompleted);
+        console.error("Failed to update subtask status");
+      } else {
+        // Notify other parts of app
         notifyTaskUpdate();
       }
     } catch (err) {
       console.error("Failed to update subtask completion:", err);
       // Revert optimistic update on error
-      fetchTasksForDate(selectedDate);
+      const revertSubtasksCompleted = new Set(completedSubtasks);
+      if (checked) {
+        revertSubtasksCompleted.delete(subtaskId);
+      } else {
+        revertSubtasksCompleted.add(subtaskId);
+      }
+      setCompletedSubtasks(revertSubtasksCompleted);
     }
   };
 
@@ -350,8 +449,24 @@ export default function CalendarScreen() {
    */
   const getTaskProgress = (task: Task): number => {
     if (!task.subtasks || task.subtasks.length === 0) return 0;
+
+    // Local optimistic progress (based on user's checkbox interactions)
     const completedCount = task.subtasks.filter(s => completedSubtasks.has(s.id)).length;
-    return completedCount / task.subtasks.length;
+    const localProgress = completedCount / task.subtasks.length;
+
+    // Server-provided progress (if available) - normalize to 0..1
+    const serverProgress = (task as any).progressPercentage !== undefined ? ((task as any).progressPercentage / 100) : undefined;
+
+    // Prefer server authoritative value for the progress icon when available.
+    // This ensures per-day cards (which only show a subset of subtasks) don't
+    // over-report progress due to local optimistic counts (e.g., showing 50%
+    // because 1 of 2 subtasks are on that day while overall is 17%).
+    if (typeof serverProgress === 'number') {
+      return serverProgress;
+    }
+
+    // Fall back to local optimistic progress when server value is not present
+    return localProgress;
   };
 
   const renderSubtask = (subtask: Subtask, parentTaskId: string) => (
@@ -360,6 +475,7 @@ export default function CalendarScreen() {
         <Checkbox 
           checked={completedSubtasks.has(subtask.id)}
           onChange={(checked) => {
+            console.log("[renderSubtask] Checkbox clicked:", {parentTaskId, subtaskId: subtask.id, subtaskTitle: subtask.title, checked});
             handleSubtaskCompletionToggle(parentTaskId, subtask.id, checked);
           }}
           size={18}
@@ -404,6 +520,7 @@ export default function CalendarScreen() {
     const categoryMeta = task.category ? getCategoryMeta(task.category) : null;
     const IconComponent = categoryMeta ? ICONS[categoryMeta.icon] : null;
     const isExpanded = expandedTaskId === task.id;
+    const effectiveId = (task as any).taskId || task.id;
 
     // If expanded, show only the expanded view
     if (isExpanded) {
@@ -440,13 +557,15 @@ export default function CalendarScreen() {
             <View style={styles.expandedRightSection}>
               {/* Title Row with Checkbox */}
               <View style={styles.expandedTitleRowInline}>
-                <Checkbox 
-                  checked={completedTasks.has(task.id)}
-                  onChange={(checked) => {
-                    handleTaskCompletionToggle(task.id, checked);
-                  }}
-                  size={24}
-                />
+
+              <Checkbox
+                checked={completedTasks.has(effectiveId)}
+                onChange={(checked) => {
+                  handleTaskCompletionToggle(effectiveId, checked);
+                }}
+                size={24}
+              />
+
                 {IconComponent && categoryMeta && (
                   React.createElement(IconComponent, {
                     size: 20,
@@ -506,7 +625,11 @@ export default function CalendarScreen() {
               {/* Subtasks */}
               {task.subtasks && task.subtasks.length > 0 && (
                 <View style={styles.expandedSubtasksContainer}>
-                  {task.subtasks.map((subtask) => renderSubtask(subtask, task.id))}
+                  {task.subtasks.map((subtask) => {
+                    // For scheduled sessions, use taskId; for regular tasks, use task.id
+                    const parentTaskId = (task as any).taskId || task.id;
+                    return renderSubtask(subtask, parentTaskId);
+                  })}
                 </View>
               )}
             </View>
@@ -538,9 +661,9 @@ export default function CalendarScreen() {
           <View style={styles.taskCompactMiddle}>
             <View style={styles.taskTitleRowCompact}>
               <Checkbox 
-                checked={completedTasks.has(task.id)}
+                checked={completedTasks.has(effectiveId)}
                 onChange={(checked) => {
-                  handleTaskCompletionToggle(task.id, checked);
+                  handleTaskCompletionToggle(effectiveId, checked);
                 }}
                 size={20}
               />
@@ -561,7 +684,10 @@ export default function CalendarScreen() {
                     <Checkbox 
                       checked={completedSubtasks.has(subtask.id)}
                       onChange={(checked) => {
-                        handleSubtaskCompletionToggle(task.id, subtask.id, checked);
+                        // For scheduled sessions, use taskId; for regular tasks, use task.id
+                        const parentTaskId = (task as any).taskId || task.id;
+                        console.log("[compact subtask] Checkbox clicked:", {parentTaskId, subtaskId: subtask.id, subtaskTitle: subtask.title, isScheduled: (task as any).isScheduled, checked});
+                        handleSubtaskCompletionToggle(parentTaskId, subtask.id, checked);
                       }}
                       size={16}
                     />
@@ -580,9 +706,9 @@ export default function CalendarScreen() {
           <View style={styles.taskCompactMiddle}>
             <View style={styles.taskTitleRowCompact}>
               <Checkbox 
-                checked={completedTasks.has(task.id)}
+                checked={completedTasks.has(effectiveId)}
                 onChange={(checked) => {
-                  handleTaskCompletionToggle(task.id, checked);
+                  handleTaskCompletionToggle(effectiveId, checked);
                 }}
                 size={20}
               />
@@ -599,7 +725,11 @@ export default function CalendarScreen() {
 
         <View style={styles.taskCompactRight}>
           {task.subtasks && task.subtasks.length > 0 && (
-            <ProgressIcon value={getTaskProgress(task)} size={24} />
+            getTaskProgress(task) === 1 ? (
+              <Checkbox checked={true} size={24} onChange={() => {}} />
+            ) : (
+              <ProgressIcon value={getTaskProgress(task)} size={24} />
+            )
           )}
           <TouchableOpacity onPress={() => handleEditTask(task)}>
             {IconComponent && categoryMeta && (

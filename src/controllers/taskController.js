@@ -887,7 +887,15 @@ export async function updateSubTask(req, res) {
 export async function markSubTaskComplete(req, res) {
   try {
     const userId = req.user.userId;
-    const { subId } = req.params;
+    const { taskId, subId } = req.params;
+
+    console.log(`[markSubTaskComplete] Controller received:`, {
+      userId,
+      taskId,
+      subId,
+      requestUrl: req.originalUrl,
+      requestPath: req.path,
+    });
 
     const result = await taskService.updateSubTask({
       userId,
@@ -895,16 +903,23 @@ export async function markSubTaskComplete(req, res) {
       updates: { status: "done" }
     });
 
+    console.log(`[markSubTaskComplete] Service result:`, {
+      success: result?.success,
+      error: result?.error,
+      subtaskId: result?.subtask?._id,
+    });
+
     if (!result || result.success === false) {
-      return res.status(404).json({ success: false, error: result ? result.error : "Subtask not found" });
+      return res.status(404).json({ success: false, error: result ? result.error : "Subtask not found" }); 
     }
 
-    return res.status(200).json({ 
-      success: true, 
+    return res.status(200).json({
+      success: true,
       subtask: result.subtask,
       message: "Subtask marked as complete"
     });
   } catch (error) {
+    console.error("[markSubTaskComplete] Controller error:", error);
     logger.error("Error in markSubTaskComplete controller:", error);
     return res.status(500).json({ success: false, error: "Failed to mark subtask complete" });
   }
