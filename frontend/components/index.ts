@@ -16,6 +16,7 @@ export { default as PriorityList } from "./special/PriorityList";
 export { default as Widget } from "./special/Widget";
 export { default as AppButton } from "./common/AppButton";
 export { default as AnimatedButtonsContainer } from "./common/animations/AnimatedButtonsContainer";
+export { default as ExpandableRow } from "./common/animations/ExpandableRow";
 export { default as AuthStep } from "../screens/auth/components/AuthStep";
 export { default as TextBouble } from "../screens/chat/components/TextBouble";
 export type { TextBoubleMode } from "../screens/chat/components/TextBouble";
