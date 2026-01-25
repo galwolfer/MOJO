@@ -282,6 +282,11 @@ export class AgentController {
 
         try {
           let response;
+          // Track whether any tools are executed during this iteration so we can
+          // report partial/side-effect-only successes to the user if the model
+          // mapping fails later on.
+          let toolsExecutedInLoop = false;
+
           try {
             response = await llmWithTools.invoke(currentMessages);
           } catch (err) {
@@ -289,13 +294,15 @@ export class AgentController {
               `[AgentController] LLM invocation failed. Sanitized messages:`,
               currentMessages.map((m) => ({ type: m._getType && m._getType(), content: m.content })),
             );
+
             // If we saw an internal TypeError (reading 'message' or 'parts'), perform a minimal retry
             // to help isolate provider/formatting issues (system + last user message)
             if (
               err instanceof TypeError &&
               (/reading 'message'/.test(err.message) ||
                 /reading 'parts'/.test(err.message) ||
-                /Cannot read properties of undefined \(reading 'parts'\)/.test(err.message))
+                /Cannot read properties of undefined \(reading 'parts'\)/.test(err.message) ||
+                (err.stack && err.stack.includes("mapGenerateContentResultToChatResult")))
             ) {
               console.warn(
                 `[AgentController] Detected TypeError in LLM invoke (possible malformed response - ${err.message}). Retrying with minimal messages (system + last user message).`,
@@ -309,7 +316,34 @@ export class AgentController {
                 console.log(`[AgentController] Fallback invoke succeeded.`);
               } catch (err2) {
                 console.error(`[AgentController] Fallback invoke also failed:`, err2);
-                throw err; // rethrow original for visibility
+
+                // If the fallback also fails AND we've already executed tools in this loop
+                // (or the last tool produced a widget result), we should NOT crash the
+                // whole agent. Instead, persist the LLM mapping failure for auditing and
+                // return a friendly partial-success message to the user.
+                try {
+                  await memoryStore.addToolResult(
+                    sessionId,
+                    userId,
+                    "_llm_mapping_error",
+                    "_llm_mapping_error",
+                    `ok=false\nerr="LLM mapping error: ${String(err2.message || err.message)}"\nstack="${String(err2.stack || err.stack)}"`,
+                  );
+                } catch (auditErr) {
+                  console.error(`[AgentController] Failed to persist LLM mapping error:`, auditErr);
+                }
+
+                if (lastWidgetResult || toolsExecutedInLoop) {
+                  finalResponse =
+                    "היי עופק — הפעולה שביקשת בוצעה בהצלחה במערכת (לדוגמה: המשימה נוצרה), אבל הייתה שגיאה זמנית ביצירת תגובת המודל ולכן לא קיבלנו תשובה מפורטת. רוצה שאציג את המשימה או שאנסה שוב?";
+                  console.warn(
+                    `[AgentController] Returning partial-success message to user because tools ran but model mapping failed.`,
+                  );
+                  break; // exit the agent loop and return the partial success message
+                }
+
+                // Otherwise rethrow original error for visibility
+                throw err;
               }
             } else {
               throw err;
@@ -397,6 +431,8 @@ export class AgentController {
 
                   // Execute the tool with the arguments provided by the LLM
                   let result = await tool.func(toolCall.args);
+                  // Mark that we executed a tool during this loop
+                  toolsExecutedInLoop = true;
 
                   // Use centralized helper to validate widget, persist results, and add messages
                   const processed = await this._handleToolExecutionResult(

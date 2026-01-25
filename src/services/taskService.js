@@ -743,7 +743,31 @@ export async function deleteTask({ taskId, userId }) {
 
     const taskname = task.taskname;
 
-    await Task.findByIdAndDelete(taskId);
+    // Use a safety-aware findOneAndDelete that includes userId so we never delete across users
+    const deleted = await Task.findOneAndDelete({ _id: taskId, userId });
+
+    if (!deleted) {
+      // If deletion didn't occur, log and return failure so callers don't assume success
+      try {
+        const { logger } = await import("../utils/logger.js");
+        logger.error(`[taskService] Deletion failed: Task ${taskId} still present for user ${userId}`);
+      } catch (e) {
+        // ignore logging failures
+      }
+      return { success: false, error: "Task deletion failed" };
+    }
+
+    // Verify deletion actually removed the document (defensive check)
+    const stillExists = await Task.findById(taskId);
+    if (stillExists) {
+      try {
+        const { logger } = await import("../utils/logger.js");
+        logger.error(`[taskService] Post-delete verification failed: Task ${taskId} still exists after delete call`);
+      } catch (e) {
+        // ignore logging failures
+      }
+      return { success: false, error: "Task deletion did not complete" };
+    }
 
     try {
       await TaskSchedule.deleteMany({ taskId });

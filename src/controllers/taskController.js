@@ -657,12 +657,13 @@ export async function deleteTask(req, res) {
     const userId = req.user.userId;
     const { id } = req.params;
 
-    const success = await taskService.deleteTask(id, userId);
+    // Call service with explicit named args and respect its return shape
+    const result = await taskService.deleteTask({ taskId: id, userId });
 
-    if (!success) {
+    if (!result || !result.success) {
       return res.status(404).json({
         success: false,
-        error: "Task not found",
+        error: result?.error || "Task not found",
       });
     }
 
@@ -672,6 +673,7 @@ export async function deleteTask(req, res) {
     return res.status(200).json({
       success: true,
       id,
+      taskname: result.taskname || null,
     });
   } catch (error) {
     logger.error("Error in deleteTask controller:", error);
