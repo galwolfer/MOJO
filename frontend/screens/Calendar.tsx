@@ -27,7 +27,7 @@ import { Checkbox } from "../components/icons/Checkbox.native";
 import { ProgressIcon } from "../components/icons/ProgressIcon.native";
 import DateSelector from "../components/layout/DateSelector";
 import CalendarPicker from "../components/inputs/CalendarPicker";
-import { getTasksForDate, getScheduledSessionsForDate, transformTasksToCalendarGroups, updateTask, toggleTaskCompletion, CalendarTaskGroup, getSubTasksForTask, markSubTaskComplete, markSubTaskTodo } from "../services/taskService";
+import { getTasksForDate, getScheduledSessionsForDate, transformTasksToCalendarGroups, updateTask, toggleTaskCompletion, CalendarTaskGroup, getSubTasksForTask, markSubTaskComplete, markSubTaskTodo, deleteTask } from "../services/taskService";
 import { useTaskContext } from "../context/TaskContext";
 
 /**
@@ -367,6 +367,42 @@ export default function CalendarScreen() {
     setActiveTab("edit" as any);
   };
 
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      const success = await deleteTask(taskId);
+      if (success) {
+        // Refresh the calendar to remove the deleted task
+        await fetchTasksForDate(selectedDate);
+        notifyTaskUpdate();
+      } else {
+        console.error("Failed to delete task");
+      }
+    } catch (error) {
+      console.error("Error deleting task:", error);
+    }
+  };
+
+  const handleDeleteSubtask = async (taskId: string, subtaskId: string) => {
+    // For now, we'll implement this by updating the task to remove the subtask
+    // Since there's no direct delete subtask endpoint, we'll use the bulk update
+    try {
+      const fullSubtasks = await getSubTasksForTask(taskId);
+      const updatedSubtasks = fullSubtasks.filter(st => st._id !== subtaskId);
+      
+      // Update the task with the filtered subtasks
+      const success = await updateTask(taskId, { subtasks: updatedSubtasks } as any);
+      if (success) {
+        // Refresh the calendar
+        await fetchTasksForDate(selectedDate);
+        notifyTaskUpdate();
+      } else {
+        console.error("Failed to delete subtask");
+      }
+    } catch (error) {
+      console.error("Error deleting subtask:", error);
+    }
+  };
+
   /**
    * Convert local Date to YYYY-MM-DD string without UTC conversion
    * Fixes timezone offset bugs where selecting a date can shift by one day
@@ -495,6 +531,9 @@ export default function CalendarScreen() {
             </AppText>
           )}
         </View>
+        <TouchableOpacity onPress={() => handleDeleteSubtask(parentTaskId, subtask.id)} style={styles.subtaskDeleteButton}>
+          <ICONS.trash size={16} color={COLORS.lightGray} />
+        </TouchableOpacity>
       </View>
       {subtask.description && (
         <AppText 
@@ -539,7 +578,15 @@ export default function CalendarScreen() {
             style={styles.expandedEditButtonTopRight}
             onPress={() => handleEditTask(task)}
           >
-            <ICONS.edit size={18} color={COLORS.darkGray} />
+            <ICONS.edit size={18} color={COLORS.lightGray} />
+          </TouchableOpacity>
+
+          {/* Top-right delete button */}
+          <TouchableOpacity 
+            style={styles.expandedDeleteButtonTopRight}
+            onPress={() => handleDeleteTask(effectiveId)}
+          >
+            <ICONS.trash size={18} color={COLORS.lightGray} />
           </TouchableOpacity>
 
           {/* Main layout: Left (time + endTime) + Right (all content) */}
@@ -731,7 +778,7 @@ export default function CalendarScreen() {
               <ProgressIcon value={getTaskProgress(task)} size={24} />
             )
           )}
-          <TouchableOpacity onPress={() => handleEditTask(task)}>
+          <TouchableOpacity onPress={() => handleEditTask(task)} style={styles.editButton}>
             {IconComponent && categoryMeta && (
               <View style={[styles.categoryIconContainerCompact, { backgroundColor: categoryMeta.color }]}>
                 {React.createElement(IconComponent, {
@@ -740,6 +787,9 @@ export default function CalendarScreen() {
                 })}
               </View>
             )}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => handleDeleteTask(effectiveId)} style={styles.deleteButton}>
+            <ICONS.trash size={20} color={COLORS.lightGray} />
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -772,7 +822,7 @@ export default function CalendarScreen() {
                 <View style={styles.checkboxInner} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.editButton}>
-                <ICONS.edit size={18} color={COLORS.darkGray} />
+                <ICONS.edit size={18} color={COLORS.lightGray} />
               </TouchableOpacity>
             </View>
           </View>
@@ -1831,6 +1881,26 @@ const styles = StyleSheet.create({
     color: COLORS.colorWhite,
     fontWeight: "600",
     textAlign: "center",
+  },
+
+  // Delete button styles
+  deleteButton: {
+    padding: 4,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  expandedDeleteButtonTopRight: {
+    position: "absolute",
+    top: SPACING.md,
+    right: SPACING.md + 32, // Position next to edit button
+    padding: 4,
+    zIndex: 10,
+  },
+  subtaskDeleteButton: {
+    padding: 4,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: SPACING.sm,
   },
 
 });
