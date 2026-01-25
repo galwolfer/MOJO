@@ -17,7 +17,7 @@ import {
   getSessionLabel,
   getTaskTypeLabel,
 } from "./widgetHelpers";
-import { TaskTitle, TaskTagsRow, ScheduledSessionsSection, renderTaskField, TwoColumnGrid } from "./components";
+import { TaskTitle, TaskTagsRow, ScheduledSessionsSection, renderTaskField, TwoColumnGrid } from "../special/task";
 import { getCategoryMeta } from "../../config/categoryMeta";
 import { getCategoryDisplay } from "./widgetHelpers";
 
@@ -107,14 +107,14 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
         <TaskTitle title={task.title} taskname={task.taskname} category={task.category} />
 
         {/* Description */}
-        {task.description && (
+        {task.description ? (
           <View style={styles.field}>
             <AppText variant="notes" style={styles.labelText}>
               Description
             </AppText>
             <AppText variant="bodyText">{task.description}</AppText>
           </View>
-        )}
+        ) : null}
 
         {/* Due Date */}
 
@@ -176,11 +176,11 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
                     {subtask.completed || subtask.status === "completed" ? "✓ " : "○ "}
                     {subtask.title}
                   </AppText>
-                  {subtask.description && (
+                  {subtask.description ? (
                     <AppText variant="notes" style={styles.subtaskDescription}>
                       {subtask.description}
                     </AppText>
-                  )}
+                  ) : null}
                   {subtask.duration && (
                     <AppText variant="notes" style={styles.subtaskDuration}>
                       {formatDuration(subtask.duration)}

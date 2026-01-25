@@ -17,7 +17,7 @@ import Icon from "../icons/Icon";
 import Tag from "../inputs/tag";
 import List, { ListCellProps } from "../layout/List";
 import { getCategoryMeta } from "../../config/categoryMeta";
-import { ScheduledSessionsSection, getSessionKey } from "./components";
+import { ScheduledSessionsSection, getSessionKey } from "../special/task";
 import {
   ScheduledSession,
   Subtask,
@@ -319,8 +319,9 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     width: "100%",
-    marginTop: -SPACING.lg - SPACING.xs,
+    marginTop: -SPACING.md,
     marginBottom: SPACING.lg,
+    marginStart: -SPACING.sm,
   },
   sectionCount: {
     color: COLORS.lightGray,

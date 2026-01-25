@@ -17,40 +17,12 @@ import { BaseWidgetProps } from "../../utils/widgetFactory";
 const ConfirmationWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
   const { title, message, confirmText = "Yes", cancelText = "No", confirmColor, cancelColor, icon } = data;
 
-  const handleConfirm = () => {
-    onAction?.("confirmed", { confirmed: true });
-  };
-
-  const handleCancel = () => {
-    onAction?.("cancelled", { confirmed: false });
-  };
-
-  const getButtonColor = (colorName?: string, defaultColor = COLORS.primary1) => {
-    if (!colorName) return defaultColor;
-    switch (colorName.toLowerCase()) {
-      case "green":
-      case "success":
-        return COLORS.primary6;
-      case "red":
-      case "danger":
-      case "error":
-        return COLORS.primary7;
-      case "orange":
-      case "warning":
-        return COLORS.primary5;
-      case "blue":
-      case "primary":
-      default:
-        return COLORS.primary1;
-    }
-  };
-
   return (
     <Widget skipAnimation>
       <View style={styles.container}>
         {/* Icon and Title */}
         <View style={styles.header}>
-          {icon && <AppText style={styles.icon}>{icon}</AppText>}
+          {icon && <AppText>{icon}</AppText>}
           {title && (
             <AppText variant="title3" style={styles.title}>
               {title}
@@ -64,8 +36,6 @@ const ConfirmationWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
             {message}
           </AppText>
         )}
-
-        {/* Action buttons removed for now */}
       </View>
     </Widget>
   );
@@ -81,19 +51,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: SPACING.sm,
   },
-  icon: {
-    fontSize: 24,
-  },
   title: {
     fontWeight: "600",
     textAlign: "center",
   },
   message: {
     textAlign: "center",
-    lineHeight: 22,
+    lineHeight: SPACING.xlg,
     color: COLORS.darkGray,
   },
-  // actions & button styles removed while buttons are disabled
 });
 
 export default ConfirmationWidget;

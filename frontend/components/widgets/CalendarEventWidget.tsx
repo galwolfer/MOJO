@@ -136,11 +136,11 @@ const CalendarEventWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
           </View>
 
           {/* Description */}
-          {event.description && (
+          {event.description ? (
             <AppText variant="notes" numberOfLines={3} style={styles.description}>
               {event.description}
             </AppText>
-          )}
+          ) : null}
 
           {/* Location */}
           {event.location && (

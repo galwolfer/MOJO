@@ -91,14 +91,14 @@ const Widget: React.FC<WidgetProps> = ({
         duration: entranceDuration,
         delay: entranceDelay,
         easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
       Animated.timing(translateY, {
         toValue: 0,
         duration: entranceDuration,
         delay: entranceDelay,
         easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
     ]).start(() => {
       console.log("[Widget] animation complete");

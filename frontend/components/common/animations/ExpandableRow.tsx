@@ -29,7 +29,7 @@ const ExpandableRow: React.FC<ExpandableRowProps> = ({ expanded, duration = 220,
           toValue: 1,
           duration: Math.max(120, duration - 20),
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
       ]).start();
     } else {
@@ -38,7 +38,7 @@ const ExpandableRow: React.FC<ExpandableRowProps> = ({ expanded, duration = 220,
           toValue: 0,
           duration: Math.max(100, duration - 40),
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
         Animated.timing(height, {
           toValue: 0,

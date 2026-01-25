@@ -79,14 +79,14 @@ const AnimatedButtonsContainer: React.FC<Props> = ({
         duration: 200,
         delay: containerDelay,
         easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
       Animated.timing(translateYRef.current, {
         toValue: 0,
         duration: 200,
         delay: containerDelay,
         easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
     ]);
 
@@ -110,13 +110,13 @@ const AnimatedButtonsContainer: React.FC<Props> = ({
           toValue: 1,
           duration: 200,
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
         Animated.timing(translateY, {
           toValue: 0,
           duration: 200,
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
       ])
     );

@@ -39,7 +39,7 @@ import {
   toggleSubtask,
   toggleSession,
 } from "./widgetHelpers";
-import { TaskTitle, TaskTagsRow, ScheduledSessionsSection, renderTaskField, TwoColumnGrid } from "./components";
+import { TaskTitle, TaskTagsRow, ScheduledSessionsSection, renderTaskField, TwoColumnGrid } from "../special/task";
 import { useTaskContext } from "../../context/TaskContext";
 
 interface TaskDetail {
@@ -163,55 +163,62 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
     console.log(`[TaskDetailWidget] entranceEnabled=${entranceEnabled}`);
   }, [entranceEnabled]);
 
+  const contentNodes: React.ReactNode[] = [
+    /* Header */
+    <View style={styles.header} key="header">
+      <TaskTitle title={task.title} taskname={task.taskname} category={task.category} />
+    </View>,
+
+    /* Tags row (category, subcategory, importance, effort) */
+    <TaskTagsRow
+      key="tags"
+      category={task.category}
+      categoryDisplay={categoryDisplayNormalized}
+      subcategory={task.subcategory}
+      subcategoryDisplay={task.subcategoryDisplay || task.subCategory?.label}
+      importance={task.importance}
+      effort={task.effort}
+    />,
+
+    /* Details Grid */
+    <TwoColumnGrid
+      key="grid"
+      items={[
+        renderTaskField({ dueDate: task.dueDate || task.deadline }, "dueDate"),
+        renderTaskField(task, "startDate"),
+        renderTaskField(task, "earliestStart"),
+        renderTaskField({ estimatedDuration: task.estimatedDuration || task.duration }, "estimatedDuration"),
+      ]}
+    />,
+
+    /* Description */
+    task.description ? (
+      <View style={styles.section} key="desc">
+        <AppText variant="bodyText">{task.description}</AppText>
+      </View>
+    ) : null,
+
+    /* Scheduled Sessions (moved to modular component) */
+    <View style={styles.ScheduledSessionsSectionContainer} key="sessionsSection">
+      <ScheduledSessionsSection
+        key="sessions"
+        taskId={task.id}
+        taskTitle={task.title || task.taskname || "Untitled task"}
+        scheduledSessions={task.scheduledSessions}
+        subtasks={task.subtasks}
+        completedParts={completedParts}
+        loadingParts={loadingParts}
+        onToggleSession={handleToggleSession}
+        estimatedDuration={task.estimatedDuration || task.duration}
+        progressPercentage={task.progressPercentage ?? null}
+        sessionHeaderMode="date"
+      />
+    </View>,
+  ];
+
   return (
     <Widget entranceEnabled={entranceEnabled} entranceDelay={entranceDelay} entranceDuration={entranceDuration}>
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TaskTitle title={task.title} taskname={task.taskname} category={task.category} />
-        </View>
-
-        {/* Tags row (category, subcategory, importance, effort) */}
-        <TaskTagsRow
-          category={task.category}
-          categoryDisplay={categoryDisplayNormalized}
-          subcategory={task.subcategory}
-          subcategoryDisplay={task.subcategoryDisplay || task.subCategory?.label}
-          importance={task.importance}
-          effort={task.effort}
-        />
-
-        {/* Details Grid */}
-        <TwoColumnGrid
-          items={[
-            renderTaskField({ dueDate: task.dueDate || task.deadline }, "dueDate"),
-            renderTaskField(task, "startDate"),
-            renderTaskField(task, "earliestStart"),
-            renderTaskField({ estimatedDuration: task.estimatedDuration || task.duration }, "estimatedDuration"),
-          ]}
-        />
-
-        {/* Description */}
-        {task.description && (
-          <View style={styles.section}>
-            <AppText variant="bodyText">{task.description}</AppText>
-          </View>
-        )}
-
-        {/* Scheduled Sessions (moved to modular component) */}
-        <ScheduledSessionsSection
-          taskId={task.id}
-          taskTitle={task.title || task.taskname || "Untitled task"}
-          scheduledSessions={task.scheduledSessions}
-          subtasks={task.subtasks}
-          completedParts={completedParts}
-          loadingParts={loadingParts}
-          onToggleSession={handleToggleSession}
-          estimatedDuration={task.estimatedDuration || task.duration}
-          progressPercentage={task.progressPercentage ?? null}
-          sessionHeaderMode="date"
-        />
-      </View>
+      <View style={styles.container}>{contentNodes.filter((n) => !(typeof n === "string" && n.trim() === ""))}</View>
     </Widget>
   );
 };
@@ -267,6 +274,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: SPACING.sm,
+  },
+  ScheduledSessionsSectionContainer: {
+    marginStart: SPACING.sm,
   },
   scheduleLabelContainer: {
     flexDirection: "row",
