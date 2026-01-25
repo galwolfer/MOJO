@@ -94,21 +94,23 @@ export const ScheduledSessionsSection: React.FC<{
     return {
       id: key,
       content: (
-        <View>
+        <View style={{ width: "100%" }}>
           {headerElement}
-          <SessionRow
-            session={session}
-            taskId={taskId}
-            taskTitle={taskTitle}
-            categoryColor={categoryColor}
-            subtasks={subtasks}
-            sessionIndex={index}
-            isDone={isDone}
-            isLoading={isLoading}
-            onToggle={() => onToggleSession?.(taskId, session, index, subtasks)}
-            canToggle={canToggle}
-            hideTaskTitle={hideTaskTitle}
-          />
+          <View style={{ marginStart: sessionHeaderMode === "taskTitle" ? (ICON_SIZES.md - SPACING.xs) / 2 : 0 }}>
+            <SessionRow
+              session={session}
+              taskId={taskId}
+              taskTitle={taskTitle}
+              categoryColor={categoryColor}
+              subtasks={subtasks}
+              sessionIndex={index}
+              isDone={isDone}
+              isLoading={isLoading}
+              onToggle={() => onToggleSession?.(taskId, session, index, subtasks)}
+              canToggle={canToggle}
+              hideTaskTitle={hideTaskTitle}
+            />
+          </View>
         </View>
       ),
       onPress: canToggle ? () => onToggleSession?.(taskId, session, index, subtasks) : undefined,
@@ -142,7 +144,7 @@ export const ScheduledSessionsSection: React.FC<{
         </View>
       ) : null}
 
-      <List data={items} />
+      <List data={items} style={{ width: "100%" }} />
     </View>
   );
 };

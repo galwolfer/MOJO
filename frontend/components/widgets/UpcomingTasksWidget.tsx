@@ -14,6 +14,7 @@ import { useTaskContext } from "../../context/TaskContext";
 import { ProgressIcon } from "../icons/ProgressIcon";
 import { Checkbox } from "../icons/Checkbox";
 import Icon from "../icons/Icon";
+import Tag from "../inputs/tag";
 import List, { ListCellProps } from "../layout/List";
 import { getCategoryMeta } from "../../config/categoryMeta";
 import { ScheduledSessionsSection, getSessionKey } from "./components";
@@ -24,6 +25,7 @@ import {
   formatDuration,
   getSubtaskIdFromSession,
   getTimeParts,
+  computeTaskProgress,
 } from "./widgetHelpers";
 
 type TaskItem = {
@@ -161,7 +163,7 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
     const hasScheduledSessions = (task.scheduledSessions || []).length > 0;
 
     const content = (
-      <View style={styles.taskCard}>
+      <View style={{ width: "100%" }}>
         {hasScheduledSessions ? (
           <ScheduledSessionsSection
             taskId={task.id}
@@ -212,7 +214,11 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
       return sessions.every((session, index) => isSessionDone(task, session, index));
     }).length;
 
-    const progressValue = tasks.length > 0 ? completedCount / Math.max(1, tasks.length) : (options?.emptyProgress ?? 0);
+    const progressValue =
+      tasks.length > 0
+        ? tasks.reduce((acc, t) => acc + computeTaskProgress(t, completedParts) / 100, 0) / tasks.length
+        : (options?.emptyProgress ?? 0);
+    const colorIndex = ((label.charCodeAt(0) + label.length) % 7) + 1;
     return (
       <View style={styles.dayGroup}>
         <View style={styles.dayHeader}>
@@ -222,9 +228,7 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
               {label}
             </AppText>
           </View>
-          <AppText variant="notes" style={styles.sectionCount}>
-            {tasks.length} task{tasks.length === 1 ? "" : "s"}
-          </AppText>
+          <Tag label={`${tasks.length} task${tasks.length === 1 ? "" : "s"}`} colorIndex={colorIndex} />
         </View>
 
         {tasks.length === 0 ? (
@@ -232,7 +236,9 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
             {emptyLabel}
           </AppText>
         ) : (
-          <List data={tasks.map((task) => buildTaskCell(task))} />
+          <View style={styles.listContainer}>
+            <List data={tasks.map((task) => buildTaskCell(task))} />
+          </View>
         )}
       </View>
     );
@@ -243,19 +249,9 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
       <View style={styles.header}>
         <View>
           <AppText variant="notes" style={styles.headerSubtitle}>
-            Scheduled for {daysLabel}
+            Your tasks for the next {daysLabel}
           </AppText>
         </View>
-        <View style={styles.headerBadge}>
-          <AppText variant="notes" style={styles.headerBadgeText}>
-            {totalToday} today
-          </AppText>
-        </View>
-        {typeof todayProgress === "number" ? (
-          <ProgressIcon value={todayProgress} size={ICON_SIZES.md} />
-        ) : (
-          <View style={styles.headerProgressSpacer} />
-        )}
       </View>
 
       {renderDaySection(todayGroup, "Today", "No tasks scheduled for today")}
@@ -277,6 +273,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
     gap: SPACING.md,
+    minWidth: 450,
   },
   headerTitle: {
     color: COLORS.black,
@@ -284,13 +281,11 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     color: COLORS.darkGray,
-    marginTop: 2,
   },
   headerBadge: {
     backgroundColor: COLORS.white,
     borderRadius: SPACING.md,
     paddingHorizontal: SPACING.md,
-    paddingVertical: 4,
   },
   headerBadgeText: {
     color: COLORS.darkGray,
@@ -302,34 +297,33 @@ const styles = StyleSheet.create({
   },
   dayGroup: {
     alignItems: "stretch",
-    gap: SPACING.md,
-    marginTop: SPACING.md,
+    gap: SPACING.sm,
     width: "100%",
   },
   dayHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
     width: "100%",
   },
   dayHeaderTitle: {
     flexDirection: "row",
     alignItems: "center",
     gap: SPACING.sm,
+    marginStart: -SPACING.xs,
   },
   sectionTitle: {
     color: COLORS.primary1,
+    fontWeight: "900",
     textTransform: "uppercase",
+  },
+  listContainer: {
+    width: "100%",
+    marginTop: -SPACING.lg - SPACING.xs,
+    marginBottom: SPACING.lg,
   },
   sectionCount: {
     color: COLORS.lightGray,
-  },
-  taskCard: {
-    backgroundColor: "transparent",
-    borderRadius: 0,
-    paddingVertical: SPACING.sm,
-    gap: SPACING.sm,
-    width: "100%",
   },
   emptyText: {
     color: COLORS.darkGray,

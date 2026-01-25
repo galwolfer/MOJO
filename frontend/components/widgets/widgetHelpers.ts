@@ -363,7 +363,6 @@ export const computeTaskProgress = (task: any, completedParts: Set<string>): num
       (st) => st.status === "done" || st.completed || (st.id && completedParts.has(st.id)),
     ).length;
     const v = total === 0 ? 0 : Math.round((completed / total) * 100);
-    console.debug(`[computeTaskProgress] ${_taskId} subtasks => ${v} (completed ${completed}/${total})`);
     return v;
   }
 
@@ -377,7 +376,6 @@ export const computeTaskProgress = (task: any, completedParts: Set<string>): num
       if (isDone) completed += 1;
     });
     const v = Math.round((completed / sessions.length) * 100);
-    console.debug(`[computeTaskProgress] ${_taskId} sessions => ${v} (completed ${completed}/${sessions.length})`);
     return v;
   }
 
@@ -389,7 +387,6 @@ export const computeTaskProgress = (task: any, completedParts: Set<string>): num
   }
 
   // No progress information available
-  console.debug(`[computeTaskProgress] ${_taskId} => 0`);
   return 0;
 };
 
