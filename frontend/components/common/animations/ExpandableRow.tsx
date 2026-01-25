@@ -1,0 +1,71 @@
+import React, { useEffect, useRef, useState } from "react";
+import { Animated, Easing, View, StyleProp, ViewStyle } from "react-native";
+
+interface ExpandableRowProps {
+  expanded: boolean;
+  duration?: number;
+  style?: StyleProp<ViewStyle>;
+  children?: React.ReactNode;
+}
+
+const ExpandableRow: React.FC<ExpandableRowProps> = ({ expanded, duration = 220, style, children }) => {
+  const [contentHeight, setContentHeight] = useState<number | null>(null);
+  const height = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (expanded) {
+      if (contentHeight == null) {
+        return;
+      }
+      Animated.parallel([
+        Animated.timing(height, {
+          toValue: contentHeight,
+          duration: Math.max(160, duration),
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: false,
+        }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: Math.max(120, duration - 20),
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: Math.max(100, duration - 40),
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(height, {
+          toValue: 0,
+          duration: Math.max(140, duration - 20),
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: false,
+        }),
+      ]).start();
+    }
+  }, [expanded, contentHeight, duration, height, opacity]);
+
+  return (
+    <Animated.View style={[{ overflow: "hidden", height }, style as any] as any}>
+      <Animated.View
+        style={{ opacity }}
+        onLayout={(e) => {
+          const h = Math.ceil(e.nativeEvent.layout.height);
+          if (contentHeight === null && h > 0) {
+            setContentHeight(h);
+            height.setValue(expanded ? 0 : 0);
+          }
+        }}
+      >
+        <View>{children}</View>
+      </Animated.View>
+    </Animated.View>
+  );
+};
+
+export default ExpandableRow;

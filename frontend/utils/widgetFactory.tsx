@@ -11,7 +11,6 @@ import {
   ConfirmationWidget,
   CalendarEventWidget,
   TaskDetailWidget,
-  TaskListDetailedWidget,
   UpcomingTasksWidget,
   ListWidget,
 } from "../components/widgets";
@@ -34,7 +33,6 @@ export class WidgetFactory {
   private static componentMap: Record<string, React.ComponentType<BaseWidgetProps>> = {
     list: ListWidget,
     task_list: TaskListWidget,
-    task_list_detailed: TaskListDetailedWidget,
     task_detail: TaskDetailWidget,
     task_confirmation: TaskConfirmationWidget,
     confirmation: ConfirmationWidget,

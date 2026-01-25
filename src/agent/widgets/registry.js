@@ -34,7 +34,7 @@ export const widgetRegistry = new WidgetRegistry([
     description:
       "Unified list widget for task displays. Client fetches live data using listType; include minimal IDs/titles for memory.",
     schema: {
-      listType: 'String list type: "task_list", "task_list_detailed", "task_detail", "upcoming_tasks", "overdue_tasks"',
+      listType: 'String list type: "task_list", "task_detail", "upcoming_tasks", "overdue_tasks"',
       tasks: "Optional array of minimal task refs { id, title }",
       taskId: "Task ID for task_detail",
       title: "Task title for task_detail",
@@ -56,15 +56,6 @@ export const widgetRegistry = new WidgetRegistry([
       "Display a single task with full details (title, description, due date, category, subcategory, priority, status).",
     schema: {
       task: "Task object { id, title, description, status, dueDate, category, subcategory, importance, effort, estimatedDuration, canSplit, taskType, progressPercentage, priorityScore, scheduledSessions: Array { id, taskId, start, end, minutes, status, subtaskIndex, subtaskId, subtaskTitle, subtaskStatus } }",
-    },
-  }),
-  new WidgetDefinition({
-    type: "task_list_detailed",
-    description:
-      "Display a list of tasks with ALL fields shown (title, description, due date, category, subcategory, priority, importance, effort,status). Use this when the user wants to see full details of multiple tasks.",
-    schema: {
-      tasks:
-        "Array of task objects { id, title, description, status, dueDate, importance, effort, estimatedDuration, canSplit, taskType, progressPercentage, priorityScore, category, subcategory, tags, scheduledSessions: Array { id, taskId, start, end, minutes, status, subtaskIndex, subtaskId, subtaskTitle, subtaskStatus } }",
     },
   }),
   new WidgetDefinition({

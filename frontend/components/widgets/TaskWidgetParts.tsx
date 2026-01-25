@@ -276,6 +276,7 @@ export const ScheduledSessionsSection: React.FC<{
   onToggleSubtask?: (id: string) => void | Promise<void>;
   estimatedDuration?: number | null;
   progressPercentage?: number | null; // 0-100
+  hideTitle?: boolean;
 }> = ({
   scheduledSessions,
   subtasks,
@@ -284,6 +285,7 @@ export const ScheduledSessionsSection: React.FC<{
   onToggleSubtask,
   estimatedDuration,
   progressPercentage = null,
+  hideTitle = false,
 }) => {
   if (!scheduledSessions || scheduledSessions.length === 0) return null;
 
@@ -352,19 +354,22 @@ export const ScheduledSessionsSection: React.FC<{
 
   return (
     <View style={styles.section}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: SPACING.sm }}>
-        {typeof progressValue === "number" ? (
-          <ProgressIcon value={progressValue} size={ICON_SIZES.md} />
-        ) : (
-          <View style={{ width: ICON_SIZES.md }} />
-        )}
-        <AppText>
-          <AppText variant="title3" style={styles.sectionTitle}>
-            {"Scheduled Sessions "}
+      {!hideTitle ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: SPACING.sm }}>
+          {typeof progressValue === "number" ? (
+            <ProgressIcon value={progressValue} size={ICON_SIZES.md} />
+          ) : (
+            <View style={{ width: ICON_SIZES.md }} />
+          )}
+          <AppText>
+            <AppText variant="title3" style={styles.sectionTitle}>
+              {"Scheduled Sessions "}
+            </AppText>
+            <AppText variant="notes">{formatDuration(estimatedDuration ?? undefined)}</AppText>
           </AppText>
-          <AppText variant="notes">{formatDuration(estimatedDuration ?? undefined)}</AppText>
-        </AppText>
-      </View>
+        </View>
+      ) : null}
+
       <List data={items} />
     </View>
   );

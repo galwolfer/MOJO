@@ -98,7 +98,7 @@ function normalizeWidgetData(widgetType, data = {}) {
     };
   }
 
-  if (widgetType === "task_list" || widgetType === "task_list_detailed") {
+  if (widgetType === "task_list") {
     return { ...data, tasks: normalizeTaskList(data.tasks) };
   }
 

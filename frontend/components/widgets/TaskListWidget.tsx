@@ -4,13 +4,20 @@
  */
 
 import React, { useState } from "react";
-import { View, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import { View, StyleSheet, TouchableOpacity } from "react-native";
 import AppText from "../common/AppText";
-import { COLORS, SPACING } from "../../theme";
+import Tag from "../inputs/tag";
+import Icon from "../icons/Icon";
+import { COLORS, SPACING, ICON_SIZES } from "../../theme";
 import Widget from "../special/Widget";
+import List, { ListCellProps } from "../layout/List";
+import { getCategoryMeta } from "../../config/categoryMeta";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
 import { useTaskContext } from "../../context/TaskContext";
-import { completeTask, toggleTaskCompletion } from "../../services/taskService";
+import { completeTask, toggleTaskCompletion, updateSubTask } from "../../services/taskService";
+import { TaskTagsRow, ScheduledSessionsSection } from "./TaskWidgetParts";
+import { ProgressIcon } from "../icons/ProgressIcon";
+import ExpandableRow from "../common/animations/ExpandableRow";
 
 interface Task {
   id: string;
@@ -21,12 +28,24 @@ interface Task {
   effort?: number;
   progressPercentage?: number;
   scheduledSessions?: ScheduledSession[];
+  category?: string;
+  categoryDisplay?: string;
+  subcategory?: string;
+  subcategoryDisplay?: string;
+  estimatedDuration?: number;
+  tags?: string[];
+  subtasks?: any[];
 }
 
 interface ScheduledSession {
+  id?: string;
   start?: string;
   end?: string;
   status?: string;
+  subtaskIndex?: number;
+  subtaskId?: string;
+  subtaskTitle?: string;
+  subtaskStatus?: string;
 }
 
 /**
@@ -37,6 +56,12 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
   const [checkedTasks, setCheckedTasks] = useState<Set<string>>(new Set());
   const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
   const { notifyTaskUpdate } = useTaskContext();
+
+  // Selected task id (only one task may be selected/expanded at a time)
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  // Track completion of parts (scheduled sessions / subtasks) by a session key
+  const [completedParts, setCompletedParts] = useState<Set<string>>(new Set());
+  const [loadingParts, setLoadingParts] = useState<Set<string>>(new Set());
 
   React.useEffect(() => {
     const nextChecked = new Set<string>();
@@ -100,7 +125,14 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
     }
   };
 
+  const getSessionKey = (taskId: string, session: ScheduledSession, index: number) => {
+    const subId = (session as any).subtaskId || (session as any).subtaskId;
+    return subId || session.id || `${taskId}-${session.start || `session-${index}`}`;
+  };
+
   const handleTaskPress = (taskId: string) => {
+    // Ensure only one task is selected at a time; tapping the same task collapses it
+    setSelectedTaskId((prev) => (prev === taskId ? null : taskId));
     onAction?.("task_selected", { taskId });
   };
 
@@ -113,6 +145,68 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
       });
     } catch {
       return dateStr;
+    }
+  };
+
+  // derive completed parts (by session key) from scheduled sessions on tasks
+  React.useEffect(() => {
+    const completed = new Set<string>();
+    tasks.forEach((task) => {
+      (task.scheduledSessions || []).forEach((session, idx) => {
+        const key = getSessionKey(task.id, session, idx);
+        const isDone = (session as any).subtaskStatus === "done" || session.status === "completed";
+        if (isDone) completed.add(key);
+      });
+    });
+    setCompletedParts(completed);
+  }, [tasks]);
+
+  const handleToggleSession = async (taskId: string, session: ScheduledSession, index: number) => {
+    const subtaskId = (session as any).subtaskId || undefined;
+    const key = getSessionKey(taskId, session, index);
+    const canPersist = Boolean(subtaskId);
+
+    const isCompleted = completedParts.has(key);
+    const nextCompleted = !isCompleted;
+
+    setCompletedParts((prev) => {
+      const updated = new Set(prev);
+      if (nextCompleted) updated.add(key);
+      else updated.delete(key);
+      return updated;
+    });
+
+    if (canPersist) setLoadingParts((prev) => new Set(prev).add(key));
+
+    try {
+      if (canPersist && subtaskId) {
+        const success = await updateSubTask(taskId, subtaskId, { status: nextCompleted ? "done" : "todo" });
+        if (!success) throw new Error("Update failed");
+      }
+
+      notifyTaskUpdate({ taskId });
+      onAction?.("part_toggled", {
+        taskId,
+        sessionId: session.id,
+        subtaskId: subtaskId || null,
+        completed: nextCompleted,
+        synthetic: !canPersist,
+      });
+    } catch (error) {
+      // revert
+      setCompletedParts((prev) => {
+        const updated = new Set(prev);
+        if (isCompleted) updated.add(key);
+        else updated.delete(key);
+        return updated;
+      });
+    } finally {
+      if (canPersist)
+        setLoadingParts((prev) => {
+          const updated = new Set(prev);
+          updated.delete(key);
+          return updated;
+        });
     }
   };
 
@@ -154,59 +248,88 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
     );
   }
 
-  return (
-    <Widget skipAnimation>
-      <ScrollView style={styles.container} scrollEnabled={tasks.length > 3} nestedScrollEnabled={true}>
-        {tasks.map((task, index) => (
-          <TouchableOpacity
-            key={task.id || index}
-            style={styles.taskItem}
-            onPress={() => handleTaskPress(task.id)}
-            activeOpacity={0.7}
-          >
-            <TouchableOpacity style={styles.checkbox} onPress={() => handleToggleTask(task.id)} activeOpacity={0.6}>
-              <View style={[styles.checkboxBox, checkedTasks.has(task.id) && styles.checkboxBoxChecked]}>
-                {checkedTasks.has(task.id) && <AppText style={styles.checkmark}>✓</AppText>}
-              </View>
-            </TouchableOpacity>
+  // Build list cells where each cell contains the task header and (optionally) its details
+  const cells: ListCellProps[] = tasks.map((task) => {
+    const meta = getCategoryMeta(task.category);
 
-            <View style={styles.taskContent}>
-              <AppText
-                variant="bodyText"
-                numberOfLines={2}
-                style={[styles.taskTitle, checkedTasks.has(task.id) && styles.taskTitleCompleted]}
-              >
-                {task.title}
-              </AppText>
+    const content = (
+      <View style={{ width: "100%" }}>
+        <View style={styles.taskItem}>
+          <View style={styles.taskContent}>
+            <View style={styles.titleRow}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: SPACING.sm, flex: 1 }}>
+                {meta?.icon ? (
+                  <Icon name={meta.icon} size={ICON_SIZES.sm} color={meta.color} style={styles.titleIcon} />
+                ) : null}
 
-              <View style={styles.taskMeta}>
-                {task.dueDate && (
-                  <AppText variant="notes" style={styles.metaText}>
-                    📅 {formatDate(task.dueDate)}
-                  </AppText>
-                )}
-                {task.scheduledSessions && task.scheduledSessions.length > 0 && (
-                  <AppText variant="notes" style={styles.metaText}>
-                    {formatTimeRange(task.scheduledSessions[0]) || "Time TBD"}
-                  </AppText>
-                )}
-                {task.importance !== undefined && task.importance !== null && (
-                  <View style={[styles.importanceBadge, { backgroundColor: getImportanceColor(task.importance) }]}>
-                    <AppText variant="notes" style={styles.importanceText}>
-                      P{task.importance}
-                    </AppText>
-                  </View>
-                )}
-                <View style={[styles.progressBadge, { backgroundColor: getProgressColor(task.progressPercentage) }]}>
-                  <AppText variant="notes" style={styles.progressText}>
-                    {Math.round(task.progressPercentage ?? 0)}%
-                  </AppText>
-                </View>
+                <AppText
+                  variant="boldText"
+                  numberOfLines={2}
+                  style={[styles.taskTitle, checkedTasks.has(task.id) && styles.taskTitleCompleted]}
+                >
+                  {task.title || (task as any).taskname || "Untitled task"}
+                </AppText>
               </View>
+
+              {typeof task.progressPercentage === "number" ? (
+                <ProgressIcon
+                  value={Math.max(0, Math.min(1, (task.progressPercentage || 0) / 100))}
+                  size={ICON_SIZES.md}
+                />
+              ) : (
+                <View style={{ width: ICON_SIZES.md }} />
+              )}
             </View>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+
+            <ExpandableRow expanded={selectedTaskId === task.id} style={styles.expandedRow}>
+              {(task as any).tags && Array.isArray((task as any).tags) && (task as any).tags.length > 0 ? (
+                <View style={styles.tagContainer}>
+                  {(task as any).tags.map((t: string, i: number) => (
+                    <Tag key={i} label={t} style={styles.tagItem} />
+                  ))}
+                </View>
+              ) : null}
+
+              <TaskTagsRow
+                category={task.category}
+                categoryDisplay={task.categoryDisplay}
+                subcategory={task.subcategory}
+                subcategoryDisplay={task.subcategoryDisplay}
+                importance={task.importance}
+                effort={task.effort}
+              />
+
+              <ScheduledSessionsSection
+                scheduledSessions={task.scheduledSessions}
+                subtasks={(task as any).subtasks}
+                completedParts={completedParts}
+                loadingParts={loadingParts}
+                onToggleSubtask={(subtaskId: string) => {
+                  const sessions = task.scheduledSessions || [];
+                  const idx = sessions.findIndex((s: any) => (s as any).subtaskId === subtaskId || s.id === subtaskId);
+                  const session = sessions[idx] || sessions[0];
+                  handleToggleSession(task.id, session, idx >= 0 ? idx : 0);
+                }}
+                estimatedDuration={(task as any).estimatedDuration}
+                progressPercentage={task.progressPercentage}
+                hideTitle={true}
+              />
+            </ExpandableRow>
+          </View>
+        </View>
+      </View>
+    );
+
+    return {
+      id: task.id,
+      content,
+      onPress: () => handleTaskPress(task.id),
+    } as ListCellProps;
+  });
+
+  return (
+    <Widget>
+      <List data={cells} />
     </Widget>
   );
 };
@@ -221,9 +344,7 @@ const styles = StyleSheet.create({
   taskItem: {
     flexDirection: "row",
     alignItems: "flex-start",
-    paddingVertical: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.white2,
+    paddingVertical: SPACING.xs,
     gap: SPACING.md,
   },
   checkbox: {
@@ -251,6 +372,15 @@ const styles = StyleSheet.create({
   taskContent: {
     flex: 1,
     gap: 4,
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: SPACING.sm,
+  },
+  titleIcon: {
+    marginRight: SPACING.sm,
   },
   taskTitle: {
     fontWeight: "500",
@@ -286,6 +416,20 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "600",
     color: COLORS.colorWhite,
+  },
+  expandedRow: {
+    gap: SPACING.sm,
+    paddingLeft: SPACING.sm,
+    backgroundColor: "transparent",
+  },
+  tagContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm,
+  },
+  tagItem: {
+    marginRight: SPACING.sm,
+    marginBottom: SPACING.sm / 2,
   },
 });
 

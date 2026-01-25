@@ -21,7 +21,6 @@ import { useTaskUpdateSubscription } from "../../context/TaskContext";
 import { getCategoryMeta } from "../../config/categoryMeta";
 import { COLORS } from "../../theme";
 import TaskDetailWidget from "./TaskDetailWidget";
-import TaskListDetailedWidget from "./TaskListDetailedWidget";
 import TaskListWidget from "./TaskListWidget";
 import UpcomingTasksWidget from "./UpcomingTasksWidget";
 
@@ -245,8 +244,7 @@ const ListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
   switch (listType) {
     case "task_detail":
       return <TaskDetailWidget data={viewData} onAction={onAction} />;
-    case "task_list_detailed":
-      return <TaskListDetailedWidget data={viewData} onAction={onAction} />;
+
     case "upcoming_tasks":
       return <UpcomingTasksWidget data={viewData} onAction={onAction} />;
     case "overdue_tasks":
