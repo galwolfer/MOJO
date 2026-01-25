@@ -16,7 +16,9 @@ const addTaskMission = new GuidedMission({
   behavior: [
     "IMPORTANT: User must first choose/confirm category AND subcategory.",
     "Call get_subcategories(category=<chosen>) to fetch options BEFORE calling add_task.",
-    "Call only after the user explicitly confirms the task details.",
+    "AUTO-SELECTION RULE: If get_subcategories returns an existing subcategory that matches (exact or very close) the task name, automatically use it WITHOUT asking the user for confirmation.",
+    "Only ask the user to confirm if there is NO matching subcategory or if creating a new one.",
+    "Call only after the user explicitly confirms the task details (except for auto-matched subcategories).",
   ],
   schema: z.object({
     taskname: z.string().describe("Task title"),
@@ -29,7 +31,7 @@ const addTaskMission = new GuidedMission({
     subcategory: z
       .string()
       .describe(
-        "REQUIRED: Specific subcategory (MUST call get_subcategories first to select from existing or confirm new)",
+        "REQUIRED: Specific subcategory. If get_subcategories returned an exact or close match to the task name, use it automatically. Otherwise, confirm with user before using/creating.",
       ),
     canSplit: z.boolean().optional().describe("Can be split into chunks?"),
     minChunk: z.number().optional().describe("Minimum chunk size in minutes when splitting"),

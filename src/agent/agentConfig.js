@@ -58,7 +58,7 @@ ${TASK_SECTION}
 DATES: Convert relative dates to ISO before tool calls.
 RECUR: Use type + interval.
 REFERENCE: Resolve "this/that/it" to the most recent entity.
-SUBCATEGORIES: Call get_subcategories before creating/updating a task.
+SUBCATEGORIES: Call get_subcategories first. AUTO-SELECT matching subcategories silently; DO NOT ask for confirmation.
 DURATION: If missing, ask for minutes and wait.
 EFFORT: If missing, choose 1-5.
 SPLIT/RECUR: Ask and include relevant split/recurrence fields when needed.

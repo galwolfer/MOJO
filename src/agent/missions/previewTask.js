@@ -90,7 +90,8 @@ const previewTaskMission = new GuidedMission({
     "Use when user asks to create a task.",
     "STEP 1: Determine category ",
     "STEP 2: Call get_subcategories(category=<chosen>) to fetch options.",
-    "STEP 3: Call preview_task, then write 1-2 natural 'draft ready' sentences (avoid greetings; vary wording) before the widget and a short confirm/edit/cancel line after it. If the subcategory is new, mention it briefly.",
+    "STEP 2b: AUTO-SELECT: If get_subcategories returns an existing subcategory that matches the task name (exact or close), use it automatically WITHOUT confirming.",
+    "STEP 3: Call preview_task, then write 1-2 natural 'draft ready' sentences (avoid greetings; vary wording) before the widget and a short confirm/edit/cancel line after it. Only mention the subcategory if it is NEW or uncertain.",
     "STEP 3b: If the user's language is English, use English sample phrases (e.g., 'Here is your draft for your mission.' before the widget and 'You can confirm, edit, or cancel.' after it). If the user's language is not English, match the user's language. If language detection is ambiguous, default to English.",
 
     "STEP 4: After user confirms, call add_task with final details.",
@@ -104,7 +105,9 @@ const previewTaskMission = new GuidedMission({
     category: z.string().describe("REQUIRED: Category (one of the 18 standard categories)"),
     subcategory: z
       .string()
-      .describe("REQUIRED: Subcategory (MUST be from get_subcategories result or new user-confirmed)"),
+      .describe(
+        "REQUIRED: Subcategory. If get_subcategories returned an exact/close match, use it automatically. If completely new, ask user first.",
+      ),
     importance: z.number().min(1).max(5).optional().describe("1-5 importance (AI can infer)"),
     effort: z.number().min(1).max(5).optional().describe("1-5 effort (AI can infer)"),
     duration: z.number().describe("REQUIRED: Estimated minutes to complete the task (user must specify)"),

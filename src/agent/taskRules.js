@@ -32,7 +32,7 @@ export const TASK_CONFIG = {
     importance: 3,
     effort: 3,
     duration: 60,
-    splitable: true,
+    splitable: false,
     minChunk: 30,
     taskType: "perfect",
   },
@@ -122,16 +122,18 @@ export function getTaskFieldInstructions() {
 
 SUBCATEGORY WORKFLOW (IMPORTANT):
 1. After the user chooses or you infer a category, ALWAYS call get_subcategories(category=<category_index>) to see what subcategories the user has saved and historical task labels.
-2. If a matching subcategory exists in the returned list, suggest it to the user for confirmation.
-3. If none match the user's intent, ask them to provide a new subcategory name, then add it.
+2. AUTO-SELECT: If a matching subcategory exists in the returned list (exact match or very close to the task name), USE IT IMMEDIATELY in the next tool call (preview_task/add_task). DO NOT ASK the user for confirmation.
+3. NEW SUBCATEGORY: If none match the user's intent, ask them to provide a new subcategory name, then add it.
 4. NEVER skip get_subcategories — it provides both user-saved subcategories AND historical task labels that might apply.
 5. Respect user preferences: if they have saved subcategories, prioritize those over new suggestions.
 
 SPLITTING & RECURRENCE RULES:
-- When a task may be split (user says "spread", "פרוס", or indicates long duration), ALWAYS determine:
-  * 'canSplit' (boolean)
-  * 'minChunk' (minutes) — ask the user if unsure, default to the configured minChunk when user doesn't care
-  * 'taskType' (one of 'perfect', 'in_parts', 'leaky') — choose based on user's instruction: "פרוס" -> 'in_parts'; "פרוס בצורה לא מדויקת" -> 'leaky'; single-block tasks -> 'perfect'
+- DEFAULT: Tasks are created as a SINGLE BLOCK ('perfect') unless the user explicitly asks to split them.
+- SPLIT TRIGGER: Only set 'canSplit=true' or 'taskType="in_parts"/"leaky"' if the user says "spread", "break down", "split", "פרוס", or implies it (e.g. "do this over 3 days").
+- When a task IS split, determine:
+  * 'canSplit' (boolean) -> set to true
+  * 'minChunk' (minutes) — default to 30 if user doesn't specify
+  * 'taskType' -> 'in_parts' (structured split) or 'leaky' (flexible/imprecise split)
   * 'chunkCount' or 'chunkMinutes' if user requests explicit split counts or sizes
   * 'earliestStart' when user provides availability window
   * 'recurrence' when user asks for repeating tasks (type, interval, endDate or count)
