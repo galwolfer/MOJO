@@ -118,7 +118,7 @@ const AnimatedButtonsContainer: React.FC<Props> = ({
           easing: Easing.out(Easing.cubic),
           useNativeDriver: false,
         }),
-      ])
+      ]),
     );
 
     Animated.sequence([containerAnim, Animated.stagger(staggerDelay, childAnims)]).start();

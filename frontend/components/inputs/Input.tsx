@@ -163,7 +163,7 @@ function Input<T = any>({
   const providedValue = hasValueProp ? valueProp : defaultValueProp;
 
   const [inputValue, setInputValue] = useState<string>(
-    !hasValueProp && typeof providedValue === "string" ? providedValue : ""
+    !hasValueProp && typeof providedValue === "string" ? providedValue : "",
   );
 
   useEffect(() => {
