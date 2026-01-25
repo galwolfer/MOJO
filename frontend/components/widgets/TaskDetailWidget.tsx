@@ -29,19 +29,17 @@ import {
   formatDuration,
   getTaskTypeLabel,
   getSessionLabel,
+  getCategoryDisplay,
   getSubtaskIdFromSession,
   sessionRowData,
+  importanceColorIndex,
+  importanceIcon,
+  effortColor,
+  effortIcon,
+  toggleSubtask,
+  toggleSession,
 } from "./widgetHelpers";
-import {
-  TaskTitle,
-  TaskTagsRow,
-  TaskDueDate,
-  TaskDurationRow,
-  ScheduledSessionsSection,
-  renderTaskField,
-  TwoColumnGrid,
-} from "./TaskWidgetParts";
-import { updateSubTask } from "../../services/taskService";
+import { TaskTitle, TaskTagsRow, ScheduledSessionsSection, renderTaskField, TwoColumnGrid } from "./components";
 import { useTaskContext } from "../../context/TaskContext";
 
 interface TaskDetail {
@@ -117,39 +115,36 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
 
   const handleToggleSubtask = async (subtaskId?: string) => {
     if (!subtaskId) return;
-    const isCompleted = completedParts.has(subtaskId);
-    const nextCompleted = !isCompleted;
-
-    setCompletedParts((prev) => {
-      const updated = new Set(prev);
-      if (nextCompleted) updated.add(subtaskId);
-      else updated.delete(subtaskId);
-      return updated;
+    await toggleSubtask({
+      taskId: task.id,
+      subtaskId,
+      completedParts,
+      setCompletedParts,
+      loadingParts,
+      setLoadingParts,
+      notifyTaskUpdate,
+      onAction,
     });
+  };
 
-    setLoadingParts((prev) => new Set(prev).add(subtaskId));
-
-    try {
-      const success = await updateSubTask(task.id, subtaskId, { status: nextCompleted ? "done" : "todo" });
-      if (!success) throw new Error("Update failed");
-
-      notifyTaskUpdate({ taskId: task.id });
-      onAction?.("subtask_toggled", { taskId: task.id, subtaskId, completed: nextCompleted });
-    } catch (error) {
-      // revert
-      setCompletedParts((prev) => {
-        const updated = new Set(prev);
-        if (isCompleted) updated.add(subtaskId);
-        else updated.delete(subtaskId);
-        return updated;
-      });
-    } finally {
-      setLoadingParts((prev) => {
-        const updated = new Set(prev);
-        updated.delete(subtaskId);
-        return updated;
-      });
-    }
+  const handleToggleSession = async (
+    taskIdParam: string,
+    session: ScheduledSession,
+    index: number,
+    subtasksParam?: Subtask[],
+  ) => {
+    await toggleSession({
+      taskId: taskIdParam,
+      session,
+      index,
+      subtasks: subtasksParam || task.subtasks,
+      completedParts,
+      setCompletedParts,
+      loadingParts,
+      setLoadingParts,
+      notifyTaskUpdate,
+      onAction,
+    });
   };
 
   const sessionSubtaskIds = new Set<string>();
@@ -160,38 +155,9 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
   const remainingSubtasks = (task.subtasks || []).filter((st) => !sessionSubtaskIds.has(st.id || ""));
 
   const categoryMeta = getCategoryMeta(task.category);
+  const categoryDisplayNormalized = getCategoryDisplay(task.category, task.categoryDisplay);
   const subLabel = task.subcategoryDisplay || task.subCategory?.label || task.subcategory || "";
   const subIndex = paletteIndexFromKey(subLabel);
-
-  const importanceColorIndex = (imp?: number) => {
-    if (!imp) return 8; // gray
-    if (imp <= 2) return 6; // green
-    if (imp === 3) return 5; // yellow
-    return 7; // red
-  };
-
-  // Return an ICONS key so Tag will render it using the tag text color
-  const importanceIcon = (imp?: number): string => {
-    if (!imp) return "list";
-    if (imp <= 2) return "lowImportant";
-    if (imp === 3) return "mediumImportant";
-    return "highPriority";
-  };
-
-  const effortColor = (eff?: number) => {
-    if (!eff) return 8;
-    if (eff <= 2) return 6; // green
-    if (eff === 3) return 5; // yellow
-    return 7; // red
-  };
-
-  // Return ICONS key so Tag will render it with the tag text color
-  const effortIcon = (eff?: number): string => {
-    if (!eff) return "list";
-    if (eff <= 2) return "lowEffort";
-    if (eff === 3) return "flame";
-    return "highEffort";
-  };
 
   useEffect(() => {
     console.log(`[TaskDetailWidget] entranceEnabled=${entranceEnabled}`);
@@ -208,7 +174,7 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
         {/* Tags row (category, subcategory, importance, effort) */}
         <TaskTagsRow
           category={task.category}
-          categoryDisplay={task.categoryDisplay}
+          categoryDisplay={categoryDisplayNormalized}
           subcategory={task.subcategory}
           subcategoryDisplay={task.subcategoryDisplay || task.subCategory?.label}
           importance={task.importance}
@@ -218,7 +184,7 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
         {/* Details Grid */}
         <TwoColumnGrid
           items={[
-            <TaskDueDate dueDate={task.dueDate} deadline={task.deadline} />,
+            renderTaskField({ dueDate: task.dueDate || task.deadline }, "dueDate"),
             renderTaskField(task, "startDate"),
             renderTaskField(task, "earliestStart"),
             renderTaskField({ estimatedDuration: task.estimatedDuration || task.duration }, "estimatedDuration"),
@@ -234,13 +200,16 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
 
         {/* Scheduled Sessions (moved to modular component) */}
         <ScheduledSessionsSection
+          taskId={task.id}
+          taskTitle={task.title || task.taskname || "Untitled task"}
           scheduledSessions={task.scheduledSessions}
           subtasks={task.subtasks}
           completedParts={completedParts}
           loadingParts={loadingParts}
-          onToggleSubtask={handleToggleSubtask}
+          onToggleSession={handleToggleSession}
           estimatedDuration={task.estimatedDuration || task.duration}
           progressPercentage={task.progressPercentage ?? null}
+          sessionHeaderMode="date"
         />
       </View>
     </Widget>
@@ -269,10 +238,10 @@ const styles = StyleSheet.create({
   },
   inlineIconImage: {
     marginLeft: SPACING.sm,
-    marginBottom: -2,
+    marginBottom: -SPACING.xs,
   },
   section: {
-    gap: 4,
+    gap: SPACING.sm,
   },
   labelText: {
     color: COLORS.darkGray,
@@ -285,7 +254,7 @@ const styles = StyleSheet.create({
   },
   detailItem: {
     width: "45%",
-    gap: 2,
+    gap: SPACING.xs,
   },
   scheduleList: {
     gap: SPACING.sm,
@@ -297,7 +266,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 4,
+    marginBottom: SPACING.sm,
   },
   scheduleLabelContainer: {
     flexDirection: "row",
@@ -316,7 +285,7 @@ const styles = StyleSheet.create({
   scheduleDateTime: {
     color: COLORS.primary1,
     fontWeight: "700",
-    marginBottom: 2,
+    marginBottom: SPACING.xs,
   },
   scheduleTime: {
     color: COLORS.darkGray,
@@ -327,7 +296,7 @@ const styles = StyleSheet.create({
   },
   subtaskCard: {
     padding: SPACING.sm,
-    borderLeftWidth: 2,
+    borderLeftWidth: SPACING.xs,
     borderLeftColor: COLORS.darkGray,
   },
   subtaskTitle: {
@@ -340,12 +309,10 @@ const styles = StyleSheet.create({
   },
   subtaskDescription: {
     color: COLORS.darkGray,
-    fontSize: 12,
   },
   subtaskDuration: {
     color: COLORS.primary1,
-    fontSize: 11,
-    marginTop: 4,
+    marginTop: SPACING.xs,
   },
   disabled: {
     opacity: 0.6,
@@ -359,7 +326,7 @@ const styles = StyleSheet.create({
   },
   tagItem: {
     marginRight: SPACING.sm,
-    marginBottom: SPACING.sm / 2,
+    marginBottom: SPACING.xs,
   },
   // actions and actionButton styles removed while buttons are disabled
 });

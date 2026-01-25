@@ -14,8 +14,11 @@ import List, { ListCellProps } from "../layout/List";
 import { getCategoryMeta } from "../../config/categoryMeta";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
 import { useTaskContext } from "../../context/TaskContext";
-import { completeTask, toggleTaskCompletion, updateSubTask } from "../../services/taskService";
-import { TaskTagsRow, ScheduledSessionsSection } from "./TaskWidgetParts";
+import { completeTask, toggleTaskCompletion } from "../../services/taskService";
+import { TaskTagsRow, ScheduledSessionsSection, getSessionKey } from "./components";
+import { getCategoryDisplay, toggleSessionSmart, computeTaskProgress, handleTaskPress } from "./widgetHelpers";
+import { getTaskProgress } from "../../services/taskService";
+import { useTaskUpdateSubscription } from "../../context/TaskContext";
 import { ProgressIcon } from "../icons/ProgressIcon";
 import ExpandableRow from "../common/animations/ExpandableRow";
 
@@ -63,6 +66,64 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
   const [completedParts, setCompletedParts] = useState<Set<string>>(new Set());
   const [loadingParts, setLoadingParts] = useState<Set<string>>(new Set());
 
+  // Listen for task updates and refresh progress for tasks in this list
+  useTaskUpdateSubscription((payload) => {
+    console.debug("TaskListWidget: notify received", payload);
+    if (!payload?.taskId) return;
+    const taskId = payload.taskId;
+    // If this widget doesn't show that task, ignore
+    const found = tasks.find((t) => t.id === taskId);
+    console.debug("TaskListWidget: found task in list?", !!found, "taskId=", taskId);
+    if (!found) return;
+
+    (async () => {
+      try {
+        console.debug("TaskListWidget: fetching progress for", taskId);
+        const progress = await getTaskProgress(taskId);
+        console.debug("TaskListWidget: progress response for", taskId, progress);
+        if (!progress) return;
+
+        // Normalize subtasks returned by API (some use _id)
+        const apiSubtasks = (progress.subtasks || []).map((s: any) => ({
+          id: s._id || s.id,
+          status: s.status,
+          completed: s.status === "done",
+          order: s.index,
+        }));
+
+        const newKeys = new Set<string>();
+        apiSubtasks.forEach((st: any) => {
+          if (st.id && (st.completed || st.status === "done")) newKeys.add(st.id);
+        });
+
+        (progress.scheduledSessions || []).forEach((s: any, idx: number) => {
+          const key = getSessionKey(taskId, s, idx, apiSubtasks as any);
+          const isDone =
+            s.subtaskStatus === "done" || s.status === "completed" || (s.subtaskId && newKeys.has(s.subtaskId));
+          if (isDone) newKeys.add(key);
+        });
+
+        console.debug("TaskListWidget: newKeys for", taskId, Array.from(newKeys));
+
+        const subtaskIdSet = new Set(apiSubtasks.map((s: any) => s.id));
+
+        // Merge: remove old keys for this task, add refreshed keys
+        setCompletedParts((prev) => {
+          const next = new Set(prev);
+          for (const k of Array.from(prev)) {
+            if (k.startsWith(`${taskId}-`) || subtaskIdSet.has(k)) next.delete(k);
+          }
+          for (const k of newKeys) next.add(k);
+          console.debug("TaskListWidget: merged completedParts size for", taskId, next.size);
+          return next;
+        });
+      } catch (e) {
+        // ignore fetch errors silently
+        console.debug("TaskListWidget: failed to refresh task progress", e);
+      }
+    })();
+  });
+
   React.useEffect(() => {
     const nextChecked = new Set<string>();
     tasks.forEach((task) => {
@@ -73,87 +134,15 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
     setCheckedTasks(nextChecked);
   }, [tasks]);
 
-  const handleToggleTask = async (taskId: string) => {
-    // Optimistically update UI
-    const newChecked = new Set(checkedTasks);
-    const wasChecked = newChecked.has(taskId);
-
-    if (wasChecked) {
-      newChecked.delete(taskId);
-    } else {
-      newChecked.add(taskId);
-    }
-    setCheckedTasks(newChecked);
-
-    // Track loading state
-    setLoadingTasks((prev) => new Set(prev).add(taskId));
-
-    try {
-      // Call API to toggle/complete the task
-      if (!wasChecked) {
-        // Completing the task
-        console.log(`[TaskListWidget] Completing task with ID: ${taskId}`);
-        const result = await completeTask(taskId);
-        console.log(`[TaskListWidget] Complete result:`, result);
-      } else {
-        // Uncompleting - use toggle
-        console.log(`[TaskListWidget] Toggling task with ID: ${taskId}`);
-        await toggleTaskCompletion(taskId);
-      }
-
-      // Notify other components (like UserProfile) to refresh (scope update to this task)
-      notifyTaskUpdate({ taskId });
-
-      // Also call the onAction callback for any additional handling
-      onAction?.("task_toggled", { taskId, checked: !wasChecked });
-    } catch (error) {
-      console.warn("Failed to toggle task:", error);
-      // Revert optimistic update on error
-      const revertChecked = new Set(checkedTasks);
-      if (wasChecked) {
-        revertChecked.add(taskId);
-      } else {
-        revertChecked.delete(taskId);
-      }
-      setCheckedTasks(revertChecked);
-    } finally {
-      setLoadingTasks((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(taskId);
-        return newSet;
-      });
-    }
-  };
-
-  const getSessionKey = (taskId: string, session: ScheduledSession, index: number) => {
-    const subId = (session as any).subtaskId || (session as any).subtaskId;
-    return subId || session.id || `${taskId}-${session.start || `session-${index}`}`;
-  };
-
-  const handleTaskPress = (taskId: string) => {
-    // Ensure only one task is selected at a time; tapping the same task collapses it
-    setSelectedTaskId((prev) => (prev === taskId ? null : taskId));
-    onAction?.("task_selected", { taskId });
-  };
-
-  const formatDate = (dateStr: string) => {
-    try {
-      const date = new Date(dateStr);
-      return date.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      });
-    } catch {
-      return dateStr;
-    }
-  };
+  // Task press handling moved to `widgetHelpers.handleTaskPress` to keep widget logic consistent across list/detail views
+  // Use: handleTaskPress({ taskId, selectedTaskId, setSelectedTaskId, onAction });
 
   // derive completed parts (by session key) from scheduled sessions on tasks
   React.useEffect(() => {
     const completed = new Set<string>();
     tasks.forEach((task) => {
       (task.scheduledSessions || []).forEach((session, idx) => {
-        const key = getSessionKey(task.id, session, idx);
+        const key = getSessionKey(task.id, session, idx, (task as any).subtasks);
         const isDone = (session as any).subtaskStatus === "done" || session.status === "completed";
         if (isDone) completed.add(key);
       });
@@ -161,81 +150,19 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
     setCompletedParts(completed);
   }, [tasks]);
 
-  const handleToggleSession = async (taskId: string, session: ScheduledSession, index: number) => {
-    const subtaskId = (session as any).subtaskId || undefined;
-    const key = getSessionKey(taskId, session, index);
-    const canPersist = Boolean(subtaskId);
-
-    const isCompleted = completedParts.has(key);
-    const nextCompleted = !isCompleted;
-
-    setCompletedParts((prev) => {
-      const updated = new Set(prev);
-      if (nextCompleted) updated.add(key);
-      else updated.delete(key);
-      return updated;
+  const handleToggleSession = async (taskId: string, session: ScheduledSession, index: number, subtasks?: any[]) => {
+    await toggleSessionSmart({
+      taskId,
+      session,
+      index,
+      subtasks,
+      completedParts,
+      setCompletedParts,
+      loadingParts,
+      setLoadingParts,
+      notifyTaskUpdate,
+      onAction,
     });
-
-    if (canPersist) setLoadingParts((prev) => new Set(prev).add(key));
-
-    try {
-      if (canPersist && subtaskId) {
-        const success = await updateSubTask(taskId, subtaskId, { status: nextCompleted ? "done" : "todo" });
-        if (!success) throw new Error("Update failed");
-      }
-
-      notifyTaskUpdate({ taskId });
-      onAction?.("part_toggled", {
-        taskId,
-        sessionId: session.id,
-        subtaskId: subtaskId || null,
-        completed: nextCompleted,
-        synthetic: !canPersist,
-      });
-    } catch (error) {
-      // revert
-      setCompletedParts((prev) => {
-        const updated = new Set(prev);
-        if (isCompleted) updated.add(key);
-        else updated.delete(key);
-        return updated;
-      });
-    } finally {
-      if (canPersist)
-        setLoadingParts((prev) => {
-          const updated = new Set(prev);
-          updated.delete(key);
-          return updated;
-        });
-    }
-  };
-
-  const getImportanceColor = (importance?: number) => {
-    if (!importance) return COLORS.darkGray;
-    if (importance <= 2) return COLORS.primary6;
-    if (importance <= 3) return COLORS.primary5;
-    return COLORS.primary7;
-  };
-
-  const getProgressColor = (progress?: number) => {
-    const value = typeof progress === "number" ? progress : 0;
-    if (value >= 80) return COLORS.primary6;
-    if (value >= 40) return COLORS.primary5;
-    return COLORS.primary7;
-  };
-
-  const formatTimeRange = (session?: ScheduledSession) => {
-    if (!session?.start) return null;
-    try {
-      const start = new Date(session.start);
-      const end = session.end ? new Date(session.end) : null;
-      const startText = start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-      if (!end || Number.isNaN(end.getTime())) return startText;
-      const endText = end.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-      return `${startText} - ${endText}`;
-    } catch {
-      return null;
-    }
   };
 
   if (!tasks || tasks.length === 0) {
@@ -251,6 +178,10 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
   // Build list cells where each cell contains the task header and (optionally) its details
   const cells: ListCellProps[] = tasks.map((task) => {
     const meta = getCategoryMeta(task.category);
+
+    const progressPercent = computeTaskProgress(task, completedParts);
+    const progressValue = Math.max(0, Math.min(1, progressPercent / 100));
+    console.debug("TaskListWidget: render progress", task.id, progressPercent);
 
     const content = (
       <View style={{ width: "100%" }}>
@@ -271,9 +202,12 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
                 </AppText>
               </View>
 
-              {typeof task.progressPercentage === "number" ? (
+              {typeof task.progressPercentage === "number" ||
+              ((task as any).subtasks && (task as any).subtasks.length > 0) ||
+              (task.scheduledSessions && task.scheduledSessions.length > 0) ? (
                 <ProgressIcon
-                  value={Math.max(0, Math.min(1, (task.progressPercentage || 0) / 100))}
+                  key={`progress-${task.id}-${Math.round(progressValue * 100)}`}
+                  value={progressValue}
                   size={ICON_SIZES.md}
                 />
               ) : (
@@ -290,9 +224,10 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
                 </View>
               ) : null}
 
+              {/* Normalize category display for presentation */}
               <TaskTagsRow
                 category={task.category}
-                categoryDisplay={task.categoryDisplay}
+                categoryDisplay={getCategoryDisplay(task.category, task.categoryDisplay)}
                 subcategory={task.subcategory}
                 subcategoryDisplay={task.subcategoryDisplay}
                 importance={task.importance}
@@ -300,19 +235,20 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
               />
 
               <ScheduledSessionsSection
+                taskId={task.id}
+                taskTitle={task.title || (task as any).taskname || "Untitled task"}
                 scheduledSessions={task.scheduledSessions}
                 subtasks={(task as any).subtasks}
+                category={task.category}
+                categoryColor={getCategoryMeta(task.category)?.color}
                 completedParts={completedParts}
                 loadingParts={loadingParts}
-                onToggleSubtask={(subtaskId: string) => {
-                  const sessions = task.scheduledSessions || [];
-                  const idx = sessions.findIndex((s: any) => (s as any).subtaskId === subtaskId || s.id === subtaskId);
-                  const session = sessions[idx] || sessions[0];
-                  handleToggleSession(task.id, session, idx >= 0 ? idx : 0);
-                }}
+                onToggleSession={handleToggleSession}
                 estimatedDuration={(task as any).estimatedDuration}
                 progressPercentage={task.progressPercentage}
                 hideTitle={true}
+                hideTaskTitle={false}
+                sessionHeaderMode="date"
               />
             </ExpandableRow>
           </View>
@@ -323,7 +259,7 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
     return {
       id: task.id,
       content,
-      onPress: () => handleTaskPress(task.id),
+      onPress: () => handleTaskPress({ taskId: task.id, selectedTaskId, setSelectedTaskId, onAction }),
     } as ListCellProps;
   });
 
@@ -349,13 +285,13 @@ const styles = StyleSheet.create({
   },
   checkbox: {
     paddingRight: SPACING.sm,
-    paddingTop: 2,
+    paddingTop: SPACING.xs,
   },
   checkboxBox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 2,
+    width: SPACING.xlg,
+    height: SPACING.xlg,
+    borderRadius: SPACING.sm,
+    borderWidth: SPACING.xs,
     borderColor: COLORS.darkGray,
     justifyContent: "center",
     alignItems: "center",
@@ -364,14 +300,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary6,
     borderColor: COLORS.primary6,
   },
-  checkmark: {
-    fontSize: 12,
-    color: COLORS.colorWhite,
-    fontWeight: "600",
-  },
+
   taskContent: {
     flex: 1,
-    gap: 4,
+    gap: SPACING.sm,
   },
   titleRow: {
     flexDirection: "row",
@@ -398,24 +330,14 @@ const styles = StyleSheet.create({
     color: COLORS.darkGray,
   },
   importanceBadge: {
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    borderRadius: 3,
-  },
-  importanceText: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: COLORS.colorWhite,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: SPACING.xs,
   },
   progressBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 3,
-  },
-  progressText: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: COLORS.colorWhite,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: SPACING.xs,
   },
   expandedRow: {
     gap: SPACING.sm,
@@ -429,7 +351,7 @@ const styles = StyleSheet.create({
   },
   tagItem: {
     marginRight: SPACING.sm,
-    marginBottom: SPACING.sm / 2,
+    marginBottom: SPACING.xs,
   },
 });
 

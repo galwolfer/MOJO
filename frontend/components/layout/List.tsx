@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     width: "100%",
     display: "flex",
     flexDirection: "column",
-    gap: SPACING.sm / 2,
+    gap: SPACING.xs,
   },
   row: {
     width: "100%",
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
     height: SPACING.xs / 2,
     backgroundColor: COLORS.white,
     borderRadius: 1,
-    marginTop: SPACING.sm / 2,
+    marginTop: SPACING.xs,
     alignSelf: "stretch",
   },
   contentContainer: {

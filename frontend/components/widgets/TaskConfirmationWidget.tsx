@@ -17,15 +17,9 @@ import {
   getSessionLabel,
   getTaskTypeLabel,
 } from "./widgetHelpers";
-import {
-  TaskTitle,
-  TaskTagsRow,
-  TaskDueDate,
-  TaskDurationRow,
-  ScheduledSessionsSection,
-  renderTaskField,
-  TwoColumnGrid,
-} from "./TaskWidgetParts";
+import { TaskTitle, TaskTagsRow, ScheduledSessionsSection, renderTaskField, TwoColumnGrid } from "./components";
+import { getCategoryMeta } from "../../config/categoryMeta";
+import { getCategoryDisplay } from "./widgetHelpers";
 
 interface TaskData {
   id: string;
@@ -101,6 +95,8 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
 }) => {
   // Data is passed directly - use as TaskData
   const task: TaskData = data as TaskData;
+  // Normalize category display name for UI (prefer explicit display from payload, then server meta, then raw key)
+  const categoryDisplayNormalized = getCategoryDisplay(task.category, task.categoryDisplay);
 
   return (
     <Widget entranceEnabled={entranceEnabled} entranceDelay={entranceDelay} entranceDuration={entranceDuration}>
@@ -125,7 +121,7 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
         {/* Category / Subcategory / importance / effort */}
         <TaskTagsRow
           category={task.category}
-          categoryDisplay={task.categoryDisplay}
+          categoryDisplay={categoryDisplayNormalized}
           subcategory={task.subcategory}
           subcategoryDisplay={task.subcategoryDisplay || task.subCategory?.label}
           importance={task.importance}
@@ -135,7 +131,7 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
         {/* Details Grid (2-up) */}
         <TwoColumnGrid
           items={[
-            <TaskDueDate dueDate={task.dueDate} deadline={task.deadline} />,
+            renderTaskField({ dueDate: task.dueDate || task.deadline }, "dueDate"),
             renderTaskField(task, "startDate"),
             renderTaskField({ estimatedDuration: task.estimatedDuration || task.duration }, "estimatedDuration"),
             renderTaskField(task, "earliestStart"),
@@ -150,20 +146,10 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
           ].filter(Boolean)}
         />
 
-        {/* Tags (keep original tag display) */}
-
-        {/* Tags */}
-        {task.tags && task.tags.length > 0 && (
-          <View style={styles.field}>
-            <AppText variant="notes" style={styles.labelText}>
-              🏷️ Tags
-            </AppText>
-            <AppText variant="bodyText">{task.tags.join(", ")}</AppText>
-          </View>
-        )}
-
         {/* Scheduled Sessions (use shared component) */}
         <ScheduledSessionsSection
+          taskId={task.id}
+          taskTitle={task.title || task.taskname || "Untitled task"}
           scheduledSessions={task.scheduledSessions}
           subtasks={task.subtasks}
           estimatedDuration={task.estimatedDuration || task.duration}
@@ -197,7 +183,7 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
                   )}
                   {subtask.duration && (
                     <AppText variant="notes" style={styles.subtaskDuration}>
-                      ⏱️ {formatDuration(subtask.duration)}
+                      {formatDuration(subtask.duration)}
                     </AppText>
                   )}
                 </View>
@@ -239,11 +225,11 @@ const styles = StyleSheet.create({
   },
   halfField: {
     flex: 1,
-    gap: 4,
+    gap: SPACING.sm,
   },
   notesText: {
     fontStyle: "italic",
-    marginTop: 4,
+    marginTop: SPACING.sm,
   },
   confirmMessage: {
     marginVertical: SPACING.md,
@@ -263,8 +249,8 @@ const styles = StyleSheet.create({
   scheduleCard: {
     backgroundColor: COLORS.white2,
     padding: SPACING.sm,
-    borderRadius: 8,
-    borderLeftWidth: 3,
+    borderRadius: SPACING.md,
+    borderLeftWidth: SPACING.xs,
     borderLeftColor: COLORS.primary1,
     gap: 2,
   },
@@ -277,7 +263,6 @@ const styles = StyleSheet.create({
   },
   scheduleTime: {
     color: COLORS.darkGray,
-    fontSize: 12,
   },
   subtaskList: {
     gap: SPACING.sm,
@@ -285,8 +270,8 @@ const styles = StyleSheet.create({
   subtaskCard: {
     backgroundColor: COLORS.white2,
     padding: SPACING.sm,
-    borderRadius: 6,
-    borderLeftWidth: 2,
+    borderRadius: SPACING.sm,
+    borderLeftWidth: SPACING.xs,
     borderLeftColor: COLORS.darkGray,
   },
   subtaskTitle: {
@@ -298,13 +283,11 @@ const styles = StyleSheet.create({
   },
   subtaskDescription: {
     color: COLORS.darkGray,
-    fontSize: 12,
-    marginTop: 2,
+    marginTop: SPACING.xs,
   },
   subtaskDuration: {
     color: COLORS.primary1,
-    fontSize: 11,
-    marginTop: 4,
+    marginTop: SPACING.sm,
   },
   // actions and button styles removed while buttons are disabled
 });

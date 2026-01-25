@@ -16,7 +16,15 @@ import { Checkbox } from "../icons/Checkbox";
 import Icon from "../icons/Icon";
 import List, { ListCellProps } from "../layout/List";
 import { getCategoryMeta } from "../../config/categoryMeta";
-import { ScheduledSession, Subtask, formatDate, formatDuration, getSubtaskIdFromSession } from "./widgetHelpers";
+import { ScheduledSessionsSection, getSessionKey } from "./components";
+import {
+  ScheduledSession,
+  Subtask,
+  formatDate,
+  formatDuration,
+  getSubtaskIdFromSession,
+  getTimeParts,
+} from "./widgetHelpers";
 
 type TaskItem = {
   id: string;
@@ -92,11 +100,6 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
     return formatDate(`${dateKey}T00:00:00`);
   };
 
-  const getSessionKey = (taskId: string, session: ScheduledSession, index: number, subtasks?: Subtask[]) => {
-    const subtaskId = getSubtaskIdFromSession(session, subtasks);
-    return subtaskId || session.id || `${taskId}-${session.start || `session-${index}`}`;
-  };
-
   const handleToggleSession = async (
     taskId: string,
     session: ScheduledSession,
@@ -153,120 +156,27 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
     }
   };
 
-  const getTimeParts = (dateStr?: string) => {
-    if (!dateStr) return { time: "", ampm: "" };
-    try {
-      const date = new Date(dateStr);
-      const minutes = date.getMinutes();
-      const rawHours = date.getHours();
-      const ampm = rawHours >= 12 ? "PM" : "AM";
-      const hours12 = rawHours % 12 === 0 ? 12 : rawHours % 12;
-      const time = `${hours12}:${minutes.toString().padStart(2, "0")}`;
-      return { time, ampm };
-    } catch {
-      return { time: "", ampm: "" };
-    }
-  };
-
-  const buildSessionCells = (task: TaskItem): ListCellProps[] => {
-    const sessions = task.scheduledSessions || [];
-    if (sessions.length === 0) return [];
-
-    const categoryMeta = getCategoryMeta(task.category);
-    const taskTitle = task.title || task.taskname || "Untitled task";
-
-    return sessions.map((session, index) => {
-      const subtaskId = getSubtaskIdFromSession(session, task.subtasks);
-      const key = getSessionKey(task.id, session, index, task.subtasks);
-      const isDone = completedParts.has(key);
-      const canToggle = Boolean(subtaskId) || Boolean(session.id);
-      const isLoading = loadingParts.has(key);
-      const startParts = getTimeParts(session.start);
-      const endParts = getTimeParts(session.end);
-
-      return {
-        id: key,
-        content: (
-          <View style={styles.sessionRow}>
-            <View style={styles.sessionTimeBlock}>
-              <View style={[styles.sessionTimeLine, { backgroundColor: categoryMeta?.color || COLORS.primary1 }]} />
-              <View style={styles.sessionTimeColumn}>
-                <AppText variant="notes" style={styles.sessionHourText}>
-                  {session.start ? (
-                    <>
-                      {startParts.time || "Time"}
-                      {startParts.ampm ? (
-                        <AppText variant="notes" style={styles.sessionAmPm}>
-                          {" " + startParts.ampm}
-                        </AppText>
-                      ) : null}
-                    </>
-                  ) : (
-                    "Time"
-                  )}
-                </AppText>
-                <AppText variant="notes" style={styles.sessionHourText}>
-                  {session.end ? (
-                    <>
-                      {endParts.time || ""}
-                      {endParts.ampm ? (
-                        <AppText variant="notes" style={styles.sessionAmPm}>
-                          {" " + endParts.ampm}
-                        </AppText>
-                      ) : null}
-                    </>
-                  ) : (
-                    ""
-                  )}
-                </AppText>
-              </View>
-            </View>
-            <View style={styles.sessionCheckbox}>
-              {canToggle ? (
-                <Checkbox
-                  checked={isDone}
-                  onChange={() => handleToggleSession(task.id, session, index, task.subtasks)}
-                  size={ICON_SIZES.sm}
-                />
-              ) : (
-                <View style={styles.checkboxSpacer} />
-              )}
-            </View>
-
-            <View style={styles.sessionInfo}>
-              <View style={styles.sessionTitleRow}>
-                <AppText
-                  variant="bodyText"
-                  style={[styles.sessionTitleText, isDone && styles.sessionLabelDone]}
-                  ellipsizeMode="tail"
-                >
-                  <AppText variant="boldText" style={styles.sessionSubtask}>
-                    {session.subtaskTitle || `Part ${session.subtaskIndex ?? index + 1}`}
-                  </AppText>
-                  <AppText variant="bodyText" style={styles.sessionTask}>
-                    {" - " + taskTitle}
-                  </AppText>
-                </AppText>
-              </View>
-            </View>
-          </View>
-        ),
-        onPress: canToggle ? () => handleToggleSession(task.id, session, index, task.subtasks) : undefined,
-        disabled: isLoading || !canToggle,
-        divider: true,
-      } as ListCellProps;
-    });
-  };
-
   const buildTaskCell = (task: TaskItem): ListCellProps => {
-    const sessionCells = buildSessionCells(task);
+    const categoryMeta = getCategoryMeta(task.category);
+    const hasScheduledSessions = (task.scheduledSessions || []).length > 0;
 
     const content = (
       <View style={styles.taskCard}>
-        {sessionCells.length > 0 ? (
-          <View style={styles.sessionList}>
-            <List data={sessionCells} />
-          </View>
+        {hasScheduledSessions ? (
+          <ScheduledSessionsSection
+            taskId={task.id}
+            taskTitle={task.title || task.taskname || "Untitled task"}
+            scheduledSessions={task.scheduledSessions}
+            subtasks={task.subtasks}
+            category={task.category}
+            categoryColor={categoryMeta?.color}
+            completedParts={completedParts}
+            loadingParts={loadingParts}
+            onToggleSession={handleToggleSession}
+            hideTitle={true}
+            hideTaskTitle={true}
+            sessionHeaderMode="taskTitle"
+          />
         ) : (
           <AppText variant="notes" style={styles.emptySessions}>
             No scheduled sessions
@@ -420,96 +330,6 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     gap: SPACING.sm,
     width: "100%",
-  },
-  taskHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.md,
-  },
-  sessionList: {
-    marginTop: SPACING.sm,
-    width: "100%",
-  },
-  sessionRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: SPACING.sm,
-    paddingVertical: 4,
-    width: "100%",
-  },
-  sessionTimeBlock: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.xs,
-  },
-  sessionTimeColumn: {
-    alignItems: "flex-end",
-    gap: SPACING.xs,
-    minWidth: 46,
-  },
-  sessionHourText: {
-    color: COLORS.lightGray,
-  },
-  sessionAmPm: {
-    fontSize: 10,
-    color: COLORS.lightGray,
-  },
-  sessionTimeLine: {
-    width: SPACING.xs,
-    alignSelf: "stretch",
-    borderRadius: 999,
-  },
-  sessionCheckbox: {
-    width: 32,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingTop: 2,
-  },
-  sessionInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  sessionTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "nowrap",
-    gap: SPACING.xs,
-  },
-  sessionTime: {
-    color: COLORS.primary1,
-    fontWeight: "600",
-  },
-  sessionLabelDone: {
-    textDecorationLine: "line-through",
-    color: COLORS.darkGray,
-  },
-  sessionTitleText: {
-    flexShrink: 1,
-  },
-  sessionSubtask: {
-    fontWeight: "600",
-  },
-  sessionTask: {
-    color: COLORS.black,
-  },
-  inlineIcon: {
-    marginLeft: 4,
-    marginBottom: -1,
-  },
-  checkboxSpacer: {
-    width: ICON_SIZES.sm,
-    height: ICON_SIZES.sm,
-  },
-  sessionMeta: {
-    minWidth: 70,
-    alignItems: "flex-end",
-    justifyContent: "flex-start",
-  },
-  sessionDuration: {
-    color: COLORS.darkGray,
-  },
-  sessionDate: {
-    color: COLORS.lightGray,
   },
   emptyText: {
     color: COLORS.darkGray,
