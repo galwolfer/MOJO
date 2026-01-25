@@ -61,7 +61,7 @@ async function _saveUserSubCategory(userId, categoryName, subCategory) {
         $addToSet: {
           subCategories: { name: subName, category: idx },
         },
-      }
+      },
     );
   } catch (err) {
     // Silent fail if category invalid or user not found, just log warning
@@ -350,11 +350,11 @@ export async function getScheduledTasksByDay(userId, days = 7) {
 /**
  * Get detailed progress for a task with split parts.
  * Returns the task, all its subtasks, and their associated schedule blocks.
- * 
+ *
  * @param {string} userId - User ID
  * @param {string} taskId - Task ID
  * @returns {Promise<object>} Task with subtasks and schedule info
- * 
+ *
  * Example response:
  * {
  *   task: { _id, taskname, taskType, chunkCount, estimatedDuration, ... },
@@ -604,7 +604,15 @@ export async function updateTask({ userId, taskId, updates }) {
   });
 
   // If splitting-related fields changed, ensure subtask sync
-  const splitFields = ["taskType", "chunkCount", "chunkMinutes", "minMinutes", "maxMinutes", "minChunk", "estimatedDuration"];
+  const splitFields = [
+    "taskType",
+    "chunkCount",
+    "chunkMinutes",
+    "minMinutes",
+    "maxMinutes",
+    "minChunk",
+    "estimatedDuration",
+  ];
   if (Object.keys(sanitizedUpdates).some((f) => splitFields.includes(f))) {
     try {
       await syncSubTasksForTask({ taskId });
@@ -631,9 +639,10 @@ export async function syncSubTasksForTask({ taskId }) {
   }
 
   const minChunk = task.minChunk || 30;
-  const desiredCount = task.chunkCount && Number.isInteger(task.chunkCount) && task.chunkCount > 0
-    ? task.chunkCount
-    : Math.max(1, Math.ceil((task.estimatedDuration || minChunk) / minChunk));
+  const desiredCount =
+    task.chunkCount && Number.isInteger(task.chunkCount) && task.chunkCount > 0
+      ? task.chunkCount
+      : Math.max(1, Math.ceil((task.estimatedDuration || minChunk) / minChunk));
 
   const existing = await SubTask.find({ taskId }).sort({ index: 1 }).lean();
 
@@ -681,7 +690,6 @@ export async function syncSubTasksForTask({ taskId }) {
   }
 }
 
-
 /**
  * Extend the deadline of a task.
  */
@@ -704,7 +712,7 @@ export async function extendTaskDeadline({ taskId, userId, newDeadline }) {
     const task = await Task.findOneAndUpdate(
       { _id: taskId, userId },
       { $set: { dueDate: newDeadline } },
-      { new: true }
+      { new: true },
     ).lean();
 
     if (!task) {
@@ -859,7 +867,7 @@ export async function completeTask({ taskId, userId }) {
           actualCompletionMinutes,
         },
       },
-      { new: true }
+      { new: true },
     ).lean(); // Get plain object directly
 
     await logEvent({
@@ -931,7 +939,7 @@ export async function toggleTaskCompletion(taskId, userId) {
         status: nextStatus,
       },
     },
-    { new: true }
+    { new: true },
   ).lean();
 
   await logEvent({
@@ -995,15 +1003,15 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
 
   // Use find + save instead of findOneAndUpdate to trigger Mongoose hooks
   const subtask = await SubTask.findOne({ _id: subTaskId, userId });
-  
+
   if (!subtask) return { success: false, error: "SubTask not found or access denied" };
 
   // Apply updates
   Object.assign(subtask, sanitized);
-  
+
   // Save to trigger post-save hooks (which sync parent Task progress)
   await subtask.save();
-  
+
   const updated = subtask.toObject();
 
   // If all subtasks are done, optionally mark parent task as done. If some done -> in_progress
