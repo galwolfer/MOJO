@@ -369,7 +369,7 @@ export default function SettingsScreen({ onBack, onEditPreferences, onChatSettin
           {/* User Avatar with gradient ring */}
           <View style={styles.avatarContainer}>
             <LinearGradient
-              colors={[COLORS.primary1, COLORS.primary2, COLORS.primary4]}
+              colors={[COLORS.primary1, COLORS.primary2]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.avatarGradient}
