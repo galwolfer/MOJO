@@ -40,25 +40,24 @@ export default function Header({ title, Icon, show = true, rightElement, leftEle
 
     let base = width <= 320 ? baseSmall : width <= 380 ? baseMed : baseLarge;
 
-    // scale down a bit more on small screens
-    const scaleFactor = width <= 380 ? 0.55 : width <= 520 ? 0.65 : 0.8;
+    // Aggressively reduce scale so titles fit on small devices
+    const scaleFactor = width <= 380 ? 0.44 : width <= 520 ? 0.54 : 0.66;
     let size = moderateScale(base, scaleFactor);
 
     // If the title is long, reduce further to help it fit
-    if (title && title.length > 12) {
-      size = Math.max((size * 0.78), baseSmall);
+    if (title && title.length > 10) {
+      size = Math.max(size * 0.6, baseSmall);
     }
 
-    // Absolute cap so initials don't become huge
-    const absoluteCap = baseLarge;
+    // Lower cap so initials/titles don't appear too large
+    const absoluteCap = baseMed;
     return Math.min(size, absoluteCap);
   })();
-  // Only force a line-break when the title is exactly two words (e.g. "Edit Preferences").
-  // Single-word titles should stay single-line to avoid mid-word wrapping like "SETTI\nNGS".
+  // Allow wrapping for long titles or on narrow screens to avoid truncation.
   const words = title ? title.trim().split(/\s+/) : [];
-  const isTwoWord = words.length === 2;
-  const displayTitle = isTwoWord ? words.join("\n") : title;
-  const titleLines = isTwoWord ? 2 : 1;
+  const allowWrap = title ? (title.length > 8 || width < 420) : false;
+  const displayTitle = title;
+  const titleLines = allowWrap ? 2 : 1;
 
   const shouldCollapseRight = !!rightElement && (width < 420 || (title && title.length > 14 && width < 520));
 
@@ -184,7 +183,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
     flexShrink: 1,
     marginLeft: SPACING.sm,
-    maxWidth: "50%",
+    maxWidth: "80%",
     color: COLORS.primary1,
   },
 });
