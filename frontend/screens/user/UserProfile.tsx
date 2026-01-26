@@ -9,7 +9,6 @@ import {
   AppState,
   AppStateStatus,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import AppText from "../../components/common/AppText";
 import AppButton from "../../components/common/AppButton";
 import { COLORS, SPACING, SHADOWS } from "../../theme";
@@ -80,7 +79,9 @@ export default function UserProfileScreen() {
   const { subscribeToTaskUpdates } = useTaskContext();
 
   // Screen navigation state
-  const [currentScreen, setCurrentScreen] = useState<"profile" | "settings" | "edit-preferences" | "chat-settings">("profile");
+  const [currentScreen, setCurrentScreen] = useState<"profile" | "settings" | "edit-preferences" | "chat-settings">(
+    "profile",
+  );
 
   const [stats, setStats] = useState({ tasks: 0, points: 0, streak: 0 });
   const [loading, setLoading] = useState(true);
