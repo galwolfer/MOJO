@@ -479,10 +479,60 @@ export async function updateCategoryPriorities(req, res, next) {
 
     await user.save();
 
+    // Convert priorities to a plain JavaScript object for response
+    const savedPriorities = user.profile.priorities && typeof user.profile.priorities.toObject === "function"
+      ? user.profile.priorities.toObject()
+      : JSON.parse(JSON.stringify(user.profile.priorities || {}));
+
     res.json({
       success: true,
       message: "Category priorities updated successfully",
-      priorities: user.profile.priorities,
+      priorities: savedPriorities,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Get user preferences (priorities and ojoType)
+ * GET /api/auth/preferences
+ */
+export async function getPreferences(req, res, next) {
+  try {
+    const userId = req.user.userId;
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: "User not found",
+      });
+    }
+
+    // Populate OjoType for the response
+    await user.populate("profile.ojoTypeId", "name displayName persona tone");
+
+    // Convert priorities to a plain JavaScript object (Mongoose subdocument -> plain object)
+    const prioritiesDoc = user.profile.priorities;
+    const priorities = prioritiesDoc && typeof prioritiesDoc.toObject === "function"
+      ? prioritiesDoc.toObject()
+      : JSON.parse(JSON.stringify(prioritiesDoc || {}));
+    
+    const ojoType = user.profile.ojoTypeId
+      ? {
+          name: user.profile.ojoTypeId.name,
+          displayName: user.profile.ojoTypeId.displayName,
+          persona: user.profile.ojoTypeId.persona,
+          tone: user.profile.ojoTypeId.tone,
+        }
+      : null;
+
+    res.json({
+      success: true,
+      priorities,
+      ojoType,
     });
   } catch (error) {
     next(error);

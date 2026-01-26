@@ -112,12 +112,11 @@ const AppButton: React.FC<AppButtonProps> = ({
           </View>
         )}
 
-        {title ? (
+        {title && title !== "" && (
           <AppText variant="boldText" style={textStyle}>
             {title}
           </AppText>
-        ) : null}
-
+        )}
         {IconComp && iconPosition === "right" && (
           <View style={styles.iconWrapper}>
             <IconComp size={SPACING.lg} color={isFilled ? COLORS.colorWhite : resolvedColor} />

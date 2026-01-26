@@ -9,21 +9,21 @@ import {
   AppState,
   AppStateStatus,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import AppText from "../../components/common/AppText";
 import AppButton from "../../components/common/AppButton";
-import { COLORS, SPACING, SHADOWS } from "../../theme";
+import { COLORS, SPACING, SHADOWS, ICON_SIZES } from "../../theme";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigation } from "../../context/NavigationContext";
 import { useTaskContext } from "../../context/TaskContext";
 import { ICONS } from "../../components/icons/icons";
 import ScrollableContent from "../../components/layout/ScrollableContent";
 import Box from "../../components/layout/Box";
-import { StatBadge, ProgressGraph, FriendListItem } from "./components";
+import { StatBadge, ProgressGraph } from "./components";
+import FriendsList from "./components/FriendsList";
 import { moderateScale } from "react-native-size-matters";
 import { getUserStats } from "../../services/userService";
 import { getTasks, calculateTaskProgress, type Task, type TaskProgress } from "../../services/taskService";
-import SettingsScreen from "./Settings";
+import { SettingsScreen, EditPreferencesScreen, ChatSettingsScreen } from "../settings";
 
 /**
  * UserProfileScreen
@@ -77,7 +77,9 @@ export default function UserProfileScreen() {
   const { subscribeToTaskUpdates } = useTaskContext();
 
   // Screen navigation state
-  const [currentScreen, setCurrentScreen] = useState<"profile" | "settings">("profile");
+  const [currentScreen, setCurrentScreen] = useState<"profile" | "settings" | "edit-preferences" | "chat-settings">(
+    "profile",
+  );
 
   const [stats, setStats] = useState({ tasks: 0, points: 0, streak: 0 });
   const [loading, setLoading] = useState(true);
@@ -97,7 +99,7 @@ export default function UserProfileScreen() {
       setHeaderConfig({
         show: true,
         element: (
-          <View style={styles.headerProfileSection}>
+          <View style={styles.headerProfileSection} pointerEvents="box-none">
             {/* Avatar */}
             <View style={styles.headerAvatarWrapper}>
               {user?.profileImage ? (
@@ -109,7 +111,7 @@ export default function UserProfileScreen() {
                 />
               ) : (
                 <View style={styles.headerAvatarPlaceholder}>
-                  <UserIcon size={50} color={COLORS.grayLight} />
+                  <UserIcon size={ICON_SIZES.md} color={COLORS.grayLight} />
                 </View>
               )}
             </View>
@@ -118,45 +120,45 @@ export default function UserProfileScreen() {
             <AppText variant="title2" style={styles.headerUsername}>
               {user?.displayName || user?.username || "User"}
             </AppText>
-            {user?.username && user?.displayName && user.displayName !== user.username && (
+            {user?.username && (
               <AppText variant="notes" style={styles.headerDisplayName}>
                 @{user.username}
               </AppText>
             )}
 
             {/* Stats Row */}
-            <View style={styles.headerStatsRow}>
+            <View style={{ width: "100%" }}>
               {loading ? (
                 <ActivityIndicator size="small" color={COLORS.primary1} />
               ) : (
-                <>
+                <View style={styles.headerStatsRow}>
                   <StatBadge
-                    icon={<CheckIcon size={28} color={COLORS.colorWhite} />}
+                    icon={<CheckIcon size={ICON_SIZES.md} color={COLORS.colorWhite} />}
                     value={stats.tasks}
                     label="Tasks"
                     color={COLORS.primary6}
                   />
                   <StatBadge
-                    icon={<TrophyIcon size={28} color={COLORS.colorWhite} />}
+                    icon={<TrophyIcon size={ICON_SIZES.md} color={COLORS.colorWhite} />}
                     value={stats.points}
                     label="Points"
                     color={COLORS.primary5}
                   />
                   <StatBadge
-                    icon={<FlameIcon size={28} color={COLORS.colorWhite} />}
+                    icon={<FlameIcon size={ICON_SIZES.md} color={COLORS.colorWhite} />}
                     value={stats.streak}
                     label="Days Streak"
                     color={COLORS.primary4}
                   />
-                </>
+                </View>
               )}
             </View>
           </View>
         ),
         rightElement: (
-          <View style={styles.headerRight}>
-            <AppButton icon="settings" mode="light" color="primary1" onPress={() => setCurrentScreen("settings")} />
-          </View>
+          <TouchableOpacity onPress={() => setCurrentScreen("settings")} style={styles.headerRightTouchable}>
+            <SettingsIcon size={ICON_SIZES.md} color={COLORS.primary1} />
+          </TouchableOpacity>
         ),
       });
     }
@@ -202,11 +204,43 @@ export default function UserProfileScreen() {
     return unsubscribe;
   }, [subscribeToTaskUpdates, fetchAllData]);
 
-  const graphWidth = Math.min(width - SPACING.xlg * 2 - SPACING.md * 2, 300);
+  const graphWidth = Math.min(width - SPACING.xlg * 2 - SPACING.md * 2, 500);
 
   // If on Settings screen, render SettingsScreen
   if (currentScreen === "settings") {
-    return <SettingsScreen onBack={() => setCurrentScreen("profile")} />;
+    return (
+      <SettingsScreen
+        onBack={() => setCurrentScreen("profile")}
+        onEditPreferences={() => setCurrentScreen("edit-preferences")}
+        onChatSettings={() => setCurrentScreen("chat-settings")}
+      />
+    );
+  }
+
+  // If on Edit Preferences screen, render EditPreferencesScreen
+  if (currentScreen === "edit-preferences") {
+    return (
+      <EditPreferencesScreen
+        onBack={() => setCurrentScreen("settings")}
+        onSave={() => {
+          // Optionally refresh data after preferences are saved
+          fetchAllData();
+        }}
+      />
+    );
+  }
+
+  // If on Chat Settings screen, render ChatSettingsScreen
+  if (currentScreen === "chat-settings") {
+    return (
+      <ChatSettingsScreen
+        onBack={() => setCurrentScreen("settings")}
+        onSave={() => {
+          // Optionally refresh data after chat settings are saved
+          fetchAllData();
+        }}
+      />
+    );
   }
 
   return (
@@ -266,17 +300,6 @@ export default function UserProfileScreen() {
         </View>
       </Box>
 
-      {/* Friends Section */}
-      <Box title="Friends">
-        <View style={styles.friendsGradient}>
-          <View style={styles.friendsList}>
-            {MOCK_FRIENDS.map((friend) => (
-              <FriendListItem key={friend.id} {...friend} />
-            ))}
-          </View>
-        </View>
-      </Box>
-
       {/* Logout Button */}
       <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
         <AppText variant="boldText" style={styles.logoutText}>
@@ -292,7 +315,7 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     alignItems: "center",
     gap: SPACING.lg,
-    paddingBottom: SPACING.xlg * 2,
+    paddingBottom: SPACING.xlg,
   },
 
   // Header Profile Styles
@@ -300,6 +323,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: SPACING.md,
     gap: SPACING.sm,
+    width: "100%",
+    marginTop: -SPACING.xlg - SPACING.md,
   },
   headerAvatarWrapper: {
     width: moderateScale(110),
@@ -333,7 +358,7 @@ const styles = StyleSheet.create({
   headerStatsRow: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: SPACING.sm,
+    gap: SPACING.md,
     marginTop: SPACING.sm,
   },
 
@@ -342,6 +367,14 @@ const styles = StyleSheet.create({
     height: moderateScale(44),
     alignItems: "center",
     justifyContent: "center",
+  },
+  headerRightTouchable: {
+    width: moderateScale(44),
+    height: moderateScale(44),
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer" as any,
+    zIndex: 9999,
   },
 
   // Profile Section
