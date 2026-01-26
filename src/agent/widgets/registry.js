@@ -65,16 +65,7 @@ export const widgetRegistry = new WidgetRegistry([
       message: "The question to ask the user",
     },
   }),
-  new WidgetDefinition({
-    type: "calendar_event",
-    description: "Show a calendar event card.",
-    schema: {
-      title: "Event title",
-      start: "ISO start time",
-      end: "ISO end time",
-      location: "Location string",
-    },
-  }),
+
   new WidgetDefinition({
     type: "task_confirmation",
     description: "Show a task draft with all details for user confirmation.",
