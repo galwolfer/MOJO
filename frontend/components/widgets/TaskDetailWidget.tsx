@@ -36,6 +36,7 @@ import {
   importanceIcon,
   effortColor,
   effortIcon,
+  getWidgetEntranceProps,
   toggleSubtask,
   toggleSession,
 } from "./widgetHelpers";
@@ -159,10 +160,6 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
   const subLabel = task.subcategoryDisplay || task.subCategory?.label || task.subcategory || "";
   const subIndex = paletteIndexFromKey(subLabel);
 
-  useEffect(() => {
-    console.log(`[TaskDetailWidget] entranceEnabled=${entranceEnabled}`);
-  }, [entranceEnabled]);
-
   const contentNodes: React.ReactNode[] = [
     /* Header */
     <View style={styles.header} key="header">
@@ -216,9 +213,11 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
     </View>,
   ];
 
+  const widgetEntranceProps = getWidgetEntranceProps({ entranceEnabled, entranceDelay, entranceDuration });
+
   return (
-    <Widget entranceEnabled={entranceEnabled} entranceDelay={entranceDelay} entranceDuration={entranceDuration}>
-      <View style={styles.container}>{contentNodes.filter((n) => !(typeof n === "string" && n.trim() === ""))}</View>
+    <Widget {...widgetEntranceProps}>
+      <View style={styles.container}>{contentNodes}</View>
     </Widget>
   );
 };
@@ -226,6 +225,9 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
 const styles = StyleSheet.create({
   container: {
     gap: SPACING.md,
+    width: "100%",
+    maxWidth: 500,
+    alignSelf: "stretch",
   },
   header: {
     flexDirection: "row",

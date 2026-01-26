@@ -124,6 +124,7 @@ const Widget: React.FC<WidgetProps> = ({
 
 const styles = StyleSheet.create({
   widget: {
+    minWidth: 250,
     width: "100%",
     backgroundColor: COLORS.white3,
     borderRadius: SPACING.lg,

@@ -22,6 +22,22 @@ export interface ScheduledSession {
   subtaskStatus?: string;
 }
 
+export type WidgetEntranceProps = {
+  entranceEnabled?: boolean;
+  entranceDelay?: number;
+  entranceDuration?: number;
+};
+
+export const getWidgetEntranceProps = (
+  { entranceEnabled, entranceDelay, entranceDuration }: WidgetEntranceProps,
+  options?: { skipAnimation?: boolean },
+) => ({
+  entranceEnabled,
+  entranceDelay,
+  entranceDuration,
+  ...(options?.skipAnimation ? { skipAnimation: true } : {}),
+});
+
 /**
  * getSubtaskIdFromSession
  * Extracts the subtask ID from a scheduled session.
@@ -382,7 +398,6 @@ export const computeTaskProgress = (task: any, completedParts: Set<string>): num
   // Fallback to explicit progressPercentage if provided
   if (typeof task?.progressPercentage === "number") {
     const v = Math.max(0, Math.min(100, task.progressPercentage));
-    console.debug(`[computeTaskProgress] ${_taskId} explicit => ${v}`);
     return v;
   }
 

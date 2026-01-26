@@ -10,15 +10,22 @@ import AppButton from "../common/AppButton";
 import { COLORS, SPACING } from "../../theme";
 import Widget from "../special/Widget";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
+import { getWidgetEntranceProps } from "./widgetHelpers";
 
 /**
  * ConfirmationWidget - Renders a confirmation dialog
  */
-const ConfirmationWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
+const ConfirmationWidget: React.FC<BaseWidgetProps> = ({
+  data,
+  onAction,
+  entranceEnabled,
+  entranceDelay,
+  entranceDuration,
+}) => {
   const { title, message, confirmText = "Yes", cancelText = "No", confirmColor, cancelColor, icon } = data;
 
   return (
-    <Widget skipAnimation>
+    <Widget {...getWidgetEntranceProps({ entranceEnabled, entranceDelay, entranceDuration }, { skipAnimation: true })}>
       <View style={styles.container}>
         {/* Icon and Title */}
         <View style={styles.header}>

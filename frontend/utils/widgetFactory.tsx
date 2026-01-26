@@ -100,14 +100,8 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({
   const Component = WidgetFactory.getComponent(widget.widget_type);
 
   if (!Component) {
-    console.warn(`[WidgetRenderer] Unknown widget type: ${widget.widget_type}`);
     return null;
   }
-
-  // Debug: forward entrance props to component
-  console.warn(
-    `[WidgetRenderer] forwarding entranceEnabled=${String(entranceEnabled)} delay=${entranceDelay} duration=${entranceDuration} to ${widget.widget_type}`,
-  );
 
   return (
     <Component

@@ -26,6 +26,7 @@ import {
   getSubtaskIdFromSession,
   getTimeParts,
   computeTaskProgress,
+  getWidgetEntranceProps,
 } from "./widgetHelpers";
 
 type TaskItem = {
@@ -58,7 +59,13 @@ type UpcomingTasksData = {
   upcoming?: DayGroup[];
 };
 
-const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
+const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({
+  data,
+  onAction,
+  entranceEnabled,
+  entranceDelay,
+  entranceDuration,
+}) => {
   const payload = data as UpcomingTasksData;
   const { notifyTaskUpdate } = useTaskContext();
   const { width } = useWindowDimensions();
@@ -244,8 +251,25 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
     );
   };
 
+  const buildDayCell = (group: DayGroup, label: string, emptyLabel: string, options?: { emptyProgress?: number }) => {
+    const id = group.date || label;
+    const content = renderDaySection(group, label, emptyLabel, options);
+    return { id, content } as ListCellProps;
+  };
+
+  const dayCells: ListCellProps[] = [
+    buildDayCell(todayGroup, "Today", "No tasks scheduled for today"),
+    ...upcomingGroups.map((group, index) =>
+      buildDayCell(group, formatDayLabel(group.date) || `Day ${index + 1}`, "No scheduled tasks", {
+        emptyProgress: 1,
+      }),
+    ),
+  ];
+
+  const widgetEntranceProps = getWidgetEntranceProps({ entranceEnabled, entranceDelay, entranceDuration });
+
   return (
-    <Widget>
+    <Widget {...widgetEntranceProps}>
       <View style={styles.header}>
         <View>
           <AppText variant="notes" style={styles.headerSubtitle}>
@@ -254,15 +278,7 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
         </View>
       </View>
 
-      {renderDaySection(todayGroup, "Today", "No tasks scheduled for today")}
-
-      {upcomingGroups.map((group, index) => (
-        <View key={group.date || `upcoming-${index}`}>
-          {renderDaySection(group, formatDayLabel(group.date) || `Day ${index + 1}`, "No scheduled tasks", {
-            emptyProgress: 1,
-          })}
-        </View>
-      ))}
+      <List data={dayCells} />
     </Widget>
   );
 };

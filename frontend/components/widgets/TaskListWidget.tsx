@@ -16,7 +16,13 @@ import { BaseWidgetProps } from "../../utils/widgetFactory";
 import { useTaskContext } from "../../context/TaskContext";
 import { completeTask, toggleTaskCompletion } from "../../services/taskService";
 import { TaskTagsRow, ScheduledSessionsSection, getSessionKey } from "../special/task";
-import { getCategoryDisplay, toggleSessionSmart, computeTaskProgress, handleTaskPress } from "./widgetHelpers";
+import {
+  getCategoryDisplay,
+  toggleSessionSmart,
+  computeTaskProgress,
+  handleTaskPress,
+  getWidgetEntranceProps,
+} from "./widgetHelpers";
 import { getTaskProgress } from "../../services/taskService";
 import { useTaskUpdateSubscription } from "../../context/TaskContext";
 import { ProgressIcon } from "../icons/ProgressIcon";
@@ -54,7 +60,13 @@ interface ScheduledSession {
 /**
  * TaskListWidget - Renders a list of tasks
  */
-const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
+const TaskListWidget: React.FC<BaseWidgetProps> = ({
+  data,
+  onAction,
+  entranceEnabled,
+  entranceDelay,
+  entranceDuration,
+}) => {
   const tasks: Task[] = data.tasks || [];
   const [checkedTasks, setCheckedTasks] = useState<Set<string>>(new Set());
   const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
@@ -69,9 +81,7 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
   // Listen for task updates and refresh progress for tasks in this list
   const refreshTaskProgress = async (taskId: string) => {
     try {
-      console.debug("TaskListWidget: fetching progress for", taskId);
       const progress = await getTaskProgress(taskId);
-      console.debug("TaskListWidget: progress response for", taskId, progress);
       if (!progress) return;
 
       // Normalize subtasks returned by API (some use _id)
@@ -94,8 +104,6 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
         if (isDone) newKeys.add(key);
       });
 
-      console.debug("TaskListWidget: newKeys for", taskId, Array.from(newKeys));
-
       const subtaskIdSet = new Set(apiSubtasks.map((s: any) => s.id));
 
       // Merge: remove old keys for this task, add refreshed keys
@@ -105,22 +113,18 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
           if (k.startsWith(`${taskId}-`) || subtaskIdSet.has(k)) next.delete(k);
         }
         for (const k of newKeys) next.add(k);
-        console.debug("TaskListWidget: merged completedParts size for", taskId, next.size);
         return next;
       });
     } catch (e) {
       // ignore fetch errors silently
-      console.debug("TaskListWidget: failed to refresh task progress", e);
     }
   };
 
   useTaskUpdateSubscription((payload) => {
-    console.debug("TaskListWidget: notify received", payload);
     if (!payload?.taskId) return;
     const taskId = payload.taskId;
     // If this widget doesn't show that task, ignore
     const found = tasks.find((t) => t.id === taskId);
-    console.debug("TaskListWidget: found task in list?", !!found, "taskId=", taskId);
     if (!found) return;
 
     refreshTaskProgress(taskId);
@@ -167,9 +171,13 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
     });
   };
 
+  const widgetEntranceProps = getWidgetEntranceProps({ entranceEnabled, entranceDelay, entranceDuration });
+
   if (!tasks || tasks.length === 0) {
     return (
-      <Widget skipAnimation>
+      <Widget
+        {...getWidgetEntranceProps({ entranceEnabled, entranceDelay, entranceDuration }, { skipAnimation: true })}
+      >
         <AppText variant="notes" style={styles.emptyText}>
           No tasks found
         </AppText>
@@ -183,7 +191,6 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
 
     const progressPercent = computeTaskProgress(task, completedParts);
     const progressValue = Math.max(0, Math.min(1, progressPercent / 100));
-    console.debug("TaskListWidget: render progress", task.id, progressPercent);
 
     const content = (
       <View style={{ width: "100%" }}>
@@ -266,15 +273,19 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
   });
 
   return (
-    <Widget>
-      <List data={cells} />
+    <Widget {...widgetEntranceProps}>
+      <View style={styles.container}>
+        <List data={cells} />
+      </View>
     </Widget>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    // expanded: no maxHeight so the widget can grow to fit content
+    width: "100%",
+    alignSelf: "stretch",
+    overflow: "hidden",
   },
   emptyText: {
     color: COLORS.lightGray,

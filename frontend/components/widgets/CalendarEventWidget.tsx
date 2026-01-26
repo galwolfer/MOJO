@@ -10,6 +10,7 @@ import AppButton from "../common/AppButton";
 import { COLORS, SPACING } from "../../theme";
 import Widget from "../special/Widget";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
+import { getWidgetEntranceProps } from "./widgetHelpers";
 
 interface CalendarEvent {
   id?: string;
@@ -28,7 +29,13 @@ interface CalendarEvent {
 /**
  * CalendarEventWidget - Renders a calendar event
  */
-const CalendarEventWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
+const CalendarEventWidget: React.FC<BaseWidgetProps> = ({
+  data,
+  onAction,
+  entranceEnabled,
+  entranceDelay,
+  entranceDuration,
+}) => {
   const event: CalendarEvent = data.event || data;
 
   const formatDate = (dateStr: string) => {
@@ -89,7 +96,7 @@ const CalendarEventWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
   const eventColor = getEventColor(event.color);
 
   return (
-    <Widget skipAnimation>
+    <Widget {...getWidgetEntranceProps({ entranceEnabled, entranceDelay, entranceDuration }, { skipAnimation: true })}>
       <View style={styles.container}>
         {/* Color Bar */}
         <View style={[styles.colorBar, { backgroundColor: eventColor }]} />

@@ -23,6 +23,7 @@ import { COLORS } from "../../theme";
 import TaskDetailWidget from "./TaskDetailWidget";
 import TaskListWidget from "./TaskListWidget";
 import UpcomingTasksWidget from "./UpcomingTasksWidget";
+import { getWidgetEntranceProps } from "./widgetHelpers";
 
 type ListWidgetData = {
   listType?: string;
@@ -42,7 +43,13 @@ type ListWidgetData = {
 
 const DEFAULT_SCHEDULE_DAYS = 7;
 
-const ListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
+const ListWidget: React.FC<BaseWidgetProps> = ({
+  data,
+  onAction,
+  entranceEnabled,
+  entranceDelay,
+  entranceDuration,
+}) => {
   const payload = data as ListWidgetData;
   const listType = useMemo(() => (payload.listType || payload.list_type || "task_list").toLowerCase(), [payload]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -217,9 +224,11 @@ const ListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
     loadData({ silent: true });
   });
 
+  const widgetEntranceProps = getWidgetEntranceProps({ entranceEnabled, entranceDelay, entranceDuration });
+
   if (loading) {
     return (
-      <Widget skipAnimation>
+      <Widget {...getWidgetEntranceProps({ entranceEnabled, entranceDelay, entranceDuration }, { skipAnimation: true })}>
         <AppText variant="notes" style={styles.stateText}>
           Loading tasks...
         </AppText>
@@ -229,7 +238,7 @@ const ListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
 
   if (error) {
     return (
-      <Widget skipAnimation>
+      <Widget {...getWidgetEntranceProps({ entranceEnabled, entranceDelay, entranceDuration }, { skipAnimation: true })}>
         <AppText variant="notes" style={styles.stateText}>
           {error}
         </AppText>
@@ -243,15 +252,15 @@ const ListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
 
   switch (listType) {
     case "task_detail":
-      return <TaskDetailWidget data={viewData} onAction={onAction} />;
+      return <TaskDetailWidget data={viewData} onAction={onAction} {...widgetEntranceProps} />;
 
     case "upcoming_tasks":
-      return <UpcomingTasksWidget data={viewData} onAction={onAction} />;
+      return <UpcomingTasksWidget data={viewData} onAction={onAction} {...widgetEntranceProps} />;
     case "overdue_tasks":
-      return <TaskListWidget data={viewData} onAction={onAction} />;
+      return <TaskListWidget data={viewData} onAction={onAction} {...widgetEntranceProps} />;
     case "task_list":
     default:
-      return <TaskListWidget data={viewData} onAction={onAction} />;
+      return <TaskListWidget data={viewData} onAction={onAction} {...widgetEntranceProps} />;
   }
 };
 

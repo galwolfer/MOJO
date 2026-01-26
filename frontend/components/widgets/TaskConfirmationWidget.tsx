@@ -16,6 +16,7 @@ import {
   formatDuration,
   getSessionLabel,
   getTaskTypeLabel,
+  getWidgetEntranceProps,
 } from "./widgetHelpers";
 import { TaskTitle, TaskTagsRow, ScheduledSessionsSection, renderTaskField, TwoColumnGrid } from "../special/task";
 import { getCategoryMeta } from "../../config/categoryMeta";
@@ -89,6 +90,7 @@ interface Subtask {
  */
 const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
   data,
+  onAction,
   entranceEnabled,
   entranceDelay,
   entranceDuration,
@@ -98,8 +100,10 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
   // Normalize category display name for UI (prefer explicit display from payload, then server meta, then raw key)
   const categoryDisplayNormalized = getCategoryDisplay(task.category, task.categoryDisplay);
 
+  const widgetEntranceProps = getWidgetEntranceProps({ entranceEnabled, entranceDelay, entranceDuration });
+
   return (
-    <Widget entranceEnabled={entranceEnabled} entranceDelay={entranceDelay} entranceDuration={entranceDuration}>
+    <Widget {...widgetEntranceProps}>
       <ScrollView style={styles.container} nestedScrollEnabled={true} showsVerticalScrollIndicator={false}>
         {/* Header */}
 
