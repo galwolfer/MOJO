@@ -99,7 +99,7 @@ export default function UserProfileScreen() {
       setHeaderConfig({
         show: true,
         element: (
-          <View style={styles.headerProfileSection}>
+          <View style={styles.headerProfileSection} pointerEvents="box-none">
             {/* Avatar */}
             <View style={styles.headerAvatarWrapper}>
               {user?.profileImage ? (
@@ -156,9 +156,9 @@ export default function UserProfileScreen() {
           </View>
         ),
         rightElement: (
-          <View style={styles.headerRight}>
-            <AppButton icon="settings" mode="light" color="primary1" onPress={() => setCurrentScreen("settings")} />
-          </View>
+          <TouchableOpacity onPress={() => setCurrentScreen("settings")} style={styles.headerRightTouchable}>
+            <SettingsIcon size={ICON_SIZES.md} color={COLORS.primary1} />
+          </TouchableOpacity>
         ),
       });
     }
@@ -324,6 +324,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
     gap: SPACING.sm,
     width: "100%",
+    marginTop: -SPACING.xlg - SPACING.md,
   },
   headerAvatarWrapper: {
     width: moderateScale(110),
@@ -366,6 +367,14 @@ const styles = StyleSheet.create({
     height: moderateScale(44),
     alignItems: "center",
     justifyContent: "center",
+  },
+  headerRightTouchable: {
+    width: moderateScale(44),
+    height: moderateScale(44),
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer" as any,
+    zIndex: 9999,
   },
 
   // Profile Section

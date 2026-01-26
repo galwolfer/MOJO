@@ -70,8 +70,6 @@ export default function Header({ title, Icon, show = true, rightElement, leftEle
   const displayTitle = title;
   const titleLines = allowWrap ? 2 : 1;
 
-  const shouldCollapseRight = !!rightElement && (width < 420 || (title && title.length > 14 && width < 520));
-
   return (
     <View style={[styles.wrapper, style]}>
       <GlassSurface intensity={50} style={[styles.blurSurface, COMPONENT_STYLES.glassSurface]}>
@@ -95,19 +93,7 @@ export default function Header({ title, Icon, show = true, rightElement, leftEle
           </View>
 
           {/* Right Section (fixed) */}
-          <View style={styles.rightSection}>
-            {shouldCollapseRight ? (
-              <Pressable
-                accessibilityLabel="Open actions"
-                onPress={() => setOverflowOpen(true)}
-                style={styles.overflowButton}
-              >
-                <Text style={styles.overflowText}>⋯</Text>
-              </Pressable>
-            ) : (
-              rightElement
-            )}
-          </View>
+          <View style={styles.rightSection}>{rightElement}</View>
         </View>
         {element && <View>{element}</View>}
       </GlassSurface>
@@ -164,6 +150,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     minWidth: moderateScale(56),
     paddingRight: SPACING.lg,
+    zIndex: 999,
   },
   overflowButton: {
     padding: SPACING.sm,

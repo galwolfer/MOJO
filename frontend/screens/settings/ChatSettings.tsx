@@ -71,7 +71,7 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
     fetchPreferences();
   }, []);
 
-  // Setup header (single-line): Ojo icon at left, right-arrow at right
+  // Setup header
   useEffect(() => {
     setHeaderConfig({
       title: "Chat Settings",
@@ -314,17 +314,6 @@ const styles = StyleSheet.create({
     textAlign: "left",
     alignSelf: "center",
     letterSpacing: 0.08,
-  },
-  headerButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  headerRight: {
-    width: moderateScale(44),
-    height: moderateScale(44),
-    alignItems: "center",
-    justifyContent: "center",
   },
   headerLeft: {
     flexDirection: "row",

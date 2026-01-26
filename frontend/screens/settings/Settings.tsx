@@ -60,7 +60,7 @@ export default function SettingsScreen({ onBack, onEditPreferences, onChatSettin
         </TouchableOpacity>
       ),
     });
-  }, [onBack]);
+  }, []);
 
   const handleEditPreferences = () => {
     if (onEditPreferences) {
