@@ -36,7 +36,11 @@ export default function Header({ title, Icon, show = true, rightElement, leftEle
           <View style={styles.leftSection}>
             {leftElement}
             {Icon && !leftElement && <Icon size={ICON_SIZES.big} color={COLORS.primary1} />}
-            {title && <Text style={[TYPOGRAPHY.title, styles.titleText]}>{title}</Text>}
+            {title && (
+              <Text numberOfLines={1} ellipsizeMode="tail" style={[TYPOGRAPHY.title, styles.titleText]}>
+                {title}
+              </Text>
+            )}
           </View>
 
           {/* Right Section */}
@@ -85,7 +89,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   titleText: {
-    width: "100%",
+    flexShrink: 1,
     marginLeft: SPACING.sm,
     color: COLORS.primary1,
   },

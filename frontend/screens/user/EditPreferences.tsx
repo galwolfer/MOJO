@@ -16,6 +16,7 @@ import { COLORS, SPACING, FONT_SIZES, SHADOWS } from "../../theme";
 import { moderateScale } from "react-native-size-matters";
 import { CATEGORY_KEYS, type CategoryKey } from "../../config/categoryMeta";
 import { useNavigation } from "../../context/NavigationContext";
+import { useLayout } from "../../context/LayoutContext";
 import { useKeyboard } from "../../hooks";
 import { getUserPreferences, updateCategoryPriorities } from "../../services/apiClient";
 import { setAuthToken } from "../../services/httpClient";
@@ -30,6 +31,7 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
   const { setHeaderConfig } = useNavigation();
   const { token } = useAuth();
   const { visible: keyboardVisible, height: keyboardHeight } = useKeyboard();
+  const { dimensions } = useLayout();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -79,9 +81,9 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
   // Setup header
   useEffect(() => {
     setHeaderConfig({
-      title: "Mojo",
+      title: "Edit Preferences",
       show: true,
-      icon: ICONS.mojo,
+      icon: ICONS.prefrences,
       leftElement: (
         <TouchableOpacity onPress={handleCancel} style={styles.headerButton}>
           <LeftIcon size={24} color={COLORS.primary1} />
@@ -145,17 +147,14 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
   return (
     <ScrollView
       style={styles.scroll}
-      contentContainerStyle={[styles.contentContainer, { paddingBottom: SPACING.xlg * 6 + keyboardPadding }]}
+      contentContainerStyle={[
+        styles.contentContainer,
+        { paddingTop: (dimensions.headerHeight || SPACING.xlg * 3) + SPACING.md, paddingBottom: SPACING.xlg * 6 + keyboardPadding },
+      ]}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      {/* Title Section */}
-      <View style={styles.titleSection}>
-        <ICONS.prefrences size={28} color={COLORS.primary1} />
-        <AppText variant="title2" style={styles.title}>
-          EDIT PREFERENCES
-        </AppText>
-      </View>
+      {/* Title moved to topbar */}
 
       {error && (
         <AppText variant="notes" style={styles.errorText}>

@@ -66,9 +66,9 @@ export default function SettingsScreen({ onBack, onEditPreferences, onChatSettin
 
   useEffect(() => {
     setHeaderConfig({
-      title: "Mojo",
+      title: "Settings",
       show: true,
-      icon: ICONS.mojo,
+      icon: ICONS.settings,
       leftElement: (
         <TouchableOpacity onPress={onBack} style={styles.headerButton}>
           <LeftIcon size={24} color={COLORS.primary1} />
@@ -361,13 +361,7 @@ export default function SettingsScreen({ onBack, onEditPreferences, onChatSettin
       contentContainerStyle={styles.contentContainer}
       extraBottomPadding={SPACING.xlg * 3}
     >
-      {/* Settings Title */}
-      <View style={styles.titleSection}>
-        <ICONS.settings size={28} color={COLORS.primary1} />
-        <AppText variant="title2" style={styles.title}>
-          SETTINGS
-        </AppText>
-      </View>
+      {/* Title moved to topbar */}
 
       {/* Profile Settings Section */}
       <Box title="Profile" titleColor={COLORS.primary1}>

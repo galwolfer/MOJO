@@ -15,6 +15,7 @@ import { COLORS, SPACING, FONT_SIZES, SHADOWS } from "../../theme";
 import { moderateScale } from "react-native-size-matters";
 import { getAllOjoTypes, type OjoTypeName } from "../../config/ojoTypeConfig";
 import { useNavigation } from "../../context/NavigationContext";
+import { useLayout } from "../../context/LayoutContext";
 import { useKeyboard } from "../../hooks";
 import { getUserPreferences } from "../../services/apiClient";
 import { patch, setAuthToken } from "../../services/httpClient";
@@ -29,6 +30,7 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
   const { setHeaderConfig } = useNavigation();
   const { token } = useAuth();
   const { visible: keyboardVisible, height: keyboardHeight } = useKeyboard();
+  const { dimensions } = useLayout();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -71,9 +73,9 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
   // Setup header
   useEffect(() => {
     setHeaderConfig({
-      title: "Mojo",
+      title: "Chat Settings",
       show: true,
-      icon: ICONS.mojo,
+      icon: ICONS.ojo,
       leftElement: (
         <TouchableOpacity onPress={handleCancel} style={styles.headerButton}>
           <LeftIcon size={24} color={COLORS.primary1} />
@@ -136,17 +138,14 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
   return (
     <ScrollView
       style={styles.scroll}
-      contentContainerStyle={[styles.contentContainer, { paddingBottom: SPACING.xlg * 6 + keyboardPadding }]}
+      contentContainerStyle={[
+        styles.contentContainer,
+        { paddingTop: (dimensions.headerHeight || SPACING.xlg * 3) + SPACING.md, paddingBottom: SPACING.xlg * 6 + keyboardPadding },
+      ]}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      {/* Title Section */}
-      <View style={styles.titleSection}>
-        <ICONS.ojo size={28} color={COLORS.primary1} />
-        <AppText variant="title2" style={styles.title}>
-          CHAT SETTINGS
-        </AppText>
-      </View>
+      {/* Title moved to topbar */}
 
       {error && (
         <AppText variant="notes" style={styles.errorText}>
