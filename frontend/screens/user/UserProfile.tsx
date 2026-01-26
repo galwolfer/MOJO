@@ -23,9 +23,7 @@ import FriendsList from "./components/FriendsList";
 import { moderateScale } from "react-native-size-matters";
 import { getUserStats } from "../../services/userService";
 import { getTasks, calculateTaskProgress, type Task, type TaskProgress } from "../../services/taskService";
-import SettingsScreen from "./Settings";
-import EditPreferencesScreen from "./EditPreferences";
-import ChatSettingsScreen from "./ChatSettings";
+import { SettingsScreen, EditPreferencesScreen, ChatSettingsScreen } from "../settings";
 
 /**
  * UserProfileScreen

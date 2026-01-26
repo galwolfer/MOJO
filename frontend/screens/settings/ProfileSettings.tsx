@@ -269,7 +269,7 @@ export default function ProfileSettings() {
               title={showPasswordSection ? "Hide Password Change" : "Change Password (Optional)"}
               onPress={() => setShowPasswordSection(!showPasswordSection)}
               mode="light"
-              color="lightGray"
+              color="primary1"
               style={styles.button}
             />
 
@@ -354,7 +354,6 @@ export default function ProfileSettings() {
 }
 
 const styles = StyleSheet.create({
-
   profileContent: {
     alignItems: "center",
     paddingVertical: SPACING.md,
