@@ -3,7 +3,7 @@ import { View } from "react-native";
 import AppText from "../../common/AppText";
 import SessionRow from "./SessionRow";
 import List from "../../layout/List";
-import { ICON_SIZES, SPACING } from "../../../theme";
+import { COLORS, ICON_SIZES, SPACING } from "../../../theme";
 import { ScheduledSession, Subtask, getSessionKey } from "../../widgets/widgetHelpers";
 import { useTaskUpdateSubscription } from "../../../context/TaskContext";
 import TaskTitle from "./TaskTitle";
@@ -23,6 +23,7 @@ export const ScheduledSessionsSection: React.FC<{
   progressPercentage?: number | null;
   hideTitle?: boolean;
   hideTaskTitle?: boolean;
+  dividerColor?: string;
   sessionHeaderMode?: "taskTitle" | "date" | "none";
 }> = ({
   taskId,
@@ -38,6 +39,7 @@ export const ScheduledSessionsSection: React.FC<{
   hideTitle = false,
   hideTaskTitle = false,
   sessionHeaderMode = "none",
+  dividerColor = COLORS.white,
 }) => {
   // Listen for task updates and invoke parent's refresh when task updates occur elsewhere
   useTaskUpdateSubscription((payload?: { taskId?: string }) => {
@@ -61,6 +63,7 @@ export const ScheduledSessionsSection: React.FC<{
 
       <View style={{ marginStart: titleMode ? SPACING.sm : 0, marginTop: titleMode ? -SPACING.md : 0 }}>
         <List
+          dividerColor={dividerColor}
           data={sessions.map((session, index) => {
             const key = getSessionKey(taskId, session, index, subtasks);
             const isDone =

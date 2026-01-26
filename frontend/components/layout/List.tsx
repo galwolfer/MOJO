@@ -34,6 +34,7 @@ export interface ListProps {
   renderCell?: (cell: ListCellProps) => ReactNode;
   gap?: number;
   style?: ViewStyle;
+  dividerColor?: string;
   keyExtractor?: (item: ListCellProps) => string;
 }
 
@@ -97,7 +98,7 @@ export const ListCell: React.FC<ListCellProps> = ({
 /**
  * List - A simple columnar list that renders rows
  */
-const List: React.FC<ListProps> = ({ data, renderCell, gap = SPACING.sm, style, keyExtractor }) => {
+const List: React.FC<ListProps> = ({ data, renderCell, gap = SPACING.sm, style, dividerColor, keyExtractor }) => {
   const defaultRenderCell = (cell: ListCellProps, index: number) => (
     <ListCell
       key={cell.id}
@@ -108,7 +109,7 @@ const List: React.FC<ListProps> = ({ data, renderCell, gap = SPACING.sm, style, 
       disabled={cell.disabled}
       style={cell.style}
       divider={cell.divider !== false && index !== data.length - 1}
-      dividerColor={cell.dividerColor}
+      dividerColor={cell.dividerColor ?? dividerColor}
     />
   );
 
@@ -146,7 +147,7 @@ const styles = StyleSheet.create({
     width: "100%",
     height: SPACING.sm / 2,
     backgroundColor: COLORS.white,
-    borderRadius: 1,
+    borderRadius: 50,
     marginTop: SPACING.xs,
     marginHorizontal: SPACING.sm,
     alignSelf: "stretch",

@@ -185,6 +185,7 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({
             hideTitle={false}
             hideTaskTitle={true}
             sessionHeaderMode="taskTitle"
+            dividerColor={COLORS.white}
           />
         ) : (
           <AppText variant="notes" style={styles.emptySessions}>
@@ -244,7 +245,7 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({
           </AppText>
         ) : (
           <View style={styles.listContainer}>
-            <List data={tasks.map((task) => buildTaskCell(task))} />
+            <List dividerColor={COLORS.white} data={tasks.map((task) => buildTaskCell(task))} />
           </View>
         )}
       </View>

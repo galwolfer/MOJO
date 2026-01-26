@@ -3,7 +3,7 @@
  * Displays a list of tasks with checkboxes, due dates, and basic details
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, StyleSheet, TouchableOpacity } from "react-native";
 import AppText from "../common/AppText";
 import Tag from "../inputs/tag";
@@ -77,6 +77,11 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({
   // Track completion of parts (scheduled sessions / subtasks) by a session key
   const [completedParts, setCompletedParts] = useState<Set<string>>(new Set());
   const [loadingParts, setLoadingParts] = useState<Set<string>>(new Set());
+
+  // Debug: log whenever selectedTaskId changes
+  useEffect(() => {
+    console.log("TaskListWidget: selectedTaskId changed to:", selectedTaskId);
+  }, [selectedTaskId]);
 
   // Listen for task updates and refresh progress for tasks in this list
   const refreshTaskProgress = async (taskId: string) => {
@@ -196,35 +201,47 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({
       <View style={{ width: "100%" }}>
         <View style={styles.taskItem}>
           <View style={styles.taskContent}>
-            <View style={styles.titleRow}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: SPACING.sm, flex: 1 }}>
-                {meta?.icon ? (
-                  <Icon name={meta.icon} size={ICON_SIZES.sm} color={meta.color} style={styles.titleIcon} />
-                ) : null}
+            <TouchableOpacity
+              onPress={() => {
+                handleTaskPress({ taskId: task.id, selectedTaskId, setSelectedTaskId, onAction });
+              }}
+              activeOpacity={0.7}
+              style={styles.headerTouchable}
+            >
+              <View style={styles.titleRow}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: SPACING.sm, flex: 1 }}>
+                  {meta?.icon ? (
+                    <Icon name={meta.icon} size={ICON_SIZES.sm} color={meta.color} style={styles.titleIcon} />
+                  ) : null}
 
-                <AppText
-                  variant="boldText"
-                  numberOfLines={2}
-                  style={[styles.taskTitle, checkedTasks.has(task.id) && styles.taskTitleCompleted]}
-                >
-                  {task.title || (task as any).taskname || "Untitled task"}
-                </AppText>
+                  <AppText
+                    variant="boldText"
+                    numberOfLines={2}
+                    style={[styles.taskTitle, checkedTasks.has(task.id) && styles.taskTitleCompleted]}
+                  >
+                    {task.title || (task as any).taskname || "Untitled task"}
+                  </AppText>
+                </View>
+
+                {typeof task.progressPercentage === "number" ||
+                ((task as any).subtasks && (task as any).subtasks.length > 0) ||
+                (task.scheduledSessions && task.scheduledSessions.length > 0) ? (
+                  <ProgressIcon
+                    key={`progress-${task.id}-${Math.round(progressValue * 100)}`}
+                    value={progressValue}
+                    size={ICON_SIZES.md}
+                  />
+                ) : (
+                  <View style={{ width: ICON_SIZES.md }} />
+                )}
               </View>
+            </TouchableOpacity>
 
-              {typeof task.progressPercentage === "number" ||
-              ((task as any).subtasks && (task as any).subtasks.length > 0) ||
-              (task.scheduledSessions && task.scheduledSessions.length > 0) ? (
-                <ProgressIcon
-                  key={`progress-${task.id}-${Math.round(progressValue * 100)}`}
-                  value={progressValue}
-                  size={ICON_SIZES.md}
-                />
-              ) : (
-                <View style={{ width: ICON_SIZES.md }} />
-              )}
-            </View>
-
-            <ExpandableRow expanded={selectedTaskId === task.id} style={styles.expandedRow}>
+            <ExpandableRow
+              expanded={selectedTaskId === task.id}
+              style={styles.expandedRow}
+              key={`expandable-${task.id}-${selectedTaskId === task.id ? "exp" : "col"}`}
+            >
               {(task as any).tags && Array.isArray((task as any).tags) && (task as any).tags.length > 0 ? (
                 <View style={styles.tagContainer}>
                   {(task as any).tags.map((t: string, i: number) => (
@@ -268,7 +285,7 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({
     return {
       id: task.id,
       content,
-      onPress: () => handleTaskPress({ taskId: task.id, selectedTaskId, setSelectedTaskId, onAction }),
+      dividerColor: COLORS.white,
     } as ListCellProps;
   });
 
@@ -356,6 +373,9 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     paddingLeft: SPACING.sm,
     backgroundColor: "transparent",
+  },
+  headerTouchable: {
+    width: "100%",
   },
   tagContainer: {
     flexDirection: "row",
