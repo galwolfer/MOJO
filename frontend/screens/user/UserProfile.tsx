@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import AppText from "../../components/common/AppText";
 import AppButton from "../../components/common/AppButton";
-import { COLORS, SPACING, SHADOWS } from "../../theme";
+import { COLORS, SPACING, SHADOWS, ICON_SIZES } from "../../theme";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigation } from "../../context/NavigationContext";
 import { useTaskContext } from "../../context/TaskContext";
@@ -111,7 +111,7 @@ export default function UserProfileScreen() {
                 />
               ) : (
                 <View style={styles.headerAvatarPlaceholder}>
-                  <UserIcon size={moderateScale(35)} color={COLORS.grayLight} />
+                  <UserIcon size={ICON_SIZES.md} color={COLORS.grayLight} />
                 </View>
               )}
             </View>
@@ -127,30 +127,30 @@ export default function UserProfileScreen() {
             )}
 
             {/* Stats Row */}
-            <View style={styles.headerStatsRow}>
+            <View style={{ width: "100%" }}>
               {loading ? (
                 <ActivityIndicator size="small" color={COLORS.primary1} />
               ) : (
-                <>
+                <View style={styles.headerStatsRow}>
                   <StatBadge
-                    icon={<CheckIcon size={28} color={COLORS.colorWhite} />}
+                    icon={<CheckIcon size={ICON_SIZES.md} color={COLORS.colorWhite} />}
                     value={stats.tasks}
                     label="Tasks"
                     color={COLORS.primary6}
                   />
                   <StatBadge
-                    icon={<TrophyIcon size={28} color={COLORS.colorWhite} />}
+                    icon={<TrophyIcon size={ICON_SIZES.md} color={COLORS.colorWhite} />}
                     value={stats.points}
                     label="Points"
                     color={COLORS.primary5}
                   />
                   <StatBadge
-                    icon={<FlameIcon size={28} color={COLORS.colorWhite} />}
+                    icon={<FlameIcon size={ICON_SIZES.md} color={COLORS.colorWhite} />}
                     value={stats.streak}
                     label="Days Streak"
                     color={COLORS.primary4}
                   />
-                </>
+                </View>
               )}
             </View>
           </View>
@@ -300,11 +300,6 @@ export default function UserProfileScreen() {
         </View>
       </Box>
 
-      {/* Friends Section */}
-      <Box title="Friends">
-        <FriendsList friends={MOCK_FRIENDS} />
-      </Box>
-
       {/* Logout Button */}
       <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
         <AppText variant="boldText" style={styles.logoutText}>
@@ -320,7 +315,7 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     alignItems: "center",
     gap: SPACING.lg,
-    paddingBottom: SPACING.xlg * 2,
+    paddingBottom: SPACING.xlg,
   },
 
   // Header Profile Styles
@@ -328,6 +323,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: SPACING.md,
     gap: SPACING.sm,
+    width: "100%",
   },
   headerAvatarWrapper: {
     width: moderateScale(110),
@@ -361,7 +357,7 @@ const styles = StyleSheet.create({
   headerStatsRow: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: SPACING.sm,
+    gap: SPACING.md,
     marginTop: SPACING.sm,
   },
 
