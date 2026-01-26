@@ -123,34 +123,36 @@ const List: React.FC<ListProps> = ({ data, renderCell, gap = SPACING.sm, style, 
 
 const styles = StyleSheet.create({
   container: {
-    width: "100%",
     display: "flex",
     flexDirection: "column",
     gap: SPACING.xs,
+    alignSelf: "stretch",
   },
   row: {
-    width: "100%",
+    alignSelf: "stretch",
   },
   rowInner: {
     flexDirection: "row",
     alignItems: "flex-start",
     paddingVertical: SPACING.sm,
+    alignSelf: "stretch",
   },
   touchable: {
     alignSelf: "stretch",
   },
   dividerLine: {
-    width: "100%",
     height: SPACING.xs / 2,
     backgroundColor: COLORS.white,
     borderRadius: 1,
     marginTop: SPACING.xs,
+    marginHorizontal: SPACING.sm,
     alignSelf: "stretch",
   },
   contentContainer: {
     flex: 1,
     flexDirection: "row",
     alignItems: "flex-start",
+    alignSelf: "stretch",
   },
   disabled: {
     opacity: 0.6,
