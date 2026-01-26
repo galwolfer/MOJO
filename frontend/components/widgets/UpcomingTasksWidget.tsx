@@ -175,7 +175,7 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
             completedParts={completedParts}
             loadingParts={loadingParts}
             onToggleSession={handleToggleSession}
-            hideTitle={true}
+            hideTitle={false}
             hideTaskTitle={true}
             sessionHeaderMode="taskTitle"
           />

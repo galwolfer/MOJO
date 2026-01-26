@@ -2,8 +2,11 @@ import React from "react";
 import { View } from "react-native";
 import AppText from "../../common/AppText";
 import SessionRow from "./SessionRow";
+import List from "../../layout/List";
 import { ICON_SIZES, SPACING } from "../../../theme";
-import { ScheduledSession, Subtask } from "../../widgets/widgetHelpers";
+import { ScheduledSession, Subtask, getSessionKey } from "../../widgets/widgetHelpers";
+import { useTaskUpdateSubscription } from "../../../context/TaskContext";
+import TaskTitle from "./TaskTitle";
 
 export const ScheduledSessionsSection: React.FC<{
   taskId: string;
@@ -15,6 +18,7 @@ export const ScheduledSessionsSection: React.FC<{
   loadingParts?: Set<string>;
   subtasks?: Subtask[];
   onToggleSession?: (taskId: string, session: ScheduledSession, index: number, subtasks?: Subtask[]) => void;
+  onRefresh?: (taskId?: string) => void;
   estimatedDuration?: number;
   progressPercentage?: number | null;
   hideTitle?: boolean;
@@ -30,42 +34,65 @@ export const ScheduledSessionsSection: React.FC<{
   loadingParts,
   subtasks,
   onToggleSession,
+  onRefresh,
   hideTitle = false,
   hideTaskTitle = false,
   sessionHeaderMode = "none",
 }) => {
+  // Listen for task updates and invoke parent's refresh when task updates occur elsewhere
+  useTaskUpdateSubscription((payload?: { taskId?: string }) => {
+    if (!payload || !payload.taskId || payload.taskId === taskId) {
+      onRefresh?.(payload?.taskId);
+    }
+  });
+
   const sessions = scheduledSessions || [];
   if (!sessions || sessions.length === 0) {
     return null;
   }
 
+  const titleMode = sessionHeaderMode === "taskTitle";
+
   return (
     <View style={{ gap: SPACING.sm }}>
-      {!hideTitle && sessionHeaderMode === "taskTitle" ? <AppText variant="boldText">{taskTitle}</AppText> : null}
+      {!hideTitle && sessionHeaderMode === "taskTitle" ? (
+        <TaskTitle title={taskTitle} category={category} size="md" />
+      ) : null}
 
-      {sessions.map((session, index) => {
-        const isDone =
-          completedParts?.has(session.id || "") || session.subtaskStatus === "done" || session.status === "completed";
-        return (
-          <View key={session.id || `${taskId}-${index}`}>
-            <View style={{ marginStart: sessionHeaderMode === "taskTitle" ? (ICON_SIZES.md - SPACING.xs) / 2 : 0 }}>
-              <SessionRow
-                session={session}
-                taskId={taskId}
-                categoryColor={categoryColor}
-                taskTitle={taskTitle}
-                subtasks={subtasks}
-                sessionIndex={index}
-                isDone={isDone}
-                isLoading={loadingParts?.has(session.id || "")}
-                onToggle={onToggleSession ? () => onToggleSession(taskId, session, index, subtasks) : undefined}
-                canToggle={!!onToggleSession}
-                hideTaskTitle={hideTaskTitle}
-              />
-            </View>
-          </View>
-        );
-      })}
+      <View style={{ marginStart: titleMode ? SPACING.sm : 0, marginTop: titleMode ? -SPACING.md : 0 }}>
+        <List
+          data={sessions.map((session, index) => {
+            const key = getSessionKey(taskId, session, index, subtasks);
+            const isDone =
+              completedParts?.has(key) || session.subtaskStatus === "done" || session.status === "completed";
+            const id = key;
+            return {
+              id,
+              content: (
+                <SessionRow
+                  session={session}
+                  taskId={taskId}
+                  categoryColor={categoryColor}
+                  taskTitle={taskTitle}
+                  subtasks={subtasks}
+                  sessionIndex={index}
+                  isDone={isDone}
+                  isLoading={loadingParts?.has(key)}
+                  checkboxOnToggle={
+                    onToggleSession ? () => onToggleSession(taskId, session, index, subtasks) : undefined
+                  }
+                  rowOnPress={onToggleSession ? () => onToggleSession(taskId, session, index, subtasks) : undefined}
+                  canToggle={!!onToggleSession}
+                  hideTaskTitle={hideTaskTitle}
+                />
+              ),
+              onPress: onToggleSession ? () => onToggleSession(taskId, session, index, subtasks) : undefined,
+              style: { marginStart: sessionHeaderMode === "taskTitle" ? (ICON_SIZES.md - SPACING.xs) / 2 : 0 },
+              divider: true,
+            };
+          })}
+        />
+      </View>
     </View>
   );
 };

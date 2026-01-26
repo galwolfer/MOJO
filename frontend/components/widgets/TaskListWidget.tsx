@@ -67,6 +67,53 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
   const [loadingParts, setLoadingParts] = useState<Set<string>>(new Set());
 
   // Listen for task updates and refresh progress for tasks in this list
+  const refreshTaskProgress = async (taskId: string) => {
+    try {
+      console.debug("TaskListWidget: fetching progress for", taskId);
+      const progress = await getTaskProgress(taskId);
+      console.debug("TaskListWidget: progress response for", taskId, progress);
+      if (!progress) return;
+
+      // Normalize subtasks returned by API (some use _id)
+      const apiSubtasks = (progress.subtasks || []).map((s: any) => ({
+        id: s._id || s.id,
+        status: s.status,
+        completed: s.status === "done",
+        order: s.index,
+      }));
+
+      const newKeys = new Set<string>();
+      apiSubtasks.forEach((st: any) => {
+        if (st.id && (st.completed || st.status === "done")) newKeys.add(st.id);
+      });
+
+      (progress.scheduledSessions || []).forEach((s: any, idx: number) => {
+        const key = getSessionKey(taskId, s, idx, apiSubtasks as any);
+        const isDone =
+          s.subtaskStatus === "done" || s.status === "completed" || (s.subtaskId && newKeys.has(s.subtaskId));
+        if (isDone) newKeys.add(key);
+      });
+
+      console.debug("TaskListWidget: newKeys for", taskId, Array.from(newKeys));
+
+      const subtaskIdSet = new Set(apiSubtasks.map((s: any) => s.id));
+
+      // Merge: remove old keys for this task, add refreshed keys
+      setCompletedParts((prev) => {
+        const next = new Set(prev);
+        for (const k of Array.from(prev)) {
+          if (k.startsWith(`${taskId}-`) || subtaskIdSet.has(k)) next.delete(k);
+        }
+        for (const k of newKeys) next.add(k);
+        console.debug("TaskListWidget: merged completedParts size for", taskId, next.size);
+        return next;
+      });
+    } catch (e) {
+      // ignore fetch errors silently
+      console.debug("TaskListWidget: failed to refresh task progress", e);
+    }
+  };
+
   useTaskUpdateSubscription((payload) => {
     console.debug("TaskListWidget: notify received", payload);
     if (!payload?.taskId) return;
@@ -76,52 +123,7 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
     console.debug("TaskListWidget: found task in list?", !!found, "taskId=", taskId);
     if (!found) return;
 
-    (async () => {
-      try {
-        console.debug("TaskListWidget: fetching progress for", taskId);
-        const progress = await getTaskProgress(taskId);
-        console.debug("TaskListWidget: progress response for", taskId, progress);
-        if (!progress) return;
-
-        // Normalize subtasks returned by API (some use _id)
-        const apiSubtasks = (progress.subtasks || []).map((s: any) => ({
-          id: s._id || s.id,
-          status: s.status,
-          completed: s.status === "done",
-          order: s.index,
-        }));
-
-        const newKeys = new Set<string>();
-        apiSubtasks.forEach((st: any) => {
-          if (st.id && (st.completed || st.status === "done")) newKeys.add(st.id);
-        });
-
-        (progress.scheduledSessions || []).forEach((s: any, idx: number) => {
-          const key = getSessionKey(taskId, s, idx, apiSubtasks as any);
-          const isDone =
-            s.subtaskStatus === "done" || s.status === "completed" || (s.subtaskId && newKeys.has(s.subtaskId));
-          if (isDone) newKeys.add(key);
-        });
-
-        console.debug("TaskListWidget: newKeys for", taskId, Array.from(newKeys));
-
-        const subtaskIdSet = new Set(apiSubtasks.map((s: any) => s.id));
-
-        // Merge: remove old keys for this task, add refreshed keys
-        setCompletedParts((prev) => {
-          const next = new Set(prev);
-          for (const k of Array.from(prev)) {
-            if (k.startsWith(`${taskId}-`) || subtaskIdSet.has(k)) next.delete(k);
-          }
-          for (const k of newKeys) next.add(k);
-          console.debug("TaskListWidget: merged completedParts size for", taskId, next.size);
-          return next;
-        });
-      } catch (e) {
-        // ignore fetch errors silently
-        console.debug("TaskListWidget: failed to refresh task progress", e);
-      }
-    })();
+    refreshTaskProgress(taskId);
   });
 
   React.useEffect(() => {

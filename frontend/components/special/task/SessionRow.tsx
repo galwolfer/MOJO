@@ -1,5 +1,5 @@
 import React from "react";
-import { View } from "react-native";
+import { View, Pressable } from "react-native";
 import AppText from "../../common/AppText";
 import { Checkbox } from "../../icons/Checkbox";
 import { getTimeParts } from "../../widgets/widgetHelpers";
@@ -17,7 +17,10 @@ export const SessionRow: React.FC<{
   sessionIndex: number;
   isDone?: boolean;
   isLoading?: boolean;
-  onToggle?: () => void | Promise<void>;
+  // callback when the checkbox is toggled (no args)
+  checkboxOnToggle?: () => void | Promise<void>;
+  // callback when the row is pressed
+  rowOnPress?: () => void | Promise<void>;
   canToggle?: boolean;
   hideTaskTitle?: boolean;
 }> = ({
@@ -29,16 +32,26 @@ export const SessionRow: React.FC<{
   sessionIndex,
   isDone = false,
   isLoading = false,
-  onToggle,
+  checkboxOnToggle,
+  rowOnPress,
   canToggle = false,
   hideTaskTitle = false,
 }) => {
+  const checkboxHandler = checkboxOnToggle ?? rowOnPress ?? undefined;
+  const rowPressHandler = rowOnPress ?? (canToggle ? (checkboxOnToggle ?? undefined) : undefined);
   const startParts = getTimeParts(session.start);
   const endParts = getTimeParts(session.end);
   const subtaskTitle = session.subtaskTitle || `Part ${session.subtaskIndex ?? sessionIndex + 1}`;
 
+  const Container: any = rowPressHandler ? Pressable : View;
+
   return (
-    <View style={styles.sessionRow}>
+    <Container
+      onPress={rowPressHandler && !isLoading ? rowPressHandler : undefined}
+      accessibilityRole={rowPressHandler ? "button" : undefined}
+      accessibilityState={rowPressHandler ? { disabled: !canToggle, busy: isLoading } : undefined}
+      style={styles.sessionRow}
+    >
       <View style={styles.sessionTimeBlock}>
         <View style={[styles.sessionTimeLine, { backgroundColor: categoryColor || "#007AFF" }]} />
         <View style={styles.sessionTimeColumn}>
@@ -75,7 +88,7 @@ export const SessionRow: React.FC<{
 
       <View style={styles.sessionCheckbox}>
         {canToggle ? (
-          <Checkbox checked={isDone} onChange={onToggle} size={ICON_SIZES.sm} />
+          <Checkbox checked={isDone} onChange={() => checkboxHandler?.()} size={ICON_SIZES.sm} />
         ) : (
           <View style={styles.checkboxSpacer} />
         )}
@@ -95,7 +108,7 @@ export const SessionRow: React.FC<{
           </AppText>
         </View>
       </View>
-    </View>
+    </Container>
   );
 };
 
