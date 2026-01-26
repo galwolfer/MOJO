@@ -204,7 +204,7 @@ export default function UserProfileScreen() {
     return unsubscribe;
   }, [subscribeToTaskUpdates, fetchAllData]);
 
-  const graphWidth = Math.min(width - SPACING.xlg * 2 - SPACING.md * 2, 300);
+  const graphWidth = Math.min(width - SPACING.xlg * 2 - SPACING.md * 2, 500);
 
   // If on Settings screen, render SettingsScreen
   if (currentScreen === "settings") {
