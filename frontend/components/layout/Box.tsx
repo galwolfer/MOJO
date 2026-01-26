@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
     overflow: "visible",
   },
   titleWrap: {
-    height: SPACING.xlg + 5,
+    minHeight: SPACING.xlg + 2,
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.md,
     flexDirection: "row",
@@ -86,6 +86,9 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: SPACING.lg,
     borderTopRightRadius: SPACING.lg,
     backgroundColor: COLORS.primary1,
+    flexWrap: "wrap",
+    rowGap: SPACING.xs,
+    columnGap: SPACING.sm,
   },
   titleIcon: {
     width: FONT_SIZES.md,

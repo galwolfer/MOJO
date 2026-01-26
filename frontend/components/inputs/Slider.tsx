@@ -123,8 +123,7 @@ const SliderComponent: React.FC<SliderComponentProps> = ({
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => containerWidth > 0,
-        onMoveShouldSetPanResponder: (_event, gestureState) =>
-          Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
+        onMoveShouldSetPanResponder: (_event, gestureState) => Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
         onPanResponderGrant: (event) => {
           if (containerWidth <= 0) {
             return;

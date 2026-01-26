@@ -50,6 +50,7 @@ export const ListCell: React.FC<ListCellProps> = ({
   disabled = false,
   style,
   divider = true,
+  dividerColor,
 }) => {
   const partsToRender: ListCellPart[] = parts && parts.length > 0 ? parts : [];
 
@@ -88,7 +89,7 @@ export const ListCell: React.FC<ListCellProps> = ({
               ))}
         </View>
       </TouchableOpacity>
-      {divider && <View style={styles.dividerLine} />}
+      {divider && <View style={[styles.dividerLine, { backgroundColor: dividerColor ?? COLORS.white3 }]} />}
     </View>
   );
 };
@@ -107,6 +108,7 @@ const List: React.FC<ListProps> = ({ data, renderCell, gap = SPACING.sm, style, 
       disabled={cell.disabled}
       style={cell.style}
       divider={cell.divider !== false && index !== data.length - 1}
+      dividerColor={cell.dividerColor}
     />
   );
 
@@ -141,7 +143,8 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
   },
   dividerLine: {
-    height: SPACING.xs / 2,
+    width: "100%",
+    height: SPACING.sm / 2,
     backgroundColor: COLORS.white,
     borderRadius: 1,
     marginTop: SPACING.xs,

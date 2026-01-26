@@ -2,6 +2,7 @@ import React from "react";
 import { View, StyleSheet } from "react-native";
 import Widget from "./Widget";
 import AppText from "../common/AppText";
+import AppButton from "../common/AppButton";
 import ProfileImagePicker from "../inputs/ProfileImagePicker";
 import { SPACING, COLORS } from "../../theme";
 
@@ -34,6 +35,7 @@ import { SPACING, COLORS } from "../../theme";
 type Props = {
   imageUri: string | File | null;
   onImageSelected: (value: string | File | null) => void;
+  onDelete?: () => void;
   size?: number;
   title?: string;
   subtitle?: string;
@@ -42,6 +44,7 @@ type Props = {
 const ProfilePhotoWidget: React.FC<Props> = ({
   imageUri,
   onImageSelected,
+  onDelete,
   size = 80,
   title = "Profile Photo (Optional)",
   subtitle,
@@ -61,6 +64,15 @@ const ProfilePhotoWidget: React.FC<Props> = ({
 
       <View style={styles.pickerWrap}>
         <ProfileImagePicker imageUri={imageUri} onImageSelected={(v) => onImageSelected(v as any)} size={size} />
+        {imageUri && onDelete ? (
+          <AppButton
+            title="Delete Photo"
+            onPress={onDelete}
+            mode="light"
+            color="primary7"
+            style={styles.deleteButton}
+          />
+        ) : null}
       </View>
     </Widget>
   );
@@ -86,6 +98,10 @@ const styles = StyleSheet.create({
   pickerWrap: {
     alignItems: "center",
     justifyContent: "center",
+    marginTop: SPACING.sm,
+  },
+  deleteButton: {
+    alignSelf: "center",
     marginTop: SPACING.sm,
   },
 });

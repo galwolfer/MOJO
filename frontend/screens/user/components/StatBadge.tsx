@@ -53,10 +53,8 @@ const styles = StyleSheet.create({
   iconCircle: {
     width: moderateScale(32),
     height: moderateScale(32),
-    borderRadius: moderateScale(16),
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.3)",
   },
   textContainer: {
     alignItems: "flex-start",
