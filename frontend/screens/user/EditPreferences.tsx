@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
   },
   description: {
     marginBottom: 0,
-    maxWidth: 360,
+    width: "100%",
     fontSize: FONT_SIZES.sm,
     lineHeight: FONT_SIZES.base * 1.1,
     textAlign: "left",
@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
   instruction: {
     marginTop: SPACING.md,
     marginBottom: SPACING.sm,
-    maxWidth: 360,
+    width: "100%",
     fontSize: FONT_SIZES.sm,
     lineHeight: FONT_SIZES.base,
     textAlign: "left",
