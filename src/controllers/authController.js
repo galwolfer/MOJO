@@ -12,13 +12,41 @@ import { getDefaultOjoType } from "../utils/ojoTypeUtils.js";
 const JWT_SECRET = env.JWT_SECRET || "your-secret-key-change-in-production";
 const JWT_EXPIRES_IN = "7d"; // Token valid for 7 days
 
+// Normalize gender inputs into canonical enum values used throughout the app.
+// Accepts common display variants like "Non-binary", "non binary", "Non_binary", etc.
+export function canonicalizeGender(input) {
+  if (input === undefined || input === null) return null;
+  const s = String(input).toLowerCase().trim();
+  const map = {
+    female: "female",
+    woman: "female",
+    male: "male",
+    man: "male",
+    "non-binary": "nonbinary",
+    "non binary": "nonbinary",
+    non_binary: "nonbinary",
+    nonbinary: "nonbinary",
+    "prefer not to say": "prefer_not_to_say",
+    prefer_not_to_say: "prefer_not_to_say",
+    prefernottosay: "prefer_not_to_say",
+    other: "other",
+    unspecified: "unspecified",
+  };
+  if (map[s]) return map[s];
+  const alphanumeric = s.replace(/[^a-z]/g, "");
+  if (alphanumeric === "nonbinary") return "nonbinary";
+  if (alphanumeric === "prefernottosay") return "prefer_not_to_say";
+  return null;
+}
+
 /**
  * Register a new user
  * POST /api/auth/register
  */
 export async function register(req, res, next) {
   try {
-    const { username, email, password, displayName, profileImage, gender } = req.body;
+    const { username, email, password, displayName, profileImage } = req.body;
+    let gender = req.body.gender;
 
     // Validation
     if (!username || !email || !password) {
@@ -35,13 +63,13 @@ export async function register(req, res, next) {
       });
     }
 
-    const ALLOWED_GENDERS = ["female", "male", "nonbinary", "prefer_not_to_say", "other", "unspecified"];
-
     if (gender !== undefined && gender !== null) {
-      const g = String(gender).toLowerCase();
-      if (!ALLOWED_GENDERS.includes(g)) {
+      const canonical = canonicalizeGender(gender);
+      if (!canonical) {
         return res.status(400).json({ success: false, error: "Invalid gender value" });
       }
+      // use canonical value for storage
+      gender = canonical;
     }
 
     if (password.length < 6) {
@@ -78,7 +106,7 @@ export async function register(req, res, next) {
         name: displayName ? String(displayName).trim() : "",
         profileImage: profileImage || null,
         ojoTypeId: defaultOjoType ? defaultOjoType._id : null,
-        gender: gender ? String(gender).toLowerCase() : "unspecified",
+        gender: gender ? String(gender) : "unspecified",
         settings: {},
       },
     });
@@ -100,7 +128,7 @@ export async function register(req, res, next) {
         username: user.username,
       },
       JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
+      { expiresIn: JWT_EXPIRES_IN },
     );
 
     res.status(201).json({
@@ -170,7 +198,7 @@ export async function login(req, res, next) {
         username: user.username,
       },
       JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
+      { expiresIn: JWT_EXPIRES_IN },
     );
 
     res.json({
@@ -236,7 +264,8 @@ export async function getMe(req, res, next) {
  */
 export async function updateProfile(req, res, next) {
   try {
-    const { name, ojoTypeName, settings, profileImage, gender, username, email, currentPassword, newPassword } = req.body;
+    const { name, ojoTypeName, settings, profileImage, gender, username, email, currentPassword, newPassword } =
+      req.body;
     const userId = req.user.userId;
 
     const user = await User.findById(userId);
@@ -320,8 +349,11 @@ export async function updateProfile(req, res, next) {
       }
     }
     if (gender !== undefined) {
-      const g = String(gender).toLowerCase();
-      user.profile.gender = g;
+      const canonical = canonicalizeGender(gender);
+      if (!canonical) {
+        return res.status(400).json({ success: false, error: "Invalid gender value" });
+      }
+      user.profile.gender = canonical;
     }
     if (settings) {
       user.profile.settings = new Map(Object.entries(settings));
