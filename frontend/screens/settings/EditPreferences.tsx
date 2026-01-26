@@ -12,7 +12,7 @@ import AppButton from "../../components/common/AppButton";
 import Box from "../../components/layout/Box";
 import CategoryGrid from "../auth/components/CategoryGrid";
 import { ICONS } from "../../components/icons/icons";
-import { COLORS, SPACING, FONT_SIZES, SHADOWS } from "../../theme";
+import { COLORS, SPACING, FONT_SIZES, SHADOWS, ICON_SIZES } from "../../theme";
 import { moderateScale } from "react-native-size-matters";
 import { CATEGORY_KEYS, type CategoryKey } from "../../config/categoryMeta";
 import { useNavigation } from "../../context/NavigationContext";
@@ -21,6 +21,8 @@ import { useKeyboard } from "../../hooks";
 import { getUserPreferences, updateCategoryPriorities } from "../../services/apiClient";
 import { setAuthToken } from "../../services/httpClient";
 import { useAuth } from "../../context/AuthContext";
+import { ScrollableContent } from "../../components";
+import ErrorText from "../../components/common/ErrorText";
 
 type EditPreferencesScreenProps = {
   onBack: () => void;
@@ -42,7 +44,8 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
   const [originalPriorities, setOriginalPriorities] = useState<Record<string, number>>({});
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey | null>(null);
 
-  const LeftIcon = ICONS.left;
+  const RightIcon = ICONS.right;
+  const PrefIcon = ICONS.prefrences;
 
   // Fetch current preferences on mount
   useEffect(() => {
@@ -51,7 +54,7 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
         setLoading(true);
         setError(null);
         const prefs = await getUserPreferences();
-        
+
         // Set Priorities
         if (prefs.priorities) {
           setPriorities(prefs.priorities);
@@ -78,24 +81,24 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
     fetchPreferences();
   }, []);
 
-  // Setup header
+  // Setup header (single-line): Pref icon at left, right-arrow at right
   useEffect(() => {
     setHeaderConfig({
       title: "Edit Preferences",
       show: true,
       icon: ICONS.prefrences,
       leftElement: (
-        <TouchableOpacity onPress={handleCancel} style={styles.headerButton}>
-          <LeftIcon size={24} color={COLORS.primary1} />
-        </TouchableOpacity>
-      ),
-      rightElement: (
-        <View style={styles.headerRight}>
-          <AppButton icon="prefrences" mode="light" color="primary1" disabled />
+        <View style={styles.headerLeft}>
+          <PrefIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
         </View>
       ),
+      rightElement: (
+        <TouchableOpacity onPress={onBack} style={styles.headerRightTouchable}>
+          <RightIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
+        </TouchableOpacity>
+      ),
     });
-  }, []);
+  }, [onBack]);
 
   const handleCancel = () => {
     // Reset to original values
@@ -145,22 +148,22 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
   }
 
   return (
-    <ScrollView
+    <ScrollableContent
       style={styles.scroll}
+      extraTopPadding={SPACING.lg}
       contentContainerStyle={[
         styles.contentContainer,
-        { paddingTop: (dimensions.headerHeight || SPACING.xlg * 3) + SPACING.md, paddingBottom: SPACING.xlg * 6 + keyboardPadding },
+        {
+          paddingTop: (dimensions.headerHeight || SPACING.xlg * 3) + SPACING.md,
+          paddingBottom: SPACING.xlg * 6 + keyboardPadding,
+        },
       ]}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
       {/* Title moved to topbar */}
 
-      {error && (
-        <AppText variant="notes" style={styles.errorText}>
-          {error}
-        </AppText>
-      )}
+      {error && <ErrorText>{error}</ErrorText>}
 
       {/* Priorities */}
       <Box title="Your Goals & Priorities" titleColor={COLORS.primary1}>
@@ -199,22 +202,19 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
 
           {/* Action Buttons */}
           <View style={styles.buttonRow}>
-            <TouchableOpacity style={[styles.navButton, styles.cancelButton]} onPress={handleCancel}>
-              <AppText variant="boldText" style={styles.cancelButtonText}>Cancel</AppText>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.navButton, styles.saveButton, saving && styles.disabledButton]}
+            <AppButton
+              title={saving ? "Saving..." : "Save"}
               onPress={handleSave}
+              mode="filled"
+              color="primary6"
               disabled={saving}
-            >
-              <AppText variant="boldText" style={styles.saveButtonText}>
-                {saving ? "Saving..." : "Save"}
-              </AppText>
-            </TouchableOpacity>
+              style={styles.button}
+            />
+            <AppButton title="Cancel" onPress={handleCancel} mode="light" color="lightGray" style={styles.button} />
           </View>
         </View>
       </Box>
-    </ScrollView>
+    </ScrollableContent>
   );
 }
 
@@ -225,8 +225,6 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flexGrow: 1,
-    padding: SPACING.xlg,
-    paddingTop: SPACING.xlg * 3,
     alignItems: "center",
   },
   loadingContainer: {
@@ -294,18 +292,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  errorText: {
-    color: COLORS.primary5,
-    textAlign: "center",
-    marginBottom: SPACING.md,
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
+  headerRightTouchable: {
+    width: moderateScale(44),
+    height: moderateScale(44),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
   // Buttons
   buttonRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    gap: SPACING.md,
-    marginTop: SPACING.lg,
     width: "100%",
+    gap: SPACING.md,
   },
   navButton: {
     flex: 1,
@@ -317,21 +320,7 @@ const styles = StyleSheet.create({
     borderRadius: SPACING.xlg,
     gap: SPACING.sm,
   },
-  cancelButton: {
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.primary5,
-  },
-  cancelButtonText: {
-    color: COLORS.primary5,
-  },
-  saveButton: {
-    backgroundColor: COLORS.primary6,
-  },
-  saveButtonText: {
-    color: COLORS.colorWhite,
-  },
-  disabledButton: {
-    opacity: 0.5,
+  button: {
+    width: "48%",
   },
 });

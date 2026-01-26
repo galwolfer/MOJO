@@ -11,7 +11,7 @@ import AppButton from "../../components/common/AppButton";
 import Box from "../../components/layout/Box";
 import GridEntranceItem from "../../components/common/animations/GridEntranceItem";
 import { ICONS } from "../../components/icons/icons";
-import { COLORS, SPACING, FONT_SIZES, SHADOWS } from "../../theme";
+import { COLORS, SPACING, FONT_SIZES, SHADOWS, ICON_SIZES } from "../../theme";
 import { moderateScale } from "react-native-size-matters";
 import { getAllOjoTypes, type OjoTypeName } from "../../config/ojoTypeConfig";
 import { useNavigation } from "../../context/NavigationContext";
@@ -44,7 +44,8 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
   const iconSize = moderateScale(64);
   const animatedSetRef = useRef<Set<string>>(new Set());
 
-  const LeftIcon = ICONS.left;
+  const RightIcon = ICONS.right;
+  const OjoIcon = ICONS.ojo;
 
   // Fetch current OjoType on mount
   useEffect(() => {
@@ -53,7 +54,7 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
         setLoading(true);
         setError(null);
         const prefs = await getUserPreferences();
-        
+
         // Set OjoType
         if (prefs.ojoType?.name) {
           setSelectedOjo(prefs.ojoType.name as OjoTypeName);
@@ -70,24 +71,24 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
     fetchPreferences();
   }, []);
 
-  // Setup header
+  // Setup header (single-line): Ojo icon at left, right-arrow at right
   useEffect(() => {
     setHeaderConfig({
       title: "Chat Settings",
       show: true,
       icon: ICONS.ojo,
       leftElement: (
-        <TouchableOpacity onPress={handleCancel} style={styles.headerButton}>
-          <LeftIcon size={24} color={COLORS.primary1} />
-        </TouchableOpacity>
-      ),
-      rightElement: (
-        <View style={styles.headerRight}>
-          <AppButton icon="ojo" mode="light" color="primary1" disabled />
+        <View style={styles.headerLeft}>
+          <OjoIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
         </View>
       ),
+      rightElement: (
+        <TouchableOpacity onPress={onBack} style={styles.headerRightTouchable}>
+          <RightIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
+        </TouchableOpacity>
+      ),
     });
-  }, []);
+  }, [onBack]);
 
   const handleCancel = () => {
     // Reset to original value
@@ -140,7 +141,10 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
       style={styles.scroll}
       contentContainerStyle={[
         styles.contentContainer,
-        { paddingTop: (dimensions.headerHeight || SPACING.xlg * 3) + SPACING.md, paddingBottom: SPACING.xlg * 6 + keyboardPadding },
+        {
+          paddingTop: (dimensions.headerHeight || SPACING.xlg * 3) + SPACING.md,
+          paddingBottom: SPACING.xlg * 6 + keyboardPadding,
+        },
       ]}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
@@ -230,18 +234,15 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
 
           {/* Action Buttons */}
           <View style={styles.buttonRow}>
-            <TouchableOpacity style={[styles.navButton, styles.cancelButton]} onPress={handleCancel}>
-              <AppText variant="boldText" style={styles.cancelButtonText}>Cancel</AppText>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.navButton, styles.saveButton, saving && styles.disabledButton]}
+            <AppButton title="Cancel" onPress={handleCancel} mode="light" color="lightGray" style={styles.button} />
+            <AppButton
+              title={saving ? "Saving..." : "Save"}
               onPress={handleSave}
+              mode="filled"
+              color="primary6"
+              style={styles.button}
               disabled={saving}
-            >
-              <AppText variant="boldText" style={styles.saveButtonText}>
-                {saving ? "Saving..." : "Save"}
-              </AppText>
-            </TouchableOpacity>
+            />
           </View>
         </View>
       </Box>
@@ -325,6 +326,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  headerRightTouchable: {
+    width: moderateScale(44),
+    height: moderateScale(44),
+    alignItems: "center",
+    justifyContent: "center",
+  },
   errorText: {
     color: COLORS.primary5,
     textAlign: "center",
@@ -395,6 +407,9 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     color: COLORS.colorWhite,
+  },
+  button: {
+    width: "48%",
   },
   disabledButton: {
     opacity: 0.5,

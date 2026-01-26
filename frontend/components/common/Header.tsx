@@ -1,8 +1,19 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, Platform, StyleProp, ViewStyle, useWindowDimensions, Modal, Pressable } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Platform,
+  StyleProp,
+  ViewStyle,
+  useWindowDimensions,
+  Modal,
+  Pressable,
+} from "react-native";
 import { COLORS, SPACING, TYPOGRAPHY, SHADOWS, ICON_SIZES, COMPONENT_STYLES, FONT_SIZES } from "../../theme";
 import GlassSurface from "./GlassSurface";
-import { moderateScale } from 'react-native-size-matters';
+import { moderateScale } from "react-native-size-matters";
+import AppText from "./AppText";
 
 /**
  * HeaderProps
@@ -55,7 +66,7 @@ export default function Header({ title, Icon, show = true, rightElement, leftEle
   })();
   // Allow wrapping for long titles or on narrow screens to avoid truncation.
   const words = title ? title.trim().split(/\s+/) : [];
-  const allowWrap = title ? (title.length > 8 || width < 420) : false;
+  const allowWrap = title ? title.length > 8 || width < 420 : false;
   const displayTitle = title;
   const titleLines = allowWrap ? 2 : 1;
 
@@ -70,13 +81,16 @@ export default function Header({ title, Icon, show = true, rightElement, leftEle
             {leftElement}
             {Icon && !leftElement && <Icon size={ICON_SIZES.big} color={COLORS.primary1} />}
             {title && (
-              <Text
-                numberOfLines={titleLines}
-                ellipsizeMode="tail"
-                style={[TYPOGRAPHY.title, styles.titleText, { fontSize: titleFontSize, lineHeight: Math.round(titleFontSize * 1.15) }]}
-              >
-                {displayTitle}
-              </Text>
+              <View style={{ width: "100%" }}>
+                <AppText
+                  variant="title3"
+                  numberOfLines={titleLines}
+                  ellipsizeMode="tail"
+                  style={[{ color: COLORS.primary1, width: "100%" }]}
+                >
+                  {displayTitle}
+                </AppText>
+              </View>
             )}
           </View>
 
@@ -99,12 +113,7 @@ export default function Header({ title, Icon, show = true, rightElement, leftEle
       </GlassSurface>
 
       {/* Overflow modal for collapsed rightElement */}
-      <Modal
-        visible={overflowOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setOverflowOpen(false)}
-      >
+      <Modal visible={overflowOpen} transparent animationType="fade" onRequestClose={() => setOverflowOpen(false)}>
         <Pressable style={styles.modalOverlay} onPress={() => setOverflowOpen(false)}>
           <View style={styles.modalContent}>{rightElement}</View>
         </Pressable>
@@ -135,6 +144,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   leftSection: {
+    width: "100%",
     flexDirection: "row",
     justifyContent: "flex-start",
     alignItems: "center",
