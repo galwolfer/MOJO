@@ -9,6 +9,7 @@ import {
   AppState,
   AppStateStatus,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import AppText from "../../components/common/AppText";
 import AppButton from "../../components/common/AppButton";
 import { COLORS, SPACING, SHADOWS, ICON_SIZES } from "../../theme";
@@ -22,7 +23,9 @@ import { StatBadge, ProgressGraph } from "./components";
 import FriendsList from "./components/FriendsList";
 import { moderateScale } from "react-native-size-matters";
 import { getUserStats } from "../../services/userService";
+import { getUserPreferences } from "../../services/apiClient";
 import { getTasks, calculateTaskProgress, type Task, type TaskProgress } from "../../services/taskService";
+import { getOjoType } from "../../config/ojoTypeConfig";
 import { SettingsScreen, EditPreferencesScreen, ChatSettingsScreen } from "../settings";
 
 /**
@@ -93,6 +96,7 @@ export default function UserProfileScreen() {
   const CheckIcon = ICONS.list;
   const FlameIcon = ICONS.flame;
   const TrophyIcon = ICONS.trophy;
+  const [ojoGradient, setOjoGradient] = useState<string[] | null>(null);
 
   useEffect(() => {
     if (currentScreen === "profile") {
@@ -102,18 +106,26 @@ export default function UserProfileScreen() {
           <View style={styles.headerProfileSection} pointerEvents="box-none">
             {/* Avatar */}
             <View style={styles.headerAvatarWrapper}>
-              {user?.profileImage ? (
-                <Image
-                  source={{
-                    uri: user.profileImage,
-                  }}
-                  style={styles.headerAvatarImage}
-                />
-              ) : (
-                <View style={styles.headerAvatarPlaceholder}>
-                  <UserIcon size={50} color={COLORS.lightGray} />
+              <LinearGradient
+                colors={(ojoGradient ?? [COLORS.primary1, COLORS.primary2]) as [string, string, ...string[]]}
+                end={{ x: 1, y: 1 }}
+                style={styles.headerAvatarGradient}
+              >
+                <View style={styles.headerAvatarInner}>
+                  {user?.profileImage ? (
+                    <Image
+                      source={{
+                        uri: user.profileImage,
+                      }}
+                      style={styles.headerAvatarImage}
+                    />
+                  ) : (
+                    <View style={styles.headerAvatarPlaceholder}>
+                      <UserIcon size={moderateScale(35)} color={COLORS.lightGray} />
+                    </View>
+                  )}
                 </View>
-              )}
+              </LinearGradient>
             </View>
 
             {/* Display Name */}
@@ -162,7 +174,31 @@ export default function UserProfileScreen() {
         ),
       });
     }
-  }, [currentScreen, user?.profileImage, user?.displayName, user?.username, loading, stats]);
+  }, [currentScreen, user?.profileImage, user?.displayName, user?.username, loading, stats, ojoGradient]);
+
+  // Load user's OjoType gradient for avatar outline (matches ProfileSettings)
+  // Re-run whenever the profile view becomes active so changes from Settings appear immediately.
+  useEffect(() => {
+    let mounted = true;
+    if (currentScreen !== "profile") return () => {
+      mounted = false;
+    };
+
+    (async () => {
+      try {
+        const prefs = await getUserPreferences();
+        const ojoName = prefs?.ojoType?.name as any;
+        const cfg = ojoName ? getOjoType(ojoName) : getOjoType("mentorjo");
+        if (mounted) setOjoGradient(cfg.gradient2 ?? cfg.gradient ?? [cfg.color, cfg.color]);
+      } catch (e) {
+        // ignore and keep default colors
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [currentScreen]);
 
   const fetchAllData = useCallback(async () => {
     if (!mountedRef.current) return;
@@ -338,6 +374,23 @@ const styles = StyleSheet.create({
   headerAvatarImage: {
     width: "100%",
     height: "100%",
+  },
+  headerAvatarGradient: {
+    width: moderateScale(110),
+    height: moderateScale(110),
+    borderRadius: moderateScale(55),
+    alignItems: "center",
+    justifyContent: "center",
+    padding: moderateScale(2),
+  },
+  headerAvatarInner: {
+    width: "100%",
+    height: "100%",
+    borderRadius: moderateScale(53),
+    backgroundColor: COLORS.white,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
   },
   headerAvatarPlaceholder: {
     width: "100%",

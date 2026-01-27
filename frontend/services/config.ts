@@ -84,6 +84,12 @@ function initializeApiBase(): string {
 // Initialize on module load
 API_BASE = initializeApiBase();
 
+// Debug: log resolved API base for easier debugging in Metro/Expo logs
+try {
+  // eslint-disable-next-line no-console
+  console.log("Resolved API_BASE:", API_BASE);
+} catch (_) {}
+
 /**
  * Log environment and resolved API configuration to help debugging
  */

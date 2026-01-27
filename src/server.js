@@ -20,8 +20,8 @@ connectDatabase()
     // Initialize OjoTypes in the database
     await initializeOjoTypes();
 
-    server.listen(port, () => {
-      logger.info(`HTTP server listening on http://localhost:${port}`);
+    server.listen(port, "0.0.0.0", () => {
+      logger.info(`HTTP server listening on 0.0.0.0:${port}`);
       startPriorityScheduler();
 
       // Start expired task checker (runs every hour)
