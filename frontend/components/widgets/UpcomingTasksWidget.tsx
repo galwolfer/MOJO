@@ -167,10 +167,11 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({
 
   const buildTaskCell = (task: TaskItem): ListCellProps => {
     const categoryMeta = getCategoryMeta(task.category);
+    console.log("Task category:", task.category, "categoryMeta:", categoryMeta);
     const hasScheduledSessions = (task.scheduledSessions || []).length > 0;
 
     const content = (
-      <View style={{ width: "100%" }}>
+      <View style={{ width: "100%", paddingStart: SPACING.md }}>
         {hasScheduledSessions ? (
           <ScheduledSessionsSection
             taskId={task.id}
@@ -279,7 +280,7 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({
         </View>
       </View>
 
-      <List data={dayCells} />
+      <List data={dayCells} dividerColor={COLORS.white} />
     </Widget>
   );
 };
@@ -337,7 +338,7 @@ const styles = StyleSheet.create({
   listContainer: {
     width: "100%",
     marginTop: -SPACING.md,
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.sm,
     marginStart: -SPACING.sm,
   },
   sectionCount: {

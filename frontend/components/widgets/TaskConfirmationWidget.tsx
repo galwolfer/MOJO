@@ -156,6 +156,8 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
           taskTitle={task.title || task.taskname || "Untitled task"}
           scheduledSessions={task.scheduledSessions}
           subtasks={task.subtasks}
+          category={task.category}
+          categoryColor={getCategoryMeta(task.category)?.color}
           estimatedDuration={task.estimatedDuration || task.duration}
           progressPercentage={task.status === "draft" ? null : (task.progressPercentage ?? null)}
         />

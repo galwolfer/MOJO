@@ -46,7 +46,7 @@ export const SessionRow: React.FC<{
   const subtaskTitle = session.subtaskTitle || `Part ${session.subtaskIndex ?? sessionIndex + 1}`;
 
   const Container: any = rowPressHandler ? Pressable : View;
-
+  console.log("Category Color:", categoryColor);
   return (
     <View>
       {showTaskDate && (
