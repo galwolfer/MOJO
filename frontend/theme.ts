@@ -10,7 +10,6 @@ export const COLORS = {
   primary5: "#ECA32E",
   primary6: "#38AF4D",
   primary7: "#F43E3E",
-  lightGray: "#8e95b2",
 
   // Bright palette
   brightP1: "#96a7f0",
@@ -20,6 +19,7 @@ export const COLORS = {
   brightP5: "#FFD796",
   brightP6: "#A7F7B6",
   brightP7: "#FFADAD",
+  lightGray: "#7b86af",
 
   // Dark palette
   darkP1: "#1F3BC0",

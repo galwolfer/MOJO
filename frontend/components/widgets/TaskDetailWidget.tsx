@@ -227,7 +227,6 @@ const styles = StyleSheet.create({
   container: {
     gap: SPACING.md,
     width: "100%",
-    maxWidth: 500,
     alignSelf: "stretch",
   },
   header: {
