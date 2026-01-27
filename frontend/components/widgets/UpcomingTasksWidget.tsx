@@ -167,7 +167,6 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({
 
   const buildTaskCell = (task: TaskItem): ListCellProps => {
     const categoryMeta = getCategoryMeta(task.category);
-    console.log("Task category:", task.category, "categoryMeta:", categoryMeta);
     const hasScheduledSessions = (task.scheduledSessions || []).length > 0;
 
     const content = (
