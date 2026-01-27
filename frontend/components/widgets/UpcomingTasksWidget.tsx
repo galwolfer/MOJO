@@ -322,6 +322,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     width: "100%",
+    marginTop: SPACING.xs,
+    marginBottom: SPACING.md,
   },
   dayHeaderTitle: {
     flexDirection: "row",
