@@ -23,6 +23,7 @@ export const SessionRow: React.FC<{
   rowOnPress?: () => void | Promise<void>;
   canToggle?: boolean;
   hideTaskTitle?: boolean;
+  showTaskDate?: boolean;
 }> = ({
   session,
   taskId,
@@ -36,6 +37,7 @@ export const SessionRow: React.FC<{
   rowOnPress,
   canToggle = false,
   hideTaskTitle = false,
+  showTaskDate = false,
 }) => {
   const checkboxHandler = checkboxOnToggle ?? rowOnPress ?? undefined;
   const rowPressHandler = rowOnPress ?? (canToggle ? (checkboxOnToggle ?? undefined) : undefined);
@@ -46,69 +48,76 @@ export const SessionRow: React.FC<{
   const Container: any = rowPressHandler ? Pressable : View;
 
   return (
-    <Container
-      onPress={rowPressHandler && !isLoading ? rowPressHandler : undefined}
-      accessibilityRole={rowPressHandler ? "button" : undefined}
-      accessibilityState={rowPressHandler ? { disabled: !canToggle, busy: isLoading } : undefined}
-      style={styles.sessionRow}
-    >
-      <View style={styles.sessionTimeBlock}>
-        <View style={[styles.sessionTimeLine, { backgroundColor: categoryColor || "#007AFF" }]} />
-        <View style={styles.sessionTimeColumn}>
-          <AppText variant="notes" style={styles.sessionHourText}>
-            {session.start ? (
-              <>
-                {startParts.time || "Time"}
-                {startParts.ampm ? (
-                  <AppText variant="notes" style={styles.sessionAmPm}>
-                    {" " + startParts.ampm}
-                  </AppText>
-                ) : null}
-              </>
-            ) : (
-              "Time"
-            )}
-          </AppText>
-          <AppText variant="notes" style={styles.sessionHourText}>
-            {session.end ? (
-              <>
-                {endParts.time || ""}
-                {endParts.ampm ? (
-                  <AppText variant="notes" style={styles.sessionAmPm}>
-                    {" " + endParts.ampm}
-                  </AppText>
-                ) : null}
-              </>
-            ) : (
-              ""
-            )}
-          </AppText>
-        </View>
-      </View>
-
-      <View style={styles.sessionCheckbox}>
-        {canToggle ? (
-          <Checkbox checked={isDone} onChange={() => checkboxHandler?.()} size={ICON_SIZES.sm} />
-        ) : (
-          <View style={styles.checkboxSpacer} />
-        )}
-      </View>
-
-      <View style={styles.sessionInfo}>
-        <View style={styles.sessionTitleRow}>
-          <AppText variant="bodyText" style={[styles.sessionTitleText, isDone && styles.sessionLabelDone]}>
-            <AppText variant="boldText" style={styles.sessionSubtask}>
-              {subtaskTitle}
+    <View>
+      {showTaskDate && (
+        <AppText variant="notes" style={[styles.sessionDateText, { color: categoryColor || COLORS.primary1 }]}>
+          {session.start ? startParts.date : "Date"}
+        </AppText>
+      )}
+      <Container
+        onPress={rowPressHandler && !isLoading ? rowPressHandler : undefined}
+        accessibilityRole={rowPressHandler ? "button" : undefined}
+        accessibilityState={rowPressHandler ? { disabled: !canToggle, busy: isLoading } : undefined}
+        style={styles.sessionRow}
+      >
+        <View style={styles.sessionTimeBlock}>
+          <View style={[styles.sessionTimeLine, { backgroundColor: categoryColor || COLORS.primary1 }]} />
+          <View style={styles.sessionTimeColumn}>
+            <AppText variant="notes" style={styles.sessionHourText}>
+              {session.start ? (
+                <>
+                  {startParts.time || "Time"}
+                  {startParts.ampm ? (
+                    <AppText variant="notes" style={styles.sessionAmPm}>
+                      {" " + startParts.ampm}
+                    </AppText>
+                  ) : null}
+                </>
+              ) : (
+                "Time"
+              )}
             </AppText>
-            {!hideTaskTitle && taskTitle ? (
-              <AppText variant="bodyText" style={styles.sessionTask}>
-                {" - " + taskTitle}
-              </AppText>
-            ) : null}
-          </AppText>
+            <AppText variant="notes" style={styles.sessionHourText}>
+              {session.end ? (
+                <>
+                  {endParts.time || ""}
+                  {endParts.ampm ? (
+                    <AppText variant="notes" style={styles.sessionAmPm}>
+                      {" " + endParts.ampm}
+                    </AppText>
+                  ) : null}
+                </>
+              ) : (
+                ""
+              )}
+            </AppText>
+          </View>
         </View>
-      </View>
-    </Container>
+
+        <View style={styles.sessionCheckbox}>
+          {canToggle ? (
+            <Checkbox checked={isDone} onChange={() => checkboxHandler?.()} size={ICON_SIZES.sm} />
+          ) : (
+            <View style={styles.checkboxSpacer} />
+          )}
+        </View>
+
+        <View style={styles.sessionInfo}>
+          <View style={styles.sessionTitleRow}>
+            <AppText variant="bodyText" style={[styles.sessionTitleText, isDone && styles.sessionLabelDone]}>
+              <AppText variant="boldText" style={styles.sessionSubtask}>
+                {subtaskTitle}
+              </AppText>
+              {!hideTaskTitle && taskTitle ? (
+                <AppText variant="bodyText" style={styles.sessionTask}>
+                  {" - " + taskTitle}
+                </AppText>
+              ) : null}
+            </AppText>
+          </View>
+        </View>
+      </Container>
+    </View>
   );
 };
 
@@ -121,6 +130,10 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     paddingVertical: 4,
     width: "100%",
+  },
+  sessionDateText: {
+    fontWeight: "600",
+    marginBottom: SPACING.xs,
   },
   sessionTimeBlock: {
     flexDirection: "row",

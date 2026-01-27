@@ -93,6 +93,7 @@ export const ScheduledSessionsSection: React.FC<{
                   rowOnPress={onToggleSession ? () => onToggleSession(taskId, session, index, subtasks) : undefined}
                   canToggle={!!onToggleSession}
                   hideTaskTitle={hideTaskTitle}
+                  showTaskDate={sessionHeaderMode === "date"}
                 />
               ),
               onPress: onToggleSession ? () => onToggleSession(taskId, session, index, subtasks) : undefined,

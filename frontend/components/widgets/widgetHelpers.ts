@@ -298,10 +298,10 @@ export const getSessionKey = (
  * Extract hour:minute and AM/PM parts from an ISO date string.
  * Used for displaying time in 12-hour format with separate components.
  * @param dateStr - ISO date string
- * @returns Object with time (HH:MM) and ampm (AM/PM) strings
+ * @returns Object with time (HH:MM), ampm (AM/PM), and date strings
  */
-export const getTimeParts = (dateStr?: string): { time: string; ampm: string } => {
-  if (!dateStr) return { time: "", ampm: "" };
+export const getTimeParts = (dateStr?: string): { time: string; ampm: string; date: string } => {
+  if (!dateStr) return { time: "", ampm: "", date: "" };
   try {
     const date = new Date(dateStr);
     const minutes = date.getMinutes();
@@ -309,9 +309,17 @@ export const getTimeParts = (dateStr?: string): { time: string; ampm: string } =
     const ampm = rawHours >= 12 ? "PM" : "AM";
     const hours12 = rawHours % 12 === 0 ? 12 : rawHours % 12;
     const time = `${hours12}:${minutes.toString().padStart(2, "0")}`;
-    return { time, ampm };
+
+    // Format date as "Mon, Jan 27"
+    const dateFormatted = date.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+
+    return { time, ampm, date: dateFormatted };
   } catch {
-    return { time: "", ampm: "" };
+    return { time: "", ampm: "", date: "" };
   }
 };
 
