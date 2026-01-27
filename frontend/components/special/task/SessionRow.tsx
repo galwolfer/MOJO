@@ -100,20 +100,17 @@ export const SessionRow: React.FC<{
             <View style={styles.checkboxSpacer} />
           )}
         </View>
-
-        <View style={styles.sessionInfo}>
-          <View style={styles.sessionTitleRow}>
-            <AppText variant="bodyText" style={[styles.sessionTitleText, isDone && styles.sessionLabelDone]}>
-              <AppText variant="boldText" style={styles.sessionSubtask}>
-                {subtaskTitle}
-              </AppText>
-              {!hideTaskTitle && taskTitle ? (
-                <AppText variant="bodyText" style={styles.sessionTask}>
-                  {" - " + taskTitle}
-                </AppText>
-              ) : null}
+        <View style={styles.sessionTitleRow}>
+          <AppText variant="bodyText" style={[isDone && styles.sessionLabelDone]}>
+            <AppText variant="boldText" style={styles.sessionSubtask}>
+              {subtaskTitle}
             </AppText>
-          </View>
+            {!hideTaskTitle && taskTitle ? (
+              <AppText variant="bodyText" style={styles.sessionTask}>
+                {" - " + taskTitle}
+              </AppText>
+            ) : null}
+          </AppText>
         </View>
       </Container>
     </View>
@@ -169,20 +166,17 @@ const styles = StyleSheet.create({
     height: ICON_SIZES.sm,
   },
   sessionInfo: {
-    flex: 1,
     gap: SPACING.xs,
   },
   sessionTitleRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "flex-start",
     flexWrap: "nowrap",
     gap: SPACING.xs,
   },
   sessionLabelDone: {
     textDecorationLine: "line-through",
-  },
-  sessionTitleText: {
-    flexShrink: 1,
   },
   sessionSubtask: {
     fontWeight: "600",
