@@ -33,17 +33,17 @@ export default function NavBar({ show = true, hideIcons = false }: NavBarProps) 
         Animated.timing(opacityAnim, {
           toValue: 1,
           duration: 400,
-          useNativeDriver: false,
+          useNativeDriver: true,
         }),
         Animated.timing(scaleAnim, {
           toValue: 1,
           duration: 400,
-          useNativeDriver: false,
+          useNativeDriver: true,
         }),
         Animated.timing(translateYAnim, {
           toValue: 0,
           duration: 400,
-          useNativeDriver: false,
+          useNativeDriver: true,
         }),
       ]).start();
     }
