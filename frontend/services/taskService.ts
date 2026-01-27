@@ -8,6 +8,31 @@ import { get, post, patch, del } from "./httpClient";
 
 // Types
 export type TaskStatus = "todo" | "in_progress" | "done";
+export type SubTaskStatus = "todo" | "done";
+
+export type ScheduledSession = {
+  id?: string;
+  taskId?: string;
+  start?: string;
+  end?: string;
+  minutes?: number;
+  status?: string;
+  subtaskIndex?: number;
+  subtaskId?: string;
+  subtaskTitle?: string;
+  subtaskStatus?: string;
+};
+
+export type SubTask = {
+  _id: string;
+  taskId: string;
+  index?: number;
+  title: string;
+  description?: string;
+  status?: SubTaskStatus;
+  minutes?: number;
+  scheduledSessions?: ScheduledSession[];
+};
 
 export type Task = {
   _id: string;
@@ -19,12 +44,25 @@ export type Task = {
     label: string;
     source: string;
     confidence: number;
+    updatedAt?: string;
   };
   status: TaskStatus;
   completed?: boolean;
   importance?: number;
   effort?: number;
   dueDate?: string;
+  estimatedDuration?: number;
+  taskType?: "perfect" | "in_parts" | "leaky";
+  canSplit?: boolean;
+  minChunk?: number | null;
+  chunkCount?: number | null;
+  chunkMinutes?: number | null;
+  minMinutes?: number | null;
+  maxMinutes?: number | null;
+  earliestStart?: string | null;
+  priorityScore?: number;
+  progressPercentage?: number;
+  tags?: string[] | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -50,6 +88,48 @@ export type TaskProgress = {
   labels: string[];
 };
 
+export type TaskProgressData = {
+  task: Task;
+  subtasks: SubTask[];
+  scheduledSessions?: ScheduledSession[];
+  completedParts: number;
+  totalParts: number;
+  overallProgress: number;
+  progressPercentage: number;
+};
+
+export type TaskProgressResponse = {
+  success: boolean;
+  data: TaskProgressData;
+};
+
+export type ScheduledDayGroup = {
+  date: string | null;
+  tasks: Array<{
+    id: string;
+    title: string;
+    status?: TaskStatus;
+    dueDate?: string | null;
+    importance?: number;
+    effort?: number;
+    progressPercentage?: number;
+    taskType?: string | null;
+    category?: string | null;
+    subcategory?: string | null;
+    description?: string;
+    estimatedDuration?: number;
+    canSplit?: boolean;
+    scheduledSessions?: ScheduledSession[];
+  }>;
+};
+
+export type ScheduledTasksResponse = {
+  success: boolean;
+  days: number;
+  today: ScheduledDayGroup;
+  upcoming: ScheduledDayGroup[];
+};
+
 /**
  * Get all tasks for current user
  * GET /api/tasks
@@ -59,6 +139,7 @@ export async function getTasks(filters?: {
   completed?: boolean;
   dueBefore?: string;
   dueAfter?: string;
+  search?: string;
 }): Promise<Task[]> {
   try {
     const params = new URLSearchParams();
@@ -66,6 +147,7 @@ export async function getTasks(filters?: {
     if (filters?.completed !== undefined) params.append("completed", String(filters.completed));
     if (filters?.dueBefore) params.append("dueBefore", filters.dueBefore);
     if (filters?.dueAfter) params.append("dueAfter", filters.dueAfter);
+    if (filters?.search) params.append("search", filters.search);
 
     const queryString = params.toString();
     const endpoint = queryString ? `/tasks?${queryString}` : "/tasks";
@@ -88,6 +170,65 @@ export async function getTaskById(id: string): Promise<Task | null> {
     return response.task || null;
   } catch (error) {
     console.warn("Failed to fetch task:", error);
+    return null;
+  }
+}
+
+/**
+ * Get overdue tasks
+ * GET /api/tasks/overdue
+ */
+export async function getOverdueTasks(): Promise<Task[]> {
+  try {
+    const response = await get<{ success: boolean; tasks: Task[] }>(`/tasks/overdue`);
+    return response.tasks || [];
+  } catch (error) {
+    console.warn("Failed to fetch overdue tasks:", error);
+    return [];
+  }
+}
+
+/**
+ * Get task progress with subtasks and schedule
+ * GET /api/tasks/:id/progress
+ */
+export async function getTaskProgress(id: string): Promise<TaskProgressData | null> {
+  const maxRetries = 2; // number of retries after first failure
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await get<TaskProgressResponse>(`/tasks/${id}/progress`);
+      return response.data || null;
+    } catch (error: any) {
+      const msg = error instanceof Error ? error.message : String(error);
+      const isNotFound = error?.name === "ServerError" && (msg.includes("Task not found") || msg.includes("404"));
+
+      // Retry a couple of times for transient 404s (eventual consistency after updates)
+      if (isNotFound && attempt < maxRetries) {
+        const delay = 150 * (attempt + 1);
+        await new Promise((res) => setTimeout(res, delay));
+        continue;
+      }
+
+      // Otherwise log at debug level for diagnostics and return null
+      console.debug(`Failed to fetch task progress for ${id}:`, error);
+      return null;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Get scheduled tasks grouped by day
+ * GET /api/tasks/scheduled/:days?
+ */
+export async function getScheduledTasksByDay(days: number = 7): Promise<ScheduledTasksResponse | null> {
+  try {
+    const response = await get<ScheduledTasksResponse>(`/tasks/scheduled/${days}`);
+    return response || null;
+  } catch (error) {
+    console.warn("Failed to fetch scheduled tasks:", error);
     return null;
   }
 }
@@ -245,7 +386,7 @@ export async function suggestCategory(taskname: string): Promise<{
       category: string;
       subCategory: string | null;
     }>("/tasks/suggest-category", { taskname });
-    
+
     if (response.success) {
       return {
         category: response.category,
@@ -298,7 +439,7 @@ export async function toggleTaskCompletion(id: string): Promise<Task | null> {
  */
 export async function updateTask(
   id: string,
-  updates: Partial<Omit<Task, "_id" | "userId" | "createdAt" | "updatedAt">>
+  updates: Partial<Omit<Task, "_id" | "userId" | "createdAt" | "updatedAt">>,
 ): Promise<Task | null> {
   try {
     const response = await patch<{ success: boolean; task: Task }>(`/tasks/${id}`, updates);
@@ -307,6 +448,31 @@ export async function updateTask(
     console.warn("Failed to update task:", error);
     return null;
   }
+}
+
+/**
+ * Update a subtask
+ * PATCH /api/tasks/:taskId/subtasks/:subId
+ */
+export async function updateSubTask(
+  taskId: string,
+  subtaskId: string,
+  updates: Partial<{ status: SubTaskStatus; title?: string; description?: string; minutes?: number }>,
+): Promise<boolean> {
+  try {
+    await patch<{ success: boolean }>(`/tasks/${taskId}/subtasks/${subtaskId}`, updates);
+    return true;
+  } catch (error) {
+    console.warn("Failed to update subtask:", error);
+    return false;
+  }
+}
+
+/**
+ * Update a subtask status (deprecated) — use updateSubTask instead
+ */
+export async function updateSubTaskStatus(taskId: string, subtaskId: string, status: SubTaskStatus): Promise<boolean> {
+  return updateSubTask(taskId, subtaskId, { status });
 }
 
 /**
@@ -327,10 +493,15 @@ export default {
   createTask,
   getTasks,
   getTaskById,
+  getOverdueTasks,
+  getTaskProgress,
+  getScheduledTasksByDay,
   calculateTaskProgress,
   completeTask,
   toggleTaskCompletion,
   updateTask,
+  updateSubTask,
+  updateSubTaskStatus,
   deleteTask,
   suggestCategory,
 };

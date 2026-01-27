@@ -195,7 +195,10 @@ export default function ProfileSettings() {
           username: response.user.username,
           email: response.user.email,
           displayName: response.user.profile?.name || editedDisplayName,
-          profileImage: response.user.profile?.profileImage || user?.profileImage,
+          profileImage:
+            response.user.profile?.profileImage !== undefined
+              ? response.user.profile?.profileImage
+              : user?.profileImage,
         };
         await signIn(token, updatedUser);
       }
@@ -435,11 +438,11 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   userUsername: {
-    color: COLORS.grayLight,
+    color: COLORS.lightGray,
     marginTop: 2,
   },
   userEmail: {
-    color: COLORS.grayLight,
+    color: COLORS.lightGray,
   },
   editButton: {
     alignSelf: "center",

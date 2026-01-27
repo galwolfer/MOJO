@@ -97,7 +97,7 @@ async function run() {
   assert(funcMessages1.length > 0, "Expected a tool result to be added when system message from LLM is ignored");
   assert(
     funcMessages1.some((t) => String(t.message.content).includes("System messages from the model are not allowed")),
-    "Tool message should indicate system messages were ignored"
+    "Tool message should indicate system messages were ignored",
   );
 
   console.log("- System message rejection: OK");
@@ -127,7 +127,7 @@ async function run() {
   assert(funcMessages2.length > 0, "Expected tool result messages for invalid tool call");
   assert(
     funcMessages2.some((t) => String(t.message.content).includes("Validation failed")),
-    "Tool message should indicate validation failure"
+    "Tool message should indicate validation failure",
   );
 
   console.log("- Invalid tool args rejection: OK");
@@ -178,7 +178,7 @@ async function run() {
   assert(toolResult, "Expected preview_task tool result");
   assert(
     toolResult.message.content.includes("Draft created successfully"),
-    "preview_task should execute and return draft message even with invalid widget JSON"
+    "preview_task should execute and return draft message even with invalid widget JSON",
   );
 
   console.log("- Invalid widget payload handling: OK (lenient for preview_task)");
@@ -198,6 +198,25 @@ async function run() {
   assert(res && res.response && res.response.includes("Fallback success"), "Fallback should return success message");
 
   console.log("- TypeError fallback handling: OK");
+
+  // Test 5: LLM throws TypeError 'reading parts' -> fallback should be attempted and succeed
+  captured.length = 0;
+  const agent5 = new AgentController("dummy");
+  agent5.llm = createFakeLLM([
+    // Throw inside function so the invoke rejection is catchable
+    () => {
+      throw new TypeError("Cannot read properties of undefined (reading 'parts')");
+    },
+    () => ({ _getType: () => "ai", content: "Fallback parts success", tool_calls: [] }),
+  ]);
+
+  const res2 = await agent5.processMessage("sess5", "hello parts", "user5");
+  assert(
+    res2 && res2.response && res2.response.includes("Fallback parts success"),
+    "Fallback should handle 'parts' TypeError",
+  );
+
+  console.log("- TypeError (parts) fallback handling: OK");
 
   console.log("All integration tests passed ✅");
 }

@@ -3,6 +3,7 @@ import { LightMission } from "./LightMission.js";
 import { memoryStore } from "../../services/memoryService.js";
 import { GeminiAdapter } from "../geminiAdapter.js";
 import { config } from "../../config/env.js";
+import { okFalse } from "../lib/errorFormatter.js";
 
 const saveConversationNoteMission = new LightMission({
   name: "save_conversation_note",
@@ -67,7 +68,7 @@ const saveConversationNoteMission = new LightMission({
 
       return `ok=true\nmsg="Saved note: ${noteToSave}"\nimp=${importance}`;
     } catch (error) {
-      return `ok=false\nerr="${error.message}"`;
+      return okFalse(error.message);
     }
   },
 });

@@ -4,6 +4,8 @@ import * as taskService from "../../services/taskService.js";
 import { TASK_CONFIG, inferTaskProperties, inferSplittingParams } from "../taskRules.js";
 import { CATEGORY_STRING_VALUES } from "../../config/categories.js";
 import { getIllegalDisplayFields, getIllegalCharsErrorMessage } from "../../utils/illegalChars.js";
+import { createTaskViaController, saveSubcategoryToProfile } from "../missionControllerHelpers.js";
+import { okFalse, okTrue } from "../lib/errorFormatter.js";
 
 const addTaskMission = new GuidedMission({
   name: "add_task",
@@ -14,7 +16,9 @@ const addTaskMission = new GuidedMission({
   behavior: [
     "IMPORTANT: User must first choose/confirm category AND subcategory.",
     "Call get_subcategories(category=<chosen>) to fetch options BEFORE calling add_task.",
-    "Call only after the user explicitly confirms the task details.",
+    "AUTO-SELECTION RULE: If get_subcategories returns an existing subcategory that matches (exact or very close) the task name, automatically use it WITHOUT asking the user for confirmation.",
+    "Only ask the user to confirm if there is NO matching subcategory or if creating a new one.",
+    "Call only after the user explicitly confirms the task details (except for auto-matched subcategories).",
   ],
   schema: z.object({
     taskname: z.string().describe("Task title"),
@@ -27,7 +31,7 @@ const addTaskMission = new GuidedMission({
     subcategory: z
       .string()
       .describe(
-        "REQUIRED: Specific subcategory (MUST call get_subcategories first to select from existing or confirm new)"
+        "REQUIRED: Specific subcategory. If get_subcategories returned an exact or close match to the task name, use it automatically. Otherwise, confirm with user before using/creating.",
       ),
     canSplit: z.boolean().optional().describe("Can be split into chunks?"),
     minChunk: z.number().optional().describe("Minimum chunk size in minutes when splitting"),
@@ -73,7 +77,7 @@ const addTaskMission = new GuidedMission({
         subcategory,
       });
       if (illegalFields.length > 0) {
-        return `ok=false\nerr="illegal_characters"\nmsg="${getIllegalCharsErrorMessage(illegalFields)}"`;
+        return okFalse("illegal_characters", { msg: getIllegalCharsErrorMessage(illegalFields) });
       }
 
       // Infer properties from task title if not provided
@@ -88,14 +92,14 @@ const addTaskMission = new GuidedMission({
         // Will fetch user's category priority below after we have finalCategory
         finalImportance = null; // placeholder, will be set after category priority lookup
       }
-      const finalEffort = effort !== undefined && effort !== null ? effort : inferred.effort ?? null;
-      const finalDuration = duration !== undefined && duration !== null ? duration : inferred.duration ?? null;
+      const finalEffort = effort !== undefined && effort !== null ? effort : (inferred.effort ?? null);
+      const finalDuration = duration !== undefined && duration !== null ? duration : (inferred.duration ?? null);
       const finalCategory = category || inferred.category || "";
       const finalSubcategory = subcategory || inferred.subcategory || "";
 
       // Enforce estimatedDuration must be provided by the user; if missing, ask explicitly
       if (!finalDuration || typeof finalDuration !== "number" || isNaN(finalDuration) || finalDuration <= 0) {
-        return `ok=false\nerr="duration_required"\nmsg="Please ask the user: 'How many minutes will this task take?'"`;
+        return okFalse("duration_required", { msg: "Please ask the user: 'How many minutes will this task take?'" });
       }
 
       // Enforce effort must be explicitly set by the LLM (1-5). If missing, instruct LLM to pick one.
@@ -106,7 +110,9 @@ const addTaskMission = new GuidedMission({
         finalEffort < 1 ||
         finalEffort > 5
       ) {
-        return `ok=false\nerr="effort_required"\nmsg="Assistant must select an effort (integer 1-5) based on task duration, category, and complexity, and include it in the mission call."`;
+        return okFalse("effort_required", {
+          msg: "Assistant must select an effort (integer 1-5) based on task duration, category, and complexity, and include it in the mission call.",
+        });
       }
 
       // If importance was not explicitly provided by the caller, use user's per-category priority mapping
@@ -194,15 +200,20 @@ const addTaskMission = new GuidedMission({
         };
       }
 
-      // Create task in database
-      const task = await taskService.createTask(taskData);
+      // Create task through controller (which automatically triggers scheduling)
+      const task = await createTaskViaController(userId, taskData);
+
+      if (!task) {
+        return okFalse("task_creation_failed", { msg: "Failed to create task" });
+      }
 
       console.log(`[LOG] Task created: ${task._id} ${recurrence ? "(recurring)" : ""}`);
+      console.log(`[LOG] Schedule updated via controller after task creation`);
 
       // Return structured result only (LLM will generate user-facing confirmation)
-      return `ok=true\nmsg="Task created"\nid="${task._id}"`;
+      return okTrue({ msg: "Task created", id: `${task._id}` });
     } catch (error) {
-      return `ok=false\nerr="${error.message}"`;
+      return okFalse(error.message);
     }
   },
 });

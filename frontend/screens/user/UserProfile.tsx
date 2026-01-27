@@ -111,7 +111,7 @@ export default function UserProfileScreen() {
                 />
               ) : (
                 <View style={styles.headerAvatarPlaceholder}>
-                  <UserIcon size={ICON_SIZES.md} color={COLORS.grayLight} />
+                  <UserIcon size={50} color={COLORS.lightGray} />
                 </View>
               )}
             </View>
@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
   },
   headerDisplayName: {
-    color: COLORS.grayLight,
+    color: COLORS.lightGray,
     textAlign: "center",
   },
   headerStatsRow: {
@@ -434,7 +434,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
   },
   displayName: {
-    color: COLORS.grayLight,
+    color: COLORS.lightGray,
     textAlign: "center",
     marginTop: 2,
   },
@@ -472,18 +472,18 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(18),
   },
   progressSummaryLabel: {
-    color: COLORS.grayLight,
+    color: COLORS.lightGray,
     fontSize: moderateScale(10),
     marginTop: 2,
   },
   progressSummaryDivider: {
     width: 1,
     height: moderateScale(30),
-    backgroundColor: COLORS.grayLight,
+    backgroundColor: COLORS.lightGray,
     opacity: 0.3,
   },
   progressNote: {
-    color: COLORS.grayLight,
+    color: COLORS.lightGray,
     textAlign: "center",
     paddingHorizontal: SPACING.md,
   },

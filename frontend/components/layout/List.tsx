@@ -5,6 +5,7 @@
 
 import React, { ReactNode } from "react";
 import { View, StyleSheet, ViewStyle } from "react-native";
+import AppText from "../common/AppText";
 import { COLORS, SPACING, DIVIDER, COMPONENT_STYLES } from "../../theme";
 
 export interface ListCellPart {
@@ -33,6 +34,7 @@ export interface ListProps {
   renderCell?: (cell: ListCellProps) => ReactNode;
   gap?: number;
   style?: ViewStyle;
+  dividerColor?: string;
   keyExtractor?: (item: ListCellProps) => string;
 }
 
@@ -63,15 +65,29 @@ export const ListCell: React.FC<ListCellProps> = ({
         accessibilityRole={onPress ? "button" : undefined}
       >
         <View style={styles.rowInner}>
-          {content ? (
-            <View style={styles.contentContainer}>{content}</View>
-          ) : (
-            partsToRender.map((part) => (
-              <View key={part.id} style={[styles.part, { flex: part.flex ?? 1 }, part.style]}>
-                {part.content}
-              </View>
-            ))
-          )}
+          {content
+            ? (() => {
+                if (typeof content === "string" || typeof content === "number") {
+                  // Debug - capture origin when a primitive is used as the `content` prop
+                  console.debug("ListCell: primitive content", String(content), new Error().stack);
+                  return (
+                    <View style={styles.contentContainer}>
+                      <AppText>{String(content)}</AppText>
+                    </View>
+                  );
+                }
+
+                return <View style={styles.contentContainer}>{content}</View>;
+              })()
+            : partsToRender.map((part) => (
+                <View key={part.id} style={[styles.part, { flex: part.flex ?? 1 }, part.style]}>
+                  {typeof part.content === "string" || typeof part.content === "number"
+                    ? // Wrap primitive content in Text to avoid react-native-web View text-node errors
+                      (console.debug("ListCell: primitive part.content", String(part.content), new Error().stack),
+                      (<AppText>{String(part.content)}</AppText>))
+                    : part.content}
+                </View>
+              ))}
         </View>
       </TouchableOpacity>
       {divider && <View style={[styles.dividerLine, { backgroundColor: dividerColor ?? COLORS.white3 }]} />}
@@ -82,7 +98,7 @@ export const ListCell: React.FC<ListCellProps> = ({
 /**
  * List - A simple columnar list that renders rows
  */
-const List: React.FC<ListProps> = ({ data, renderCell, gap = SPACING.sm, style, keyExtractor }) => {
+const List: React.FC<ListProps> = ({ data, renderCell, gap = SPACING.sm, style, dividerColor, keyExtractor }) => {
   const defaultRenderCell = (cell: ListCellProps, index: number) => (
     <ListCell
       key={cell.id}
@@ -93,7 +109,7 @@ const List: React.FC<ListProps> = ({ data, renderCell, gap = SPACING.sm, style, 
       disabled={cell.disabled}
       style={cell.style}
       divider={cell.divider !== false && index !== data.length - 1}
-      dividerColor={cell.dividerColor}
+      dividerColor={cell.dividerColor ?? dividerColor}
     />
   );
 
@@ -110,18 +126,19 @@ const List: React.FC<ListProps> = ({ data, renderCell, gap = SPACING.sm, style, 
 
 const styles = StyleSheet.create({
   container: {
-    width: "100%",
     display: "flex",
     flexDirection: "column",
-    gap: SPACING.sm / 2,
+    gap: SPACING.xs,
+    alignSelf: "stretch",
   },
   row: {
-    width: "100%",
+    alignSelf: "stretch",
   },
   rowInner: {
     flexDirection: "row",
     alignItems: "flex-start",
     paddingVertical: SPACING.sm,
+    alignSelf: "stretch",
   },
   touchable: {
     alignSelf: "stretch",
@@ -130,14 +147,16 @@ const styles = StyleSheet.create({
     width: "100%",
     height: SPACING.sm / 2,
     backgroundColor: COLORS.white,
-    borderRadius: 1,
-    marginTop: SPACING.sm / 2,
+    borderRadius: 50,
+    marginTop: SPACING.xs,
+    marginHorizontal: SPACING.sm,
     alignSelf: "stretch",
   },
   contentContainer: {
     flex: 1,
     flexDirection: "row",
     alignItems: "flex-start",
+    alignSelf: "stretch",
   },
   disabled: {
     opacity: 0.6,

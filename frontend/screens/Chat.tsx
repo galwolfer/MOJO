@@ -128,14 +128,14 @@ export default function ChatScreen() {
       }
       sendText(activeSessionId, trimmed, () => sessionsRef.current);
     },
-    [getTodaySessionId, isLoading, sendText, sessionId, setSessionId]
+    [getTodaySessionId, isLoading, sendText, sessionId, setSessionId],
   );
 
   const onRetry = useCallback(
     (sessionIdToRetry: string, clientId: string) => {
       handleRetry(sessionIdToRetry, clientId, () => sessionsRef.current);
     },
-    [handleRetry]
+    [handleRetry],
   );
 
   // Put the chat input back into the shared NavBar (original behavior)
@@ -154,7 +154,7 @@ export default function ChatScreen() {
   const handleWidgetAction = useCallback(
     (actionId: string, actionData?: any) => {
       console.log("[Chat] Widget action:", actionId, actionData);
-      
+
       // Notify TaskContext to trigger updates in UserProfile and other screens
       // Task-related actions: task_toggled, confirmed, completed, created, updated, deleted
       const taskActions = [
@@ -169,12 +169,14 @@ export default function ChatScreen() {
         "task_updated",
         "task_deleted",
       ];
-      
+
       if (taskActions.includes(actionId)) {
-        notifyTaskUpdate();
+        // If the widget action includes taskId, scope the notification; otherwise broadcast
+        const payload = actionData && actionData.taskId ? { taskId: actionData.taskId } : undefined;
+        notifyTaskUpdate(payload);
       }
     },
-    [notifyTaskUpdate]
+    [notifyTaskUpdate],
   );
 
   const renderTimelineItem = useCallback(
@@ -186,7 +188,7 @@ export default function ChatScreen() {
         onWidgetAction={handleWidgetAction}
       />
     ),
-    [timelineItems.length, onRetry, handleWidgetAction]
+    [timelineItems.length, onRetry, handleWidgetAction],
   );
 
   const keyExtractor = useCallback((item: TimelineItem) => item.id, []);
@@ -201,7 +203,7 @@ export default function ChatScreen() {
         : contentInsets.bottom + SPACING.md,
       flexGrow: 1,
     }),
-    [contentInsets]
+    [contentInsets],
   );
 
   /**
@@ -218,7 +220,7 @@ export default function ChatScreen() {
       const reachedBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - bottomThreshold;
       setIsAtBottom(reachedBottom);
     },
-    [setScrollPosition]
+    [setScrollPosition],
   );
 
   /**
@@ -252,7 +254,7 @@ export default function ChatScreen() {
       contentHeightRef.current = height;
       handleContentSizeChange();
     },
-    [handleContentSizeChange]
+    [handleContentSizeChange],
   );
 
   useEffect(() => {

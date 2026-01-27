@@ -44,7 +44,7 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
   const [originalPriorities, setOriginalPriorities] = useState<Record<string, number>>({});
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey | null>(null);
 
-  const RightIcon = ICONS.right;
+  const LeftIcon = ICONS.left;
   const PrefIcon = ICONS.prefrences;
 
   // Fetch current preferences on mount
@@ -88,14 +88,14 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
       show: true,
       icon: ICONS.prefrences,
       leftElement: (
+        <TouchableOpacity onPress={onBack} style={styles.headerRightTouchable}>
+          <LeftIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
+        </TouchableOpacity>
+      ),
+      rightElement: (
         <View style={styles.headerLeft}>
           <PrefIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
         </View>
-      ),
-      rightElement: (
-        <TouchableOpacity onPress={onBack} style={styles.headerRightTouchable}>
-          <RightIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
-        </TouchableOpacity>
       ),
     });
   }, [onBack]);
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
   },
   loadingText: {
-    color: COLORS.grayLight,
+    color: COLORS.lightGray,
   },
   titleSection: {
     flexDirection: "row",

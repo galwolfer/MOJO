@@ -1,52 +1,44 @@
 import { z } from "zod";
 import { LightMission } from "./LightMission.js";
-import * as taskService from "../../services/taskService.js";
+import { Task } from "../../models/Task.js";
+import { fetchScheduledSessions, getScheduleWindow } from "./taskScheduleUtils.js";
+import { okFalse, okTrue } from "../lib/errorFormatter.js";
 
 const getUpcomingTasksMission = new LightMission({
   name: "get_upcoming_tasks",
   group: "task",
-  description: "Return tasks due within N days. Keep message brief - widget shows details.",
-  missionInfo: "Tasks due soon. Write short intro (e.g., 'Here are your upcoming tasks:'). Don't repeat details.",
-  widgets: ["task_list"],
+  description: "Return tasks scheduled within N days. Keep message brief - widget shows details.",
+  missionInfo: "Scheduled tasks. Write short intro (e.g., 'Here are your upcoming tasks:'). Don't repeat details.",
+  widgets: ["list"],
   schema: z.object({
     days: z.number().optional().default(7),
   }),
   execute: async ({ userId, args }) => {
     const { days = 7 } = args;
     try {
-      const tasks = await taskService.getUpcomingTasks(userId, days);
+      const { start, end } = getScheduleWindow(days);
+      const sessions = await fetchScheduledSessions({ userId, start, end, includeSubtasks: true });
 
-      if (tasks.length === 0) {
-        return `ok=true\ncount=0`;
+      if (sessions.length === 0) {
+        return okTrue({ count: 0 });
       }
 
-      // Construct Widget JSON
-      const widgetJson = {
-        version: "1.0",
-        widget_type: "task_list",
-        data: {
-          tasks: tasks.map((t) => ({
-            id: t._id,
-            title: t.taskname,
-            status: t.status,
-            dueDate: t.dueDate ? new Date(t.dueDate).toISOString() : null,
-            importance: t.importance,
-            priorityScore: t.priorityScore || 0,
-            taskType: t.taskType || null,
-            subCategory: t.subCategory || null,
-            tags: t.tags,
-            description: t.description,
-            estimatedDuration: t.estimatedDuration,
-            canSplit: t.canSplit,
-          })),
-        },
-      };
+      const taskIds = Array.from(new Set(sessions.map((s) => s.taskId).filter(Boolean)));
+      const tasks = await Task.find({ _id: { $in: taskIds }, userId }).lean();
+      const minimalTasks = tasks.map((t) => ({
+        id: t._id?.toString ? t._id.toString() : t._id,
+        title: t.taskname,
+      }));
 
       // Return widget only (use canonical builder to ensure correct tags/fields)
       const { buildWidgetString } = await import("../widgets/widgetUtils.js");
-      return buildWidgetString("task_list", { tasks: widgetJson.data.tasks });
+      return buildWidgetString("list", {
+        listType: "upcoming_tasks",
+        days,
+        tasks: minimalTasks,
+      });
     } catch (error) {
-      return `ok=false\nerr="${error.message}"`;
+      return okFalse(error.message);
     }
   },
 });

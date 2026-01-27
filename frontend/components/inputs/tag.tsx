@@ -7,9 +7,13 @@ interface TagProps {
   label: string;
   editable?: boolean;
   onRemove?: () => void;
-  leftIcon?: React.ReactNode;
+  /** Optional icon node or an `ICONS` map key (e.g., 'study', 'flame') */
+  leftIcon?: React.ReactNode | string;
   /** choose a color palette 1..7, random if omitted */
   colorIndex?: number;
+  /** optional explicit background and text colors (hex/string) */
+  bgColor?: string;
+  textColor?: string;
   style?: StyleProp<ViewStyle>; // accept style objects or arrays
 }
 
@@ -22,18 +26,29 @@ interface TagProps {
  * @param colorIndex - Color palette index (1-7).
  * @param style - Optional custom styles.
  */
-const Tag = ({ label, editable = false, onRemove, leftIcon, colorIndex, style }: TagProps) => {
+const Tag = ({ label, editable = false, onRemove, leftIcon, colorIndex, bgColor, textColor, style }: TagProps) => {
   const pair = getPalettePair(typeof colorIndex === "number" ? colorIndex : undefined);
+  const bg = bgColor || pair.bg;
+  const text = textColor || pair.text;
 
   return (
-    <View style={[styles.root, { backgroundColor: pair.bg }, style]}>
-      {leftIcon ? <View style={styles.leftIcon}>{leftIcon}</View> : null}
-      <Text style={[styles.label, { color: pair.text }]} numberOfLines={1} ellipsizeMode="tail">
+    <View style={[styles.root, { backgroundColor: bg }, style]}>
+      {leftIcon ? (
+        <View style={styles.leftIcon}>
+          {typeof leftIcon === "string"
+            ? (() => {
+                const IconComp = (ICONS as any)[leftIcon];
+                return IconComp ? <IconComp size={ICON_SIZES.sm} color={text} /> : null;
+              })()
+            : leftIcon}
+        </View>
+      ) : null}
+      <Text style={[styles.label, { color: text }]} numberOfLines={1} ellipsizeMode="tail">
         {label}
       </Text>
       {editable && (
         <TouchableOpacity onPress={onRemove} accessibilityRole="button" style={styles.removeTouch}>
-          <ICONS.cancel width={ICON_SIZES.sm} height={ICON_SIZES.sm} color={pair.text} />
+          <ICONS.cancel width={ICON_SIZES.sm} height={ICON_SIZES.sm} color={text} />
         </TouchableOpacity>
       )}
     </View>
