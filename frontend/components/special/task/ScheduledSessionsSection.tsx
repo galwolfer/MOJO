@@ -61,7 +61,13 @@ export const ScheduledSessionsSection: React.FC<{
         <TaskTitle title={taskTitle} category={category} size="md" />
       ) : null}
 
-      <View style={{ marginStart: titleMode ? SPACING.sm : 0, marginTop: titleMode ? -SPACING.md : 0 }}>
+      <View
+        style={{
+          marginStart: titleMode ? SPACING.sm : 0,
+          marginTop: titleMode ? -SPACING.sm : 0,
+          marginBottom: titleMode ? -SPACING.xlg : 0,
+        }}
+      >
         <List
           dividerColor={dividerColor}
           data={sessions.map((session, index) => {
