@@ -111,7 +111,7 @@ export default function UserProfileScreen() {
                 />
               ) : (
                 <View style={styles.headerAvatarPlaceholder}>
-                  <UserIcon size={50} color={COLORS.lightGray} />
+                  <UserIcon size={moderateScale(35)} color={COLORS.lightGray} />
                 </View>
               )}
             </View>
