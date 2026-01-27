@@ -244,7 +244,7 @@ export default function ProfileSettings() {
                   {editedProfileImage ? (
                     <Image source={{ uri: editedProfileImage }} style={styles.avatarImagePlain} />
                   ) : (
-                    <UserIcon size={moderateScale(35)} color={COLORS.grayLight} />
+                    <UserIcon size={moderateScale(35)} color={COLORS.lightGray} />
                   )}
                 </View>
               </LinearGradient>
