@@ -132,8 +132,8 @@ const styles = StyleSheet.create({
   leftSection: {
     width: "100%",
     flexDirection: "row",
-    justifyContent: "flex-start",
-    alignItems: "center",
+    justifyContent: "flex-end",
+    alignItems: "flex-end",
     flexShrink: 1,
     gap: SPACING.md,
   },
@@ -149,7 +149,6 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     flexShrink: 0,
     minWidth: moderateScale(56),
-    paddingRight: SPACING.lg,
     zIndex: 999,
   },
   overflowButton: {
