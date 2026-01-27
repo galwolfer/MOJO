@@ -132,8 +132,8 @@ const styles = StyleSheet.create({
   leftSection: {
     width: "100%",
     flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "flex-end",
+    justifyContent: "flex-start",
+    alignItems: "flex-start",
     flexShrink: 1,
     gap: SPACING.md,
   },
