@@ -217,7 +217,7 @@ export default function ProfileSettings() {
                 {editedProfileImage ? (
                   <Image source={{ uri: editedProfileImage }} style={styles.avatarImagePlain} />
                 ) : (
-                  <UserIcon size={moderateScale(35)} color={COLORS.grayLight} />
+                  <UserIcon size={moderateScale(35)} color={COLORS.lightGray} />
                 )}
               </View>
               <AppButton
@@ -401,11 +401,11 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   userUsername: {
-    color: COLORS.grayLight,
+    color: COLORS.lightGray,
     marginTop: 2,
   },
   userEmail: {
-    color: COLORS.grayLight,
+    color: COLORS.lightGray,
   },
   editButton: {
     alignSelf: "center",

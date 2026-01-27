@@ -9,9 +9,9 @@ import {
   TaskListWidget,
   TaskConfirmationWidget,
   ConfirmationWidget,
-  CalendarEventWidget,
   TaskDetailWidget,
-  TaskListDetailedWidget,
+  UpcomingTasksWidget,
+  ListWidget,
 } from "../components/widgets";
 
 /**
@@ -20,6 +20,10 @@ import {
 export interface BaseWidgetProps {
   data: Record<string, any>;
   onAction?: (actionId: string, actionData?: any) => void;
+  entranceEnabled?: boolean; // Optional signal to trigger entrance animations
+  entranceDelay?: number; // ms delay before widget entrance animation
+  entranceDuration?: number; // ms duration for widget entrance animation
+  skipAnimation?: boolean; // Skip animation entirely (e.g., when widget was already shown)
 }
 
 /**
@@ -27,12 +31,12 @@ export interface BaseWidgetProps {
  */
 export class WidgetFactory {
   private static componentMap: Record<string, React.ComponentType<BaseWidgetProps>> = {
+    list: ListWidget,
     task_list: TaskListWidget,
-    task_list_detailed: TaskListDetailedWidget,
     task_detail: TaskDetailWidget,
     task_confirmation: TaskConfirmationWidget,
     confirmation: ConfirmationWidget,
-    calendar_event: CalendarEventWidget,
+    upcoming_tasks: UpcomingTasksWidget,
   };
 
   /**
@@ -70,6 +74,10 @@ export class WidgetFactory {
 export interface WidgetRendererProps {
   widget: WidgetData;
   onAction?: (actionId: string, actionData?: any) => void;
+  entranceEnabled?: boolean;
+  entranceDelay?: number;
+  entranceDuration?: number;
+  skipAnimation?: boolean;
 }
 
 /**
@@ -82,15 +90,30 @@ export interface WidgetRendererProps {
  * />
  * ```
  */
-export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, onAction }) => {
+export const WidgetRenderer: React.FC<WidgetRendererProps> = ({
+  widget,
+  onAction,
+  entranceEnabled,
+  entranceDelay,
+  entranceDuration,
+  skipAnimation,
+}) => {
   const Component = WidgetFactory.getComponent(widget.widget_type);
 
   if (!Component) {
-    console.warn(`[WidgetRenderer] Unknown widget type: ${widget.widget_type}`);
     return null;
   }
 
-  return <Component data={widget.data} onAction={onAction} />;
+  return (
+    <Component
+      data={widget.data}
+      onAction={onAction}
+      entranceEnabled={entranceEnabled}
+      entranceDelay={entranceDelay}
+      entranceDuration={entranceDuration}
+      skipAnimation={skipAnimation}
+    />
+  );
 };
 
 export default WidgetRenderer;

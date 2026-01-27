@@ -41,14 +41,14 @@ export function Checkbox({ checked, onChange, size = 18 }: CheckboxProps) {
   const strokeColor = useTransform(
     checkProgress,
     [0, 1],
-    [COLORS.lightGray, COLORS.primary6] // theme gray to theme green
+    [COLORS.lightGray, COLORS.primary6], // theme gray to theme green
   );
 
   // Stroke width animation (gets thicker when checked)
   const strokeWidth = useTransform(
     checkProgress,
     [0, 1],
-    [2.5, 2.5] // Keep consistent
+    [2.5, 2.5], // Keep consistent
   );
 
   // Checkmark drawing animation
@@ -62,7 +62,7 @@ export function Checkbox({ checked, onChange, size = 18 }: CheckboxProps) {
   const checkScale = useTransform(
     checkProgress,
     [0, 0.5, 0.75, 1],
-    [0.5, 1.15, 0.95, 1] // Starts small, overshoots, pulls back, settles
+    [0.5, 1.15, 0.95, 1], // Starts small, overshoots, pulls back, settles
   );
 
   const handleClick = () => {

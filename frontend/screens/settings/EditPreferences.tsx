@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
   },
   loadingText: {
-    color: COLORS.grayLight,
+    color: COLORS.lightGray,
   },
   titleSection: {
     flexDirection: "row",

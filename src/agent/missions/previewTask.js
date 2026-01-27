@@ -3,6 +3,7 @@ import { GuidedMission } from "./GuidedMission.js";
 import { TASK_CONFIG, inferTaskProperties, inferSplittingParams } from "../taskRules.js";
 import { getDisplayName } from "../../config/categories.js";
 import { getIllegalDisplayFields, getIllegalCharsErrorMessage } from "../../utils/illegalChars.js";
+import { okFalse, okTrue } from "../lib/errorFormatter.js";
 
 /**
  * Parse relative date strings like "next Thursday", "tomorrow", "in 3 days"
@@ -16,30 +17,23 @@ function parseRelativeDate(dateString) {
   const lowerStr = dateString.toLowerCase().trim();
 
   // Handle: "tomorrow"
-  if (lowerStr === "tomorrow" || lowerStr === "מחר") {
+  if (lowerStr === "tomorrow") {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
     return tomorrow.toISOString().split("T")[0];
   }
 
   // Handle: "today"
-  if (lowerStr === "today" || lowerStr === "היום") {
+  if (lowerStr === "today") {
     return today.toISOString().split("T")[0];
   }
 
   // Handle: "next Thursday", "this Thursday", "Thursday", etc.
   const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-  const hebrewDays = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
   for (let i = 0; i < days.length; i++) {
     const engDay = days[i];
-    const hebDay = hebrewDays[i];
-    if (
-      lowerStr.includes(engDay) ||
-      lowerStr.includes(hebDay) ||
-      lowerStr.includes(`ליום ${hebDay}`) ||
-      lowerStr.includes(`ל${hebDay}`)
-    ) {
+    if (lowerStr.includes(engDay)) {
       // Calculate days until next occurrence of this day
       let daysToAdd = (i - dayOfWeek + 7) % 7;
 
@@ -49,7 +43,7 @@ function parseRelativeDate(dateString) {
       }
 
       // If user says "next" explicitly
-      if (lowerStr.includes("next") || lowerStr.includes("הקרוב")) {
+      if (lowerStr.includes("next")) {
         if (daysToAdd === 0) daysToAdd = 7; // Ensure it's in the future
       }
 
@@ -61,8 +55,7 @@ function parseRelativeDate(dateString) {
 
   // Handle: "in 3 days", "in 1 week", etc.
   const relativeRegex = /in\s+(\d+)\s+(days?|weeks?|hours?)/i;
-  const hebrewRelativeRegex = /בעוד\s+(\d+)\s+(ימים?|שבועות?|שעות?)/i;
-  let match = lowerStr.match(relativeRegex) || lowerStr.match(hebrewRelativeRegex);
+  const match = lowerStr.match(relativeRegex);
   if (match) {
     const amount = parseInt(match[1]);
     const unit = match[2].toLowerCase();
@@ -97,7 +90,8 @@ const previewTaskMission = new GuidedMission({
     "Use when user asks to create a task.",
     "STEP 1: Determine category ",
     "STEP 2: Call get_subcategories(category=<chosen>) to fetch options.",
-    "STEP 3: Call preview_task, then write 1-2 natural 'draft ready' sentences (avoid greetings; vary wording) before the widget and a short confirm/edit/cancel line after it. If the subcategory is new, mention it briefly.",
+    "STEP 2b: AUTO-SELECT: If get_subcategories returns an existing subcategory that matches the task name (exact or close), use it automatically WITHOUT confirming.",
+    "STEP 3: Call preview_task, then write 1-2 natural 'draft ready' sentences (avoid greetings; vary wording) before the widget and a short confirm/edit/cancel line after it. Only mention the subcategory if it is NEW or uncertain.",
     "STEP 3b: If the user's language is English, use English sample phrases (e.g., 'Here is your draft for your mission.' before the widget and 'You can confirm, edit, or cancel.' after it). If the user's language is not English, match the user's language. If language detection is ambiguous, default to English.",
 
     "STEP 4: After user confirms, call add_task with final details.",
@@ -111,7 +105,9 @@ const previewTaskMission = new GuidedMission({
     category: z.string().describe("REQUIRED: Category (one of the 18 standard categories)"),
     subcategory: z
       .string()
-      .describe("REQUIRED: Subcategory (MUST be from get_subcategories result or new user-confirmed)"),
+      .describe(
+        "REQUIRED: Subcategory. If get_subcategories returned an exact/close match, use it automatically. If completely new, ask user first.",
+      ),
     importance: z.number().min(1).max(5).optional().describe("1-5 importance (AI can infer)"),
     effort: z.number().min(1).max(5).optional().describe("1-5 effort (AI can infer)"),
     duration: z.number().describe("REQUIRED: Estimated minutes to complete the task (user must specify)"),
@@ -160,7 +156,7 @@ const previewTaskMission = new GuidedMission({
         subcategory,
       });
       if (illegalFields.length > 0) {
-        return `ok=false\nerr="illegal_characters"\nmsg="${getIllegalCharsErrorMessage(illegalFields)}"`;
+        return okFalse("illegal_characters", { msg: getIllegalCharsErrorMessage(illegalFields) });
       }
 
       // Parse relative dates (e.g., "next Thursday", "tomorrow", "in 3 days") to ISO format
@@ -170,7 +166,7 @@ const previewTaskMission = new GuidedMission({
       } catch (e) {
         // If parsing fails, try to use it as-is (might be ISO format already)
         if (!/^\d{4}-\d{2}-\d{2}$/.test(deadline)) {
-          return `ok=false\nerr="Invalid deadline format: ${deadline}. Use 'YYYY-MM-DD', 'tomorrow', 'next Thursday', etc."`;
+          return okFalse(`Invalid deadline format: ${deadline}. Use 'YYYY-MM-DD', 'tomorrow', 'next Thursday', etc.`);
         }
         finalDeadline = deadline;
       }
@@ -178,7 +174,7 @@ const previewTaskMission = new GuidedMission({
       // Validate deadline is a valid date
       const deadlineDate = new Date(finalDeadline);
       if (isNaN(deadlineDate.getTime())) {
-        return `ok=false\nerr="Invalid deadline date: ${finalDeadline}"`;
+        return okFalse(`Invalid deadline date: ${finalDeadline}`);
       }
 
       // Infer properties from task name if not provided
@@ -192,7 +188,7 @@ const previewTaskMission = new GuidedMission({
 
       // If duration isn't provided, request it from the user
       if (!finalDuration || typeof finalDuration !== "number" || isNaN(finalDuration) || finalDuration <= 0) {
-        return `ok=false\nerr="duration_required"\nmsg="Please ask the user: 'How many minutes will this task take?'"`;
+        return okFalse("duration_required", { msg: "Please ask the user: 'How many minutes will this task take?'" });
       }
 
       // Enforce effort must be provided by the assistant (LLM) — pick integer 1-5 based on duration/category
@@ -203,10 +199,12 @@ const previewTaskMission = new GuidedMission({
         finalEffort < 1 ||
         finalEffort > 5
       ) {
-        return `ok=false\nerr="effort_required"\nmsg="Assistant must select an effort (integer 1-5) based on task duration, category, and complexity, and include it in the preview_task call."`;
+        return okFalse("effort_required", {
+          msg: "Assistant must select an effort (integer 1-5) based on task duration, category, and complexity, and include it in the preview_task call.",
+        });
       }
 
-      // If importance was not explicitly provided by the caller, use user's per-category priority mapping (#categorise entity)
+      // If importance was not explicitly provided by the caller, use user's per-category priority mapping (#categories entity)
       if (importance === undefined || importance === null) {
         try {
           const { getUserCategoryImportance } = await import("../../services/userPreferenceService.js");
@@ -265,40 +263,41 @@ const previewTaskMission = new GuidedMission({
 
       const userLang = detectLangFromText(taskname || description || categoryDisplay);
 
-      // Build a short confirmation message localized to userLang. Keep it concise.
-      const confirmationMessage =
-        userLang === "he"
-          ? "הטיוטה מוכנה. אפשר לאשר, לערוך או לבטל."
-          : "Here is your draft. You can confirm, edit, or cancel.";
-
       const widgetPayload = {
         id: "draft-" + Date.now(),
+        // Keep both `title` and `taskname` for compatibility with callers
         title: taskname,
+        taskname: taskname,
+        // Include human-consumable deadline and machine ISO dueDate
+        deadline: finalDeadline,
+        dueDate: new Date(finalDeadline).toISOString(),
         description: description || "",
         status: "draft",
-        dueDate: new Date(finalDeadline).toISOString(),
         // Use internal category key for the 'category' field (for internal operations)
         category: category || "",
         // Provide user-facing display name separately
         categoryDisplay: categoryDisplay,
         subcategory: subcategory || "",
+        subcategoryDisplay: subcategory || "",
         importance: finalImportance,
         effort: finalEffort,
+        // Provide both canonical duration and an estimatedDuration alias
+        duration: finalDuration,
         estimatedDuration: finalDuration,
         canSplit: finalCanSplit,
         taskType: finalTaskType,
         // Splitting parameters (only include when relevant)
         minChunk: displayMinChunk,
         chunkCount: displayChunkCount,
+        chunkMinutes: displayChunkMinutes,
         minMinutes: displayMinMinutes,
         maxMinutes: displayMaxMinutes,
         earliestStart: finalEarliestStart,
         recurrence: recurrence || null,
-        tags: null,
+        progressPercentage: 0,
+        scheduledSessions: [],
         // Small human-readable short description for listing/preview
         shortDescription,
-        // Confirmation message to show near the widget (localized)
-        confirmationMessage,
         // Store internal category key for task creation
         _categoryKey: category || "",
       };
@@ -330,7 +329,7 @@ const previewTaskMission = new GuidedMission({
         );
       }
     } catch (error) {
-      return `ok=false\nerr="Failed to generate preview: ${error.message}"`;
+      return okFalse(`Failed to generate preview: ${error.message}`);
     }
   },
 });

@@ -16,10 +16,20 @@ export { WIDGETS };
 export function getWidgetPromptInstructions() {
   // Streamlined widget guidance: brief but clear
   const lines = [];
-  lines.push("WIDGETS:");
-  lines.push("- Use widgets to present task data; do not repeat fields shown in the widget.");
-  lines.push("- Copy tool-returned <WIDGET_JSON> exactly when embedding.");
-  lines.push("- Use one natural sentence before the widget and one after (confirm/edit/cancel).");
+  lines.push("WIDGETS (Rich UI Cards):");
+  lines.push("- You MUST wrap the JSON data in <WIDGET_JSON> tags so the user sees a UI card.");
+  lines.push("- REQUIRED STRUCTURE: [Intro Text] <WIDGET_JSON>...JSON...</WIDGET_JSON> [Outro Text]");
+  lines.push('- Intro Text: Brief summary (e.g., "Here are your upcoming tasks:").');
+  lines.push(
+    '- Outro Text: Call to action or question (e.g., "Shall I make any changes?", "Do you want to add more?").',
+  );
+  lines.push("- NEVER output a widget without text before AND after it.");
+  lines.push(
+    "- CRITICAL: NEVER write the JSON text outside the tags. The user sees the rendered widget, not the code.",
+  );
+  lines.push("- Copy tool-returned <WIDGET_JSON>... content exactly.");
+  lines.push("- Do not repeat task details in text; the widget handles that.");
+  lines.push('- For task displays, use widget_type "list" (task_confirmation is the only exception).');
   lines.push("");
   lines.push("WIDGET TYPES:");
 
@@ -48,10 +58,11 @@ ${TASK_SECTION}
 DATES: Convert relative dates to ISO before tool calls.
 RECUR: Use type + interval.
 REFERENCE: Resolve "this/that/it" to the most recent entity.
-SUBCATEGORIES: Call get_subcategories before creating/updating a task.
+SUBCATEGORIES: Call get_subcategories first. AUTO-SELECT matching subcategories silently; DO NOT ask for confirmation.
 DURATION: If missing, ask for minutes and wait.
 EFFORT: If missing, choose 1-5.
-SPLIT/RECUR: Ask and include relevant split/recurrence fields when needed.`;
+SPLIT/RECUR: Ask and include relevant split/recurrence fields when needed.
+DETAILS: When a user asks for task details, call get_task_detail.`;
 
 // Short descriptions for tools. Use these for LLM-facing description fields so they can be adjusted in one place.
 export const TOOL_DESCRIPTIONS = missionRegistry.getToolDescriptions();
@@ -70,7 +81,7 @@ CRITICAL:
 - To add: preview_task -> task_confirmation -> add_task on confirm.
 - To list: call get_tasks/get_upcoming_tasks/get_overdue_tasks first.
 - Use RECENT ENTITIES only for reference resolution, not for lists.
-- Use <WIDGET_JSON> when showing tasks.
+- ALWAYS use <WIDGET_JSON> tags when showing tasks. NEVER output raw JSON without these tags.
 - Do not output angle brackets in normal text or task fields; ask the user to remove them if provided. Only block the literal bracket characters.
 - Respond in the user's language.
 

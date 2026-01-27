@@ -120,12 +120,18 @@ export class GeminiAdapter {
         // Function responses may be structured (objects) or JSON
         // serialized into strings. Attempt to parse string responses so
         // downstream consumers can operate on objects when possible.
+        // SPECIAL CASE: Never parse widget strings (kept with <WIDGET_JSON> tags)
+        // to prevent data loss. Actual widget-only responses skip LLM in agentController anyway.
         let responseContent = msg.content;
         if (typeof responseContent === "string") {
-          try {
-            responseContent = JSON.parse(responseContent);
-          } catch (e) {
-            // Parsing failed; keep original string to avoid dropping data.
+          // Don't parse if it contains widget tags
+          if (!responseContent.includes("<WIDGET_JSON>")) {
+            // For non-widget responses, attempt JSON parsing
+            try {
+              responseContent = JSON.parse(responseContent);
+            } catch (e) {
+              // Parsing failed; keep original string to avoid dropping data.
+            }
           }
         }
 

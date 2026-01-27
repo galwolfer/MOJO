@@ -1,14 +1,15 @@
 import { z } from "zod";
 import { LightMission } from "./LightMission.js";
 import * as taskService from "../../services/taskService.js";
+import { okFalse, okTrue } from "../lib/errorFormatter.js";
 
 const getTasksMission = new LightMission({
   name: "get_tasks",
   group: "task",
   description: "Fetch tasks (filters/search). Keep your message brief - widget shows the details.",
   missionInfo:
-    "Retrieve tasks. Write short intro before widget (e.g., 'Here are your tasks:'). Don't list details in text.",
-  widgets: ["task_list"],
+    "Retrieve tasks. Write short intro before widget (e.g., 'Here are your tasks:'). If only one task found, it shows details. Don't list details in text.",
+  widgets: ["list"],
   schema: z.object({
     search: z.string().optional().describe("Search query to find tasks by name/title"),
     category: z.string().optional().describe("Filter by category"),
@@ -21,48 +22,54 @@ const getTasksMission = new LightMission({
     try {
       // Build filter object for database query
       const filters = {};
+      const filterPayload = {};
       if (search) filters.taskname = { $regex: search, $options: "i" };
-      if (category) filters.category = category;
+      if (search) filterPayload.search = search;
+      if (category) {
+        filters.category = category;
+        filterPayload.category = category;
+      }
       if (completed !== undefined) {
         filters.status = completed ? "done" : { $ne: "done" };
+        filterPayload.completed = completed;
       }
-      if (dueBefore) filters.dueDate = { ...filters.dueDate, $lte: new Date(dueBefore) };
-      if (dueAfter) filters.dueDate = { ...filters.dueDate, $gte: new Date(dueAfter) };
+      if (dueBefore) {
+        filters.dueDate = { ...filters.dueDate, $lte: new Date(dueBefore) };
+        filterPayload.dueBefore = dueBefore;
+      }
+      if (dueAfter) {
+        filters.dueDate = { ...filters.dueDate, $gte: new Date(dueAfter) };
+        filterPayload.dueAfter = dueAfter;
+      }
 
       // Query database with filters (correct service function name)
       const tasks = await taskService.getTasksForUser(userId, filters);
 
       if (tasks.length === 0) {
-        return `ok=true\ncount=0`;
+        return okTrue({ count: 0 });
       }
 
-      // Construct Widget JSON
-      const widgetJson = {
-        version: "1.0",
-        widget_type: "task_list",
-        data: {
-          tasks: tasks.map((t) => ({
-            id: t._id,
-            title: t.taskname,
-            status: t.status,
-            dueDate: t.dueDate ? new Date(t.dueDate).toISOString() : null,
-            importance: t.importance,
-            priorityScore: t.priorityScore || 0,
-            taskType: t.taskType || null,
-            subCategory: t.subCategory || null,
-            tags: t.tags,
-            description: t.description,
-            estimatedDuration: t.estimatedDuration,
-            canSplit: t.canSplit,
-          })),
-        },
+      const minimalTasks = tasks.map((t) => ({
+        id: t._id?.toString ? t._id.toString() : t._id,
+        title: t.taskname,
+      }));
+
+      const listType = tasks.length === 1 ? "task_detail" : "task_list";
+      const widgetData = {
+        listType,
+        tasks: minimalTasks,
+        filters: Object.keys(filterPayload).length > 0 ? filterPayload : null,
       };
 
-      // Return widget only (use canonical builder to ensure correct tags/fields)
+      if (listType === "task_detail") {
+        widgetData.taskId = minimalTasks[0]?.id || null;
+        widgetData.title = minimalTasks[0]?.title || null;
+      }
+
       const { buildWidgetString } = await import("../widgets/widgetUtils.js");
-      return buildWidgetString("task_list", { tasks: widgetJson.data.tasks });
+      return buildWidgetString("list", widgetData);
     } catch (error) {
-      return `ok=false\nerr="${error.message}"`;
+      return okFalse(error.message);
     }
   },
 });

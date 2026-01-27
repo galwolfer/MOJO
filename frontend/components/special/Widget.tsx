@@ -17,8 +17,8 @@
  * </Widget>
  * ```
  */
-import React, { useEffect, useRef } from "react";
-import { View, StyleSheet, Animated, Easing, StyleProp, ViewStyle } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { View, StyleSheet, Animated, Easing, StyleProp, ViewStyle, Text } from "react-native";
 import { COLORS, SPACING } from "../../theme";
 
 type WidgetProps = {
@@ -44,45 +44,49 @@ const Widget: React.FC<WidgetProps> = ({
   entranceDuration = 200,
   skipAnimation = false,
 }) => {
-  // Don't render until entrance is requested to avoid showing content early.
-  const [mounted, setMounted] = React.useState<boolean>(entranceEnabled || skipAnimation);
+  // Always mount - let parent control visibility via opacity (for chat) or use entrance animation (for auth)
+  const [mounted, setMounted] = React.useState<boolean>(true);
   // Track if this is the first time the component is being shown
   const isFirstMountRef = useRef(true);
 
   useEffect(() => {
-    if (entranceEnabled || skipAnimation) setMounted(true);
+    if (entranceEnabled || skipAnimation) {
+      setMounted(true);
+    }
   }, [entranceEnabled, skipAnimation]);
 
   // If not mounted yet, render nothing (prevents early flash / layout shift)
   if (!mounted) return null;
 
-  const opacity = useRef(new Animated.Value(skipAnimation ? 1 : 0)).current;
-  const translateY = useRef(new Animated.Value(skipAnimation ? 0 : 8)).current;
+  const [animating, setAnimating] = useState(false);
+
+  // Initialize animated values based on skipAnimation to avoid flash
+  const opacity = useRef(new Animated.Value(skipAnimation || entranceEnabled === false ? 1 : 0)).current;
+  const translateY = useRef(new Animated.Value(skipAnimation || entranceEnabled === false ? 0 : 8)).current;
 
   useEffect(() => {
     // If skipAnimation is true, show immediately without animation
     if (skipAnimation) {
       opacity.setValue(1);
       translateY.setValue(0);
+      setAnimating(false);
       return;
     }
 
     if (!entranceEnabled) {
-      // If entrance is not enabled but we are mounted (someone forced mount), make it visible immediately
+      // If entrance is not enabled but we are mounted, make it visible immediately
       opacity.setValue(1);
       translateY.setValue(0);
+      setAnimating(false);
       return;
     }
 
-    // Skip animation if this is not the first mount (e.g., returning from navigation)
-    if (!isFirstMountRef.current) {
-      opacity.setValue(1);
-      translateY.setValue(0);
-      return;
-    }
+    // When entranceEnabled becomes true, animate in
+    // Reset values to start state
+    opacity.setValue(0);
+    translateY.setValue(8);
 
-    // Mark that we've done the animation at least once
-    isFirstMountRef.current = false;
+    setAnimating(true);
 
     Animated.parallel([
       Animated.timing(opacity, {
@@ -90,16 +94,18 @@ const Widget: React.FC<WidgetProps> = ({
         duration: entranceDuration,
         delay: entranceDelay,
         easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
       Animated.timing(translateY, {
         toValue: 0,
         duration: entranceDuration,
         delay: entranceDelay,
         easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
-    ]).start();
+    ]).start((result: any) => {
+      setAnimating(false);
+    });
   }, [entranceEnabled, entranceDelay, entranceDuration, skipAnimation, opacity, translateY]);
 
   return (
@@ -120,6 +126,7 @@ const Widget: React.FC<WidgetProps> = ({
 
 const styles = StyleSheet.create({
   widget: {
+    minWidth: 250,
     width: "100%",
     backgroundColor: COLORS.white3,
     borderRadius: SPACING.lg,

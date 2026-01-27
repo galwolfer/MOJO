@@ -155,7 +155,7 @@ const PriorityList: React.FC<PriorityListProps> = ({ items, onChange }) => {
       // Notify parent.
       onChange(data);
     },
-    [onChange]
+    [onChange],
   );
 
   const dataForRender = isDraggingRef.current ? frozenDataRef.current : listData;

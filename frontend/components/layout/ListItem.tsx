@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
     color: COLORS.black,
   },
   subtitle: {
-    color: COLORS.grayLight,
+    color: COLORS.lightGray,
     marginTop: 2,
   },
 });

@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { GuidedMission } from "./GuidedMission.js";
 import * as taskService from "../../services/taskService.js";
+import { deleteTaskViaController } from "../missionControllerHelpers.js";
+import { okFalse, okTrue } from "../lib/errorFormatter.js";
 
 const deleteTaskMission = new GuidedMission({
   name: "delete_task",
@@ -15,18 +17,19 @@ const deleteTaskMission = new GuidedMission({
   execute: async ({ userId, args }) => {
     const { taskId, confirm } = args;
     try {
-      if (!confirm) return `ok=false\nerr="confirmation_required"`;
+      if (!confirm) return okFalse("confirmation_required");
 
-      const result = await taskService.deleteTask({ taskId, userId });
-      if (!result.success) {
-        return `ok=false\nerr="${result.error}"`;
+      // Delete through controller (which automatically triggers scheduling)
+      const success = await deleteTaskViaController(userId, taskId);
+      if (!success) {
+        return okFalse("task_deletion_failed");
       }
-      return `ok=true\nid="${taskId}"`;
+      return okTrue({ id: taskId });
     } catch (error) {
       if (error.message && (error.message.includes("ObjectId") || error.kind === "ObjectId")) {
-        return `ok=false\nerr="Invalid Task ID"`;
+        return okFalse("Invalid Task ID");
       }
-      return `ok=false\nerr="${error.message}"`;
+      return okFalse(error.message);
     }
   },
 });

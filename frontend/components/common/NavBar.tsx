@@ -133,6 +133,7 @@ const styles = StyleSheet.create({
   navBar: {
     alignSelf: "stretch",
     borderRadius: SPACING.xlg,
+    overflow: "hidden",
     ...(SHADOWS.card as object),
   },
   fullWidth: {

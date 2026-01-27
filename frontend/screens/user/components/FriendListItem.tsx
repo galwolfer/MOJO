@@ -32,11 +32,7 @@ type FriendListItemProps = {
   isOnline?: boolean;
 };
 
-const MiniStat: React.FC<{ icon: React.ReactNode; value: number; color: string }> = ({
-  icon,
-  value,
-  color,
-}) => (
+const MiniStat: React.FC<{ icon: React.ReactNode; value: number; color: string }> = ({ icon, value, color }) => (
   <View style={[styles.miniStat, { backgroundColor: color }]}>
     <View style={styles.miniIcon}>{icon}</View>
     <AppText variant="notes" style={styles.miniValue}>
@@ -45,12 +41,7 @@ const MiniStat: React.FC<{ icon: React.ReactNode; value: number; color: string }
   </View>
 );
 
-const FriendListItem: React.FC<FriendListItemProps> = ({
-  name,
-  avatar,
-  stats,
-  isOnline = false,
-}) => {
+const FriendListItem: React.FC<FriendListItemProps> = ({ name, avatar, stats, isOnline = false }) => {
   const UserIcon = ICONS.user;
   const CheckIcon = ICONS.list;
   const FlameIcon = ICONS.flame;
@@ -65,7 +56,7 @@ const FriendListItem: React.FC<FriendListItemProps> = ({
             <Image source={{ uri: avatar }} style={styles.avatar} />
           ) : (
             <View style={[styles.avatar, styles.avatarPlaceholder]}>
-              <UserIcon size={moderateScale(18)} color={COLORS.grayLight} />
+              <UserIcon size={moderateScale(18)} color={COLORS.lightGray} />
             </View>
           )}
         </View>
@@ -78,21 +69,21 @@ const FriendListItem: React.FC<FriendListItemProps> = ({
         </AppText>
 
         <View style={styles.statsRow}>
-        <MiniStat
-          icon={<CheckIcon size={moderateScale(16)} color={COLORS.colorWhite} />}
-          value={stats.tasks}
-          color={COLORS.primary6}
-        />
-        <MiniStat
-          icon={<FlameIcon size={moderateScale(16)} color={COLORS.colorWhite} />}
-          value={stats.streak}
-          color={COLORS.primary5}
-        />
-        <MiniStat
-          icon={<TrophyIcon size={moderateScale(16)} color={COLORS.colorWhite} />}
-          value={stats.points}
-          color={COLORS.primary4}
-        />
+          <MiniStat
+            icon={<CheckIcon size={moderateScale(16)} color={COLORS.colorWhite} />}
+            value={stats.tasks}
+            color={COLORS.primary6}
+          />
+          <MiniStat
+            icon={<FlameIcon size={moderateScale(16)} color={COLORS.colorWhite} />}
+            value={stats.streak}
+            color={COLORS.primary5}
+          />
+          <MiniStat
+            icon={<TrophyIcon size={moderateScale(16)} color={COLORS.colorWhite} />}
+            value={stats.points}
+            color={COLORS.primary4}
+          />
         </View>
       </View>
     </View>

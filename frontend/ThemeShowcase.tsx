@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
     color: COLORS.black,
   },
   hexLabel: {
-    color: COLORS.grayLight,
+    color: COLORS.lightGray,
   },
   spacingRow: {
     flexDirection: "row",

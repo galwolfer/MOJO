@@ -16,7 +16,7 @@
     "frontend/**/*",
     "src/**/*",
     "scripts/**/*"
-  ],
+, "tests/agent/test_errorFormatter.test.js", "tests/agent/test_widget_utils.test.js", "tests/agent/test_widgetHelper.test.js"  ],
   "exclude": [
     "node_modules",
     "dist"
