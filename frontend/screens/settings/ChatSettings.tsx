@@ -44,7 +44,7 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
   const iconSize = moderateScale(64);
   const animatedSetRef = useRef<Set<string>>(new Set());
 
-  const RightIcon = ICONS.right;
+  const LeftIcon = ICONS.left;
   const OjoIcon = ICONS.ojo;
 
   // Fetch current OjoType on mount
@@ -78,14 +78,14 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
       show: true,
       icon: ICONS.ojo,
       leftElement: (
+        <TouchableOpacity onPress={onBack} style={styles.headerRightTouchable}>
+          <LeftIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
+        </TouchableOpacity>
+      ),
+      rightElement: (
         <View style={styles.headerLeft}>
           <OjoIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
         </View>
-      ),
-      rightElement: (
-        <TouchableOpacity onPress={onBack} style={styles.headerRightTouchable}>
-          <RightIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
-        </TouchableOpacity>
       ),
     });
   }, [onBack]);
