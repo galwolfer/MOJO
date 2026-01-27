@@ -15,7 +15,6 @@ import { COLORS } from "../../../theme";
  * - `dayQualities` - Array of day quality ratings ('good', 'medium', 'bad')
  * - `width` - Width of the graph
  * - `height` - Height of the graph
- * - `useMockData` - Use mock data for testing (shows all day types)
  */
 
 type DayQuality = "good" | "medium" | "bad";
@@ -25,7 +24,6 @@ type ProgressGraphProps = {
   dayQualities?: DayQuality[];
   width?: number;
   height?: number;
-  useMockData?: boolean;
 };
 
 // Color mapping for different day qualities
@@ -40,25 +38,9 @@ const ProgressGraph: React.FC<ProgressGraphProps> = ({
   dayQualities: propQualities,
   width = 280,
   height = 100,
-  useMockData = false, // Default to false - use real data
 }) => {
-  // Mock data for testing - shows all different day types
-  const mockData = [25, 45, 20, 60, 35, 75, 50, 85, 40, 70, 55];
-  const mockQualities: DayQuality[] = [
-    "bad",
-    "medium",
-    "bad",
-    "good",
-    "medium",
-    "good",
-    "good",
-    "good",
-    "medium",
-    "good",
-    "medium",
-  ];
-
-  const data = useMockData ? mockData : propData || [20, 35, 25, 50, 45, 60, 55, 70, 65, 80, 75];
+  // Prefer real data passed via props; fallback to a sensible default for display
+  const data = propData && propData.length ? propData : [20, 35, 25, 50, 45, 60, 55, 70, 65, 80, 75];
 
   // Auto-convert numeric data to quality labels based on thresholds
   const autoGenerateQualities = (values: number[]): DayQuality[] => {
@@ -69,7 +51,8 @@ const ProgressGraph: React.FC<ProgressGraphProps> = ({
     });
   };
 
-  const dayQualities = useMockData ? mockQualities : propQualities || autoGenerateQualities(data);
+  // Day qualities: prefer explicit propQualities; otherwise auto-generate from numeric values
+  const dayQualities = propQualities && propQualities.length ? propQualities : autoGenerateQualities(data);
   const lineStrokeWidth = 6;
   const pointRadius = 8;
   const pointStrokeWidth = 2;
@@ -129,18 +112,20 @@ const ProgressGraph: React.FC<ProgressGraphProps> = ({
       const nextPoint = points[index + 1];
       const gradientId = `gradient-${index}`;
 
+      // Check if we're jumping from red to green or green to red
       const needsYellowBridge =
         (point.quality === "good" && nextPoint.quality === "bad") ||
         (point.quality === "bad" && nextPoint.quality === "good");
 
+      // Always include a middle Stop element; use yellow when bridging red<->green, otherwise match the start color
+      const middleStop = (
+        <Stop offset="50%" stopColor={needsYellowBridge ? DAY_COLORS.medium : point.color} stopOpacity={1} />
+      );
+
       return (
         <LinearGradient key={gradientId} id={gradientId} x1="0" y1="0" x2="1" y2="0">
-          <Stop offset="0%" stopColor={point.color} stopOpacity={0.8} />
-          {needsYellowBridge ? (
-            <Stop offset="50%" stopColor={DAY_COLORS.medium} stopOpacity={1} />
-          ) : (
-            <Stop offset="50%" stopColor={point.color} stopOpacity={1} />
-          )}
+          <Stop offset="0%" stopColor={point.color} stopOpacity={1} />
+          {middleStop}
           <Stop offset="100%" stopColor={nextPoint.color} stopOpacity={1} />
         </LinearGradient>
       );
@@ -154,8 +139,22 @@ const ProgressGraph: React.FC<ProgressGraphProps> = ({
     return points.slice(0, -1).map((current, i) => {
       const next = points[i + 1];
 
-      // Simple line segment
-      const path = `M ${current.x} ${current.y} L ${next.x} ${next.y}`;
+      // For flat lines (same y-coordinate), add a tiny offset to ensure visibility
+      const currentY = current.y;
+      const nextY = next.y;
+      const yDiff = Math.abs(nextY - currentY);
+
+      // If line is completely flat, create a path that's slightly curved to ensure rendering
+      let path;
+      if (yDiff < 0.5) {
+        // Add a very subtle arc for flat lines to ensure they render
+        const midX = (current.x + next.x) / 2;
+        const arcY = currentY - 0.1; // Tiny bump
+        path = `M ${current.x} ${currentY} Q ${midX} ${arcY} ${next.x} ${nextY}`;
+      } else {
+        // Normal line
+        path = `M ${current.x} ${currentY} L ${next.x} ${nextY}`;
+      }
 
       return (
         <Path
@@ -176,7 +175,7 @@ const ProgressGraph: React.FC<ProgressGraphProps> = ({
       <Svg width={width} height={height}>
         <Defs>{createSegmentGradients()}</Defs>
 
-        {/* Colored line segments */}
+        {/* Colored line segments - draw BEFORE circles so circles appear on top */}
         {createColoredSegments()}
 
         {/* Circles for each data point */}

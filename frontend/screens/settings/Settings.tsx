@@ -36,7 +36,7 @@ export default function SettingsScreen({ onBack, onEditPreferences, onChatSettin
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const RightIcon = ICONS.right;
+  const LeftIcon = ICONS.left;
   const SettingsIcon = ICONS.settings;
   const UserIcon = ICONS.user;
   const EditIcon = ICONS.prefrences;
@@ -50,14 +50,14 @@ export default function SettingsScreen({ onBack, onEditPreferences, onChatSettin
       show: true,
       icon: ICONS.settings,
       leftElement: (
+        <TouchableOpacity onPress={onBack} style={styles.headerRightTouchable}>
+          <LeftIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
+        </TouchableOpacity>
+      ),
+      rightElement: (
         <View style={styles.headerLeft}>
           <SettingsIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
         </View>
-      ),
-      rightElement: (
-        <TouchableOpacity onPress={onBack} style={styles.headerRightTouchable}>
-          <RightIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
-        </TouchableOpacity>
       ),
     });
   }, []);
@@ -159,19 +159,12 @@ export default function SettingsScreen({ onBack, onEditPreferences, onChatSettin
 
       {/* Logout & Delete Row */}
       <View style={styles.signButtonsRow}>
-        <AppButton
-          title="Logout"
-          onPress={signOut}
-          mode="light"
-          color="primary7"
-          style={[styles.signButton, styles.signOutButton]}
-        />
+        <AppButton title="Logout" onPress={signOut} mode="light" color="primary7" />
         <AppButton
           title="Delete Account"
           onPress={handleDeleteAccount}
           mode="light"
           color="lightGray"
-          style={[styles.signButton, styles.deleteButton]}
           disabled={isSaving}
         />
       </View>
@@ -212,9 +205,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     marginTop: SPACING.md,
   },
-  signButton: {
-    marginHorizontal: SPACING.sm,
-  },
 
   // Preferences Content
   preferencesContent: {
@@ -228,22 +218,5 @@ const styles = StyleSheet.create({
   },
   preferenceText: {
     color: COLORS.black,
-  },
-
-  // Sign Out Button
-  signOutButton: {
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.xlg,
-    borderRadius: SPACING.xlg,
-    ...SHADOWS.card,
-    marginTop: SPACING.md,
-  },
-  deleteButton: {
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.xlg,
-    borderRadius: SPACING.xlg,
-    ...SHADOWS.card,
-    marginTop: SPACING.md,
-    marginBottom: SPACING.xlg * 2,
   },
 });

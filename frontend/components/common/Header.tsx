@@ -79,16 +79,14 @@ export default function Header({ title, Icon, show = true, rightElement, leftEle
             {leftElement}
             {Icon && !leftElement && <Icon size={ICON_SIZES.big} color={COLORS.primary1} />}
             {title && (
-              <View style={{ width: "100%" }}>
-                <AppText
-                  variant="title3"
-                  numberOfLines={titleLines}
-                  ellipsizeMode="tail"
-                  style={[{ color: COLORS.primary1, width: "100%" }]}
-                >
-                  {displayTitle}
-                </AppText>
-              </View>
+              <AppText
+                variant="title3"
+                numberOfLines={titleLines}
+                ellipsizeMode="tail"
+                style={[{ color: COLORS.primary1, width: "100%" }]}
+              >
+                {displayTitle}
+              </AppText>
             )}
           </View>
 
@@ -135,12 +133,12 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     alignItems: "center",
     flexShrink: 1,
-    gap: SPACING.md,
   },
   centerSection: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    height: "100%",
   },
 
   rightSection: {
@@ -149,7 +147,6 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     flexShrink: 0,
     minWidth: moderateScale(56),
-    paddingRight: SPACING.lg,
     zIndex: 999,
   },
   overflowButton: {
