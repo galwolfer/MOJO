@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, StyleSheet, Image, Alert, Platform } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { moderateScale } from "react-native-size-matters";
 import AppText from "../../components/common/AppText";
 import Input from "../../components/inputs/Input";
@@ -210,13 +211,19 @@ export default function ProfileSettings() {
         <View style={styles.avatarContainer}>
           {!isEditMode && (
             <View>
-              <View style={styles.avatarPlain}>
-                {editedProfileImage ? (
-                  <Image source={{ uri: editedProfileImage }} style={styles.avatarImagePlain} />
-                ) : (
-                  <UserIcon size={moderateScale(35)} color={COLORS.grayLight} />
-                )}
-              </View>
+              <LinearGradient
+                colors={[COLORS.primary1, COLORS.primary2]}
+                end={{ x: 1, y: 1 }}
+                style={styles.avatarGradient}
+              >
+                <View style={styles.avatarInner}>
+                  {editedProfileImage ? (
+                    <Image source={{ uri: editedProfileImage }} style={styles.avatarImagePlain} />
+                  ) : (
+                    <UserIcon size={moderateScale(35)} color={COLORS.grayLight} />
+                  )}
+                </View>
+              </LinearGradient>
               <AppButton
                 icon="edit"
                 mode="filled"
@@ -363,7 +370,16 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
     position: "relative",
   },
-  avatarPlain: {
+  avatarGradient: {
+    width: moderateScale(104),
+    height: moderateScale(104),
+    borderRadius: moderateScale(52),
+    alignItems: "center",
+    justifyContent: "center",
+    padding: moderateScale(2),
+    ...SHADOWS.card,
+  },
+  avatarInner: {
     width: moderateScale(100),
     height: moderateScale(100),
     borderRadius: moderateScale(50),
