@@ -79,9 +79,7 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({
   const [loadingParts, setLoadingParts] = useState<Set<string>>(new Set());
 
   // Debug: log whenever selectedTaskId changes
-  useEffect(() => {
-    console.log("TaskListWidget: selectedTaskId changed to:", selectedTaskId);
-  }, [selectedTaskId]);
+  useEffect(() => {}, [selectedTaskId]);
 
   // Listen for task updates and refresh progress for tasks in this list
   const refreshTaskProgress = async (taskId: string) => {

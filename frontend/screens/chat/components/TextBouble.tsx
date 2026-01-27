@@ -475,7 +475,9 @@ const TextBouble: React.FC<Props> = ({
         // Trigger widget entrance animation (only on a real typing run)
         try {
           // Only set the trigger if we actually performed a typing animation
-          if (resolvedTypewriter && fullText) setTriggerWidgetEntrance(true);
+          if (resolvedTypewriter && fullText) {
+            setTriggerWidgetEntrance(true);
+          }
         } catch (_) {}
       });
     },
@@ -513,6 +515,10 @@ const TextBouble: React.FC<Props> = ({
         // If there's a widget and we're not typing, mount it immediately and persist
         if (parsedContent.widget) {
           setWidgetMounted(true);
+          // Only trigger entrance animation if widget hasn't been shown before
+          if (!widgetWasShown) {
+            setTriggerWidgetEntrance(true);
+          }
           if (playOnceKey) widgetShownMap.set(playOnceKey, true);
         }
       }
@@ -601,8 +607,8 @@ const TextBouble: React.FC<Props> = ({
       if (playOnceKey) widgetShownMap.set(playOnceKey, true);
     }
 
-    // Reset per-message trigger when the widget content changes
-    setTriggerWidgetEntrance(false);
+    // DON'T reset triggerWidgetEntrance here - it needs to stay true long enough for Widget to see it
+    // The Widget component will handle its own animation lifecycle
     // If we're typing, do not unmount; we only mount/trigger once typing completes.
   }, [parsedContent.widget, isTyping, playOnceKey, widgetMounted, nonTextOpacity]);
 
@@ -744,6 +750,7 @@ const TextBouble: React.FC<Props> = ({
               entranceEnabled={triggerWidgetEntrance}
               entranceDelay={150}
               entranceDuration={200}
+              skipAnimation={playOnceKey ? widgetShownMap.get(playOnceKey) : false}
             />
           </Animated.View>
         )}

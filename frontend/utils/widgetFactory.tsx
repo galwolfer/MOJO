@@ -23,6 +23,7 @@ export interface BaseWidgetProps {
   entranceEnabled?: boolean; // Optional signal to trigger entrance animations
   entranceDelay?: number; // ms delay before widget entrance animation
   entranceDuration?: number; // ms duration for widget entrance animation
+  skipAnimation?: boolean; // Skip animation entirely (e.g., when widget was already shown)
 }
 
 /**
@@ -76,6 +77,7 @@ export interface WidgetRendererProps {
   entranceEnabled?: boolean;
   entranceDelay?: number;
   entranceDuration?: number;
+  skipAnimation?: boolean;
 }
 
 /**
@@ -94,6 +96,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({
   entranceEnabled,
   entranceDelay,
   entranceDuration,
+  skipAnimation,
 }) => {
   const Component = WidgetFactory.getComponent(widget.widget_type);
 
@@ -108,6 +111,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({
       entranceEnabled={entranceEnabled}
       entranceDelay={entranceDelay}
       entranceDuration={entranceDuration}
+      skipAnimation={skipAnimation}
     />
   );
 };

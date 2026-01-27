@@ -26,16 +26,18 @@ export type WidgetEntranceProps = {
   entranceEnabled?: boolean;
   entranceDelay?: number;
   entranceDuration?: number;
+  skipAnimation?: boolean;
 };
 
 export const getWidgetEntranceProps = (
-  { entranceEnabled, entranceDelay, entranceDuration }: WidgetEntranceProps,
+  { entranceEnabled, entranceDelay, entranceDuration, skipAnimation }: WidgetEntranceProps,
   options?: { skipAnimation?: boolean },
 ) => ({
-  entranceEnabled,
+  // Default entranceEnabled to true so widgets animate in by default unless explicitly disabled
+  entranceEnabled: entranceEnabled ?? true,
   entranceDelay,
   entranceDuration,
-  ...(options?.skipAnimation ? { skipAnimation: true } : {}),
+  skipAnimation: skipAnimation ?? options?.skipAnimation ?? false,
 });
 
 /**

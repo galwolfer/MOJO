@@ -50,7 +50,9 @@ const Widget: React.FC<WidgetProps> = ({
   const isFirstMountRef = useRef(true);
 
   useEffect(() => {
-    if (entranceEnabled || skipAnimation) setMounted(true);
+    if (entranceEnabled || skipAnimation) {
+      setMounted(true);
+    }
   }, [entranceEnabled, skipAnimation]);
 
   // If not mounted yet, render nothing (prevents early flash / layout shift)
@@ -58,8 +60,9 @@ const Widget: React.FC<WidgetProps> = ({
 
   const [animating, setAnimating] = useState(false);
 
-  const opacity = useRef(new Animated.Value(skipAnimation ? 1 : 0)).current;
-  const translateY = useRef(new Animated.Value(skipAnimation ? 0 : 8)).current;
+  // Initialize animated values based on skipAnimation to avoid flash
+  const opacity = useRef(new Animated.Value(skipAnimation || entranceEnabled === false ? 1 : 0)).current;
+  const translateY = useRef(new Animated.Value(skipAnimation || entranceEnabled === false ? 0 : 8)).current;
 
   useEffect(() => {
     // If skipAnimation is true, show immediately without animation
@@ -100,8 +103,7 @@ const Widget: React.FC<WidgetProps> = ({
         easing: Easing.out(Easing.cubic),
         useNativeDriver: false,
       }),
-    ]).start(() => {
-      console.log("[Widget] animation complete");
+    ]).start((result: any) => {
       setAnimating(false);
     });
   }, [entranceEnabled, entranceDelay, entranceDuration, skipAnimation, opacity, translateY]);
