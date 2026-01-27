@@ -151,7 +151,6 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
   },
   contentContainer: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "flex-start",
     alignSelf: "stretch",

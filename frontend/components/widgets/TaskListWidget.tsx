@@ -207,7 +207,7 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({
               style={styles.headerTouchable}
             >
               <View style={styles.titleRow}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: SPACING.sm, flex: 1 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: SPACING.sm }}>
                   {meta?.icon ? (
                     <Icon name={meta.icon} size={ICON_SIZES.sm} color={meta.color} style={styles.titleIcon} />
                   ) : null}
@@ -220,7 +220,6 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({
                     {task.title || (task as any).taskname || "Untitled task"}
                   </AppText>
                 </View>
-
                 {typeof task.progressPercentage === "number" ||
                 ((task as any).subtasks && (task as any).subtasks.length > 0) ||
                 (task.scheduledSessions && task.scheduledSessions.length > 0) ? (
@@ -301,6 +300,7 @@ const styles = StyleSheet.create({
     width: "100%",
     alignSelf: "stretch",
     overflow: "hidden",
+    minWidth: 100,
   },
   emptyText: {
     color: COLORS.lightGray,
@@ -310,6 +310,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     paddingVertical: SPACING.xs,
     gap: SPACING.md,
+    width: "100%",
   },
   checkbox: {
     paddingRight: SPACING.sm,
@@ -330,7 +331,6 @@ const styles = StyleSheet.create({
   },
 
   taskContent: {
-    flex: 1,
     gap: SPACING.sm,
   },
   titleRow: {
