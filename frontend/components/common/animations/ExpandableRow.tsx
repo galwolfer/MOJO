@@ -14,10 +14,9 @@ const ExpandableRow: React.FC<ExpandableRowProps> = ({ expanded, duration = 220,
   const opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    if (contentHeight == null) return;
+
     if (expanded) {
-      if (contentHeight == null) {
-        return;
-      }
       Animated.parallel([
         Animated.timing(height, {
           toValue: contentHeight,
@@ -50,20 +49,41 @@ const ExpandableRow: React.FC<ExpandableRowProps> = ({ expanded, duration = 220,
     }
   }, [expanded, contentHeight, duration, height, opacity]);
 
+  const measuring = contentHeight == null;
+
   return (
-    <Animated.View style={[{ overflow: "hidden", height }, style as any] as any}>
-      <Animated.View
-        style={{ opacity }}
+    <Animated.View
+      style={[
+        {
+          overflow: "hidden",
+          ...(measuring
+            ? {
+                position: "absolute",
+                left: 0,
+                right: 0,
+                opacity: 0,
+              }
+            : { height, opacity }),
+        },
+        style as any,
+      ]}
+      pointerEvents={expanded && !measuring ? "auto" : "none"}
+    >
+      <View
         onLayout={(e) => {
           const h = Math.ceil(e.nativeEvent.layout.height);
-          if (contentHeight === null && h > 0) {
+          if (h > 0 && h !== contentHeight) {
             setContentHeight(h);
-            height.setValue(expanded ? 0 : 0);
+            if (!expanded) {
+              height.setValue(0);
+              opacity.setValue(0);
+            }
           }
         }}
+        collapsable={false}
       >
-        <View>{children}</View>
-      </Animated.View>
+        {children}
+      </View>
     </Animated.View>
   );
 };
