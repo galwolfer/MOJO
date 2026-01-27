@@ -8,6 +8,7 @@ import { logger } from "../utils/logger.js";
 import { User } from "../models/User.js";
 import { getCategoryIndex, isValidCategory } from "../config/categories.js";
 import { hasIllegalDisplayChars } from "../utils/illegalChars.js";
+import { triggerSchedulerUpdate } from "../services/schedulingService.js";
 
 /**
  * Task Controller
@@ -17,12 +18,14 @@ import { hasIllegalDisplayChars } from "../utils/illegalChars.js";
 /**
  * Auto-save subcategory to user profile
  * Automatically adds new subcategories to user's collection when they create/update tasks
- * 
+ * Exported as a helper for use in missions and other controllers
+ *
  * @param {string} userId - User ID
  * @param {string} subcategoryName - Subcategory name
  * @param {string} categoryKey - Category key (e.g., "work_and_career")
+ * @returns {Promise<void>}
  */
-async function autoSaveSubcategory(userId, subcategoryName, categoryKey) {
+export async function autoSaveSubcategory(userId, subcategoryName, categoryKey) {
   try {
     // Validate inputs
     if (!subcategoryName || typeof subcategoryName !== "string" || subcategoryName.trim().length === 0) {
@@ -34,7 +37,7 @@ async function autoSaveSubcategory(userId, subcategoryName, categoryKey) {
     }
 
     const trimmedName = subcategoryName.trim();
-    
+
     // Get category index (0-17)
     const categoryIndex = getCategoryIndex(categoryKey);
 
@@ -46,7 +49,7 @@ async function autoSaveSubcategory(userId, subcategoryName, categoryKey) {
 
     // Check if this subcategory already exists for this category (case-insensitive)
     const exists = user.subCategories.some(
-      (sub) => sub.category === categoryIndex && sub.name.toLowerCase() === trimmedName.toLowerCase()
+      (sub) => sub.category === categoryIndex && sub.name.toLowerCase() === trimmedName.toLowerCase(),
     );
 
     if (exists) {
@@ -126,40 +129,51 @@ export async function suggestCategory(req, res) {
 export async function createTask(req, res) {
   try {
     const userId = req.user.userId;
-    
+
     // Log the entire request body for debugging
     console.log("=== CONTROLLER RECEIVED ===");
     console.log("req.body:", JSON.stringify(req.body, null, 2));
-    
-    const { 
-      name, 
-      taskname, 
-      category, 
-      subcategory, 
-      deadline, 
+
+    const {
+      name,
+      taskname,
+      category,
+      subcategory,
+      deadline,
       recurrence,
       importance,
       effort,
       estimatedMinutes,
+      estimatedDuration,
+      canSplit,
+      minChunk,
       description,
-      tags,
       subtasks,
       taskType,
       chunkCount,
+      chunkMinutes,
+      minMinutes,
+      maxMinutes,
     } = req.body;
 
     console.log("Extracted fields:", {
       importance,
       effort,
       estimatedMinutes,
+      estimatedDuration,
+      canSplit,
+      minChunk,
       description,
-      tags,
       subtasks,
       taskType,
       chunkCount,
+      chunkMinutes,
+      minMinutes,
+      maxMinutes,
     });
 
     const title = (taskname || name || "").trim();
+    const descriptionValue = typeof bodyDescription === "string" ? bodyDescription : req.body.description || "";
 
     // Validation
     if (!title) {
@@ -204,25 +218,46 @@ export async function createTask(req, res) {
 
     // Auto-save subcategory to user profile if provided
     if (subcategory && category) {
+      console.log("[taskController.createTask] Auto-saving subcategory:", { subcategory, category, userId });
       await autoSaveSubcategory(userId, subcategory, category);
     }
+
+    // Use estimatedDuration (from agent) OR estimatedMinutes (from frontend)
+    const finalEstimatedDuration = estimatedDuration || estimatedMinutes || 60;
+
+    console.log("[taskController.createTask] Creating task with:", {
+      taskname: title,
+      category,
+      subcategory,
+      subCategoryObject: subcategory ? { label: subcategory, source: "user", confidence: 1 } : null,
+    });
+
+    // Preserve explicit nulls for minChunk (to allow clearing); only use default when undefined
+    const finalMinChunk = minChunk === null ? null : typeof minChunk === "number" && minChunk > 0 ? minChunk : 30;
 
     const task = await taskService.createTask({
       userId,
       taskname: title,
-      description: description || undefined,
+      description: descriptionValue,
       category: category || "",
       subCategory: subcategory ? { label: subcategory, source: "user", confidence: 1, updatedAt: new Date() } : null,
       dueDate: deadline ? new Date(deadline) : null,
-      importance: importance !== undefined ? importance : 3, // Default to 3 if not provided
-      effort: effort !== undefined ? effort : 3, // Default to 3 if not provided
-      estimatedDuration: estimatedMinutes || 60, // Default to 60 minutes if not provided
-      tags: tags || undefined,
-      subtasks: subtasks || undefined,
+      importance: importance !== undefined ? importance : 3,
+      effort: effort !== undefined ? effort : 3,
+      estimatedDuration: finalEstimatedDuration,
+      canSplit: canSplit !== undefined ? canSplit : true,
+      minChunk: finalMinChunk,
       taskType: taskType || "perfect",
-      chunkCount: chunkCount || undefined,
+      chunkCount: typeof chunkCount === "number" ? chunkCount : undefined,
+      chunkMinutes: typeof chunkMinutes === "number" ? chunkMinutes : undefined,
+      minMinutes: typeof minMinutes === "number" ? minMinutes : undefined,
+      maxMinutes: typeof maxMinutes === "number" ? maxMinutes : undefined,
       recurrence,
+      subtasks: subtasks || undefined,
     });
+
+    // Trigger scheduler to update the plan after creating a task
+    await triggerSchedulerUpdate(userId, "creation", "API");
 
     return res.status(201).json({
       success: true,
@@ -252,7 +287,7 @@ export async function createTask(req, res) {
 export async function getTasks(req, res) {
   try {
     const userId = req.user.userId;
-    const { tag, category, completed, dueBefore, dueAfter } = req.query;
+    const { tag, category, completed, dueBefore, dueAfter, search } = req.query;
 
     // Build filters
     const filters = {};
@@ -273,6 +308,9 @@ export async function getTasks(req, res) {
 
     if (dueAfter) {
       filters.dueAfter = dueAfter;
+    }
+    if (search) {
+      filters.search = search;
     }
 
     const tasks = await taskService.getTasks(userId, filters);
@@ -327,7 +365,7 @@ export async function getTaskById(req, res) {
 /**
  * Update a task
  * PATCH /api/tasks/:id
- * 
+ *
  * Body fields (all optional):
  * - taskname/name: string
  * - description: string
@@ -355,7 +393,7 @@ export async function updateTask(req, res) {
 
     // Map public API fields to service field names
     const updates = {};
-    
+
     // Task name
     if (raw.taskname !== undefined || raw.name !== undefined) {
       const name = raw.taskname || raw.name;
@@ -373,7 +411,7 @@ export async function updateTask(req, res) {
         updates.taskname = trimmed;
       }
     }
-    
+
     // Description
     if (raw.description !== undefined) {
       if (typeof raw.description === "string") {
@@ -384,24 +422,24 @@ export async function updateTask(req, res) {
         updates.description = trimmed;
       }
     }
-    
+
     // Category
     if (raw.category !== undefined) updates.category = raw.category;
-    
+
     // Subcategory
     if (raw.subcategory !== undefined) {
       if (typeof raw.subcategory === "string" && hasIllegalDisplayChars(raw.subcategory)) {
         return res.status(400).json({ success: false, error: "Subcategory cannot include angle brackets." });
       }
       updates.subCategory = { label: raw.subcategory, source: "user", confidence: 1, updatedAt: new Date() };
-      
+
       // Auto-save subcategory to user profile
       const taskCategory = raw.category || updates.category;
       if (taskCategory && raw.subcategory) {
         await autoSaveSubcategory(userId, raw.subcategory, taskCategory);
       }
     }
-    
+
     // Importance (1-5)
     if (raw.importance !== undefined) {
       const imp = Number(raw.importance);
@@ -410,7 +448,7 @@ export async function updateTask(req, res) {
       }
       updates.importance = imp;
     }
-    
+
     // Effort (1-5)
     if (raw.effort !== undefined) {
       const eff = Number(raw.effort);
@@ -419,7 +457,7 @@ export async function updateTask(req, res) {
       }
       updates.effort = eff;
     }
-    
+
     // Estimated Duration
     if (raw.estimatedDuration !== undefined) {
       const dur = Number(raw.estimatedDuration);
@@ -428,10 +466,10 @@ export async function updateTask(req, res) {
       }
       updates.estimatedDuration = Math.round(dur);
     }
-    
+
     // Task splitting options
     if (raw.canSplit !== undefined) updates.canSplit = Boolean(raw.canSplit);
-    
+
     // Task type validation
     if (raw.taskType !== undefined) {
       if (!["perfect", "in_parts", "leaky"].includes(raw.taskType)) {
@@ -439,50 +477,78 @@ export async function updateTask(req, res) {
       }
       updates.taskType = raw.taskType;
     }
-    
+
     // Chunk settings (for in_parts/leaky tasks)
     if (raw.chunkCount !== undefined) {
-      const cc = Number(raw.chunkCount);
-      if (!Number.isInteger(cc) || cc < 1) {
-        return res.status(400).json({ success: false, error: "Chunk count must be at least 1" });
+      // Accept explicit null to clear stored chunk count when switching types
+      if (raw.chunkCount === null) {
+        updates.chunkCount = null;
+      } else {
+        const cc = Number(raw.chunkCount);
+        if (!Number.isInteger(cc) || cc < 1) {
+          return res.status(400).json({ success: false, error: "Chunk count must be at least 1" });
+        }
+        updates.chunkCount = cc;
       }
-      updates.chunkCount = cc;
     }
-    
+
     if (raw.chunkMinutes !== undefined) {
-      const cm = Number(raw.chunkMinutes);
-      if (isNaN(cm) || cm < 1) {
-        return res.status(400).json({ success: false, error: "Chunk minutes must be at least 1" });
+      if (raw.chunkMinutes === null) {
+        updates.chunkMinutes = null;
+      } else {
+        const cm = Number(raw.chunkMinutes);
+        if (isNaN(cm) || cm < 1) {
+          return res.status(400).json({ success: false, error: "Chunk minutes must be at least 1" });
+        }
+        updates.chunkMinutes = Math.round(cm);
       }
-      updates.chunkMinutes = Math.round(cm);
     }
-    
+
     if (raw.minMinutes !== undefined) {
-      const min = Number(raw.minMinutes);
-      if (isNaN(min) || min < 1) {
-        return res.status(400).json({ success: false, error: "Min minutes must be at least 1" });
+      if (raw.minMinutes === null) {
+        updates.minMinutes = null;
+      } else {
+        const min = Number(raw.minMinutes);
+        if (isNaN(min) || min < 1) {
+          return res.status(400).json({ success: false, error: "Min minutes must be at least 1" });
+        }
+        updates.minMinutes = Math.round(min);
       }
-      updates.minMinutes = Math.round(min);
     }
-    
+
     if (raw.maxMinutes !== undefined) {
-      const max = Number(raw.maxMinutes);
-      if (isNaN(max) || max < 1) {
-        return res.status(400).json({ success: false, error: "Max minutes must be at least 1" });
+      if (raw.maxMinutes === null) {
+        updates.maxMinutes = null;
+      } else {
+        const max = Number(raw.maxMinutes);
+        if (isNaN(max) || max < 1) {
+          return res.status(400).json({ success: false, error: "Max minutes must be at least 1" });
+        }
+        updates.maxMinutes = Math.round(max);
       }
-      updates.maxMinutes = Math.round(max);
     }
-    
+
     if (raw.minChunk !== undefined) {
-      const mc = Number(raw.minChunk);
-      if (isNaN(mc) || mc < 15) {
-        return res.status(400).json({ success: false, error: "Min chunk must be at least 15 minutes" });
+      // Allow explicit null to clear stored minChunk
+      if (raw.minChunk === null) {
+        updates.minChunk = null;
+      } else {
+        const mc = Number(raw.minChunk);
+        if (isNaN(mc) || mc < 15) {
+          return res.status(400).json({ success: false, error: "Min chunk must be at least 15 minutes" });
+        }
+        updates.minChunk = Math.round(mc);
       }
-      updates.minChunk = Math.round(mc);
     }
-    
-    // Validate min/max relationship
-    if (updates.minMinutes && updates.maxMinutes && updates.minMinutes > updates.maxMinutes) {
+
+    // Validate min/max relationship (when both provided and not null)
+    if (
+      updates.minMinutes !== undefined &&
+      updates.maxMinutes !== undefined &&
+      updates.minMinutes !== null &&
+      updates.maxMinutes !== null &&
+      updates.minMinutes > updates.maxMinutes
+    ) {
       return res.status(400).json({ success: false, error: "Min minutes cannot exceed max minutes" });
     }
 
@@ -493,7 +559,7 @@ export async function updateTask(req, res) {
       }
       updates.status = raw.status;
     }
-    
+
     // Completed flag (alias for status)
     if (raw.completed !== undefined && raw.status === undefined) {
       updates.status = raw.completed ? "done" : "todo";
@@ -511,6 +577,25 @@ export async function updateTask(req, res) {
         }
         updates.dueDate = d;
       }
+    }
+
+    // Recurrence
+    if (raw.recurrence !== undefined) {
+      const rec = {
+        type: raw.recurrence.type,
+        interval: raw.recurrence.interval || 1,
+        endDate: raw.recurrence.endDate ? new Date(raw.recurrence.endDate) : null,
+        count: raw.recurrence.count || null,
+        completedDates: [],
+      };
+
+      if (rec.endDate && isNaN(rec.endDate.getTime())) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Invalid recurrence.endDate. Use ISO 8601 (YYYY-MM-DD)." });
+      }
+
+      updates.recurrence = rec;
     }
 
     if (Object.keys(updates).length === 0) {
@@ -537,11 +622,14 @@ export async function updateTask(req, res) {
       }
     }
 
-    return res.status(200).json({ 
-      success: true, 
+    // Trigger scheduler to update the plan after task update
+    await triggerSchedulerUpdate(userId, "update", "API");
+
+    return res.status(200).json({
+      success: true,
       task: result.task,
       gamification: gamification,
-      message: "Task updated successfully"
+      message: "Task updated successfully",
     });
   } catch (error) {
     logger.error("Error in updateTask controller:", error);
@@ -569,18 +657,23 @@ export async function deleteTask(req, res) {
     const userId = req.user.userId;
     const { id } = req.params;
 
-    const success = await taskService.deleteTask(id, userId);
+    // Call service with explicit named args and respect its return shape
+    const result = await taskService.deleteTask({ taskId: id, userId });
 
-    if (!success) {
+    if (!result || !result.success) {
       return res.status(404).json({
         success: false,
-        error: "Task not found",
+        error: result?.error || "Task not found",
       });
     }
+
+    // Trigger scheduler to update the plan after deletion
+    await triggerSchedulerUpdate(userId, "deletion", "API");
 
     return res.status(200).json({
       success: true,
       id,
+      taskname: result.taskname || null,
     });
   } catch (error) {
     logger.error("Error in deleteTask controller:", error);
@@ -621,6 +714,40 @@ export async function getUpcomingTasks(req, res) {
     return res.status(500).json({
       success: false,
       error: "Failed to retrieve upcoming tasks",
+    });
+  }
+}
+
+/**
+ * Get scheduled tasks grouped by day (today + upcoming)
+ * GET /api/tasks/scheduled/:days?
+ */
+export async function getScheduledTasks(req, res) {
+  try {
+    const userId = req.user.userId;
+    const days = parseInt(req.params.days) || 7;
+
+    if (days < 1 || days > 365) {
+      return res.status(400).json({
+        success: false,
+        error: "Days must be between 1 and 365",
+      });
+    }
+
+    const schedule = await taskService.getScheduledTasksByDay(userId, days);
+
+    return res.status(200).json({
+      success: true,
+      days: schedule.days,
+      today: schedule.today,
+      upcoming: schedule.upcoming,
+    });
+  } catch (error) {
+    logger.error("Error in getScheduledTasks controller:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: "Failed to retrieve scheduled tasks",
     });
   }
 }
@@ -720,7 +847,7 @@ export async function getSubTasksForTask(req, res) {
 /**
  * Get detailed progress for a task with split parts
  * GET /api/tasks/:id/progress
- * 
+ *
  * Returns:
  * - Task details
  * - All subtasks with their schedule blocks
@@ -769,7 +896,7 @@ export async function getSubTaskById(req, res) {
 /**
  * Update a subtask (e.g., mark complete)
  * PATCH /api/tasks/:taskId/subtasks/:subId
- * 
+ *
  * Body fields (all optional):
  * - title: string
  * - description: string
@@ -781,9 +908,9 @@ export async function updateSubTask(req, res) {
     const userId = req.user.userId;
     const { subId } = req.params;
     const raw = req.body || {};
-    
+
     const updates = {};
-    
+
     // Title
     if (raw.title !== undefined) {
       if (typeof raw.title === "string") {
@@ -797,7 +924,7 @@ export async function updateSubTask(req, res) {
         updates.title = trimmed;
       }
     }
-    
+
     // Description
     if (raw.description !== undefined) {
       if (typeof raw.description === "string") {
@@ -808,7 +935,7 @@ export async function updateSubTask(req, res) {
         updates.description = trimmed;
       }
     }
-    
+
     // Status
     if (raw.status !== undefined) {
       if (!["todo", "done"].includes(raw.status)) {
@@ -816,7 +943,7 @@ export async function updateSubTask(req, res) {
       }
       updates.status = raw.status;
     }
-    
+
     // Minutes
     if (raw.minutes !== undefined) {
       const min = Number(raw.minutes);
@@ -825,7 +952,7 @@ export async function updateSubTask(req, res) {
       }
       updates.minutes = Math.round(min);
     }
-    
+
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ success: false, error: "No valid fields to update" });
     }
@@ -836,10 +963,10 @@ export async function updateSubTask(req, res) {
       return res.status(404).json({ success: false, error: result ? result.error : "Subtask not found" });
     }
 
-    return res.status(200).json({ 
-      success: true, 
+    return res.status(200).json({
+      success: true,
       subtask: result.subtask,
-      message: "Subtask updated successfully"
+      message: "Subtask updated successfully",
     });
   } catch (error) {
     logger.error("Error in updateSubTask controller:", error);
@@ -859,17 +986,17 @@ export async function markSubTaskComplete(req, res) {
     const result = await taskService.updateSubTask({
       userId,
       subTaskId: subId,
-      updates: { status: "done" }
+      updates: { status: "done" },
     });
 
     if (!result || result.success === false) {
       return res.status(404).json({ success: false, error: result ? result.error : "Subtask not found" });
     }
 
-    return res.status(200).json({ 
-      success: true, 
+    return res.status(200).json({
+      success: true,
       subtask: result.subtask,
-      message: "Subtask marked as complete"
+      message: "Subtask marked as complete",
     });
   } catch (error) {
     logger.error("Error in markSubTaskComplete controller:", error);
@@ -889,17 +1016,17 @@ export async function markSubTaskTodo(req, res) {
     const result = await taskService.updateSubTask({
       userId,
       subTaskId: subId,
-      updates: { status: "todo" }
+      updates: { status: "todo" },
     });
 
     if (!result || result.success === false) {
       return res.status(404).json({ success: false, error: result ? result.error : "Subtask not found" });
     }
 
-    return res.status(200).json({ 
-      success: true, 
+    return res.status(200).json({
+      success: true,
       subtask: result.subtask,
-      message: "Subtask marked as todo"
+      message: "Subtask marked as todo",
     });
   } catch (error) {
     logger.error("Error in markSubTaskTodo controller:", error);
@@ -919,26 +1046,26 @@ export async function updateSubTaskStatus(req, res) {
     const { status } = req.body;
 
     if (!status || !["todo", "done"].includes(status)) {
-      return res.status(400).json({ 
-        success: false, 
-        error: "Status is required and must be 'todo' or 'done'" 
+      return res.status(400).json({
+        success: false,
+        error: "Status is required and must be 'todo' or 'done'",
       });
     }
 
     const result = await taskService.updateSubTask({
       userId,
       subTaskId: subId,
-      updates: { status }
+      updates: { status },
     });
 
     if (!result || result.success === false) {
       return res.status(404).json({ success: false, error: result ? result.error : "Subtask not found" });
     }
 
-    return res.status(200).json({ 
-      success: true, 
+    return res.status(200).json({
+      success: true,
       subtask: result.subtask,
-      message: `Subtask status updated to ${status}`
+      message: `Subtask status updated to ${status}`,
     });
   } catch (error) {
     logger.error("Error in updateSubTaskStatus controller:", error);
@@ -949,11 +1076,11 @@ export async function updateSubTaskStatus(req, res) {
 /**
  * Bulk update task with subtasks
  * PATCH /api/tasks/:id/full
- * 
+ *
  * Body:
  * - task: object with task fields to update
  * - subtasks: array of { _id, ...fields } to update
- * 
+ *
  * This endpoint allows updating task and its subtasks in a single transaction
  */
 export async function bulkUpdateTaskWithSubtasks(req, res) {
@@ -961,13 +1088,13 @@ export async function bulkUpdateTaskWithSubtasks(req, res) {
     const userId = req.user.userId;
     const { id } = req.params;
     const { task: taskUpdates, subtasks: subtaskUpdates } = req.body || {};
-    
+
     const results = {
       task: null,
       subtasks: [],
-      errors: []
+      errors: [],
     };
-    
+
     // Update task if provided
     if (taskUpdates && Object.keys(taskUpdates).length > 0) {
       const taskResult = await taskService.updateTask({ userId, taskId: id, updates: taskUpdates });
@@ -977,7 +1104,7 @@ export async function bulkUpdateTaskWithSubtasks(req, res) {
         results.errors.push({ type: "task", error: taskResult.error });
       }
     }
-    
+
     // Update subtasks if provided
     if (Array.isArray(subtaskUpdates) && subtaskUpdates.length > 0) {
       for (const subUpdate of subtaskUpdates) {
@@ -985,10 +1112,10 @@ export async function bulkUpdateTaskWithSubtasks(req, res) {
           results.errors.push({ type: "subtask", error: "Subtask _id is required" });
           continue;
         }
-        
+
         const { _id, ...updates } = subUpdate;
         const subResult = await taskService.updateSubTask({ userId, subTaskId: _id, updates });
-        
+
         if (subResult.success) {
           results.subtasks.push(subResult.subtask);
         } else {
@@ -996,25 +1123,25 @@ export async function bulkUpdateTaskWithSubtasks(req, res) {
         }
       }
     }
-    
+
     // Determine overall success
     const hasErrors = results.errors.length > 0;
     const hasUpdates = results.task || results.subtasks.length > 0;
-    
+
     if (!hasUpdates && hasErrors) {
       return res.status(400).json({
         success: false,
         error: "Failed to update task or subtasks",
-        details: results.errors
+        details: results.errors,
       });
     }
-    
+
     return res.status(200).json({
       success: true,
       message: hasErrors ? "Partial update completed with some errors" : "Task and subtasks updated successfully",
       task: results.task,
       subtasks: results.subtasks,
-      errors: results.errors.length > 0 ? results.errors : undefined
+      errors: results.errors.length > 0 ? results.errors : undefined,
     });
   } catch (error) {
     logger.error("Error in bulkUpdateTaskWithSubtasks controller:", error);
@@ -1035,7 +1162,9 @@ export async function completeTask(req, res) {
 
     const result = await taskService.completeTask({ taskId: id, userId });
 
-    logger.info(`[completeTask] Task service result: success=${result?.success}, wasAlreadyCompleted=${result?.wasAlreadyCompleted}`);
+    logger.info(
+      `[completeTask] Task service result: success=${result?.success}, wasAlreadyCompleted=${result?.wasAlreadyCompleted}`,
+    );
 
     if (!result || result.success === false) {
       logger.warn(`[completeTask] Task not found or error: ${result?.error}`);

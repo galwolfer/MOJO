@@ -19,58 +19,63 @@ import { COLORS } from "../../theme";
 
 export type IconProps = SvgProps & { size?: number };
 
-const ICON_FILES: Record<string, string> = {
-  mentorjo: "mentorjo.svg",
-  bestojo: "bestojo.svg",
-  brojo: "brojo.svg",
-  strictojo: "strictojo.svg",
-  burger: "burger.svg",
-  calendar: "calendar.svg",
-  cancel: "cancel.svg",
-  clock: "clock-1.svg",
-  creative: "creative.svg",
-  default: "default.svg",
-  down: "down-icon.svg",
-  edit: "edit.svg",
-  explore: "explore.svg",
-  family: "family.svg",
-  flame: "flame-1.svg",
-  friends: "friends.svg",
-  goals: "goals.svg",
-  health: "health.svg",
-  heart: "heart.svg",
-  highEffort: "high effort.svg",
-  highPriority: "high Priority.svg",
-  hobbies: "hobbies.svg",
-  home: "Home.svg",
-  left: "left.svg",
-  list: "list.svg",
-  lowEffort: "low effort.svg",
-  lowImportant: "low important.svg",
-  medal: "medal.svg",
-  mediumImportant: "medium important.svg",
-  mediumPiority: "medium piority.svg",
-  mindfulness: "mindfulness.svg",
-  mojo: "mojo-logo.svg",
-  move: "move.svg",
-  notifications: "notifications.svg",
-  ojo: "ojo.svg",
-  other: "other.svg",
-  plus: "plus-1.svg",
-  prefrences: "prefrences.svg",
-  reflection: "reflection.svg",
-  repeat: "repeat.svg",
-  right: "right.svg",
-  send: "send-icon.svg",
-  settings: "settings.svg",
-  shoppingCart: "shopping-cart.svg",
-  skills: "Skills.svg",
-  study: "study.svg",
-  trophy: "trophy.svg",
-  up: "up-icon.svg",
-  user: "user.svg",
-  work: "Work.svg",
-  workout: "workout.svg",
+export const ICON_FILES: Record<string, string> = {
+  bag: 'bag.svg',
+  bestojo: 'bestojo.svg',
+  brojo: 'brojo.svg',
+  burger: 'burger.svg',
+  calendar: 'calendar.svg',
+  cancel: 'cancel.svg',
+  check: 'check.svg',
+  clock: 'clock-1.svg',
+  creative: 'creative.svg',
+  default: 'default.svg',
+  down: 'down-icon.svg',
+  edit: 'edit.svg',
+  explore: 'explore.svg',
+  family: 'family.svg',
+  flame: 'flame-1.svg',
+  friends: 'friends.svg',
+  goals: 'goals.svg',
+  health: 'health.svg',
+  heart: 'heart.svg',
+  highEffort: 'high effort.svg',
+  highPriority: 'high Priority.svg',
+  hobbies: 'hobbies.svg',
+  home: 'Home.svg',
+  left: 'left.svg',
+  list: 'list.svg',
+  lowEffort: 'low effort.svg',
+  lowImportant: 'low important.svg',
+  medal: 'medal.svg',
+  mediumImportant: 'medium important.svg',
+  mediumPiority: 'medium piority.svg',
+  mentorjo: 'mentorjo.svg',
+  mindfulness: 'mindfulness.svg',
+  mojo: 'mojo-logo.svg',
+  move: 'move.svg',
+  notifications: 'notifications.svg',
+  ojo: 'ojo.svg',
+  other: 'other.svg',
+  plus: 'plus-1.svg',
+  prefrences: 'prefrences.svg',
+  puzzle: 'puzzle.svg',
+  reflection: 'reflection.svg',
+  repeat: 'repeat.svg',
+  right: 'right.svg',
+  send: 'send-icon.svg',
+  settings: 'settings.svg',
+  shoppingCart: 'shopping-cart.svg',
+  skills: 'Skills.svg',
+  split: 'split.svg',
+  strictojo: 'strictojo.svg',
+  study: 'study.svg',
+  trash: 'trash.svg',
+  trophy: 'trophy.svg',
+  up: 'up-icon.svg',
+  user: 'user.svg',
+  work: 'Work.svg',
+  workout: 'workout.svg',
 };
 
 function decodeBase64(base64: string) {
@@ -142,7 +147,41 @@ function createIcon(svgFileName: string, debugName: string): React.FC<IconProps>
 }
 
 export const ICONS: Record<string, React.FC<IconProps>> = Object.fromEntries(
-  Object.entries(ICON_FILES).map(([key, file]) => [key, createIcon(file, key)])
+  Object.entries(ICON_FILES).map(([key, file]) => [key, createIcon(file, key)]),
 ) as Record<string, React.FC<IconProps>>;
 
 export const ICON_NAMES = Object.keys(ICONS);
+
+function encodeBase64(str: string) {
+  if (typeof btoa === "function") return btoa(str);
+  if (typeof Buffer !== "undefined") return Buffer.from(str, "utf8").toString("base64");
+  throw new Error("No base64 encoder available");
+}
+
+/**
+ * Returns a colored SVG data URI for the given icon key.
+ * Falls back to the default icon if not found.
+ */
+export function getIconDataUri(iconKey: string, color?: string) {
+  const file = ICON_FILES[iconKey] || ICON_FILES.default;
+  const dataUri = (SVG_DATA_URIS as Record<string, string>)[file];
+  if (!dataUri) return undefined;
+
+  const base64 = dataUri.split(",")[1];
+  let svg = "";
+  try {
+    svg = decodeBase64(base64);
+  } catch (e) {
+    return dataUri;
+  }
+
+  const tint = typeof color === "string" ? color : COLORS.black;
+  const colored = svg.replace(/currentColor/g, tint);
+
+  try {
+    const encoded = encodeBase64(colored);
+    return `data:image/svg+xml;base64,${encoded}`;
+  } catch (e) {
+    return dataUri;
+  }
+}

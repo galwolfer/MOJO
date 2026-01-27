@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { LightMission } from "./LightMission.js";
 import { memoryStore } from "../../services/memoryService.js";
+import { okFalse } from "../lib/errorFormatter.js";
 
 const saveUserFactMission = new LightMission({
   name: "save_user_fact",
@@ -35,7 +36,7 @@ const saveUserFactMission = new LightMission({
 
       return `ok=true\nmsg="Saved: ${fact}"\ncat="${category}"\nimp=${importance}`;
     } catch (error) {
-      return `ok=false\nerr="${error.message}"`;
+      return okFalse(error.message);
     }
   },
 });

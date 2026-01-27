@@ -44,7 +44,7 @@ const SortableItem: React.FC<{ item: PriorityListItem }> = ({ item }) => {
       transition: transition ?? "transform 200ms cubic-bezier(0.2, 0, 0, 1)",
       zIndex: isDragging ? 1 : 0,
     }),
-    [transform, transition, isDragging]
+    [transform, transition, isDragging],
   );
 
   const cardStyle: CSSProperties = {
@@ -99,7 +99,7 @@ const SortableItem: React.FC<{ item: PriorityListItem }> = ({ item }) => {
 const PriorityList: React.FC<PriorityListProps> = ({ items, onChange }) => {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   const handleDragEnd = (event: DragEndEvent) => {

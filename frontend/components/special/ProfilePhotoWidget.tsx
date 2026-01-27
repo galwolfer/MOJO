@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
   subtitle: {
     marginTop: 4,
     textAlign: "center",
-    color: COLORS.grayLight,
+    color: COLORS.lightGray,
   },
   pickerWrap: {
     alignItems: "center",

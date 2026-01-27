@@ -88,7 +88,7 @@ router.post("/suggest-category", taskController.suggestCategory);
  * Add a custom subcategory for a specific category
  * POST /api/tasks/subcategories
  * Body: { name: string, category: string }
- * 
+ *
  * Validates category exists (0-17) and prevents duplicates
  * Limited to 50 subcategories per category per user
  */
@@ -108,9 +108,9 @@ router.post("/subcategories", async (req, res, next) => {
 
     // Validate category exists
     if (!isValidCategory(category)) {
-      return res.status(400).json({ 
-        success: false, 
-        error: "Invalid category. Must be one of the 18 standard categories" 
+      return res.status(400).json({
+        success: false,
+        error: "Invalid category. Must be one of the 18 standard categories",
       });
     }
 
@@ -119,9 +119,9 @@ router.post("/subcategories", async (req, res, next) => {
 
     // Name length validation
     if (trimmedName.length < 2 || trimmedName.length > 50) {
-      return res.status(400).json({ 
-        success: false, 
-        error: "Subcategory name must be between 2 and 50 characters" 
+      return res.status(400).json({
+        success: false,
+        error: "Subcategory name must be between 2 and 50 characters",
       });
     }
 
@@ -132,23 +132,21 @@ router.post("/subcategories", async (req, res, next) => {
     }
 
     // Check for duplicate (case-insensitive)
-    const existingInCategory = user.subCategories.filter(s => s.category === categoryIndex);
-    const duplicate = existingInCategory.find(
-      s => s.name.toLowerCase() === trimmedName.toLowerCase()
-    );
+    const existingInCategory = user.subCategories.filter((s) => s.category === categoryIndex);
+    const duplicate = existingInCategory.find((s) => s.name.toLowerCase() === trimmedName.toLowerCase());
 
     if (duplicate) {
-      return res.status(400).json({ 
-        success: false, 
-        error: `Subcategory "${trimmedName}" already exists in ${getDisplayName(category)}` 
+      return res.status(400).json({
+        success: false,
+        error: `Subcategory "${trimmedName}" already exists in ${getDisplayName(category)}`,
       });
     }
 
     // Limit: 50 subcategories per category
     if (existingInCategory.length >= 50) {
-      return res.status(400).json({ 
-        success: false, 
-        error: `Maximum 50 subcategories per category reached for ${getDisplayName(category)}` 
+      return res.status(400).json({
+        success: false,
+        error: `Maximum 50 subcategories per category reached for ${getDisplayName(category)}`,
       });
     }
 
@@ -158,10 +156,10 @@ router.post("/subcategories", async (req, res, next) => {
 
     logger.info(`User ${userId} added subcategory "${trimmedName}" to ${category}`);
 
-    res.status(201).json({ 
-      success: true, 
+    res.status(201).json({
+      success: true,
       message: "Subcategory added successfully",
-      subcategory: { name: trimmedName, category: category, categoryIndex }
+      subcategory: { name: trimmedName, category: category, categoryIndex },
     });
   } catch (error) {
     next(error);
@@ -171,10 +169,10 @@ router.post("/subcategories", async (req, res, next) => {
 /**
  * Get user's custom subcategories
  * GET /api/tasks/subcategories?category=work_and_career
- * 
+ *
  * If category provided: returns subcategories for that category only
  * If no category: returns all user subcategories grouped by category
- * 
+ *
  * Also includes historical task-derived subcategories (merged and deduped)
  */
 router.get("/subcategories", async (req, res, next) => {
@@ -190,9 +188,9 @@ router.get("/subcategories", async (req, res, next) => {
     // Filter by category if provided
     if (category) {
       if (!isValidCategory(category)) {
-        return res.status(400).json({ 
-          success: false, 
-          error: "Invalid category" 
+        return res.status(400).json({
+          success: false,
+          error: "Invalid category",
         });
       }
 
@@ -200,36 +198,34 @@ router.get("/subcategories", async (req, res, next) => {
       const normalizedCategory = category.toLowerCase().replace(/[^a-z_]/g, "");
 
       // Get user-saved subcategories
-      const userSubs = (user.subCategories || [])
-        .filter(s => s.category === categoryIndex)
-        .map(s => s.name);
+      const userSubs = (user.subCategories || []).filter((s) => s.category === categoryIndex).map((s) => s.name);
 
       // Get historical task subcategories
-      const taskSubs = await Task.distinct("subCategory.label", { 
-        userId, 
-        category: normalizedCategory 
+      const taskSubs = await Task.distinct("subCategory.label", {
+        userId,
+        category: normalizedCategory,
       });
       const validTaskSubs = (taskSubs || [])
-        .filter(s => s && typeof s === "string" && s.trim().length > 0)
-        .map(s => s.trim());
+        .filter((s) => s && typeof s === "string" && s.trim().length > 0)
+        .map((s) => s.trim());
 
       // Merge and dedupe (case-sensitive)
       const combined = new Set([...userSubs, ...validTaskSubs]);
       const subcategories = Array.from(combined).sort();
 
-      return res.json({ 
-        success: true, 
+      return res.json({
+        success: true,
         category,
         categoryDisplay: getDisplayName(category),
         count: subcategories.length,
-        subcategories 
+        subcategories,
       });
     }
 
     // No category filter: return all grouped by category
     const grouped = {};
-    
-    for (const sub of (user.subCategories || [])) {
+
+    for (const sub of user.subCategories || []) {
       const catIndex = sub.category;
       if (!grouped[catIndex]) {
         grouped[catIndex] = [];
@@ -237,10 +233,10 @@ router.get("/subcategories", async (req, res, next) => {
       grouped[catIndex].push(sub.name);
     }
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       totalCount: (user.subCategories || []).length,
-      subcategoriesByCategory: grouped 
+      subcategoriesByCategory: grouped,
     });
   } catch (error) {
     next(error);
@@ -250,7 +246,7 @@ router.get("/subcategories", async (req, res, next) => {
 /**
  * Delete a custom subcategory
  * DELETE /api/tasks/subcategories/:name?category=work_and_career
- * 
+ *
  * Removes subcategory from user profile
  * Does NOT affect existing tasks that use this subcategory
  */
@@ -283,13 +279,13 @@ router.delete("/subcategories/:name", async (req, res, next) => {
     // Find and remove (case-insensitive match)
     const initialLength = user.subCategories.length;
     user.subCategories = user.subCategories.filter(
-      s => !(s.category === categoryIndex && s.name.toLowerCase() === trimmedName.toLowerCase())
+      (s) => !(s.category === categoryIndex && s.name.toLowerCase() === trimmedName.toLowerCase()),
     );
 
     if (user.subCategories.length === initialLength) {
-      return res.status(404).json({ 
-        success: false, 
-        error: `Subcategory "${trimmedName}" not found in ${getDisplayName(category)}` 
+      return res.status(404).json({
+        success: false,
+        error: `Subcategory "${trimmedName}" not found in ${getDisplayName(category)}`,
       });
     }
 
@@ -297,10 +293,10 @@ router.delete("/subcategories/:name", async (req, res, next) => {
 
     logger.info(`User ${userId} removed subcategory "${trimmedName}" from ${category}`);
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: "Subcategory removed successfully",
-      removed: { name: trimmedName, category }
+      removed: { name: trimmedName, category },
     });
   } catch (error) {
     next(error);
@@ -311,6 +307,9 @@ router.delete("/subcategories/:name", async (req, res, next) => {
    FILTERED QUERIES
    These routes must come before /:id routes to avoid conflicts
    ───────────────────────────────────────────────────────────────────────── */
+
+// Get tasks scheduled within the next N days (grouped by day)
+router.get("/scheduled/:days?", taskController.getScheduledTasks);
 
 // Get tasks due within the next N days (default: 7)
 router.get("/upcoming/:days?", taskController.getUpcomingTasks);
@@ -404,7 +403,7 @@ router.patch("/expired/:id/extend", async (req, res, next) => {
     const task = await Task.findOneAndUpdate(
       { _id: taskId, userId, status: { $ne: "done" } },
       { $set: { dueDate: newDate } },
-      { new: true }
+      { new: true },
     );
 
     if (!task) {
@@ -476,7 +475,7 @@ router.post("/expired/:id/handle", async (req, res, next) => {
       const task = await Task.findOneAndUpdate(
         { _id: taskId, userId, status: { $ne: "done" } },
         { $set: { dueDate: newDate } },
-        { new: true }
+        { new: true },
       );
 
       if (!task) {

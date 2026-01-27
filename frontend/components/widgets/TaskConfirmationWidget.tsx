@@ -3,182 +3,198 @@
  * Displays task details for user confirmation before creating/updating
  */
 
-import React from "react";
+import React, { useEffect } from "react";
 import { View, StyleSheet, ScrollView } from "react-native";
 import AppText from "../common/AppText";
 import { COLORS, SPACING } from "../../theme";
 import Widget from "../special/Widget";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
+import {
+  formatDate,
+  formatDateTime,
+  formatTimeRange,
+  formatDuration,
+  getSessionLabel,
+  getTaskTypeLabel,
+  getWidgetEntranceProps,
+} from "./widgetHelpers";
+import { TaskTitle, TaskTagsRow, ScheduledSessionsSection, renderTaskField, TwoColumnGrid } from "../special/task";
+import { getCategoryMeta } from "../../config/categoryMeta";
+import { getCategoryDisplay } from "./widgetHelpers";
 
 interface TaskData {
   id: string;
   title: string;
+  taskname?: string;
   description?: string;
   dueDate?: string;
+  deadline?: string;
   importance?: number;
   effort?: number;
   estimatedDuration?: number;
+  duration?: number;
   category?: string;
+  categoryDisplay?: string;
   subcategory?: string;
+  subcategoryDisplay?: string;
+  subCategory?: {
+    label?: string;
+    source?: string;
+    confidence?: number;
+    updatedAt?: string;
+  };
   status?: string;
   canSplit?: boolean;
   taskType?: string;
-  minChunk?: number;
-  chunkCount?: number;
-  minMinutes?: number;
-  maxMinutes?: number;
-  earliestStart?: string;
+  minChunk?: number | null;
+  chunkCount?: number | null;
+  chunkMinutes?: number | null;
+  minMinutes?: number | null;
+  maxMinutes?: number | null;
+  earliestStart?: string | null;
+  progressPercentage?: number;
+  priorityScore?: number;
+  scheduledSessions?: ScheduledSession[];
+  subtasks?: Subtask[];
   recurrence?: {
     type: string;
     interval?: number;
     endDate?: string;
     count?: number;
   };
-  tags?: string[];
+  tags?: string[] | null;
+}
+
+interface ScheduledSession {
+  id?: string;
+  start?: string;
+  end?: string;
+  status?: string;
+  subtaskIndex?: number;
+  subtaskTitle?: string;
+}
+
+interface Subtask {
+  id?: string;
+  title: string;
+  description?: string;
+  status?: string;
+  completed?: boolean;
+  order?: number;
+  duration?: number;
 }
 
 /**
  * TaskConfirmationWidget - Renders task details for confirmation
  * Note: data comes directly from the widget, no nested 'task' object
  */
-const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({ data }) => {
+const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
+  data,
+  onAction,
+  entranceEnabled,
+  entranceDelay,
+  entranceDuration,
+}) => {
   // Data is passed directly - use as TaskData
   const task: TaskData = data as TaskData;
+  // Normalize category display name for UI (prefer explicit display from payload, then server meta, then raw key)
+  const categoryDisplayNormalized = getCategoryDisplay(task.category, task.categoryDisplay);
 
-  // Debug: Log the received data to see what's coming from the backend
-  console.log('[TaskConfirmationWidget] Received data:', JSON.stringify(data, null, 2));
-
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return "Not set";
-    try {
-      const date = new Date(dateStr);
-      return date.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
-    } catch {
-      return dateStr;
-    }
-  };
-
-  const getImportanceLabel = (importance?: number) => {
-    if (!importance) return "Not set";
-    const labels = ["", "Low", "Medium-Low", "Medium", "High", "Critical"];
-    return labels[importance] || `Level ${importance}`;
-  };
-
-  const getEffortLabel = (effort?: number) => {
-    if (!effort) return "Not set";
-    const labels = ["", "Minimal", "Light", "Moderate", "Heavy", "Extensive"];
-    return labels[effort] || `Level ${effort}`;
-  };
-
-  const formatDuration = (minutes?: number) => {
-    if (!minutes) return "Not set";
-    if (minutes < 60) return `${minutes} minutes`;
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (mins === 0) return `${hours} hour${hours > 1 ? "s" : ""}`;
-    return `${hours}h ${mins}m`;
-  };
+  const widgetEntranceProps = getWidgetEntranceProps({ entranceEnabled, entranceDelay, entranceDuration });
 
   return (
-    <Widget skipAnimation>
+    <Widget {...widgetEntranceProps}>
       <ScrollView style={styles.container} nestedScrollEnabled={true} showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <View style={styles.header}>
-          <AppText variant="title3" style={styles.headerTitle}>
-            Confirm Task Details
-          </AppText>
-        </View>
 
         {/* Title */}
-        <View style={styles.field}>
-          <AppText variant="notes" style={styles.labelText}>
-            Title
-          </AppText>
-          <AppText variant="bodyText">{task.title}</AppText>
-        </View>
+        <TaskTitle title={task.title} taskname={task.taskname} category={task.category} />
 
         {/* Description */}
-        {task.description && (
+        {task.description ? (
           <View style={styles.field}>
             <AppText variant="notes" style={styles.labelText}>
               Description
             </AppText>
             <AppText variant="bodyText">{task.description}</AppText>
           </View>
-        )}
+        ) : null}
 
         {/* Due Date */}
-        <View style={styles.field}>
-          <AppText variant="notes" style={styles.labelText}>
-            📅 Due Date
-          </AppText>
-          <AppText variant="bodyText">{formatDate(task.dueDate)}</AppText>
-        </View>
 
-        {/* Category */}
-        {task.category && (
-          <View style={styles.field}>
-            <AppText variant="notes" style={styles.labelText}>
-              📁 Category
-            </AppText>
-            <AppText variant="bodyText">{task.category}</AppText>
-          </View>
-        )}
+        {/* Category / Subcategory / importance / effort */}
+        <TaskTagsRow
+          category={task.category}
+          categoryDisplay={categoryDisplayNormalized}
+          subcategory={task.subcategory}
+          subcategoryDisplay={task.subcategoryDisplay || task.subCategory?.label}
+          importance={task.importance}
+          effort={task.effort}
+        />
 
-        {/* Subcategory */}
-        {task.subcategory && (
-          <View style={styles.field}>
-            <AppText variant="notes" style={styles.labelText}>
-              📂 Subcategory
-            </AppText>
-            <AppText variant="bodyText">{task.subcategory}</AppText>
-          </View>
-        )}
+        {/* Details Grid (2-up) */}
+        <TwoColumnGrid
+          items={[
+            renderTaskField({ dueDate: task.dueDate || task.deadline }, "dueDate"),
+            renderTaskField(task, "startDate"),
+            renderTaskField({ estimatedDuration: task.estimatedDuration || task.duration }, "estimatedDuration"),
+            renderTaskField(task, "earliestStart"),
+            renderTaskField(task, "taskType"),
+            task.status !== "draft" ? renderTaskField(task, "progressPercentage") : null,
+            renderTaskField(task, "canSplit"),
+            renderTaskField(task, "sessionRange"),
+            renderTaskField(task, "recurrence"),
+            renderTaskField(task, "chunkCount"),
+            renderTaskField(task, "chunkMinutes"),
+            renderTaskField(task, "minChunk"),
+          ].filter(Boolean)}
+        />
 
-        {/* Importance & Effort Row */}
-        <View style={styles.row}>
-          <View style={styles.halfField}>
-            <AppText variant="notes" style={styles.labelText}>
-              ⚡ Importance
-            </AppText>
-            <AppText variant="bodyText">{getImportanceLabel(task.importance)}</AppText>
-          </View>
-          <View style={styles.halfField}>
-            <AppText variant="notes" style={styles.labelText}>
-              💪 Effort
-            </AppText>
-            <AppText variant="bodyText">{getEffortLabel(task.effort)}</AppText>
-          </View>
-        </View>
+        {/* Scheduled Sessions (use shared component) */}
+        <ScheduledSessionsSection
+          taskId={task.id}
+          taskTitle={task.title || task.taskname || "Untitled task"}
+          scheduledSessions={task.scheduledSessions}
+          subtasks={task.subtasks}
+          category={task.category}
+          categoryColor={getCategoryMeta(task.category)?.color}
+          estimatedDuration={task.estimatedDuration || task.duration}
+          progressPercentage={task.status === "draft" ? null : (task.progressPercentage ?? null)}
+        />
 
-        {/* Estimated Duration */}
-        {task.estimatedDuration && (
-          <View style={styles.field}>
-            <AppText variant="notes" style={styles.labelText}>
-              ⏱️ Estimated Duration
+        {/* Subtasks */}
+        {task.subtasks && task.subtasks.length > 0 && (
+          <View style={styles.section}>
+            <AppText variant="title3" style={styles.sectionTitle}>
+              ✓ Subtasks ({task.subtasks.filter((st) => st.completed || st.status === "completed").length}/
+              {task.subtasks.length})
             </AppText>
-            <AppText variant="bodyText">{formatDuration(task.estimatedDuration)}</AppText>
-          </View>
-        )}
-
-        {/* Splitting */}
-        {task.canSplit && (
-          <View style={styles.field}>
-            <AppText variant="notes" style={styles.labelText}>
-              🔀 Splitting
-            </AppText>
-            <AppText variant="bodyText">
-              {task.taskType === "in_parts" && task.chunkCount
-                ? `${task.chunkCount} parts`
-                : task.taskType === "leaky"
-                  ? `Flexible (${task.minMinutes || 15}-${task.maxMinutes || 60} min)`
-                  : "Can be split"}
-            </AppText>
+            <View style={styles.subtaskList}>
+              {task.subtasks.map((subtask, index) => (
+                <View key={subtask.id || `subtask-${index}`} style={styles.subtaskCard}>
+                  <AppText
+                    variant="bodyText"
+                    style={[
+                      styles.subtaskTitle,
+                      (subtask.completed || subtask.status === "completed") && styles.subtaskCompleted,
+                    ]}
+                  >
+                    {subtask.completed || subtask.status === "completed" ? "✓ " : "○ "}
+                    {subtask.title}
+                  </AppText>
+                  {subtask.description ? (
+                    <AppText variant="notes" style={styles.subtaskDescription}>
+                      {subtask.description}
+                    </AppText>
+                  ) : null}
+                  {subtask.duration && (
+                    <AppText variant="notes" style={styles.subtaskDuration}>
+                      {formatDuration(subtask.duration)}
+                    </AppText>
+                  )}
+                </View>
+              ))}
+            </View>
           </View>
         )}
 
@@ -215,18 +231,69 @@ const styles = StyleSheet.create({
   },
   halfField: {
     flex: 1,
-    gap: 4,
+    gap: SPACING.sm,
   },
   notesText: {
     fontStyle: "italic",
-    marginTop: 4,
+    marginTop: SPACING.sm,
   },
   confirmMessage: {
     marginVertical: SPACING.md,
     alignItems: "center",
   },
-  confirmText: {
+  section: {
+    marginTop: SPACING.md,
+    gap: SPACING.sm,
+  },
+  sectionTitle: {
+    fontWeight: "600",
+    marginBottom: SPACING.sm,
+  },
+  scheduleList: {
+    gap: SPACING.sm,
+  },
+  scheduleCard: {
+    backgroundColor: COLORS.white2,
+    padding: SPACING.sm,
+    borderRadius: SPACING.md,
+    borderLeftWidth: SPACING.xs,
+    borderLeftColor: COLORS.primary1,
+    gap: 2,
+  },
+  scheduleLabel: {
+    fontWeight: "600",
+  },
+  scheduleDateTime: {
+    color: COLORS.primary1,
+    fontWeight: "500",
+  },
+  scheduleTime: {
     color: COLORS.darkGray,
+  },
+  subtaskList: {
+    gap: SPACING.sm,
+  },
+  subtaskCard: {
+    backgroundColor: COLORS.white2,
+    padding: SPACING.sm,
+    borderRadius: SPACING.sm,
+    borderLeftWidth: SPACING.xs,
+    borderLeftColor: COLORS.darkGray,
+  },
+  subtaskTitle: {
+    fontWeight: "500",
+  },
+  subtaskCompleted: {
+    textDecorationLine: "line-through",
+    color: COLORS.darkGray,
+  },
+  subtaskDescription: {
+    color: COLORS.darkGray,
+    marginTop: SPACING.xs,
+  },
+  subtaskDuration: {
+    color: COLORS.primary1,
+    marginTop: SPACING.sm,
   },
   // actions and button styles removed while buttons are disabled
 });

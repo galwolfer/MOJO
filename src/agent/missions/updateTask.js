@@ -1,9 +1,11 @@
 import { z } from "zod";
 import { GuidedMission } from "./GuidedMission.js";
 import * as taskService from "../../services/taskService.js";
-import { CATEGORY_STRING_VALUES, getDisplayName } from "../../config/categories.js";
+import { CATEGORY_STRING_VALUES } from "../../config/categories.js";
 import { TASK_CONFIG } from "../taskRules.js";
 import { getIllegalDisplayFields, getIllegalCharsErrorMessage } from "../../utils/illegalChars.js";
+import { updateTaskViaController } from "../missionControllerHelpers.js";
+import { okFalse, okTrue } from "../lib/errorFormatter.js";
 
 const updateTaskMission = new GuidedMission({
   name: "update_task",
@@ -15,7 +17,7 @@ const updateTaskMission = new GuidedMission({
     "Require confirm=true before applying updates.",
     "For completing tasks, use complete_task tool instead.",
   ],
-  widgets: ["task_detail"],
+  widgets: ["list"],
   schema: z.object({
     taskId: z.string().optional(),
     taskname: z.string().optional().describe("Task title to identify task when taskId is not provided"),
@@ -78,7 +80,7 @@ const updateTaskMission = new GuidedMission({
       let resolvedTaskId = taskId;
       // Require explicit confirmation to avoid accidental changes
       if (!confirm) {
-        return `ok=false\nerr="confirmation_required"`;
+        return okFalse("confirmation_required");
       }
 
       const illegalFields = getIllegalDisplayFields({
@@ -86,19 +88,26 @@ const updateTaskMission = new GuidedMission({
         subcategory,
       });
       if (illegalFields.length > 0) {
-        return `ok=false\nerr="illegal_characters"\nmsg="${getIllegalCharsErrorMessage(illegalFields)}"`;
+        return okFalse("illegal_characters", { msg: getIllegalCharsErrorMessage(illegalFields) });
       }
 
       // If taskId not provided, try to resolve by exact task title
       if (!resolvedTaskId) {
-        if (!taskname) return `ok=false\nerr="task_identifier_required"`;
+        if (!taskname) return okFalse("task_identifier_required");
         const candidates = await taskService.getTasksForUser(userId, { taskname: taskname });
         if (!candidates || candidates.length === 0) {
-          return `ok=false\nerr="task_not_found"`;
+          return okFalse("task_not_found");
         }
         if (candidates.length > 1) {
-          const list = candidates.map((c) => `- ${c.taskname} (${c._id})`).join("\n");
-          return `ok=false\nerr="multiple_tasks_found"\nlist="${list}"`;
+          // Show the candidate tasks in a Task List widget so user can pick
+          const tasks = candidates.map((c) => ({
+            id: c._id?.toString ? c._id.toString() : c._id,
+            title: c.taskname,
+            dueDate: c.dueDate,
+            importance: c.importance,
+            effort: c.effort,
+          }));
+          return buildWidget("list", { listType: "task_list", tasks });
         }
         resolvedTaskId = candidates[0]._id;
       }
@@ -115,7 +124,7 @@ const updateTaskMission = new GuidedMission({
       // Validate and normalize numeric and splitting-related fields similar to add_task behavior
       if (estimatedDuration !== undefined) {
         if (typeof estimatedDuration !== "number" || isNaN(estimatedDuration) || estimatedDuration <= 0) {
-          return `ok=false\nerr="Invalid estimatedDuration. Provide minutes as a positive number."`;
+          return okFalse("Invalid estimatedDuration. Provide minutes as a positive number.");
         }
         updates.estimatedDuration = estimatedDuration;
       }
@@ -173,7 +182,7 @@ const updateTaskMission = new GuidedMission({
       if (deadline !== undefined) {
         const d = new Date(deadline);
         if (isNaN(d.getTime())) {
-          return `ok=false\nerr="Invalid date format. Use ISO 8601 (YYYY-MM-DD)."`;
+          return okFalse("Invalid date format. Use ISO 8601 (YYYY-MM-DD).");
         }
         updates.dueDate = d;
       }
@@ -190,7 +199,7 @@ const updateTaskMission = new GuidedMission({
 
         // Validate endDate if provided
         if (rec.endDate && isNaN(rec.endDate.getTime())) {
-          return `ok=false\nerr="Invalid recurrence.endDate. Use ISO 8601 (YYYY-MM-DD)."`;
+          return okFalse("Invalid recurrence.endDate. Use ISO 8601 (YYYY-MM-DD).");
         }
 
         updates.recurrence = rec;
@@ -199,57 +208,27 @@ const updateTaskMission = new GuidedMission({
       // Note: completed status change is handled by complete_task tool, not here
       // This prevents bypassing gamification
 
-      // Update in database
-      const result = await taskService.updateTask({ userId, taskId: resolvedTaskId, updates });
+      // Update through controller (which automatically triggers scheduling)
+      const result = await updateTaskViaController(userId, resolvedTaskId, updates);
 
-      if (!result.success) {
-        return `ok=false\nerr="${result.error}"`;
+      if (!result) {
+        return okFalse("task_update_failed");
       }
 
-      const task = result.task;
-
-      // Construct task_detail widget to show the updated task
+      const task = result;
+      const id = task._id?.toString ? task._id.toString() : task._id;
+      const title = task.taskname;
       const widgetJson = {
-        version: "1.0",
-        widget_type: "task_detail",
-        data: {
-          task: {
-            id: task._id,
-            title: task.taskname,
-            description: task.description,
-            status: task.status,
-            dueDate: task.dueDate ? new Date(task.dueDate).toISOString() : null,
-            // Provide aliases and full splitting fields so widgets can display everything
-            taskname: task.taskname,
-            deadline: task.dueDate ? new Date(task.dueDate).toISOString().split("T")[0] : null,
-            estimatedDuration: task.estimatedDuration,
-            duration: task.estimatedDuration,
-            importance: task.importance,
-            priorityScore: task.priorityScore || 0,
-            taskType: task.taskType || null,
-            minChunk: task.minChunk !== undefined ? task.minChunk : null,
-            chunkCount: task.chunkCount !== undefined ? task.chunkCount : null,
-            chunkMinutes: task.chunkMinutes !== undefined ? task.chunkMinutes : null,
-            minMinutes: task.minMinutes !== undefined ? task.minMinutes : null,
-            maxMinutes: task.maxMinutes !== undefined ? task.maxMinutes : null,
-            earliestStart: task.earliestStart
-              ? task.earliestStart instanceof Date
-                ? task.earliestStart.toISOString().split("T")[0]
-                : task.earliestStart
-              : null,
-            subCategory: task.subCategory || null,
-            category: task.category,
-            categoryDisplay: getDisplayName(task.category),
-            subcategoryDisplay: task.subCategory ? task.subCategory.label : null,
-            canSplit: task.canSplit,
-          },
-        },
+        listType: "task_detail",
+        taskId: id,
+        title,
+        tasks: [{ id, title }],
       };
 
       const { buildWidgetString } = await import("../widgets/widgetUtils.js");
-      return buildWidgetString("task_detail", widgetJson.data);
+      return buildWidgetString("list", widgetJson);
     } catch (error) {
-      return `ok=false\nerr="${error.message}"`;
+      return okFalse(error.message);
     }
   },
 });

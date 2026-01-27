@@ -14,6 +14,27 @@ function normalizeWidgetTags(text: string): string {
 }
 
 /**
+ * Attempts to parse JSON, trying to fix common errors like missing closing braces
+ */
+function safeJsonParse(jsonString: string): any {
+  try {
+    return JSON.parse(jsonString);
+  } catch (e) {
+    try {
+      // Try appending a closing brace
+      return JSON.parse(jsonString + "}");
+    } catch (e2) {
+      try {
+        // Try appending two closing braces (nested objects)
+        return JSON.parse(jsonString + "}}");
+      } catch (e3) {
+        throw e;
+      }
+    }
+  }
+}
+
+/**
  * Detects if a text contains a widget JSON block
  */
 export function hasWidget(text: string): boolean {
@@ -39,7 +60,7 @@ export function parseWidget(text: string): WidgetData | null {
     const jsonString = extractWidgetJsonString(text);
     if (!jsonString) return null;
 
-    const parsed = JSON.parse(jsonString);
+    const parsed = safeJsonParse(jsonString);
 
     // Validate required fields
     if (!parsed.widget_type) {
@@ -50,7 +71,7 @@ export function parseWidget(text: string): WidgetData | null {
     return {
       version: parsed.version || "1.0",
       widget_type: parsed.widget_type,
-      data: parsed.data || {},
+      data: parsed.data || parsed,
     };
   } catch (error) {
     console.warn("[widgetParser] Failed to parse widget JSON:", error);
@@ -79,6 +100,17 @@ export function splitTextAndWidget(text: string): {
   const widgetMatch = normalized.match(/([\s\S]*?)<WIDGET_JSON>([\s\S]*?)<\/WIDGET_JSON>([\s\S]*)/);
 
   if (!widgetMatch) {
+    // Check for incomplete widget (streaming) - hide the raw JSON part so user doesn't see code typing out
+    const openMatch = normalized.match(/([\s\S]*?)<WIDGET_JSON>([\s\S]*)/);
+    if (openMatch) {
+      const [, beforeText] = openMatch;
+      return {
+        beforeText: beforeText.trim(),
+        widget: null,
+        afterText: "",
+      };
+    }
+
     return {
       beforeText: text,
       widget: null,
@@ -89,11 +121,11 @@ export function splitTextAndWidget(text: string): {
   const [, beforeText, jsonString, afterText] = widgetMatch;
 
   try {
-    const parsed = JSON.parse(jsonString.trim());
+    const parsed = safeJsonParse(jsonString.trim());
     const widget: WidgetData = {
       version: parsed.version || "1.0",
       widget_type: parsed.widget_type,
-      data: parsed.data || {},
+      data: parsed.data || parsed,
     };
 
     return {
@@ -104,7 +136,7 @@ export function splitTextAndWidget(text: string): {
   } catch (error) {
     console.warn("[widgetParser] Failed to parse widget:", error);
     return {
-      beforeText: text,
+      beforeText: text, // Return original text if parsing fails (fallback)
       widget: null,
       afterText: "",
     };

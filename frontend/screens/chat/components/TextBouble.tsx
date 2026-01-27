@@ -363,9 +363,12 @@ const TextBouble: React.FC<Props> = ({
     }
     const { beforeText, widget, afterText } = splitTextAndWidget(rawText);
     return {
-      displayText: widget ? beforeText || null : rawText,
+      // Use beforeText as the display text unconditionally when in agent mode,
+      // because splitTextAndWidget handles both partial (streaming) and full widgets
+      // by returning the cleaned text in beforeText.
+      displayText: beforeText,
       widget,
-      afterText: widget ? afterText || null : null,
+      afterText: afterText || null,
     };
   }, [rawText, mode]);
 
@@ -375,6 +378,8 @@ const TextBouble: React.FC<Props> = ({
 
   const [showConic, setShowConic] = useState(() => mode === "agent" && resolvedTypewriter && !!fullText);
   const [isTyping, setIsTyping] = useState(() => mode === "agent" && resolvedTypewriter && !!fullText);
+  // Trigger that is set when typing finishes (used to start widget entrance animation)
+  const [triggerWidgetEntrance, setTriggerWidgetEntrance] = useState(false);
 
   // Track whether the widget should be mounted and remain visible once shown.
   // Use the persistent map to check if this widget was already revealed (survives re-renders).
@@ -466,6 +471,14 @@ const TextBouble: React.FC<Props> = ({
           playedRef.current = true;
           if (playOnceKey) playedMap.set(playOnceKey, true);
         } catch (_) {}
+
+        // Trigger widget entrance animation (only on a real typing run)
+        try {
+          // Only set the trigger if we actually performed a typing animation
+          if (resolvedTypewriter && fullText) {
+            setTriggerWidgetEntrance(true);
+          }
+        } catch (_) {}
       });
     },
     [onTypingDone, conicOpacity, glowOpacity, nonTextOpacity, setWidgetMounted],
@@ -502,6 +515,10 @@ const TextBouble: React.FC<Props> = ({
         // If there's a widget and we're not typing, mount it immediately and persist
         if (parsedContent.widget) {
           setWidgetMounted(true);
+          // Only trigger entrance animation if widget hasn't been shown before
+          if (!widgetWasShown) {
+            setTriggerWidgetEntrance(true);
+          }
           if (playOnceKey) widgetShownMap.set(playOnceKey, true);
         }
       }
@@ -578,6 +595,8 @@ const TextBouble: React.FC<Props> = ({
 
     // No widget in this message - nothing to mount
     if (!parsedContent.widget) {
+      // reset trigger when widget changes/removed
+      if (triggerWidgetEntrance) setTriggerWidgetEntrance(false);
       return;
     }
 
@@ -587,7 +606,10 @@ const TextBouble: React.FC<Props> = ({
       nonTextOpacity.setValue(1);
       if (playOnceKey) widgetShownMap.set(playOnceKey, true);
     }
-    // If we're typing, do not unmount; we only mount once typing completes.
+
+    // DON'T reset triggerWidgetEntrance here - it needs to stay true long enough for Widget to see it
+    // The Widget component will handle its own animation lifecycle
+    // If we're typing, do not unmount; we only mount/trigger once typing completes.
   }, [parsedContent.widget, isTyping, playOnceKey, widgetMounted, nonTextOpacity]);
 
   const radii = useMemo(() => getRadii(mode), [mode]);
@@ -716,7 +738,20 @@ const TextBouble: React.FC<Props> = ({
         {/* Render widget if present (agent mode only) */}
         {mode === "agent" && parsedContent.widget && widgetMounted && (
           <Animated.View style={{ opacity: nonTextOpacity, width: "100%" }}>
-            <WidgetRenderer widget={parsedContent.widget} onAction={onWidgetAction} />
+            {/* Debug: log rendering state for widget */}
+            {(() => {
+              const wt = parsedContent.widget?.widget_type || "unknown";
+
+              return null;
+            })()}
+            <WidgetRenderer
+              widget={parsedContent.widget}
+              onAction={onWidgetAction}
+              entranceEnabled={triggerWidgetEntrance}
+              entranceDelay={150}
+              entranceDuration={200}
+              skipAnimation={playOnceKey ? widgetShownMap.get(playOnceKey) : false}
+            />
           </Animated.View>
         )}
         {mode === "agent" && parsedContent.widget && widgetMounted && afterText && (

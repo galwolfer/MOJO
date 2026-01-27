@@ -160,14 +160,14 @@ export default function ChatScreen() {
       }
       sendText(activeSessionId, trimmed, () => sessionsRef.current);
     },
-    [getTodaySessionId, isLoading, sendText, sessionId, setSessionId]
+    [getTodaySessionId, isLoading, sendText, sessionId, setSessionId],
   );
 
   const onRetry = useCallback(
     (sessionIdToRetry: string, clientId: string) => {
       handleRetry(sessionIdToRetry, clientId, () => sessionsRef.current);
     },
-    [handleRetry]
+    [handleRetry],
   );
 
   // Put the chat input back into the shared NavBar (original behavior)
@@ -183,7 +183,7 @@ export default function ChatScreen() {
     ({ item, index }: { item: TimelineItem; index: number }) => (
       <TimelineItemComponent item={item} isLastItem={index === timelineItems.length - 1} onRetry={onRetry} />
     ),
-    [timelineItems.length, onRetry]
+    [timelineItems.length, onRetry],
   );
 
   const keyExtractor = useCallback((item: TimelineItem) => item.id, []);
@@ -198,7 +198,7 @@ export default function ChatScreen() {
         : contentInsets.bottom + SPACING.md,
       flexGrow: 1,
     }),
-    [contentInsets]
+    [contentInsets],
   );
 
   /**
@@ -215,7 +215,7 @@ export default function ChatScreen() {
       const reachedBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - bottomThreshold;
       setIsAtBottom(reachedBottom);
     },
-    [setScrollPosition]
+    [setScrollPosition],
   );
 
   /**
@@ -249,7 +249,7 @@ export default function ChatScreen() {
       contentHeightRef.current = height;
       handleContentSizeChange();
     },
-    [handleContentSizeChange]
+    [handleContentSizeChange],
   );
 
   useEffect(() => {
