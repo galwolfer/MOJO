@@ -56,6 +56,8 @@ const ExpandableRow: React.FC<ExpandableRowProps> = ({ expanded, duration = 220,
       style={[
         {
           overflow: "hidden",
+          alignSelf: "stretch",
+          width: "100%",
           ...(measuring
             ? {
                 position: "absolute",
@@ -81,6 +83,7 @@ const ExpandableRow: React.FC<ExpandableRowProps> = ({ expanded, duration = 220,
           }
         }}
         collapsable={false}
+        style={{ width: "100%", alignSelf: "stretch" }}
       >
         {children}
       </View>

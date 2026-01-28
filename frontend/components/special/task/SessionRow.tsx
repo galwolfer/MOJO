@@ -141,7 +141,6 @@ const styles = StyleSheet.create({
   sessionTimeColumn: {
     alignItems: "flex-end",
     gap: SPACING.xs,
-    minWidth: 46,
   },
   sessionHourText: {
     color: COLORS.lightGray,

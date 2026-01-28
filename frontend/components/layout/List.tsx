@@ -154,6 +154,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     alignSelf: "stretch",
+    width: "100%",
+    flexShrink: 1,
   },
   disabled: {
     opacity: 0.6,
