@@ -93,6 +93,86 @@ export default function LoadingScreen({ onLoadingComplete, isAppReady }: Loading
     isFullyLoadedRef.current = isFullyLoaded;
   }, [isFullyLoaded]);
 
+  // Timing constants (ms)
+  const FAST_LOAD_END_MS = 2250;
+  const LOOP_START_MS = 4000;
+
+  // Timers: check at 2.25s and 4s to decide completion/looping
+  useEffect(() => {
+    const fastLoadTimer = setTimeout(() => {
+      if (phaseRef.current === "initial") {
+        if (isFullyLoadedRef.current) {
+          console.log("[LoadingScreen.web] Loaded before 2.25s, completing now");
+          const anim = animationRef.current;
+          if (anim && typeof anim.goToAndStop === "function") {
+            try {
+              anim.goToAndStop(ANIMATION_END_FRAME, true);
+            } catch (e) {
+              // ignore
+            }
+          }
+          setPhase("complete");
+          onLoadingComplete();
+        } else {
+          setPhase("waitingForLoop");
+        }
+      }
+    }, FAST_LOAD_END_MS);
+
+    const loopStartTimer = setTimeout(() => {
+      if (phaseRef.current === "waitingForLoop") {
+        if (isFullyLoadedRef.current) {
+          console.log("[LoadingScreen.web] Loaded before 4s, completing now");
+          const anim = animationRef.current;
+          if (anim && typeof anim.goToAndStop === "function") {
+            try {
+              anim.goToAndStop(ANIMATION_END_FRAME, true);
+            } catch (e) {
+              // ignore
+            }
+          }
+          setPhase("complete");
+          onLoadingComplete();
+        } else {
+          setPhase("looping");
+          const anim = animationRef.current;
+          if (anim && typeof anim.goToAndPlay === "function") {
+            try {
+              anim.goToAndPlay(LOOP_START_FRAME, true);
+            } catch (e) {
+              // ignore
+            }
+          }
+        }
+      }
+    }, LOOP_START_MS);
+
+    return () => {
+      clearTimeout(fastLoadTimer);
+      clearTimeout(loopStartTimer);
+    };
+  }, [onLoadingComplete]);
+
+  // If the app becomes loaded during waitingForLoop/looping, act accordingly
+  useEffect(() => {
+    if (isFullyLoaded && phaseRef.current === "waitingForLoop") {
+      console.log("[LoadingScreen.web] Loaded during waitingForLoop, completing now");
+      const anim = animationRef.current;
+      if (anim && typeof anim.goToAndStop === "function") {
+        try {
+          anim.goToAndStop(ANIMATION_END_FRAME, true);
+        } catch (e) {
+          // ignore
+        }
+      }
+      setPhase("complete");
+      onLoadingComplete();
+    } else if (isFullyLoaded && phaseRef.current === "looping") {
+      console.log("[LoadingScreen.web] Loaded during looping, transitioning to finishing");
+      setPhase("finishing");
+    }
+  }, [isFullyLoaded, onLoadingComplete]);
+
   // Initialize lottie-web animation on mount
   useEffect(() => {
     if (!containerRef.current) return;

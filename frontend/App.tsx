@@ -48,10 +48,7 @@ function AppContent() {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <View style={styles.loadingContainer}>
-          <LoadingScreen
-            onLoadingComplete={handleLoadingComplete}
-            isAppReady={isAppReady}
-          />
+          <LoadingScreen onLoadingComplete={handleLoadingComplete} isAppReady={isAppReady} />
         </View>
       </GestureHandlerRootView>
     );
