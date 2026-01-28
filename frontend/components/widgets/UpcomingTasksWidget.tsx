@@ -289,12 +289,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
+    width: "100%",
     gap: SPACING.md,
     minWidth: 450,
   },
   headerTitle: {
     color: COLORS.black,
     fontWeight: "700",
+    width: "100%",
   },
   headerSubtitle: {
     color: COLORS.darkGray,
@@ -313,7 +315,7 @@ const styles = StyleSheet.create({
     height: ICON_SIZES.md,
   },
   dayGroup: {
-    alignItems: "stretch",
+    alignItems: "flex-start",
     gap: SPACING.sm,
     width: "100%",
   },
@@ -321,9 +323,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    minWidth: 450,
     width: "100%",
     marginTop: SPACING.xs,
     marginBottom: SPACING.md,
+    gap: SPACING.md,
+    flexWrap: "wrap",
   },
   dayHeaderTitle: {
     flexDirection: "row",
