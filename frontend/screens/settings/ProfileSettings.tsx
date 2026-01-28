@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { View, StyleSheet, Image, Alert, Platform } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { moderateScale } from "react-native-size-matters";
 import AppText from "../../components/common/AppText";
 import Input from "../../components/inputs/Input";
@@ -11,9 +10,8 @@ import { COLORS, SPACING, SHADOWS } from "../../theme";
 import { useAuth } from "../../context/AuthContext";
 import { ICONS } from "../../components/icons/icons";
 import { updateProfile } from "../../services/apiClient";
-import { getUserPreferences } from "../../services/apiClient";
-import { getOjoType } from "../../config/ojoTypeConfig";
 import { Box } from "../../components";
+import UserAvatar from "../../components/common/UserAvatar";
 
 export default function ProfileSettings() {
   const { user, signIn, token } = useAuth();
@@ -29,7 +27,6 @@ export default function ProfileSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editedProfileImage, setEditedProfileImage] = useState<string | null>(user?.profileImage || null);
-  const [ojoGradient, setOjoGradient] = useState<string[] | null>(null);
   const [newProfileImage, setNewProfileImage] = useState<string | File | null>(null);
   const [showPasswordSection, setShowPasswordSection] = useState(false);
 
@@ -41,24 +38,6 @@ export default function ProfileSettings() {
       setEditedProfileImage(user.profileImage || null);
     }
   }, [user, isEditMode]);
-
-  // Load user's OjoType gradient for avatar outline
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const prefs = await getUserPreferences();
-        const ojoName = prefs?.ojoType?.name as any;
-        const cfg = ojoName ? getOjoType(ojoName) : getOjoType("mentorjo");
-        if (mounted) setOjoGradient(cfg.gradient2 ?? cfg.gradient ?? [cfg.color, cfg.color]);
-      } catch (e) {
-        // ignore and keep default colors
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   const handleEditProfile = () => {
     setIsEditMode(true);
@@ -235,19 +214,7 @@ export default function ProfileSettings() {
         <View style={styles.avatarContainer}>
           {!isEditMode && (
             <View>
-              <LinearGradient
-                colors={(ojoGradient ?? [COLORS.primary1, COLORS.primary2]) as [string, string, ...string[]]}
-                end={{ x: 1, y: 1 }}
-                style={styles.avatarGradient}
-              >
-                <View style={styles.avatarInner}>
-                  {editedProfileImage ? (
-                    <Image source={{ uri: editedProfileImage }} style={styles.avatarImagePlain} />
-                  ) : (
-                    <UserIcon size={moderateScale(35)} color={COLORS.lightGray} />
-                  )}
-                </View>
-              </LinearGradient>
+              <UserAvatar size={moderateScale(104)} imageUri={editedProfileImage ?? null} />
               <AppButton
                 icon="edit"
                 mode="filled"

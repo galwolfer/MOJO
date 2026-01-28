@@ -11,6 +11,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { NavigationProvider } from "./context/NavigationContext";
 import { LayoutProvider } from "./context/LayoutContext";
 import { TaskProvider } from "./context/TaskContext";
+import { OjoProvider } from "./context/OjoContext";
 import MainLayout from "./components/layout/MainLayout";
 
 SplashScreen.preventAutoHideAsync();
@@ -75,9 +76,11 @@ export default function App() {
     <AuthProvider>
       <NavigationProvider>
         <LayoutProvider>
-          <TaskProvider>
-            <AppContent />
-          </TaskProvider>
+          <OjoProvider>
+            <TaskProvider>
+              <AppContent />
+            </TaskProvider>
+          </OjoProvider>
         </LayoutProvider>
       </NavigationProvider>
     </AuthProvider>
