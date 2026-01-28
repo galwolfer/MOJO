@@ -65,7 +65,7 @@ export const ScheduledSessionsSection: React.FC<{
         style={{
           marginStart: titleMode ? SPACING.sm : 0,
           marginTop: titleMode ? -SPACING.sm : 0,
-          marginBottom: titleMode && sessions.length === 0 ? -SPACING.lg : 0,
+          marginBottom: titleMode && sessions.length === 0 ? -SPACING.md : 0,
         }}
       >
         <List

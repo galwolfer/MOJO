@@ -14,6 +14,7 @@ export { default as ProfileImagePicker } from "./inputs/ProfileImagePicker";
 export { default as ProfilePhotoWidget } from "./special/ProfilePhotoWidget";
 export { default as PriorityList } from "./special/PriorityList";
 export { default as Widget } from "./special/Widget";
+export { default as LoadingScreen } from "./special/LoadingScreen";
 export { default as AppButton } from "./common/AppButton";
 export { default as AnimatedButtonsContainer } from "./common/animations/AnimatedButtonsContainer";
 export { default as ExpandableRow } from "./common/animations/ExpandableRow";

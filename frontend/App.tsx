@@ -11,12 +11,15 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { NavigationProvider } from "./context/NavigationContext";
 import { LayoutProvider } from "./context/LayoutContext";
 import { TaskProvider } from "./context/TaskContext";
+import { OjoProvider } from "./context/OjoContext";
 import MainLayout from "./components/layout/MainLayout";
+import LoadingScreen from "./components/special/LoadingScreen";
 
 SplashScreen.preventAutoHideAsync();
 
 function AppContent() {
   const { user, isLoading } = useAuth();
+  const [showLoadingScreen, setShowLoadingScreen] = useState(true);
   const [fontsLoaded, fontError] = useFonts({
     "Fredoka-Bold": require("./assets/fonts/Fredoka-Bold.ttf"),
     "Fredoka-Light": require("./assets/fonts/Fredoka-Light.ttf"),
@@ -25,16 +28,33 @@ function AppContent() {
     "Fredoka-SemiBold": require("./assets/fonts/Fredoka-SemiBold.ttf"),
   });
 
-  const onLayoutRootView = useCallback(async () => {
-    if ((fontsLoaded || fontError) && !isLoading) {
-      await SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded, fontError, isLoading]);
+  // Hide Expo splash screen immediately when component mounts so custom loading screen is visible
+  useEffect(() => {
+    SplashScreen.hideAsync();
+  }, []);
+
+  // App is ready when fonts are loaded and auth state is resolved
+  const isAppReady = (fontsLoaded || !!fontError) && !isLoading;
+
+  const handleLoadingComplete = useCallback(() => {
+    setShowLoadingScreen(false);
+  }, []);
 
   const { width, height } = useWindowDimensions();
   const isDesktopLike = (Platform as any).OS === "web" ? width >= 1000 : width >= 1000;
 
-  if ((!fontsLoaded && !fontError) || isLoading) {
+  // Show loading screen overlay
+  if (showLoadingScreen) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <View style={styles.loadingContainer}>
+          <LoadingScreen onLoadingComplete={handleLoadingComplete} isAppReady={isAppReady} />
+        </View>
+      </GestureHandlerRootView>
+    );
+  }
+
+  if (!isAppReady) {
     return null;
   }
 
@@ -55,7 +75,7 @@ function AppContent() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <View style={outerStyle} onLayout={onLayoutRootView}>
+      <View style={outerStyle}>
         {user ? (
           <MainLayout />
         ) : (
@@ -75,9 +95,11 @@ export default function App() {
     <AuthProvider>
       <NavigationProvider>
         <LayoutProvider>
-          <TaskProvider>
-            <AppContent />
-          </TaskProvider>
+          <OjoProvider>
+            <TaskProvider>
+              <AppContent />
+            </TaskProvider>
+          </OjoProvider>
         </LayoutProvider>
       </NavigationProvider>
     </AuthProvider>
@@ -89,6 +111,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "red",
     width: "100%",
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: COLORS.white3,
   },
   desktopOuter: {
     flex: 1,

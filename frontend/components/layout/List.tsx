@@ -99,10 +99,10 @@ export const ListCell: React.FC<ListCellProps> = ({
  * List - A simple columnar list that renders rows
  */
 const List: React.FC<ListProps> = ({ data, renderCell, gap = SPACING.sm, style, dividerColor, keyExtractor }) => {
-  const defaultRenderCell = (cell: ListCellProps, index: number) => (
+  const defaultRenderCell = (cell: ListCellProps, index: number, uniqueKey: string) => (
     <ListCell
-      key={cell.id}
-      id={cell.id}
+      key={uniqueKey}
+      id={uniqueKey}
       parts={cell.parts}
       content={cell.content}
       onPress={cell.onPress}
@@ -115,11 +115,11 @@ const List: React.FC<ListProps> = ({ data, renderCell, gap = SPACING.sm, style, 
 
   return (
     <View style={[styles.container, style]}>
-      {data.map((cell, index) => (
-        <View key={keyExtractor ? keyExtractor(cell) : cell.id}>
-          {renderCell ? renderCell(cell) : defaultRenderCell(cell, index)}
-        </View>
-      ))}
+      {data.map((cell, index) => {
+        const baseKey = keyExtractor ? keyExtractor(cell) : cell.id;
+        const uniqueKey = `${baseKey}-${index}`;
+        return <View key={uniqueKey}>{renderCell ? renderCell(cell) : defaultRenderCell(cell, index, uniqueKey)}</View>;
+      })}
     </View>
   );
 };
@@ -128,7 +128,6 @@ const styles = StyleSheet.create({
   container: {
     display: "flex",
     flexDirection: "column",
-    gap: SPACING.xs,
     alignSelf: "stretch",
   },
   row: {
@@ -137,26 +136,26 @@ const styles = StyleSheet.create({
   rowInner: {
     flexDirection: "row",
     alignItems: "flex-start",
-    paddingVertical: SPACING.sm,
     alignSelf: "stretch",
+    width: "100%",
   },
   touchable: {
     alignSelf: "stretch",
+    width: "100%",
   },
   dividerLine: {
     width: "100%",
-    height: SPACING.sm / 2,
+    height: 1,
     backgroundColor: COLORS.white,
-    borderRadius: 50,
-    marginTop: SPACING.xs,
-    marginHorizontal: SPACING.sm,
+    marginVertical: SPACING.xs,
     alignSelf: "stretch",
   },
   contentContainer: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "flex-start",
     alignSelf: "stretch",
+    width: "100%",
+    flexShrink: 1,
   },
   disabled: {
     opacity: 0.6,

@@ -591,7 +591,6 @@ export const toggleSubtask = async ({
     if (!success) throw new Error("Update failed");
 
     // Debug: log toggle
-    console.debug(`[toggleSubtask] task=${taskId} subtask=${subtaskId} completed=${nextCompleted}`);
     // Notify other components of task update
     notifyTaskUpdate({ taskId });
     // Also schedule a delayed notify to give backend time to settle and ensure list widgets refresh

@@ -46,7 +46,6 @@ export const SessionRow: React.FC<{
   const subtaskTitle = session.subtaskTitle || `Part ${session.subtaskIndex ?? sessionIndex + 1}`;
 
   const Container: any = rowPressHandler ? Pressable : View;
-  console.log("Category Color:", categoryColor);
   return (
     <View>
       {showTaskDate && (
@@ -101,20 +100,17 @@ export const SessionRow: React.FC<{
             <View style={styles.checkboxSpacer} />
           )}
         </View>
-
-        <View style={styles.sessionInfo}>
-          <View style={styles.sessionTitleRow}>
-            <AppText variant="bodyText" style={[styles.sessionTitleText, isDone && styles.sessionLabelDone]}>
-              <AppText variant="boldText" style={styles.sessionSubtask}>
-                {subtaskTitle}
-              </AppText>
-              {!hideTaskTitle && taskTitle ? (
-                <AppText variant="bodyText" style={styles.sessionTask}>
-                  {" - " + taskTitle}
-                </AppText>
-              ) : null}
+        <View style={styles.sessionTitleRow}>
+          <AppText variant="bodyText" style={[isDone && styles.sessionLabelDone]}>
+            <AppText variant="boldText" style={styles.sessionSubtask}>
+              {subtaskTitle}
             </AppText>
-          </View>
+            {!hideTaskTitle && taskTitle ? (
+              <AppText variant="bodyText" style={styles.sessionTask}>
+                {" - " + taskTitle}
+              </AppText>
+            ) : null}
+          </AppText>
         </View>
       </Container>
     </View>
@@ -130,6 +126,8 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     paddingVertical: 4,
     width: "100%",
+    height: 2 * SPACING.xlg,
+    marginBottom: -SPACING.sm,
   },
   sessionDateText: {
     fontWeight: "600",
@@ -143,7 +141,6 @@ const styles = StyleSheet.create({
   sessionTimeColumn: {
     alignItems: "flex-end",
     gap: SPACING.xs,
-    minWidth: 46,
   },
   sessionHourText: {
     color: COLORS.lightGray,
@@ -168,20 +165,17 @@ const styles = StyleSheet.create({
     height: ICON_SIZES.sm,
   },
   sessionInfo: {
-    flex: 1,
     gap: SPACING.xs,
   },
   sessionTitleRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "flex-start",
     flexWrap: "nowrap",
     gap: SPACING.xs,
   },
   sessionLabelDone: {
     textDecorationLine: "line-through",
-  },
-  sessionTitleText: {
-    flexShrink: 1,
   },
   sessionSubtask: {
     fontWeight: "600",

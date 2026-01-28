@@ -90,6 +90,7 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     flexWrap: "wrap",
     marginTop: SPACING.sm,
+    marginBottom: SPACING.md,
   },
   tagItem: {
     marginRight: SPACING.sm,

@@ -196,86 +196,75 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({
     const progressValue = Math.max(0, Math.min(1, progressPercent / 100));
 
     const content = (
-      <View style={{ width: "100%" }}>
-        <View style={styles.taskItem}>
-          <View style={styles.taskContent}>
-            <TouchableOpacity
-              onPress={() => {
-                handleTaskPress({ taskId: task.id, selectedTaskId, setSelectedTaskId, onAction });
-              }}
-              activeOpacity={0.7}
-              style={styles.headerTouchable}
-            >
-              <View style={styles.titleRow}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: SPACING.sm, flex: 1 }}>
-                  {meta?.icon ? (
-                    <Icon name={meta.icon} size={ICON_SIZES.sm} color={meta.color} style={styles.titleIcon} />
-                  ) : null}
+      <View style={styles.taskItem}>
+        <View style={styles.taskContent}>
+          <TouchableOpacity
+            onPress={() => {
+              handleTaskPress({ taskId: task.id, selectedTaskId, setSelectedTaskId, onAction });
+            }}
+            activeOpacity={0.7}
+            style={styles.headerTouchable}
+          >
+            <View style={styles.titleRow}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: SPACING.sm }}>
+                {meta?.icon ? (
+                  <Icon name={meta.icon} size={ICON_SIZES.sm} color={meta.color} style={styles.titleIcon} />
+                ) : null}
 
-                  <AppText
-                    variant="boldText"
-                    numberOfLines={2}
-                    style={[styles.taskTitle, checkedTasks.has(task.id) && styles.taskTitleCompleted]}
-                  >
-                    {task.title || (task as any).taskname || "Untitled task"}
-                  </AppText>
-                </View>
-
-                {typeof task.progressPercentage === "number" ||
-                ((task as any).subtasks && (task as any).subtasks.length > 0) ||
-                (task.scheduledSessions && task.scheduledSessions.length > 0) ? (
-                  <ProgressIcon
-                    key={`progress-${task.id}-${Math.round(progressValue * 100)}`}
-                    value={progressValue}
-                    size={ICON_SIZES.md}
-                  />
-                ) : (
-                  <View style={{ width: ICON_SIZES.md }} />
-                )}
+                <AppText
+                  variant="boldText"
+                  numberOfLines={2}
+                  style={[styles.taskTitle, checkedTasks.has(task.id) && styles.taskTitleCompleted]}
+                >
+                  {task.title || (task as any).taskname || "Untitled task"}
+                </AppText>
               </View>
-            </TouchableOpacity>
+              {typeof task.progressPercentage === "number" ||
+              ((task as any).subtasks && (task as any).subtasks.length > 0) ||
+              (task.scheduledSessions && task.scheduledSessions.length > 0) ? (
+                <ProgressIcon
+                  key={`progress-${task.id}-${Math.round(progressValue * 100)}`}
+                  value={progressValue}
+                  size={ICON_SIZES.md}
+                />
+              ) : (
+                <View style={{ width: ICON_SIZES.md }} />
+              )}
+            </View>
+          </TouchableOpacity>
 
-            <ExpandableRow
-              expanded={selectedTaskId === task.id}
-              style={styles.expandedRow}
-              key={`expandable-${task.id}-${selectedTaskId === task.id ? "exp" : "col"}`}
-            >
-              {(task as any).tags && Array.isArray((task as any).tags) && (task as any).tags.length > 0 ? (
-                <View style={styles.tagContainer}>
-                  {(task as any).tags.map((t: string, i: number) => (
-                    <Tag key={i} label={t} style={styles.tagItem} />
-                  ))}
-                </View>
-              ) : null}
+          <ExpandableRow
+            expanded={selectedTaskId === task.id}
+            style={styles.expandedRow}
+            key={`expandable-${task.id}-${selectedTaskId === task.id ? "exp" : "col"}`}
+          >
+            {/* Normalize category display for presentation */}
+            <TaskTagsRow
+              category={task.category}
+              categoryDisplay={getCategoryDisplay(task.category, task.categoryDisplay)}
+              subcategory={task.subcategory}
+              subcategoryDisplay={task.subcategoryDisplay}
+              importance={task.importance}
+              effort={task.effort}
+            />
 
-              {/* Normalize category display for presentation */}
-              <TaskTagsRow
-                category={task.category}
-                categoryDisplay={getCategoryDisplay(task.category, task.categoryDisplay)}
-                subcategory={task.subcategory}
-                subcategoryDisplay={task.subcategoryDisplay}
-                importance={task.importance}
-                effort={task.effort}
-              />
-
-              <ScheduledSessionsSection
-                taskId={task.id}
-                taskTitle={task.title || (task as any).taskname || "Untitled task"}
-                scheduledSessions={task.scheduledSessions}
-                subtasks={(task as any).subtasks}
-                category={task.category}
-                categoryColor={getCategoryMeta(task.category)?.color}
-                completedParts={completedParts}
-                loadingParts={loadingParts}
-                onToggleSession={handleToggleSession}
-                estimatedDuration={(task as any).estimatedDuration}
-                progressPercentage={task.progressPercentage}
-                hideTitle={true}
-                hideTaskTitle={false}
-                sessionHeaderMode="date"
-              />
-            </ExpandableRow>
-          </View>
+            <ScheduledSessionsSection
+              taskId={task.id}
+              taskTitle={task.title || (task as any).taskname || "Untitled task"}
+              scheduledSessions={task.scheduledSessions}
+              subtasks={(task as any).subtasks}
+              category={task.category}
+              categoryColor={getCategoryMeta(task.category)?.color}
+              completedParts={completedParts}
+              loadingParts={loadingParts}
+              onToggleSession={handleToggleSession}
+              estimatedDuration={(task as any).estimatedDuration}
+              progressPercentage={task.progressPercentage}
+              hideTitle={true}
+              hideTaskTitle={false}
+              sessionHeaderMode="date"
+            />
+          </ExpandableRow>
         </View>
       </View>
     );
@@ -299,17 +288,19 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({
 const styles = StyleSheet.create({
   container: {
     width: "100%",
-    alignSelf: "stretch",
-    overflow: "hidden",
+    justifyContent: "space-between",
+    overflow: "visible",
+    flex: 1,
   },
   emptyText: {
     color: COLORS.lightGray,
   },
   taskItem: {
     flexDirection: "row",
-    alignItems: "flex-start",
     paddingVertical: SPACING.xs,
     gap: SPACING.md,
+    width: "100%",
+    flex: 1,
   },
   checkbox: {
     paddingRight: SPACING.sm,
@@ -330,8 +321,11 @@ const styles = StyleSheet.create({
   },
 
   taskContent: {
-    flex: 1,
     gap: SPACING.sm,
+    flex: 1,
+    width: "100%",
+    maxWidth: "100%",
+    flexShrink: 1,
   },
   titleRow: {
     flexDirection: "row",
@@ -370,7 +364,9 @@ const styles = StyleSheet.create({
   expandedRow: {
     gap: SPACING.sm,
     paddingLeft: SPACING.sm,
-    backgroundColor: "transparent",
+    width: "100%",
+    maxWidth: "100%",
+    flexShrink: 1,
   },
   headerTouchable: {
     width: "100%",
@@ -379,6 +375,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: SPACING.sm,
+    backgroundColor: "blue",
   },
   tagItem: {
     marginRight: SPACING.sm,
