@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import {
   View,
   StyleSheet,
@@ -98,83 +98,88 @@ export default function UserProfileScreen() {
   const TrophyIcon = ICONS.trophy;
   const [ojoGradient, setOjoGradient] = useState<string[] | null>(null);
 
-  useEffect(() => {
-    if (currentScreen === "profile") {
-      setHeaderConfig({
-        show: true,
-        element: (
-          <View style={styles.headerProfileSection} pointerEvents="box-none">
-            {/* Avatar */}
-            <View style={styles.headerAvatarWrapper}>
-              <LinearGradient
-                colors={(ojoGradient ?? [COLORS.primary1, COLORS.primary2]) as [string, string, ...string[]]}
-                end={{ x: 1, y: 1 }}
-                style={styles.headerAvatarGradient}
-              >
-                <View style={styles.headerAvatarInner}>
-                  {user?.profileImage ? (
-                    <Image
-                      source={{
-                        uri: user.profileImage,
-                      }}
-                      style={styles.headerAvatarImage}
-                    />
-                  ) : (
-                    <View style={styles.headerAvatarPlaceholder}>
-                      <UserIcon size={moderateScale(35)} color={COLORS.lightGray} />
-                    </View>
-                  )}
-                </View>
-              </LinearGradient>
-            </View>
-
-            {/* Display Name */}
-            <AppText variant="title2" style={styles.headerUsername}>
-              {user?.displayName || user?.username || "User"}
-            </AppText>
-            {user?.username && (
-              <AppText variant="notes" style={styles.headerDisplayName}>
-                @{user.username}
-              </AppText>
-            )}
-
-            {/* Stats Row */}
-            <View style={{ width: "100%" }}>
-              {loading ? (
-                <ActivityIndicator size="small" color={COLORS.primary1} />
+  const headerElement = useMemo(
+    () => (
+      <View style={styles.headerProfileSection} pointerEvents="box-none">
+        {/* Avatar */}
+        <View style={styles.headerAvatarWrapper}>
+          <LinearGradient
+            colors={(ojoGradient ?? [COLORS.primary1, COLORS.primary2]) as [string, string, ...string[]]}
+            end={{ x: 1, y: 1 }}
+            style={styles.headerAvatarGradient}
+          >
+            <View style={styles.headerAvatarInner}>
+              {user?.profileImage ? (
+                <Image
+                  source={{
+                    uri: user.profileImage,
+                  }}
+                  style={styles.headerAvatarImage}
+                />
               ) : (
-                <View style={styles.headerStatsRow}>
-                  <StatBadge
-                    icon={<CheckIcon size={ICON_SIZES.md} color={COLORS.colorWhite} />}
-                    value={stats.tasks}
-                    label="Tasks"
-                    color={COLORS.primary6}
-                  />
-                  <StatBadge
-                    icon={<TrophyIcon size={ICON_SIZES.md} color={COLORS.colorWhite} />}
-                    value={stats.points}
-                    label="Points"
-                    color={COLORS.primary5}
-                  />
-                  <StatBadge
-                    icon={<FlameIcon size={ICON_SIZES.md} color={COLORS.colorWhite} />}
-                    value={stats.streak}
-                    label="Days Streak"
-                    color={COLORS.primary4}
-                  />
+                <View style={styles.headerAvatarPlaceholder}>
+                  <UserIcon size={moderateScale(35)} color={COLORS.lightGray} />
                 </View>
               )}
             </View>
-          </View>
-        ),
-        rightElement: (
-          <TouchableOpacity onPress={() => setCurrentScreen("settings")} style={styles.headerRightTouchable}>
-            <SettingsIcon size={ICON_SIZES.md} color={COLORS.primary1} />
-          </TouchableOpacity>
-        ),
-      });
-    }
-  }, [currentScreen, user?.profileImage, user?.displayName, user?.username, loading, stats, ojoGradient]);
+          </LinearGradient>
+        </View>
+
+        {/* Display Name */}
+        <AppText variant="title2" style={styles.headerUsername}>
+          {user?.displayName || user?.username || "User"}
+        </AppText>
+        {user?.username && (
+          <AppText variant="notes" style={styles.headerDisplayName}>
+            @{user.username}
+          </AppText>
+        )}
+
+        {/* Stats Row */}
+        <View style={{ width: "100%" }}>
+          {loading ? (
+            <ActivityIndicator size="small" color={COLORS.primary1} />
+          ) : (
+            <View style={styles.headerStatsRow}>
+              <StatBadge
+                icon={<CheckIcon size={ICON_SIZES.md} color={COLORS.colorWhite} />}
+                value={stats.tasks}
+                label="Tasks"
+                color={COLORS.primary6}
+              />
+              <StatBadge
+                icon={<TrophyIcon size={ICON_SIZES.md} color={COLORS.colorWhite} />}
+                value={stats.points}
+                label="Points"
+                color={COLORS.primary5}
+              />
+              <StatBadge
+                icon={<FlameIcon size={ICON_SIZES.md} color={COLORS.colorWhite} />}
+                value={stats.streak}
+                label="Days Streak"
+                color={COLORS.primary4}
+              />
+            </View>
+          )}
+        </View>
+      </View>
+    ),
+    [user?.profileImage, user?.displayName, user?.username, loading, stats, ojoGradient],
+  );
+
+  const headerRight = useMemo(
+    () => (
+      <TouchableOpacity onPress={() => setCurrentScreen("settings")} style={styles.headerRightTouchable}>
+        <SettingsIcon size={ICON_SIZES.md} color={COLORS.primary1} />
+      </TouchableOpacity>
+    ),
+    [setCurrentScreen],
+  );
+
+  useEffect(() => {
+    if (currentScreen !== "profile") return;
+    setHeaderConfig({ show: true, element: headerElement, rightElement: headerRight });
+  }, [currentScreen, headerElement, headerRight, setHeaderConfig]);
 
   // Load user's OjoType gradient for avatar outline (matches ProfileSettings)
   // Re-run whenever the profile view becomes active so changes from Settings appear immediately.
