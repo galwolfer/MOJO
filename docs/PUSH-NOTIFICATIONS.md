@@ -28,14 +28,43 @@ Push notifications on Android require Firebase Cloud Messaging (FCM). Follow the
 1. Download the `google-services.json` file
 2. Save it to `frontend/google-services.json`
 
-### 4. Rebuild the App
+### 4. Upload FCM V1 Service Account Key to Expo
+The Legacy FCM API is deprecated. You must use FCM V1 with a Service Account:
+
+1. In Firebase Console, go to ⚙️ **Project Settings** → **Service accounts** tab
+2. Click **Generate new private key** → **Generate key**
+3. Save the downloaded JSON file (e.g., `mojo-firebase-adminsdk-xxxxx.json`)
+4. Upload to Expo:
+   ```bash
+   cd frontend
+   npx eas credentials --platform android
+   ```
+5. Select:
+   - **development** (or your build profile)
+   - **Google Service Account**
+   - **Manage your Google Service Account Key for Push Notifications (FCM V1)**
+   - **Set up a Google Service Account Key for Push Notifications (FCM V1)**
+6. Enter the path to your service account JSON file
+
+### 5. Link Expo Project (if needed)
+If you get permission errors, re-link the project to your Expo account:
+```bash
+cd frontend
+npx eas login           # Login to your Expo account
+npx eas init --force    # Re-initialize project under your account
+```
+
+### 6. Rebuild the App
 ```bash
 cd frontend
 npx expo prebuild --clean
 npx expo run:android
 ```
 
-**Note**: Without Firebase configured, you'll see a warning about "FirebaseApp is not initialized". The app will still work, but push notifications will not function.
+**Important**: 
+- Without Firebase configured, you'll see "FirebaseApp is not initialized" warning
+- Without FCM V1 Service Account, you'll see "Unable to retrieve the FCM server key" error
+- Push notifications require a **Development Build**, not Expo Go (SDK 53+)
 
 ## Architecture
 
@@ -209,6 +238,30 @@ PUT /api/notifications/preferences
 ## Notes
 
 - Push notifications only work on **physical devices**, not emulators
+- Push notifications require a **Development Build** (not Expo Go) as of SDK 53
 - Expo Push Tokens are specific to each device installation
 - Token changes when app is uninstalled/reinstalled
 - Invalid tokens are automatically cleaned up
+- The Expo Project ID in `frontend/context/NotificationContext.tsx` must match the one in `app.json`
+- FCM V1 credentials are linked to your Expo project, so the project must be owned by your Expo account
+
+## Troubleshooting
+
+### "User not found" error
+- Ensure the notification routes use `req.user.userId` (not `req.userId`)
+- Check that the user is authenticated before making notification API calls
+
+### "Unable to retrieve the FCM server key" error
+- Upload your FCM V1 Service Account key via `eas credentials`
+- Ensure the Expo project ID matches between app.json and NotificationContext.tsx
+- Rebuild and reinstall the app after changing project IDs
+
+### "FirebaseApp is not initialized" error
+- Add `google-services.json` to `frontend/` directory
+- Run `npx expo prebuild --clean` and rebuild
+
+### Notifications not appearing
+- Check that the app has notification permissions
+- Verify notifications are enabled in the app settings
+- Test with a physical device (not emulator)
+- Use Development Build, not Expo Go
