@@ -6,7 +6,7 @@
  */
 
 import React, { useState } from "react";
-import { View, StyleSheet, Switch, TouchableOpacity } from "react-native";
+import { View, StyleSheet, Switch, TouchableOpacity, Text } from "react-native";
 import { moderateScale } from "react-native-size-matters";
 import { useNotifications } from "../../context/NotificationContext";
 import { COLORS, SPACING, FONT_SIZES } from "../../theme";
@@ -278,7 +278,7 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
                         disabled={isSaving}
                         style={[styles.timeButton, isSaving && styles.buttonDisabled]}
                       >
-                        <AppText variant="boldText" style={styles.timeButtonText}>−</AppText>
+                        <Text style={styles.timeButtonText}>−</Text>
                       </TouchableOpacity>
                       <AppText variant="title2" style={styles.timeDisplay}>
                         {String(preferences?.morningDigest?.hour || 8).padStart(2, '0')}
@@ -293,7 +293,7 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
                         disabled={isSaving}
                         style={[styles.timeButton, isSaving && styles.buttonDisabled]}
                       >
-                        <AppText variant="boldText" style={styles.timeButtonText}>+</AppText>
+                        <Text style={styles.timeButtonText}>+</Text>
                       </TouchableOpacity>
                     </View>
                     <AppText variant="title2" style={styles.timeSeparator}>:</AppText>
@@ -309,7 +309,7 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
                         disabled={isSaving}
                         style={[styles.timeButton, isSaving && styles.buttonDisabled]}
                       >
-                        <AppText variant="boldText" style={styles.timeButtonText}>−</AppText>
+                        <Text style={styles.timeButtonText}>−</Text>
                       </TouchableOpacity>
                       <AppText variant="title2" style={styles.timeDisplay}>
                         {String(preferences?.morningDigest?.minute || 0).padStart(2, '0')}
@@ -324,7 +324,7 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
                         disabled={isSaving}
                         style={[styles.timeButton, isSaving && styles.buttonDisabled]}
                       >
-                        <AppText variant="boldText" style={styles.timeButtonText}>+</AppText>
+                        <Text style={styles.timeButtonText}>+</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -568,6 +568,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: SPACING.sm,
+    marginVertical: SPACING.md,
     width: "100%",
     direction: "ltr",
   },
@@ -575,18 +576,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: SPACING.sm,
+    flexDirection: "column",
   },
   timeButton: {
-    width: moderateScale(36),
-    height: moderateScale(36),
-    borderRadius: moderateScale(18),
+    width: moderateScale(40),
+    height: moderateScale(40),
+    borderRadius: moderateScale(20),
     backgroundColor: COLORS.primary1,
     justifyContent: "center",
     alignItems: "center",
+    padding: 0,
   },
   timeButtonText: {
     fontSize: FONT_SIZES.lg,
     color: COLORS.colorWhite,
+    textAlign: "center",
+    lineHeight: FONT_SIZES.lg,
+    includeFontPadding: false,
+    textAlignVertical: "center",
   },
   timeDisplay: {
     fontSize: moderateScale(32),
