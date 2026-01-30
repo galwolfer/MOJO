@@ -9,6 +9,7 @@ import React, { useState } from "react";
 import { View, Text, StyleSheet, Switch, TouchableOpacity, ActivityIndicator } from "react-native";
 import { useNotifications } from "../../context/NotificationContext";
 import { COLORS } from "../../theme";
+import { post } from "../../services/httpClient";
 
 type NotificationSettingsProps = {
   style?: any;
@@ -33,6 +34,7 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
 
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [isTestingMorningDigest, setIsTestingMorningDigest] = useState(false);
   const [isTogglingTestMode, setIsTogglingTestMode] = useState(false);
 
   const handleToggleNotifications = async (enabled: boolean) => {
@@ -48,6 +50,18 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
         enabled,
         hour: preferences?.morningDigest?.hour ?? 8,
         minute: preferences?.morningDigest?.minute ?? 0,
+      },
+    });
+    setIsSaving(false);
+  };
+
+  const handleMorningDigestTimeChange = async (hour: number, minute: number) => {
+    setIsSaving(true);
+    await updatePreferences({
+      morningDigest: { 
+        enabled: preferences?.morningDigest?.enabled ?? true,
+        hour,
+        minute,
       },
     });
     setIsSaving(false);
@@ -81,6 +95,18 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
     setIsTesting(true);
     await testNotification();
     setIsTesting(false);
+  };
+
+  const handleTestMorningDigest = async () => {
+    setIsTestingMorningDigest(true);
+    try {
+      const result = await post("/notifications/test/morning-digest", {});
+      console.log('Morning digest test triggered:', result);
+    } catch (error) {
+      console.error('Error testing morning digest:', error);
+    } finally {
+      setIsTestingMorningDigest(false);
+    }
   };
 
   const handleToggleTestMode = async () => {
@@ -172,7 +198,7 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
             <View style={styles.settingInfo}>
               <Text style={styles.settingLabel}>🌅 Morning Digest</Text>
               <Text style={styles.settingDescription}>
-                Daily summary of tasks at {preferences?.morningDigest?.hour || 8}:00 AM
+                Daily summary of tasks at {String(preferences?.morningDigest?.hour || 8).padStart(2, '0')}:{String(preferences?.morningDigest?.minute || 0).padStart(2, '0')} AM
               </Text>
             </View>
             <Switch
@@ -183,6 +209,79 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
               thumbColor={preferences?.morningDigest?.enabled ? COLORS.colorWhite : COLORS.lightGray}
             />
           </View>
+
+          {/* Morning Digest Time Picker */}
+          {preferences?.morningDigest?.enabled && (
+            <View style={[styles.settingRow, styles.nestedSetting, styles.timePickerSection]}>
+              <View style={styles.timePickerContainer}>
+                <Text style={styles.timePickerLabel}>Set Time</Text>
+                <View style={styles.timeInputGroup}>
+                  {/* Hour Selector */}
+                  <View style={styles.timeInputContainer}>
+                    <TouchableOpacity 
+                      onPress={() => {
+                        const newHour = (preferences?.morningDigest?.hour || 8) > 0 
+                          ? (preferences?.morningDigest?.hour || 8) - 1 
+                          : 23;
+                        handleMorningDigestTimeChange(newHour, preferences?.morningDigest?.minute || 0);
+                      }}
+                      disabled={isSaving}
+                      style={[styles.timeButton, isSaving && styles.buttonDisabled]}
+                    >
+                      <Text style={styles.timeButtonText}>−</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.timeDisplay}>
+                      {String(preferences?.morningDigest?.hour || 8).padStart(2, '0')}
+                    </Text>
+                    <TouchableOpacity 
+                      onPress={() => {
+                        const newHour = (preferences?.morningDigest?.hour || 8) < 23 
+                          ? (preferences?.morningDigest?.hour || 8) + 1 
+                          : 0;
+                        handleMorningDigestTimeChange(newHour, preferences?.morningDigest?.minute || 0);
+                      }}
+                      disabled={isSaving}
+                      style={[styles.timeButton, isSaving && styles.buttonDisabled]}
+                    >
+                      <Text style={styles.timeButtonText}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.timeSeparator}>:</Text>
+                  {/* Minute Selector */}
+                  <View style={styles.timeInputContainer}>
+                    <TouchableOpacity 
+                      onPress={() => {
+                        const newMinute = (preferences?.morningDigest?.minute || 0) > 0 
+                          ? (preferences?.morningDigest?.minute || 0) - 1 
+                          : 59;
+                        handleMorningDigestTimeChange(preferences?.morningDigest?.hour || 8, newMinute);
+                      }}
+                      disabled={isSaving}
+                      style={[styles.timeButton, isSaving && styles.buttonDisabled]}
+                    >
+                      <Text style={styles.timeButtonText}>−</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.timeDisplay}>
+                      {String(preferences?.morningDigest?.minute || 0).padStart(2, '0')}
+                    </Text>
+                    <TouchableOpacity 
+                      onPress={() => {
+                        const newMinute = (preferences?.morningDigest?.minute || 0) < 59 
+                          ? (preferences?.morningDigest?.minute || 0) + 1 
+                          : 0;
+                        handleMorningDigestTimeChange(preferences?.morningDigest?.hour || 8, newMinute);
+                      }}
+                      disabled={isSaving}
+                      style={[styles.timeButton, isSaving && styles.buttonDisabled]}
+                    >
+                      <Text style={styles.timeButtonText}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                <Text style={styles.timePickerHint}>Tap +/− to adjust the time</Text>
+              </View>
+            </View>
+          )}
 
           {/* Task Reminders */}
           <View style={styles.settingRow}>
@@ -229,6 +328,18 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
                 <ActivityIndicator color={COLORS.primary1} />
               ) : (
                 <Text style={styles.testButtonText}>Send Test Notification</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.testButton, styles.testMorningDigestButton, isTestingMorningDigest && styles.buttonDisabled]}
+              onPress={handleTestMorningDigest}
+              disabled={isTestingMorningDigest}
+            >
+              {isTestingMorningDigest ? (
+                <ActivityIndicator color={COLORS.colorWhite} />
+              ) : (
+                <Text style={[styles.testButtonText, styles.testMorningDigestButtonText]}>🌅 Test Morning Digest Now</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -307,6 +418,64 @@ const styles = StyleSheet.create({
   nestedSetting: {
     marginLeft: 20,
   },
+  timePickerSection: {
+    flexDirection: 'column',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.white3,
+  },
+  timePickerContainer: {
+    width: '100%',
+  },
+  timePickerLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.black,
+    marginBottom: 12,
+  },
+  timeInputGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  timeInputContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  timeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: COLORS.primary1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 4,
+  },
+  timeButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.colorWhite,
+  },
+  timeDisplay: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: COLORS.black,
+    minWidth: 44,
+    textAlign: 'center',
+  },
+  timeSeparator: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: COLORS.black,
+    marginHorizontal: 8,
+  },
+  timePickerHint: {
+    fontSize: 12,
+    color: COLORS.lightGray,
+    textAlign: 'center',
+  },
   settingInfo: {
     flex: 1,
     marginRight: 16,
@@ -368,11 +537,19 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: "center",
+    marginBottom: 10,
+  },
+  testMorningDigestButton: {
+    backgroundColor: COLORS.primary1,
+    marginBottom: 0,
   },
   testButtonText: {
     fontSize: 14,
     fontWeight: "500",
     color: COLORS.primary1,
+  },
+  testMorningDigestButtonText: {
+    color: COLORS.colorWhite,
   },
   debugSection: {
     marginTop: 20,

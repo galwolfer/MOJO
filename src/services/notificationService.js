@@ -159,30 +159,58 @@ export async function sendNotificationToUser(userId, notification) {
  * @returns {Promise<Array>} Array of tasks for today
  */
 async function getTodaysTasks(userId) {
-  const today = startOfDay(new Date());
-  const tomorrow = addDays(today, 1);
+  // Get user to access their timezone
+  const user = await User.findById(userId).select('pushNotifications.timezone').lean();
+  const userTimezone = user?.pushNotifications?.timezone || 'UTC';
 
-  // Get tasks that are due today or have scheduled sessions today
-  const tasks = await Task.find({
+  // Get today's date in user's local timezone
+  const now = new Date();
+  const userLocalNow = new Date(now.toLocaleString('en-US', { timeZone: userTimezone }));
+  
+  // Get start and end of today in user's timezone as UTC times
+  const todayLocalStart = new Date(userLocalNow);
+  todayLocalStart.setHours(0, 0, 0, 0);
+  
+  const todayLocalEnd = new Date(userLocalNow);
+  todayLocalEnd.setHours(23, 59, 59, 999);
+
+  // Convert these local times to ISO strings to compare with MongoDB UTC dates
+  // We need to query for tasks where dueDate falls within today's range in the user's timezone
+  const todayStart = new Date(todayLocalStart);
+  const todayEnd = new Date(todayLocalEnd);
+
+  // Get all non-done tasks for the user, then filter in-memory by timezone-aware date
+  const allTasks = await Task.find({
     userId,
     status: { $ne: "done" },
-    $or: [
-      { dueDate: { $gte: today, $lt: tomorrow } },
-      { createdAt: { $gte: today, $lt: tomorrow } },
-    ],
   }).lean();
+
+  // Filter tasks that are due today or created today in user's local timezone
+  const todaysTasks = allTasks.filter(task => {
+    if (!task.dueDate) return false;
+    
+    // Convert task's dueDate to user's local timezone
+    const taskDueDate = new Date(task.dueDate);
+    const taskLocalDate = new Date(taskDueDate.toLocaleString('en-US', { timeZone: userTimezone }));
+    taskLocalDate.setHours(0, 0, 0, 0);
+    
+    const todayLocalDate = new Date(userLocalNow);
+    todayLocalDate.setHours(0, 0, 0, 0);
+    
+    return taskLocalDate.getTime() === todayLocalDate.getTime();
+  });
 
   // Also get tasks with scheduled sessions today
   const scheduledSessions = await TaskSchedule.find({
     userId,
-    start: { $gte: today, $lt: tomorrow },
+    start: { $gte: todayStart, $lte: todayEnd },
     status: { $ne: "completed" },
   }).lean();
 
   const scheduledTaskIds = [...new Set(scheduledSessions.map(s => s.taskId.toString()))];
   
-  // Get scheduled tasks not already in the list
-  const existingTaskIds = new Set(tasks.map(t => t._id.toString()));
+  // Add scheduled tasks that aren't already in the list
+  const existingTaskIds = new Set(todaysTasks.map(t => t._id.toString()));
   const additionalTaskIds = scheduledTaskIds.filter(id => !existingTaskIds.has(id));
   
   if (additionalTaskIds.length > 0) {
@@ -190,10 +218,10 @@ async function getTodaysTasks(userId) {
       _id: { $in: additionalTaskIds },
       status: { $ne: "done" },
     }).lean();
-    tasks.push(...additionalTasks);
+    todaysTasks.push(...additionalTasks);
   }
 
-  return tasks;
+  return todaysTasks;
 }
 
 /**
@@ -255,13 +283,12 @@ function buildMorningDigestNotification(user, tasks) {
  */
 export async function sendMorningDigestNotifications() {
   const now = new Date();
-  const currentHour = now.getUTCHours();
-  const currentMinute = now.getUTCMinutes();
+  const currentUTCHour = now.getUTCHours();
+  const currentUTCMinute = now.getUTCMinutes();
 
-  logger.info(`Running morning digest check at ${currentHour}:${currentMinute} UTC`);
+  logger.info(`Running morning digest check at ${currentUTCHour}:${String(currentUTCMinute).padStart(2, '0')} UTC`);
 
-  // Find users who should receive morning digest at this hour
-  // This is a simplified approach - in production, you'd want to handle timezones properly
+  // Find users who should receive morning digest
   const users = await User.find({
     "pushNotifications.enabled": true,
     "pushNotifications.morningDigest.enabled": true,
@@ -287,12 +314,20 @@ export async function sendMorningDigestNotifications() {
 
   for (const user of users) {
     try {
-      // Check if it's the right time for this user (simplified timezone handling)
+      // Get user's preferred time
       const userHour = user.pushNotifications?.morningDigest?.hour || 8;
+      const userMinute = user.pushNotifications?.morningDigest?.minute || 0;
+      const userTimezone = user.pushNotifications?.timezone || "UTC";
       
-      // For simplicity, we check if current UTC hour matches user's preferred hour
-      // In production, convert user's timezone to determine if it's their morning
-      if (currentHour !== userHour) {
+      // Get current time in user's timezone
+      const userLocalTime = new Date(now.toLocaleString('en-US', { timeZone: userTimezone }));
+      const currentUserHour = userLocalTime.getHours();
+      const currentUserMinute = userLocalTime.getMinutes();
+      
+      logger.info(`User ${user._id}: Local time ${currentUserHour}:${String(currentUserMinute).padStart(2, '0')} ${userTimezone}, Preferred ${userHour}:${String(userMinute).padStart(2, '0')}`);
+      
+      // Check if current local time matches user's preferred time
+      if (currentUserHour !== userHour || currentUserMinute !== userMinute) {
         results.skipped++;
         continue;
       }
@@ -342,6 +377,92 @@ export async function sendMorningDigestNotifications() {
   }
 
   logger.info(`Morning digest results: ${JSON.stringify(results)}`);
+  return results;
+}
+
+/**
+ * Test morning digest notifications (ignores lastMorningDigest check)
+ * Used for testing purposes to allow multiple sends in one day
+ * 
+ * @returns {Promise<Object>} Results object with sent, failed, skipped counts
+ */
+export async function testMorningDigestNotifications() {
+  const now = new Date();
+  const currentUTCHour = now.getUTCHours();
+  const currentUTCMinute = now.getUTCMinutes();
+
+  logger.info(`🧪 Running MORNING DIGEST TEST at ${currentUTCHour}:${String(currentUTCMinute).padStart(2, '0')} UTC`);
+
+  // Find all users with morning digest enabled (no lastMorningDigest check)
+  const users = await User.find({
+    "pushNotifications.enabled": true,
+    "pushNotifications.morningDigest.enabled": true,
+    "pushNotifications.expoPushToken": { $ne: null },
+  }).lean();
+
+  logger.info(`Found ${users.length} users for morning digest test`);
+
+  const results = {
+    total: users.length,
+    sent: 0,
+    failed: 0,
+    skipped: 0,
+  };
+
+  const messages = [];
+
+  for (const user of users) {
+    try {
+      // Get user's preferred time
+      const userHour = user.pushNotifications?.morningDigest?.hour || 8;
+      const userMinute = user.pushNotifications?.morningDigest?.minute || 0;
+      const userTimezone = user.pushNotifications?.timezone || "UTC";
+      
+      // Get current time in user's timezone
+      const userLocalTime = new Date(now.toLocaleString('en-US', { timeZone: userTimezone }));
+      const currentUserHour = userLocalTime.getHours();
+      const currentUserMinute = userLocalTime.getMinutes();
+      
+      logger.info(`🧪 User ${user._id}: Local time ${currentUserHour}:${String(currentUserMinute).padStart(2, '0')} ${userTimezone}, Preferred ${userHour}:${String(userMinute).padStart(2, '0')}`);
+      
+      // For testing, skip the time check - send to all users with digest enabled
+      const token = user.pushNotifications?.expoPushToken;
+      if (!isValidExpoPushToken(token)) {
+        results.skipped++;
+        continue;
+      }
+
+      // Get today's tasks for this user
+      const tasks = await getTodaysTasks(user._id);
+      const notification = buildMorningDigestNotification(user, tasks);
+
+      messages.push({
+        to: token,
+        sound: "default",
+        title: notification.title,
+        body: notification.body,
+        data: notification.data,
+        priority: "high",
+        channelId: "morning-digest",
+      });
+    } catch (error) {
+      logger.error(`🧪 Failed to prepare test digest for user ${user._id}:`, error);
+      results.failed++;
+    }
+  }
+
+  // Send all notifications in batch
+  if (messages.length > 0) {
+    const sendResult = await sendPushNotifications(messages);
+    
+    if (sendResult.success) {
+      results.sent = messages.length;
+    } else {
+      results.failed = messages.length;
+    }
+  }
+
+  logger.info(`🧪 Morning digest TEST results: ${JSON.stringify(results)}`);
   return results;
 }
 

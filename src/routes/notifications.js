@@ -251,4 +251,26 @@ router.get("/test/status", (req, res) => {
   });
 });
 
+/**
+ * POST /api/notifications/test/morning-digest
+ * Manually trigger morning digest for testing (ignores daily limit)
+ */
+router.post("/test/morning-digest", async (req, res) => {
+  try {
+    const { testMorningDigestNotifications } = await import("../services/notificationService.js");
+    const result = await testMorningDigestNotifications();
+    return res.json({ 
+      success: true, 
+      message: "Morning digest test triggered (ignores daily limit)",
+      result 
+    });
+  } catch (error) {
+    console.error("Error triggering morning digest test:", error);
+    return res.status(500).json({ 
+      success: false, 
+      error: "Failed to trigger morning digest test" 
+    });
+  }
+});
+
 export default router;

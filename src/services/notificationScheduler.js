@@ -20,8 +20,8 @@ let taskReminderJob = null;
 
 /**
  * Start the morning digest scheduler
- * Runs every hour to check if users need their morning digest
- * (Users have different preferred times)
+ * Runs every minute to check if users need their morning digest
+ * (Users have different preferred times and minutes)
  */
 export function startMorningDigestScheduler() {
   if (morningDigestJob) {
@@ -29,9 +29,9 @@ export function startMorningDigestScheduler() {
     return;
   }
 
-  // Run at the start of every hour
+  // Run every minute to check all users' preferences
   // The notification service handles timezone and user preferences
-  morningDigestJob = cron.schedule("0 * * * *", async () => {
+  morningDigestJob = cron.schedule("* * * * *", async () => {
     logger.info("🌅 Running morning digest job");
     try {
       const results = await sendMorningDigestNotifications();
@@ -41,7 +41,7 @@ export function startMorningDigestScheduler() {
     }
   });
 
-  logger.info("📅 Morning digest scheduler started (runs hourly)");
+  logger.info("📅 Morning digest scheduler started (runs every minute)");
 }
 
 /**
