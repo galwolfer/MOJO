@@ -40,6 +40,9 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
   const [isTesting, setIsTesting] = useState(false);
   const [isTestingMorningDigest, setIsTestingMorningDigest] = useState(false);
   const [isTogglingTestMode, setIsTogglingTestMode] = useState(false);
+  const [isTestingSmartReminder, setIsTestingSmartReminder] = useState(false);
+  const [isTestingDefaultReminder, setIsTestingDefaultReminder] = useState(false);
+  const [smartReminderResult, setSmartReminderResult] = useState<any>(null);
 
   const handleToggleNotifications = async (enabled: boolean) => {
     setIsSaving(true);
@@ -110,6 +113,41 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
       console.error('Error testing morning digest:', error);
     } finally {
       setIsTestingMorningDigest(false);
+    }
+  };
+
+  const handleTestSmartReminder = async () => {
+    setIsTestingSmartReminder(true);
+    try {
+      const result = await post("/notifications/test/task-reminder", { useSmartReminders: true });
+      console.log('Smart reminder test triggered:', result);
+    } catch (error) {
+      console.error('Error testing smart reminder:', error);
+    } finally {
+      setIsTestingSmartReminder(false);
+    }
+  };
+
+  const handleTestDefaultReminder = async () => {
+    setIsTestingDefaultReminder(true);
+    try {
+      const result = await post("/notifications/test/task-reminder", { useSmartReminders: false });
+      console.log('Default reminder test triggered:', result);
+    } catch (error) {
+      console.error('Error testing default reminder:', error);
+    } finally {
+      setIsTestingDefaultReminder(false);
+    }
+  };
+
+  const handleTestSmartCalculation = async () => {
+    try {
+      const result = await post("/notifications/test/smart-reminder", {});
+      console.log('Smart reminder calculation:', result);
+      setSmartReminderResult(result);
+    } catch (error) {
+      console.error('Error testing smart calculation:', error);
+      setSmartReminderResult({ success: false, error: "Failed to calculate" });
     }
   };
 
@@ -361,6 +399,67 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
               />
             </View>
 
+            {/* Task Reminder Tests */}
+            {preferences?.taskReminders?.enabled && (
+              <View style={styles.testModeSection}>
+                <AppText variant="boldText" style={styles.testModeTitle}>⏰ Task Reminder Tests</AppText>
+                <AppText variant="notes" style={styles.testModeDescription}>
+                  Test task reminders using your current tasks.
+                </AppText>
+                <View style={styles.buttonRow}>
+                  <AppButton
+                    title={isTestingSmartReminder ? "..." : "🧠 Smart"}
+                    onPress={handleTestSmartReminder}
+                    mode="filled"
+                    color="primary3"
+                    disabled={isTestingSmartReminder}
+                    style={styles.testBtn}
+                  />
+                  <AppButton
+                    title={isTestingDefaultReminder ? "..." : "📋 Default"}
+                    onPress={handleTestDefaultReminder}
+                    mode="light"
+                    color="primary3"
+                    disabled={isTestingDefaultReminder}
+                    style={styles.testBtn}
+                  />
+                </View>
+                <AppButton
+                  title="📊 View Smart Calculation"
+                  onPress={handleTestSmartCalculation}
+                  mode="light"
+                  color="primary4"
+                  style={styles.testModeBtn}
+                />
+                {smartReminderResult && (
+                  <View style={styles.calculationResult}>
+                    {smartReminderResult.success ? (
+                      <>
+                        <AppText variant="boldText" style={styles.calculationTitle}>
+                          Task: {smartReminderResult.task?.name}
+                        </AppText>
+                        {smartReminderResult.mlPrediction && (
+                          <AppText variant="notes" style={styles.calculationText}>
+                            ML Category: {smartReminderResult.mlPrediction.category}/5 - {smartReminderResult.mlPrediction.interpretation}
+                          </AppText>
+                        )}
+                        <AppText variant="notes" style={styles.calculationText}>
+                          Smart: {smartReminderResult.comparison?.smart?.timing?.minutesBefore}min before, {smartReminderResult.comparison?.smart?.timing?.remindCount}x reminders ({smartReminderResult.comparison?.smart?.timing?.urgency})
+                        </AppText>
+                        <AppText variant="notes" style={styles.calculationText}>
+                          Default: {smartReminderResult.comparison?.default?.timing?.minutesBefore}min before
+                        </AppText>
+                      </>
+                    ) : (
+                      <AppText variant="notes" style={styles.calculationText}>
+                        {smartReminderResult.error || "No tasks available for calculation"}
+                      </AppText>
+                    )}
+                  </View>
+                )}
+              </View>
+            )}
+
             {/* Periodic Test Mode */}
             <View style={styles.testModeSection}>
               <View style={styles.testModeHeader}>
@@ -468,14 +567,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: SPACING.xs,
+    marginBottom: SPACING.sm,
     width: "100%",
     direction: "ltr",
   },
   timeInputContainer: {
     alignItems: "center",
     justifyContent: "center",
-    gap: SPACING.xs,
+    gap: SPACING.sm,
   },
   timeButton: {
     width: moderateScale(36),
@@ -550,7 +649,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: SPACING.xs,
+    marginBottom: SPACING.sm,
   },
   testModeTitle: {
     fontSize: FONT_SIZES.sm,
@@ -574,7 +673,27 @@ const styles = StyleSheet.create({
     color: COLORS.colorWhite,
   },
   testModeBtn: {
-    marginTop: SPACING.xs,
+    marginTop: SPACING.sm,
+  },
+  // Calculation Result
+  calculationResult: {
+    marginTop: SPACING.sm,
+    padding: SPACING.sm,
+    backgroundColor: COLORS.white2,
+    borderRadius: moderateScale(8),
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.primary4,
+  },
+  calculationTitle: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.darkGray,
+    marginBottom: SPACING.sm,
+  },
+  calculationText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.lightGray,
+    marginBottom: 2,
+    lineHeight: FONT_SIZES.sm * 1.4,
   },
   // Debug
   debugText: {

@@ -723,6 +723,231 @@ export async function sendTaskReminderNotifications() {
 }
 
 /**
+ * Test task reminder for a specific user
+ * Sends a reminder notification immediately, ignoring timing checks
+ * 
+ * @param {string} userId - User ID to test
+ * @param {Object} options - Test options
+ * @param {boolean} options.useSmartReminders - Whether to use ML-based smart reminders
+ * @returns {Promise<Object>} Test result
+ */
+export async function testTaskReminderNotification(userId, options = {}) {
+  const { useSmartReminders = true } = options;
+  
+  logger.info(`🧪 Testing task reminder for user ${userId}, smartReminders=${useSmartReminders}`);
+
+  try {
+    const user = await User.findById(userId).lean();
+    
+    if (!user) {
+      return { success: false, error: "User not found" };
+    }
+
+    const token = user.pushNotifications?.expoPushToken;
+    if (!isValidExpoPushToken(token)) {
+      return { success: false, error: "No valid push token registered" };
+    }
+
+    // Find user's next upcoming task (or most recent incomplete task)
+    const now = new Date();
+    let task = await Task.findOne({
+      userId,
+      status: { $ne: "done" },
+      dueDate: { $gte: now },
+    }).sort({ dueDate: 1 }).lean();
+
+    // If no upcoming task, find any incomplete task
+    if (!task) {
+      task = await Task.findOne({
+        userId,
+        status: { $ne: "done" },
+      }).sort({ createdAt: -1 }).lean();
+    }
+
+    // If still no task, create a mock task for testing
+    if (!task) {
+      task = {
+        _id: "test-task-id",
+        taskname: "Sample Test Task",
+        importance: 3,
+        dueDate: new Date(now.getTime() + 60 * 60 * 1000), // 1 hour from now
+        userId,
+      };
+      logger.info("🧪 No tasks found, using mock task for testing");
+    }
+
+    // Calculate timing based on settings
+    let timing;
+    if (useSmartReminders) {
+      timing = await calculateSmartReminderTiming(task, user);
+      logger.info(`🧪 Smart reminder timing: ${JSON.stringify(timing)}`);
+    } else {
+      timing = {
+        minutesBefore: user.pushNotifications?.taskReminders?.defaultReminderMinutes || 60,
+        remindCount: 1,
+        urgency: "normal",
+      };
+      logger.info(`🧪 Default reminder timing: ${JSON.stringify(timing)}`);
+    }
+
+    // Build notification
+    const notification = buildTaskReminderNotification(task, timing);
+    
+    // Add test indicator to title
+    notification.title = `🧪 TEST: ${notification.title}`;
+    notification.data = {
+      ...notification.data,
+      isTest: true,
+      testType: useSmartReminders ? "smart_reminder" : "default_reminder",
+    };
+
+    // Send the notification
+    const sendResult = await sendNotificationToUser(userId, {
+      ...notification,
+      channelId: "task-reminders",
+    });
+
+    return {
+      success: sendResult.success,
+      message: sendResult.success 
+        ? `Task reminder test sent (${useSmartReminders ? 'smart' : 'default'} mode)`
+        : "Failed to send test notification",
+      task: {
+        id: task._id,
+        name: task.taskname,
+        importance: task.importance,
+        dueDate: task.dueDate,
+      },
+      timing,
+      notification: {
+        title: notification.title,
+        body: notification.body,
+      },
+    };
+  } catch (error) {
+    logger.error(`🧪 Task reminder test failed for user ${userId}:`, error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Test smart reminder calculation without sending notification
+ * Returns the ML prediction and calculated timing for a task
+ * 
+ * @param {string} userId - User ID
+ * @param {string} taskId - Optional task ID (uses first upcoming task if not provided)
+ * @returns {Promise<Object>} Calculation result
+ */
+export async function testSmartReminderCalculation(userId, taskId = null) {
+  logger.info(`🧪 Testing smart reminder calculation for user ${userId}`);
+
+  try {
+    const user = await User.findById(userId).lean();
+    
+    if (!user) {
+      return { success: false, error: "User not found" };
+    }
+
+    // Find the task
+    let task;
+    if (taskId) {
+      task = await Task.findOne({ _id: taskId, userId }).lean();
+      if (!task) {
+        return { success: false, error: "Task not found" };
+      }
+    } else {
+      // Find first upcoming task
+      const now = new Date();
+      task = await Task.findOne({
+        userId,
+        status: { $ne: "done" },
+        dueDate: { $gte: now },
+      }).sort({ dueDate: 1 }).lean();
+
+      if (!task) {
+        task = await Task.findOne({
+          userId,
+          status: { $ne: "done" },
+        }).sort({ createdAt: -1 }).lean();
+      }
+    }
+
+    if (!task) {
+      return { 
+        success: false, 
+        error: "No tasks found for testing",
+        hint: "Create a task first to test smart reminder calculation"
+      };
+    }
+
+    // Calculate smart timing
+    const smartTiming = await calculateSmartReminderTiming(task, user);
+    
+    // Calculate default timing for comparison
+    const defaultTiming = {
+      minutesBefore: user.pushNotifications?.taskReminders?.defaultReminderMinutes || 60,
+      remindCount: 1,
+      urgency: "normal",
+    };
+
+    // Build sample notifications for both
+    const smartNotification = buildTaskReminderNotification(task, smartTiming);
+    const defaultNotification = buildTaskReminderNotification(task, defaultTiming);
+
+    return {
+      success: true,
+      task: {
+        id: task._id,
+        name: task.taskname,
+        category: task.category,
+        importance: task.importance,
+        estimatedDuration: task.estimatedDuration,
+        dueDate: task.dueDate,
+        status: task.status,
+      },
+      comparison: {
+        smart: {
+          timing: smartTiming,
+          notification: {
+            title: smartNotification.title,
+            body: smartNotification.body,
+          },
+        },
+        default: {
+          timing: defaultTiming,
+          notification: {
+            title: defaultNotification.title,
+            body: defaultNotification.body,
+          },
+        },
+      },
+      mlPrediction: smartTiming.predictionCategory ? {
+        category: smartTiming.predictionCategory,
+        score: smartTiming.predictionScore,
+        interpretation: getCategoryInterpretation(smartTiming.predictionCategory),
+      } : null,
+    };
+  } catch (error) {
+    logger.error(`🧪 Smart reminder calculation test failed:`, error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Get human-readable interpretation of ML prediction category
+ */
+function getCategoryInterpretation(category) {
+  const interpretations = {
+    1: "Very quick completion expected - minimal reminders needed",
+    2: "Quick completion expected - standard reminder timing",
+    3: "Moderate completion time - may need earlier reminders",
+    4: "Slow completion expected - multiple earlier reminders recommended",
+    5: "Unlikely to complete quickly - aggressive reminder strategy",
+  };
+  return interpretations[category] || "Unknown category";
+}
+
+/**
  * Register or update user's push token
  * 
  * @param {string} userId - User ID

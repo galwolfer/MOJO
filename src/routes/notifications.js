@@ -273,4 +273,54 @@ router.post("/test/morning-digest", async (req, res) => {
   }
 });
 
+/**
+ * POST /api/notifications/test/task-reminder
+ * Test task reminder notification for the authenticated user
+ * 
+ * Body: { 
+ *   useSmartReminders?: boolean (default: true)
+ * }
+ */
+router.post("/test/task-reminder", async (req, res) => {
+  try {
+    const { useSmartReminders = true } = req.body;
+    const { testTaskReminderNotification } = await import("../services/notificationService.js");
+    
+    const result = await testTaskReminderNotification(req.user.userId, { useSmartReminders });
+    
+    return res.json(result);
+  } catch (error) {
+    console.error("Error testing task reminder:", error);
+    return res.status(500).json({ 
+      success: false, 
+      error: "Failed to test task reminder" 
+    });
+  }
+});
+
+/**
+ * POST /api/notifications/test/smart-reminder
+ * Test smart reminder calculation (shows ML prediction without sending notification)
+ * 
+ * Body: { 
+ *   taskId?: string (optional - uses first upcoming task if not provided)
+ * }
+ */
+router.post("/test/smart-reminder", async (req, res) => {
+  try {
+    const { taskId } = req.body;
+    const { testSmartReminderCalculation } = await import("../services/notificationService.js");
+    
+    const result = await testSmartReminderCalculation(req.user.userId, taskId);
+    
+    return res.json(result);
+  } catch (error) {
+    console.error("Error testing smart reminder calculation:", error);
+    return res.status(500).json({ 
+      success: false, 
+      error: "Failed to test smart reminder calculation" 
+    });
+  }
+});
+
 export default router;
