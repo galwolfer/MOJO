@@ -15,11 +15,16 @@ function ensureGamification(user) {
       longestStreak: 0,
       lastActiveDate: null,
       completedTasks: 0,
+      completedSubtasks: 0,
     };
   }
   // Ensure completedTasks field exists for older users
   if (user.gamification.completedTasks === undefined) {
     user.gamification.completedTasks = 0;
+  }
+  // Ensure completedSubtasks field exists for older users
+  if (user.gamification.completedSubtasks === undefined) {
+    user.gamification.completedSubtasks = 0;
   }
 }
 
@@ -183,32 +188,125 @@ export const getUserStats = async (req, res) => {
 /**
  * Award points for completing a task
  * Called internally when task is marked as done
+ * 
+ * Point calculation:
+ * - If task has uncompleted subtasks: award points for each remaining subtask + task completion bonus
+ * - If task has no subtasks: award base task points + task completion bonus
+ * 
+ * @param {string} userId - User ID
+ * @param {Object} task - Task object
+ * @param {Array} uncompletedSubtasks - Array of subtasks that weren't completed yet (optional)
+ * @returns {Promise<{ points: number, gamification: Object }>}
  */
-export async function awardTaskCompletionPoints(userId, task) {
+export async function awardTaskCompletionPoints(userId, task, uncompletedSubtasks = []) {
   try {
-    // Base points for completing a task
-    let points = 10;
+    let totalPoints = 0;
+    const hasSubtasks = uncompletedSubtasks && uncompletedSubtasks.length > 0;
 
-    // Bonus for importance
-    points += (task.importance || 3) * 2;
+    if (hasSubtasks) {
+      // Award points for each uncompleted subtask that's being completed with the task
+      for (const subtask of uncompletedSubtasks) {
+        // Base points for subtask
+        let subtaskPoints = 3;
+        
+        // Bonus based on subtask duration (1 point per 15 minutes)
+        const minutes = subtask?.minutes || subtask?.duration || 30;
+        subtaskPoints += Math.floor(minutes / 15);
+        
+        // Small bonus from parent task importance/effort
+        subtaskPoints += Math.floor((task.importance || 3) / 2);
+        subtaskPoints += Math.floor((task.effort || 3) / 2);
+        
+        totalPoints += subtaskPoints;
+        
+        // Increment completed subtasks counter for each
+        await incrementCompletedSubtasks(userId);
+      }
+      
+      logger.info(`[awardTaskCompletionPoints] Awarded ${totalPoints} points for ${uncompletedSubtasks.length} uncompleted subtasks`);
+    } else {
+      // No subtasks - award base task points
+      // Base points for completing a task
+      totalPoints = 10;
 
-    // Bonus for effort
-    points += (task.effort || 3) * 2;
+      // Bonus based on task duration (1 point per 15 minutes)
+      const taskMinutes = task.minMinutes || task.maxMinutes || task.duration || 30;
+      totalPoints += Math.floor(taskMinutes / 15);
 
-    // Bonus for completing before deadline
-    if (task.dueDate && new Date() < new Date(task.dueDate)) {
-      points += 5;
+      // Bonus for importance
+      totalPoints += (task.importance || 3) * 2;
+
+      // Bonus for effort
+      totalPoints += (task.effort || 3) * 2;
+
+      // Bonus for completing before deadline
+      if (task.dueDate && new Date() < new Date(task.dueDate)) {
+        totalPoints += 5;
+      }
+      
+      logger.info(`[awardTaskCompletionPoints] Task ${task._id} base points (no subtasks, ${taskMinutes} min) = ${totalPoints}`);
     }
 
-    logger.info(`[awardTaskCompletionPoints] Task ${task._id} (importance: ${task.importance}, effort: ${task.effort}) = ${points} points`);
+    // TASK COMPLETION BONUS - awarded when entire task is finished
+    const completionBonus = calculateTaskCompletionBonus(task);
+    totalPoints += completionBonus;
+    
+    logger.info(`[awardTaskCompletionPoints] Task ${task._id} completion bonus = ${completionBonus}, total = ${totalPoints} points`);
 
-    await addUserPoints(userId, points);
+    await addUserPoints(userId, totalPoints);
     await incrementCompletedTasks(userId);
     const updatedGamification = await updateUserStreak(userId, true);
 
-    return { points, gamification: updatedGamification };
+    return { points: totalPoints, bonus: completionBonus, gamification: updatedGamification };
   } catch (error) {
     logger.error(`[awardTaskCompletionPoints] Error awarding points:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Calculate the bonus points for completing an entire task
+ * This bonus is awarded when all subtasks are done or task is completed directly
+ * 
+ * @param {Object} task - Task object
+ * @returns {number} Bonus points
+ */
+function calculateTaskCompletionBonus(task) {
+  let bonus = 5; // Base completion bonus
+  
+  // Higher bonus for more important/difficult tasks
+  bonus += Math.floor((task.importance || 3) / 2);
+  bonus += Math.floor((task.effort || 3) / 2);
+  
+  // Bonus for completing before deadline
+  if (task.dueDate && new Date() < new Date(task.dueDate)) {
+    bonus += 3;
+  }
+  
+  return bonus;
+}
+
+/**
+ * Award only the task completion bonus (used when last subtask completes the task)
+ * This avoids double-counting subtask points
+ * 
+ * @param {string} userId - User ID
+ * @param {Object} task - Task object
+ * @returns {Promise<{ points: number, gamification: Object }>}
+ */
+export async function awardTaskCompletionBonus(userId, task) {
+  try {
+    const bonus = calculateTaskCompletionBonus(task);
+    
+    logger.info(`[awardTaskCompletionBonus] Task ${task._id} completion bonus = ${bonus} points`);
+
+    await addUserPoints(userId, bonus);
+    await incrementCompletedTasks(userId);
+    const updatedGamification = await updateUserStreak(userId, true);
+
+    return { points: bonus, gamification: updatedGamification };
+  } catch (error) {
+    logger.error(`[awardTaskCompletionBonus] Error awarding bonus:`, error);
     throw error;
   }
 }
@@ -236,9 +334,73 @@ async function incrementCompletedTasks(userId) {
   }
 }
 
+/**
+ * Helper: Increment completed subtasks counter
+ */
+async function incrementCompletedSubtasks(userId) {
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      logger.warn(`[incrementCompletedSubtasks] User ${userId} not found`);
+      return null;
+    }
+
+    ensureGamification(user);
+    user.gamification.completedSubtasks = (user.gamification.completedSubtasks || 0) + 1;
+    await user.save();
+
+    logger.info(`[incrementCompletedSubtasks] User ${userId}: completedSubtasks = ${user.gamification.completedSubtasks}`);
+    return user.gamification.completedSubtasks;
+  } catch (error) {
+    logger.error(`[incrementCompletedSubtasks] Error:`, error);
+    return null;
+  }
+}
+
+/**
+ * Award points for completing a subtask
+ * Called internally when subtask is marked as done
+ * Subtasks give smaller points than full tasks but still contribute to progress and streaks
+ *
+ * @param {string} userId - User ID
+ * @param {Object} subtask - Subtask object with optional minutes/duration
+ * @param {Object} parentTask - Optional parent task for context (importance, effort)
+ * @returns {Promise<{ points: number, gamification: Object }>}
+ */
+export async function awardSubtaskCompletionPoints(userId, subtask, parentTask = null) {
+  try {
+    // Base points for completing a subtask (smaller than task)
+    let points = 3;
+
+    // Bonus based on subtask duration (1 point per 15 minutes)
+    const minutes = subtask?.minutes || subtask?.duration || 30;
+    points += Math.floor(minutes / 15);
+
+    // Small bonus from parent task importance/effort if available
+    if (parentTask) {
+      points += Math.floor((parentTask.importance || 3) / 2);
+      points += Math.floor((parentTask.effort || 3) / 2);
+    }
+
+    logger.info(`[awardSubtaskCompletionPoints] Subtask ${subtask?._id || subtask?.id} (minutes: ${minutes}) = ${points} points`);
+
+    await addUserPoints(userId, points);
+    await incrementCompletedSubtasks(userId);
+    // Subtask completion also contributes to streak
+    const updatedGamification = await updateUserStreak(userId, true);
+
+    return { points, gamification: updatedGamification };
+  } catch (error) {
+    logger.error(`[awardSubtaskCompletionPoints] Error awarding points:`, error);
+    throw error;
+  }
+}
+
 export default {
   getUserStats,
   updateUserStreak,
   addUserPoints,
   awardTaskCompletionPoints,
+  awardTaskCompletionBonus,
+  awardSubtaskCompletionPoints,
 };
