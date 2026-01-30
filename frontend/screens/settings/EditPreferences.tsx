@@ -96,7 +96,7 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
       show: true,
       icon: ICONS.prefrences,
       leftElement: (
-        <TouchableOpacity onPress={handleBackPress} style={styles.headerIconButton}>
+        <TouchableOpacity onPress={handleBackPress} >
           <LeftIcon size={ICON_SIZES.md} color={COLORS.primary1} />
         </TouchableOpacity>
       ),

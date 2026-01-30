@@ -88,7 +88,7 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
       show: true,
       icon: ICONS.ojo,
       leftElement: (
-        <TouchableOpacity onPress={handleBackPress} style={styles.headerIconButton}>
+        <TouchableOpacity onPress={handleBackPress} >
           <LeftIcon size={ICON_SIZES.md} color={COLORS.primary1} />
         </TouchableOpacity>
       ),

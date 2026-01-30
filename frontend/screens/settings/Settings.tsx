@@ -58,7 +58,7 @@ export default function SettingsScreen({ onBack, onEditPreferences, onChatSettin
       show: true,
       icon: ICONS.settings,
       leftElement: (
-        <TouchableOpacity onPress={handleBackPress} style={styles.headerIconButton}>
+        <TouchableOpacity onPress={handleBackPress}>
           <LeftIcon size={ICON_SIZES.md} color={COLORS.primary1} />
         </TouchableOpacity>
       ),
