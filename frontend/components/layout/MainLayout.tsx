@@ -13,7 +13,7 @@ import { useLayout } from "../../context/LayoutContext";
 import Header from "../common/Header";
 import NavBar from "../common/NavBar";
 import ChatScreen from "../../screens/chat/Chat";
-import CalendarScreen from "../../screens/Calendar";
+import CalendarScreen from "../../screens/calander/Calendar";
 import UserProfileScreen from "../../screens/user/UserProfile";
 import CreateTaskScreen from "../../screens/CreateTask";
 import EditTaskScreen from "../../screens/EditTask";
@@ -39,7 +39,7 @@ export default function MainLayout() {
       setLocalHeaderHeight(height);
       setHeaderHeight(height);
     },
-    [setHeaderHeight]
+    [setHeaderHeight],
   );
 
   const onNavBarLayout = useCallback(
@@ -50,7 +50,7 @@ export default function MainLayout() {
       const effectiveHeight = height + SPACING.xlg;
       setNavBarHeight(height, effectiveHeight);
     },
-    [setNavBarHeight]
+    [setNavBarHeight],
   );
 
   const renderScreen = () => {

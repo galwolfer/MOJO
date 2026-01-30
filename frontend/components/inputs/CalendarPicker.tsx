@@ -1,6 +1,6 @@
 /**
  * Calendar Picker Component
- * 
+ *
  * A reusable calendar date picker with month navigation.
  * Displays a traditional calendar grid with clickable dates.
  */
@@ -8,7 +8,7 @@
 import React, { useState, useMemo } from "react";
 import { View, StyleSheet, Pressable } from "react-native";
 import AppText from "../common/AppText";
-import { COLORS, SPACING, FONT_SIZES, SHADOWS, FONTS } from "../../theme";
+import { COLORS, SPACING, FONT_SIZES, SHADOWS, FONTS, ICON_SIZES } from "../../theme";
 import { ICONS } from "../icons/icons";
 
 interface CalendarPickerProps {
@@ -25,7 +25,13 @@ interface DayCell {
   dateString: string;
 }
 
-const CalendarPicker: React.FC<CalendarPickerProps> = ({ onDateSelect, selectedDate, allowPastDates = false, allowPreviousMonths = false, lighterPastDates = false }) => {
+const CalendarPicker: React.FC<CalendarPickerProps> = ({
+  onDateSelect,
+  selectedDate,
+  allowPastDates = false,
+  allowPreviousMonths = false,
+  lighterPastDates = false,
+}) => {
   const [currentDate, setCurrentDate] = useState(new Date());
 
   const monthName = currentDate.toLocaleString("en-US", { month: "long", year: "numeric" });
@@ -48,18 +54,18 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({ onDateSelect, selectedD
     let day = new Date(startDate);
 
     // Generate 6 weeks worth of days (42 days)
-    const leadingDays = firstDay.getDay();      // כמה ימים ריקים לפני ה-1 בחודש
-    const daysInMonth = lastDay.getDate();      // כמה ימים יש בחודש
+    const leadingDays = firstDay.getDay();
+    const daysInMonth = lastDay.getDate();
     const totalNeeded = leadingDays + daysInMonth;
 
-    const weeks = Math.ceil(totalNeeded / 7);   // כמה שורות לוח צריך (4/5/6)
-    const cellsCount = weeks * 7;               // כמה תאים באמת נדרשים
+    const weeks = Math.ceil(totalNeeded / 7);
+    const cellsCount = weeks * 7;
 
     for (let i = 0; i < cellsCount; i++) {
       const isCurrentMonth = day.getMonth() === month;
       const year = day.getFullYear();
-      const month_ = String(day.getMonth() + 1).padStart(2, '0');
-      const date = String(day.getDate()).padStart(2, '0');
+      const month_ = String(day.getMonth() + 1).padStart(2, "0");
+      const date = String(day.getDate()).padStart(2, "0");
       const dateString = `${year}-${month_}-${date}`;
 
       days.push({
@@ -73,7 +79,6 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({ onDateSelect, selectedD
     }
 
     return days;
-
   };
 
   const calendarDays = useMemo(() => getCalendarDays(), [currentDate]);
@@ -110,23 +115,22 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({ onDateSelect, selectedD
 
   const isCurrentMonth = () => {
     const today = new Date();
-    return currentDate.getMonth() === today.getMonth() && 
-           currentDate.getFullYear() === today.getFullYear();
+    return currentDate.getMonth() === today.getMonth() && currentDate.getFullYear() === today.getFullYear();
   };
 
   return (
-    <View style={styles.container}>
+    <View>
       {/* Header with Month/Year and Navigation */}
       <View style={styles.header}>
-        <Pressable 
-          style={[styles.navButton, !allowPreviousMonths && isCurrentMonth() && styles.navButtonDisabled]} 
+        <Pressable
+          style={[styles.navButton, !allowPreviousMonths && isCurrentMonth() && styles.navButtonDisabled]}
           onPress={handlePrevMonth}
           disabled={!allowPreviousMonths && isCurrentMonth()}
         >
           {ICONS.left &&
             React.createElement(ICONS.left, {
-              size: 24,
-              color: !allowPreviousMonths && isCurrentMonth() ? "#B8B3CC" : COLORS.white,
+              size: ICON_SIZES.md,
+              color: !allowPreviousMonths && isCurrentMonth() ? COLORS.lightGray : COLORS.white,
             })}
         </Pressable>
 
@@ -135,7 +139,7 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({ onDateSelect, selectedD
         <Pressable style={styles.navButton} onPress={handleNextMonth}>
           {ICONS.right &&
             React.createElement(ICONS.right, {
-              size: 24,
+              size: ICON_SIZES.md,
               color: COLORS.white,
             })}
         </Pressable>
@@ -173,7 +177,7 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({ onDateSelect, selectedD
               <AppText
                 style={[
                   styles.dateText,
-                  !isLastRow && { marginBottom: 10 },
+                  !isLastRow && { marginBottom: SPACING.md },
                   !day.isCurrentMonth && styles.dateTextInactive,
                   isPast && (lighterPastDates ? styles.dateTextPastLighter : styles.dateTextPast),
                   isDateSelected(day.dateString) && styles.dateTextSelected,
@@ -193,13 +197,6 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({ onDateSelect, selectedD
 };
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.md,
-    paddingBottom: 2,
-  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -208,16 +205,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.sm,
   },
   navButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: SPACING.xlg,
+    height: SPACING.xlg,
+    borderRadius: SPACING.lg,
     backgroundColor: COLORS.primary1,
     justifyContent: "center",
     alignItems: "center",
-    ...SHADOWS.card,
+    ...(SHADOWS.card as object),
   },
   navButtonDisabled: {
-    backgroundColor: "#C8C3D8",
+    backgroundColor: COLORS.white,
     opacity: 0.6,
   },
   monthYear: {
@@ -231,31 +228,30 @@ const styles = StyleSheet.create({
   dayLabelsContainer: {
     flexDirection: "row",
     marginBottom: SPACING.sm,
-    paddingHorizontal: 4,
+    paddingHorizontal: SPACING.sm,
   },
   dayLabelCell: {
     width: "14.285%",
     justifyContent: "center",
     alignItems: "center",
-    paddingVertical: 4,
+    paddingVertical: SPACING.xs,
   },
   dayLabel: {
-    fontSize: 13,
-    color: "#9B95B5", // Muted purple-gray
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.lightGray,
     fontWeight: "500",
   },
   calendarGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    // paddingHorizontal: 4,
   },
   dateCell: {
     width: "14.285%", // 7 columns (100/7)
     aspectRatio: 1,
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: 10,
-    marginBottom: 5,
+    borderRadius: SPACING.md,
+    marginBottom: SPACING.sm,
   },
   dateCellInactive: {
     opacity: 1,
@@ -268,23 +264,23 @@ const styles = StyleSheet.create({
   },
   dateCellSelected: {
     backgroundColor: COLORS.primary1,
-    ...SHADOWS.card,
+    ...(SHADOWS.card as object),
   },
   dateText: {
     fontSize: FONT_SIZES.md,
-    color: "#2D2D2D", // Dark gray for current month dates
+    color: COLORS.black,
     fontWeight: "500",
   },
   dateTextInactive: {
-    color: "#B8B3CC", // Light purple-gray for adjacent month dates
+    color: COLORS.lightGray,
     fontWeight: "400",
   },
   dateTextPast: {
-    color: "#D0CBDF", // Very light purple-gray for past dates
+    color: COLORS.white3,
     textDecorationLine: "line-through",
   },
   dateTextPastLighter: {
-    color: "#D0CBDF",
+    color: COLORS.white2,
   },
   dateTextSelected: {
     color: COLORS.white,
@@ -292,9 +288,9 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   todayDot: {
-    width: 18,
-    height: 3,
-    borderRadius: 0,
+    width: ICON_SIZES.sm,
+    height: SPACING.xs,
+    borderRadius: SPACING.xs,
     backgroundColor: COLORS.primary1,
   },
   todayDotSelected: {

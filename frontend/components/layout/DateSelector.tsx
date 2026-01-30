@@ -94,13 +94,9 @@ export default function DateSelector({ selectedDate, setSelectedDate }: DateSele
               onPress={() => setSelectedDate(day.fullDate)}
               activeOpacity={0.85}
             >
-              <AppText style={[styles.dayName, showPill && styles.dayTextOnPill]}>
-                {day.dayName}
-              </AppText>
+              <AppText style={[styles.dayName, showPill && styles.dayTextOnPill]}>{day.dayName}</AppText>
 
-              <AppText style={[styles.dayDate, showPill && styles.dayTextOnPill]}>
-                {day.date}
-              </AppText>
+              <AppText style={[styles.dayDate, showPill && styles.dayTextOnPill]}>{day.date}</AppText>
 
               {showDot && <View style={[styles.todayDot, dotWhite && styles.todayDotOnPill]} />}
             </TouchableOpacity>
@@ -121,7 +117,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: SPACING.sm,
     backgroundColor: "transparent",
-    borderRadius: 20,
+    borderRadius: SPACING.xlg,
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.md,
     alignSelf: "stretch",
@@ -133,7 +129,7 @@ const styles = StyleSheet.create({
   },
   navCircle: {
     backgroundColor: COLORS.primary1,
-    borderRadius: 20,
+    borderRadius: SPACING.xlg,
     width: 40,
     height: 40,
   },
@@ -147,16 +143,16 @@ const styles = StyleSheet.create({
   dayItem: {
     alignItems: "center",
     justifyContent: "center",
-    width: 40,
-    height: 72,
-    borderRadius: 28,
+    width: SPACING.xlg,
+    height: SPACING.xlg * 1.5,
+    borderRadius: SPACING.xlg,
     backgroundColor: "transparent",
   },
   dayItemSelected: {
     backgroundColor: COLORS.primary1,
-    width: 70,
-    height: 72,
-    borderRadius: 28,
+    paddingVertical: SPACING.lg,
+    paddingHorizontal: SPACING.lg * 1.2,
+    borderRadius: SPACING.xlg,
   },
   dayName: {
     fontFamily: FONTS.fredokaRegular,
@@ -176,10 +172,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   todayDot: {
-    marginTop: 6,
-    width: 18,
-    height: 6,
-    borderRadius: 3,
+    marginTop: SPACING.sm,
+    width: SPACING.lg,
+    borderRadius: SPACING.xlg,
     backgroundColor: COLORS.primary1,
   },
   todayDotOnPill: {
