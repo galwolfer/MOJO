@@ -88,13 +88,13 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
       show: true,
       icon: ICONS.ojo,
       leftElement: (
-        <TouchableOpacity onPress={handleBackPress} style={styles.headerRightTouchable}>
-          <LeftIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
+        <TouchableOpacity onPress={handleBackPress} style={styles.headerIconButton}>
+          <LeftIcon size={ICON_SIZES.md} color={COLORS.primary1} />
         </TouchableOpacity>
       ),
       rightElement: (
         <View style={styles.headerLeft}>
-          <OjoIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
+          <OjoIcon size={ICON_SIZES.md} color={COLORS.primary1} />
         </View>
       ),
     });
@@ -340,6 +340,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+
   errorText: {
     color: COLORS.primary5,
     textAlign: "center",

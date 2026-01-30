@@ -83,7 +83,7 @@ export default function Header({ title, Icon, show = true, rightElement, leftEle
                 variant="title3"
                 numberOfLines={titleLines}
                 ellipsizeMode="tail"
-                style={[{ color: COLORS.primary1, width: "100%" }]}
+                style={[{ color: COLORS.primary1, flex: 1 }]}
               >
                 {displayTitle}
               </AppText>
@@ -128,10 +128,11 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   leftSection: {
-    width: "100%",
+    flex: 1,
     flexDirection: "row",
     justifyContent: "flex-start",
     alignItems: "center",
+    gap: SPACING.sm,
     flexShrink: 1,
   },
   centerSection: {

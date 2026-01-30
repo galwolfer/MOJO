@@ -10,8 +10,8 @@
  */
 import React from "react";
 import { StyleSheet, TouchableOpacity } from "react-native";
-import AppText from "../../../components/common/AppText";
-import { COLORS, SPACING, SHADOWS } from "../../../theme";
+import { ICONS } from "../../../components/icons/icons";
+import { COLORS, SPACING, SHADOWS, ICON_SIZES } from "../../../theme";
 
 interface FloatingActionButtonProps {
   onPress: () => void;
@@ -19,8 +19,15 @@ interface FloatingActionButtonProps {
 
 export default function FloatingActionButton({ onPress }: FloatingActionButtonProps) {
   return (
-    <TouchableOpacity style={styles.floatingButton} activeOpacity={0.8} onPress={onPress}>
-      <AppText style={styles.floatingButtonText}>+</AppText>
+    <TouchableOpacity
+      style={styles.floatingButton}
+      activeOpacity={0.8}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel="Add task"
+      accessible
+    >
+      <ICONS.plus size={ICON_SIZES.md} color={COLORS.white} />
     </TouchableOpacity>
   );
 }
@@ -38,9 +45,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     zIndex: 99,
     ...(SHADOWS.card as object),
-  },
-  floatingButtonText: {
-    color: COLORS.white,
-    textAlign: "center",
   },
 });
