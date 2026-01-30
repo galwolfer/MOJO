@@ -2,14 +2,18 @@
  * NotificationSettings Component
  *
  * A settings panel for managing push notification preferences.
- * Displays toggles for different notification types and timing preferences.
+ * Matches the styling of other settings screens (ChatSettings, ProfileSettings, etc.)
  */
 
 import React, { useState } from "react";
-import { View, Text, StyleSheet, Switch, TouchableOpacity, ActivityIndicator } from "react-native";
+import { View, StyleSheet, Switch, TouchableOpacity } from "react-native";
+import { moderateScale } from "react-native-size-matters";
 import { useNotifications } from "../../context/NotificationContext";
-import { COLORS } from "../../theme";
+import { COLORS, SPACING, FONT_SIZES } from "../../theme";
 import { post } from "../../services/httpClient";
+import AppText from "../common/AppText";
+import AppButton from "../common/AppButton";
+import Box from "../layout/Box";
 
 type NotificationSettingsProps = {
   style?: any;
@@ -126,269 +130,280 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
   // Not initialized - show setup button
   if (!isInitialized) {
     return (
-      <View style={[styles.container, style]}>
-        <Text style={styles.title}>🔔 Push Notifications</Text>
-
-        {!isPhysicalDevice && (
-          <View style={styles.warningBox}>
-            <Text style={styles.warningText}>
-              ⚠️ Push notifications only work on physical devices, not simulators.
-            </Text>
-          </View>
-        )}
-
-        {error && (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        )}
-
-        <TouchableOpacity
-          style={[styles.button, isLoading && styles.buttonDisabled]}
-          onPress={handleInitialize}
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <ActivityIndicator color={COLORS.colorWhite} />
-          ) : (
-            <Text style={styles.buttonText}>Enable Notifications</Text>
+      <Box title="Push Notifications" titleColor={COLORS.primary1}>
+        <View style={styles.boxContent}>
+          {!isPhysicalDevice && (
+            <View style={styles.warningBox}>
+              <AppText variant="notes" style={styles.warningText}>
+                ⚠️ Push notifications only work on physical devices, not simulators.
+              </AppText>
+            </View>
           )}
-        </TouchableOpacity>
-      </View>
+
+          {error && (
+            <View style={styles.errorBox}>
+              <AppText variant="notes" style={styles.errorText}>{error}</AppText>
+            </View>
+          )}
+
+          <AppText variant="bodyText" style={styles.description}>
+            Enable push notifications to receive morning task digests and smart reminders.
+          </AppText>
+
+          <AppButton
+            title={isLoading ? "Enabling..." : "Enable Notifications"}
+            onPress={handleInitialize}
+            mode="filled"
+            color="primary1"
+            disabled={isLoading}
+            style={styles.enableButton}
+          />
+        </View>
+      </Box>
     );
   }
 
   // Permission denied
   if (permissionStatus !== "granted") {
     return (
-      <View style={[styles.container, style]}>
-        <Text style={styles.title}>🔔 Push Notifications</Text>
-        <View style={styles.warningBox}>
-          <Text style={styles.warningText}>
-            Notifications are disabled. Please enable them in your device settings.
-          </Text>
+      <Box title="Push Notifications" titleColor={COLORS.primary1}>
+        <View style={styles.boxContent}>
+          <View style={styles.warningBox}>
+            <AppText variant="notes" style={styles.warningText}>
+              Notifications are disabled. Please enable them in your device settings.
+            </AppText>
+          </View>
         </View>
-      </View>
+      </Box>
     );
   }
 
   return (
     <View style={[styles.container, style]}>
-      <Text style={styles.title}>🔔 Push Notifications</Text>
+      {/* Main Settings */}
+      <Box title="Notification Preferences" titleColor={COLORS.primary1}>
+        <View style={styles.boxContent}>
+          <AppText variant="bodyText" style={styles.description}>
+            Customize how and when you receive notifications from Mojo.
+          </AppText>
 
-      {/* Master toggle */}
-      <View style={styles.settingRow}>
-        <View style={styles.settingInfo}>
-          <Text style={styles.settingLabel}>All Notifications</Text>
-          <Text style={styles.settingDescription}>Enable or disable all push notifications</Text>
-        </View>
-        <Switch
-          value={preferences?.enabled ?? false}
-          onValueChange={handleToggleNotifications}
-          disabled={isSaving}
-          trackColor={{ false: COLORS.white2, true: COLORS.primary1 }}
-          thumbColor={preferences?.enabled ? COLORS.colorWhite : COLORS.lightGray}
-        />
-      </View>
-
-      {preferences?.enabled && (
-        <>
-          {/* Morning Digest */}
+          {/* Master toggle */}
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>🌅 Morning Digest</Text>
-              <Text style={styles.settingDescription}>
-                Daily summary of tasks at {String(preferences?.morningDigest?.hour || 8).padStart(2, '0')}:{String(preferences?.morningDigest?.minute || 0).padStart(2, '0')} AM
-              </Text>
+              <AppText variant="boldText" style={styles.settingLabel}>All Notifications</AppText>
+              <AppText variant="notes" style={styles.settingDescription}>
+                Enable or disable all push notifications
+              </AppText>
             </View>
             <Switch
-              value={preferences?.morningDigest?.enabled ?? true}
-              onValueChange={handleToggleMorningDigest}
+              value={preferences?.enabled ?? false}
+              onValueChange={handleToggleNotifications}
               disabled={isSaving}
               trackColor={{ false: COLORS.white2, true: COLORS.primary1 }}
-              thumbColor={preferences?.morningDigest?.enabled ? COLORS.colorWhite : COLORS.lightGray}
+              thumbColor={preferences?.enabled ? COLORS.colorWhite : COLORS.lightGray}
             />
           </View>
 
-          {/* Morning Digest Time Picker */}
-          {preferences?.morningDigest?.enabled && (
-            <View style={[styles.settingRow, styles.nestedSetting, styles.timePickerSection]}>
-              <View style={styles.timePickerContainer}>
-                <Text style={styles.timePickerLabel}>Set Time</Text>
-                <View style={styles.timeInputGroup}>
-                  {/* Hour Selector */}
-                  <View style={styles.timeInputContainer}>
-                    <TouchableOpacity 
-                      onPress={() => {
-                        const newHour = (preferences?.morningDigest?.hour || 8) > 0 
-                          ? (preferences?.morningDigest?.hour || 8) - 1 
-                          : 23;
-                        handleMorningDigestTimeChange(newHour, preferences?.morningDigest?.minute || 0);
-                      }}
-                      disabled={isSaving}
-                      style={[styles.timeButton, isSaving && styles.buttonDisabled]}
-                    >
-                      <Text style={styles.timeButtonText}>−</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.timeDisplay}>
-                      {String(preferences?.morningDigest?.hour || 8).padStart(2, '0')}
-                    </Text>
-                    <TouchableOpacity 
-                      onPress={() => {
-                        const newHour = (preferences?.morningDigest?.hour || 8) < 23 
-                          ? (preferences?.morningDigest?.hour || 8) + 1 
-                          : 0;
-                        handleMorningDigestTimeChange(newHour, preferences?.morningDigest?.minute || 0);
-                      }}
-                      disabled={isSaving}
-                      style={[styles.timeButton, isSaving && styles.buttonDisabled]}
-                    >
-                      <Text style={styles.timeButtonText}>+</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <Text style={styles.timeSeparator}>:</Text>
-                  {/* Minute Selector */}
-                  <View style={styles.timeInputContainer}>
-                    <TouchableOpacity 
-                      onPress={() => {
-                        const newMinute = (preferences?.morningDigest?.minute || 0) > 0 
-                          ? (preferences?.morningDigest?.minute || 0) - 1 
-                          : 59;
-                        handleMorningDigestTimeChange(preferences?.morningDigest?.hour || 8, newMinute);
-                      }}
-                      disabled={isSaving}
-                      style={[styles.timeButton, isSaving && styles.buttonDisabled]}
-                    >
-                      <Text style={styles.timeButtonText}>−</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.timeDisplay}>
-                      {String(preferences?.morningDigest?.minute || 0).padStart(2, '0')}
-                    </Text>
-                    <TouchableOpacity 
-                      onPress={() => {
-                        const newMinute = (preferences?.morningDigest?.minute || 0) < 59 
-                          ? (preferences?.morningDigest?.minute || 0) + 1 
-                          : 0;
-                        handleMorningDigestTimeChange(preferences?.morningDigest?.hour || 8, newMinute);
-                      }}
-                      disabled={isSaving}
-                      style={[styles.timeButton, isSaving && styles.buttonDisabled]}
-                    >
-                      <Text style={styles.timeButtonText}>+</Text>
-                    </TouchableOpacity>
-                  </View>
+          {preferences?.enabled && (
+            <>
+              {/* Morning Digest */}
+              <View style={styles.settingRow}>
+                <View style={styles.settingInfo}>
+                  <AppText variant="boldText" style={styles.settingLabel}>🌅 Morning Digest</AppText>
+                  <AppText variant="notes" style={styles.settingDescription}>
+                    Daily summary at {String(preferences?.morningDigest?.hour || 8).padStart(2, '0')}:{String(preferences?.morningDigest?.minute || 0).padStart(2, '0')}
+                  </AppText>
                 </View>
-                <Text style={styles.timePickerHint}>Tap +/− to adjust the time</Text>
+                <Switch
+                  value={preferences?.morningDigest?.enabled ?? true}
+                  onValueChange={handleToggleMorningDigest}
+                  disabled={isSaving}
+                  trackColor={{ false: COLORS.white2, true: COLORS.primary1 }}
+                  thumbColor={preferences?.morningDigest?.enabled ? COLORS.colorWhite : COLORS.lightGray}
+                />
               </View>
-            </View>
+
+              {/* Morning Digest Time Picker */}
+              {preferences?.morningDigest?.enabled && (
+                <View style={styles.timePickerContainer}>
+                  <AppText variant="boldText" style={styles.timePickerLabel}>Set Digest Time</AppText>
+                  <View style={styles.timeInputGroup}>
+                    {/* Hour Selector */}
+                    <View style={styles.timeInputContainer}>
+                      <TouchableOpacity 
+                        onPress={() => {
+                          const newHour = (preferences?.morningDigest?.hour || 8) > 0 
+                            ? (preferences?.morningDigest?.hour || 8) - 1 
+                            : 23;
+                          handleMorningDigestTimeChange(newHour, preferences?.morningDigest?.minute || 0);
+                        }}
+                        disabled={isSaving}
+                        style={[styles.timeButton, isSaving && styles.buttonDisabled]}
+                      >
+                        <AppText variant="boldText" style={styles.timeButtonText}>−</AppText>
+                      </TouchableOpacity>
+                      <AppText variant="title2" style={styles.timeDisplay}>
+                        {String(preferences?.morningDigest?.hour || 8).padStart(2, '0')}
+                      </AppText>
+                      <TouchableOpacity 
+                        onPress={() => {
+                          const newHour = (preferences?.morningDigest?.hour || 8) < 23 
+                            ? (preferences?.morningDigest?.hour || 8) + 1 
+                            : 0;
+                          handleMorningDigestTimeChange(newHour, preferences?.morningDigest?.minute || 0);
+                        }}
+                        disabled={isSaving}
+                        style={[styles.timeButton, isSaving && styles.buttonDisabled]}
+                      >
+                        <AppText variant="boldText" style={styles.timeButtonText}>+</AppText>
+                      </TouchableOpacity>
+                    </View>
+                    <AppText variant="title2" style={styles.timeSeparator}>:</AppText>
+                    {/* Minute Selector */}
+                    <View style={styles.timeInputContainer}>
+                      <TouchableOpacity 
+                        onPress={() => {
+                          const newMinute = (preferences?.morningDigest?.minute || 0) > 0 
+                            ? (preferences?.morningDigest?.minute || 0) - 1 
+                            : 59;
+                          handleMorningDigestTimeChange(preferences?.morningDigest?.hour || 8, newMinute);
+                        }}
+                        disabled={isSaving}
+                        style={[styles.timeButton, isSaving && styles.buttonDisabled]}
+                      >
+                        <AppText variant="boldText" style={styles.timeButtonText}>−</AppText>
+                      </TouchableOpacity>
+                      <AppText variant="title2" style={styles.timeDisplay}>
+                        {String(preferences?.morningDigest?.minute || 0).padStart(2, '0')}
+                      </AppText>
+                      <TouchableOpacity 
+                        onPress={() => {
+                          const newMinute = (preferences?.morningDigest?.minute || 0) < 59 
+                            ? (preferences?.morningDigest?.minute || 0) + 1 
+                            : 0;
+                          handleMorningDigestTimeChange(preferences?.morningDigest?.hour || 8, newMinute);
+                        }}
+                        disabled={isSaving}
+                        style={[styles.timeButton, isSaving && styles.buttonDisabled]}
+                      >
+                        <AppText variant="boldText" style={styles.timeButtonText}>+</AppText>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  <AppText variant="notes" style={styles.timePickerHint}>Tap +/− to adjust the time</AppText>
+                </View>
+              )}
+
+              {/* Task Reminders */}
+              <View style={styles.settingRow}>
+                <View style={styles.settingInfo}>
+                  <AppText variant="boldText" style={styles.settingLabel}>⏰ Task Reminders</AppText>
+                  <AppText variant="notes" style={styles.settingDescription}>
+                    Get reminded before task deadlines
+                  </AppText>
+                </View>
+                <Switch
+                  value={preferences?.taskReminders?.enabled ?? true}
+                  onValueChange={handleToggleTaskReminders}
+                  disabled={isSaving}
+                  trackColor={{ false: COLORS.white2, true: COLORS.primary1 }}
+                  thumbColor={preferences?.taskReminders?.enabled ? COLORS.colorWhite : COLORS.lightGray}
+                />
+              </View>
+
+              {/* Smart Reminders */}
+              {preferences?.taskReminders?.enabled && (
+                <View style={[styles.settingRow, styles.nestedSetting]}>
+                  <View style={styles.settingInfo}>
+                    <AppText variant="boldText" style={styles.settingLabel}>🧠 Smart Reminders</AppText>
+                    <AppText variant="notes" style={styles.settingDescription}>
+                      Use AI to optimize reminder timing
+                    </AppText>
+                  </View>
+                  <Switch
+                    value={preferences?.taskReminders?.useSmartReminders ?? true}
+                    onValueChange={handleToggleSmartReminders}
+                    disabled={isSaving}
+                    trackColor={{ false: COLORS.white2, true: COLORS.primary1 }}
+                    thumbColor={preferences?.taskReminders?.useSmartReminders ? COLORS.colorWhite : COLORS.lightGray}
+                  />
+                </View>
+              )}
+            </>
           )}
+        </View>
+      </Box>
 
-          {/* Task Reminders */}
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>⏰ Task Reminders</Text>
-              <Text style={styles.settingDescription}>Get reminded before task deadlines</Text>
-            </View>
-            <Switch
-              value={preferences?.taskReminders?.enabled ?? true}
-              onValueChange={handleToggleTaskReminders}
-              disabled={isSaving}
-              trackColor={{ false: COLORS.white2, true: COLORS.primary1 }}
-              thumbColor={preferences?.taskReminders?.enabled ? COLORS.colorWhite : COLORS.lightGray}
-            />
-          </View>
+      {/* Test Section */}
+      {preferences?.enabled && (
+        <Box title="Test Notifications" titleColor={COLORS.primary5}>
+          <View style={styles.boxContent}>
+            <AppText variant="bodyText" style={styles.description}>
+              Send test notifications to verify your setup is working correctly.
+            </AppText>
 
-          {/* Smart Reminders */}
-          {preferences?.taskReminders?.enabled && (
-            <View style={[styles.settingRow, styles.nestedSetting]}>
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingLabel}>🧠 Smart Reminders</Text>
-                <Text style={styles.settingDescription}>
-                  Use AI to optimize reminder timing based on your behavior
-                </Text>
-              </View>
-              <Switch
-                value={preferences?.taskReminders?.useSmartReminders ?? true}
-                onValueChange={handleToggleSmartReminders}
-                disabled={isSaving}
-                trackColor={{ false: COLORS.white2, true: COLORS.primary1 }}
-                thumbColor={preferences?.taskReminders?.useSmartReminders ? COLORS.colorWhite : COLORS.lightGray}
+            <View style={styles.buttonRow}>
+              <AppButton
+                title={isTesting ? "Sending..." : "Test Push"}
+                onPress={handleTestNotification}
+                mode="light"
+                color="primary1"
+                disabled={isTesting}
+                style={styles.testBtn}
+              />
+              <AppButton
+                title={isTestingMorningDigest ? "Sending..." : "Test Digest"}
+                onPress={handleTestMorningDigest}
+                mode="filled"
+                color="primary1"
+                disabled={isTestingMorningDigest}
+                style={styles.testBtn}
               />
             </View>
-          )}
 
-          {/* Test Notification */}
-          <View style={styles.testSection}>
-            <TouchableOpacity
-              style={[styles.testButton, isTesting && styles.buttonDisabled]}
-              onPress={handleTestNotification}
-              disabled={isTesting}
-            >
-              {isTesting ? (
-                <ActivityIndicator color={COLORS.primary1} />
-              ) : (
-                <Text style={styles.testButtonText}>Send Test Notification</Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.testButton, styles.testMorningDigestButton, isTestingMorningDigest && styles.buttonDisabled]}
-              onPress={handleTestMorningDigest}
-              disabled={isTestingMorningDigest}
-            >
-              {isTestingMorningDigest ? (
-                <ActivityIndicator color={COLORS.colorWhite} />
-              ) : (
-                <Text style={[styles.testButtonText, styles.testMorningDigestButtonText]}>🌅 Test Morning Digest Now</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          {/* Periodic Test Mode */}
-          <View style={styles.testModeSection}>
-            <View style={styles.testModeHeader}>
-              <Text style={styles.testModeTitle}>🔄 Periodic Test Mode</Text>
-              {testModeActive && (
-                <View style={styles.activeIndicator}>
-                  <Text style={styles.activeIndicatorText}>ACTIVE</Text>
-                </View>
-              )}
+            {/* Periodic Test Mode */}
+            <View style={styles.testModeSection}>
+              <View style={styles.testModeHeader}>
+                <AppText variant="boldText" style={styles.testModeTitle}>🔄 Periodic Test Mode</AppText>
+                {testModeActive && (
+                  <View style={styles.activeIndicator}>
+                    <AppText variant="notes" style={styles.activeIndicatorText}>ACTIVE</AppText>
+                  </View>
+                )}
+              </View>
+              <AppText variant="notes" style={styles.testModeDescription}>
+                {testModeActive 
+                  ? 'Notifications are being sent every minute. Stop to disable.'
+                  : 'Start to receive a test notification every 1 minute.'
+                }
+              </AppText>
+              <AppButton
+                title={isTogglingTestMode 
+                  ? "..." 
+                  : testModeActive 
+                    ? "⏹️ Stop Test Mode" 
+                    : "▶️ Start Test Mode"
+                }
+                onPress={handleToggleTestMode}
+                mode="filled"
+                color={testModeActive ? "primary5" : "primary4"}
+                disabled={isTogglingTestMode}
+                style={styles.testModeBtn}
+              />
             </View>
-            <Text style={styles.testModeDescription}>
-              {testModeActive 
-                ? 'Notifications are being sent every minute. Stop to disable.'
-                : 'Start to receive a test notification every 1 minute.'
-              }
-            </Text>
-            <TouchableOpacity
-              style={[
-                styles.testModeButton, 
-                testModeActive ? styles.testModeButtonStop : styles.testModeButtonStart,
-                isTogglingTestMode && styles.buttonDisabled
-              ]}
-              onPress={handleToggleTestMode}
-              disabled={isTogglingTestMode}
-            >
-              {isTogglingTestMode ? (
-                <ActivityIndicator color={COLORS.colorWhite} />
-              ) : (
-                <Text style={styles.testModeButtonText}>
-                  {testModeActive ? '⏹️ Stop Test Mode' : '▶️ Start Test Mode'}
-                </Text>
-              )}
-            </TouchableOpacity>
           </View>
-        </>
+        </Box>
       )}
 
       {/* Debug info (remove in production) */}
       {__DEV__ && (
-        <View style={styles.debugSection}>
-          <Text style={styles.debugTitle}>Debug Info</Text>
-          <Text style={styles.debugText}>Token: {pushToken?.substring(0, 40)}...</Text>
-          <Text style={styles.debugText}>Status: {permissionStatus}</Text>
-          <Text style={styles.debugText}>Timezone: {preferences?.timezone}</Text>
-        </View>
+        <Box title="Debug Info" titleColor={COLORS.lightGray}>
+          <View style={styles.boxContent}>
+            <AppText variant="notes" style={styles.debugText}>Token: {pushToken?.substring(0, 40)}...</AppText>
+            <AppText variant="notes" style={styles.debugText}>Status: {permissionStatus}</AppText>
+            <AppText variant="notes" style={styles.debugText}>Timezone: {preferences?.timezone}</AppText>
+          </View>
+        </Box>
       )}
     </View>
   );
@@ -396,229 +411,176 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.colorWhite,
-    borderRadius: 16,
-    padding: 20,
-    marginVertical: 10,
+    gap: SPACING.md,
   },
-  title: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: COLORS.black,
-    marginBottom: 20,
+  boxContent: {
+    paddingVertical: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  description: {
+    fontSize: FONT_SIZES.sm,
+    lineHeight: FONT_SIZES.base * 1.1,
+    color: COLORS.darkGray,
+    marginBottom: SPACING.sm,
   },
   settingRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 14,
+    paddingVertical: SPACING.md,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.white3,
   },
   nestedSetting: {
-    marginLeft: 20,
-  },
-  timePickerSection: {
-    flexDirection: 'column',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.white3,
-  },
-  timePickerContainer: {
-    width: '100%',
-  },
-  timePickerLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.black,
-    marginBottom: 12,
-  },
-  timeInputGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  timeInputContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  timeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: COLORS.primary1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginVertical: 4,
-  },
-  timeButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.colorWhite,
-  },
-  timeDisplay: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: COLORS.black,
-    minWidth: 44,
-    textAlign: 'center',
-  },
-  timeSeparator: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: COLORS.black,
-    marginHorizontal: 8,
-  },
-  timePickerHint: {
-    fontSize: 12,
-    color: COLORS.lightGray,
-    textAlign: 'center',
+    marginLeft: SPACING.md,
+    paddingLeft: SPACING.md,
+    borderLeftWidth: 2,
+    borderLeftColor: COLORS.primary1,
   },
   settingInfo: {
     flex: 1,
-    marginRight: 16,
+    marginRight: SPACING.md,
   },
   settingLabel: {
-    fontSize: 16,
-    fontWeight: "500",
+    fontSize: FONT_SIZES.base,
     color: COLORS.black,
     marginBottom: 2,
   },
   settingDescription: {
-    fontSize: 13,
+    fontSize: FONT_SIZES.sm,
     color: COLORS.lightGray,
   },
+  // Time Picker
+  timePickerContainer: {
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.sm,
+    marginLeft: SPACING.md,
+    borderLeftWidth: 2,
+    borderLeftColor: COLORS.primary1,
+    alignItems: "center",
+  },
+  timePickerLabel: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.black,
+    marginBottom: SPACING.sm,
+  },
+  timeInputGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: SPACING.xs,
+    width: "100%",
+    direction: "ltr",
+  },
+  timeInputContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: SPACING.xs,
+  },
+  timeButton: {
+    width: moderateScale(36),
+    height: moderateScale(36),
+    borderRadius: moderateScale(18),
+    backgroundColor: COLORS.primary1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  timeButtonText: {
+    fontSize: FONT_SIZES.lg,
+    color: COLORS.colorWhite,
+  },
+  timeDisplay: {
+    fontSize: moderateScale(32),
+    color: COLORS.black,
+    minWidth: moderateScale(50),
+    textAlign: "center",
+  },
+  timeSeparator: {
+    fontSize: moderateScale(28),
+    color: COLORS.black,
+    marginHorizontal: SPACING.sm,
+  },
+  timePickerHint: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.lightGray,
+    textAlign: "center",
+  },
+  // Alerts
   warningBox: {
     backgroundColor: "#FFF3CD",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
+    borderRadius: moderateScale(12),
+    padding: SPACING.md,
+    marginBottom: SPACING.sm,
   },
   warningText: {
-    fontSize: 14,
     color: "#856404",
   },
   errorBox: {
     backgroundColor: "#F8D7DA",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
+    borderRadius: moderateScale(12),
+    padding: SPACING.md,
+    marginBottom: SPACING.sm,
   },
   errorText: {
-    fontSize: 14,
     color: "#721C24",
   },
-  button: {
-    backgroundColor: COLORS.primary1,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginTop: 10,
+  // Buttons
+  enableButton: {
+    marginTop: SPACING.sm,
+  },
+  buttonRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: SPACING.md,
+  },
+  testBtn: {
+    flex: 1,
   },
   buttonDisabled: {
     opacity: 0.6,
   },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: COLORS.colorWhite,
-  },
-  testSection: {
-    marginTop: 20,
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.white3,
-  },
-  testButton: {
-    borderWidth: 1,
-    borderColor: COLORS.primary1,
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  testMorningDigestButton: {
-    backgroundColor: COLORS.primary1,
-    marginBottom: 0,
-  },
-  testButtonText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: COLORS.primary1,
-  },
-  testMorningDigestButtonText: {
-    color: COLORS.colorWhite,
-  },
-  debugSection: {
-    marginTop: 20,
-    padding: 12,
-    backgroundColor: COLORS.white3,
-    borderRadius: 8,
-  },
-  debugTitle: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.lightGray,
-    marginBottom: 8,
-  },
-  debugText: {
-    fontSize: 11,
-    color: COLORS.lightGray,
-    marginBottom: 2,
-    fontFamily: "monospace",
-  },
+  // Test Mode
   testModeSection: {
-    marginTop: 20,
-    padding: 16,
-    backgroundColor: "#FFF8E1",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#FFE082",
+    marginTop: SPACING.md,
+    padding: SPACING.md,
+    backgroundColor: COLORS.white3,
+    borderRadius: moderateScale(12),
   },
   testModeHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 8,
+    marginBottom: SPACING.xs,
   },
   testModeTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#F57C00",
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.darkGray,
   },
   testModeDescription: {
-    fontSize: 13,
-    color: "#795548",
-    marginBottom: 12,
-    lineHeight: 18,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.lightGray,
+    marginBottom: SPACING.sm,
+    lineHeight: FONT_SIZES.sm * 1.3,
   },
   activeIndicator: {
     backgroundColor: "#4CAF50",
-    borderRadius: 12,
-    paddingHorizontal: 10,
+    borderRadius: moderateScale(12),
+    paddingHorizontal: SPACING.sm,
     paddingVertical: 4,
   },
   activeIndicatorText: {
-    fontSize: 11,
+    fontSize: FONT_SIZES.sm,
     fontWeight: "700",
     color: COLORS.colorWhite,
   },
-  testModeButton: {
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: "center",
+  testModeBtn: {
+    marginTop: SPACING.xs,
   },
-  testModeButtonStart: {
-    backgroundColor: "#FF9800",
-  },
-  testModeButtonStop: {
-    backgroundColor: "#F44336",
-  },
-  testModeButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.colorWhite,
+  // Debug
+  debugText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.lightGray,
+    marginBottom: 2,
+    fontFamily: "monospace",
   },
 });
