@@ -7,14 +7,17 @@
 
 import React, { createContext, useContext, useCallback, useRef, useMemo } from "react";
 
-type TaskUpdateListener = () => void;
+type TaskUpdatePayload = { taskId?: string } | undefined;
+
+type TaskUpdateListener = (payload?: TaskUpdatePayload) => void;
 
 interface TaskContextValue {
   /**
    * Notify all listeners that tasks have been updated.
    * Call this after completing, creating, updating, or deleting a task.
+   * Optional payload allows scoping updates to a specific task (avoids unnecessary refreshes).
    */
-  notifyTaskUpdate: () => void;
+  notifyTaskUpdate: (payload?: TaskUpdatePayload, delayMs?: number) => void;
 
   /**
    * Subscribe to task update notifications.
@@ -38,16 +41,24 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   const listenersRef = useRef<Set<TaskUpdateListener>>(new Set());
   const lastUpdateRef = useRef<number>(Date.now());
 
-  const notifyTaskUpdate = useCallback(() => {
+  const notifyTaskUpdate = useCallback((payload?: TaskUpdatePayload, delayMs?: number) => {
     lastUpdateRef.current = Date.now();
-    // Notify all subscribers
-    listenersRef.current.forEach((listener) => {
-      try {
-        listener();
-      } catch (error) {
-        console.warn("TaskContext: Error in listener:", error);
-      }
-    });
+
+    const notify = () => {
+      listenersRef.current.forEach((listener) => {
+        try {
+          listener(payload);
+        } catch (error) {
+          console.warn("TaskContext: Error in listener:", error);
+        }
+      });
+    };
+
+    if (typeof delayMs === "number" && delayMs > 0) {
+      setTimeout(() => notify(), delayMs);
+    } else {
+      notify();
+    }
   }, []);
 
   const subscribeToTaskUpdates = useCallback((listener: TaskUpdateListener) => {
@@ -66,7 +77,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         return lastUpdateRef.current;
       },
     }),
-    [notifyTaskUpdate, subscribeToTaskUpdates]
+    [notifyTaskUpdate, subscribeToTaskUpdates],
   );
 
   return <TaskContext.Provider value={value}>{children}</TaskContext.Provider>;

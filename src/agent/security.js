@@ -63,7 +63,13 @@ export function validateWidgetPayload(raw) {
     try {
       payload = JSON.parse(jsonText);
     } catch (err) {
-      return { valid: false, reason: `Invalid JSON: ${err.message}` };
+      // Attempt fallback repair using tolerant extractor if direct parse fails
+      try {
+        payload = extractWidgetFromText(raw);
+        if (!payload) return { valid: false, reason: `Invalid JSON: ${err.message}` };
+      } catch (fallbackErr) {
+        return { valid: false, reason: `Invalid JSON: ${err.message}` };
+      }
     }
   }
 
@@ -93,6 +99,20 @@ export function validateWidgetPayload(raw) {
     }
   }
 
+  if (payload.widget_type === "list") {
+    const listType = payload.data?.listType || payload.data?.list_type;
+    if (!listType) {
+      return { valid: false, reason: "list payload missing listType" };
+    }
+    if (listType === "task_detail") {
+      const hasTaskId = Boolean(payload.data?.taskId);
+      const hasTaskRef = Array.isArray(payload.data?.tasks) && payload.data.tasks.some((t) => t && (t.id || t.title));
+      if (!hasTaskId && !hasTaskRef) {
+        return { valid: false, reason: "task_detail list missing taskId or task ref" };
+      }
+    }
+  }
+
   // Reject empty task lists to avoid showing widgets with no useful data
   if (payload.widget_type === "task_list") {
     if (!payload.data || !Array.isArray(payload.data.tasks)) {
@@ -101,6 +121,13 @@ export function validateWidgetPayload(raw) {
     if (payload.data.tasks.length === 0) {
       // Return parsed widget for special handling by the controller
       return { valid: false, reason: "Empty task list", widget: payload };
+    }
+  }
+
+  if (payload.widget_type === "upcoming_tasks") {
+    const todayTasks = payload.data?.today?.tasks;
+    if (!Array.isArray(todayTasks)) {
+      return { valid: false, reason: "upcoming_tasks payload missing today.tasks array" };
     }
   }
 

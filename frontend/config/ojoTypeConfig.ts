@@ -17,6 +17,8 @@ export interface OjoTypeConfig {
   isDefault: boolean;
   // New: gradient colors for persona-specific animated gradient
   gradient?: string[];
+  // Avatar-specific alternate gradient (optional)
+  gradient2?: string[];
 }
 
 /**
@@ -44,7 +46,8 @@ export const OJO_TYPES: Record<OjoTypeName, OjoTypeConfig> = {
     color: COLORS.primary2, // Cyan #4CC9F0
     description: "Your bro, friend who's always got your back.",
     isDefault: false,
-    gradient: [COLORS.primary2, COLORS.brightP6, COLORS.primary6, COLORS.primary2, COLORS.darkP6, COLORS.primary6],
+     gradient: [COLORS.primary2, COLORS.brightP6, COLORS.primary6, COLORS.primary2, COLORS.darkP6, COLORS.primary6],
+     gradient2: [COLORS.primary2, COLORS.brightP2, COLORS.primary2, COLORS.brightP2, COLORS.primary2, COLORS.brightP2],
   },
   strictojo: {
     name: "strictojo",

@@ -32,11 +32,7 @@ type FriendListItemProps = {
   isOnline?: boolean;
 };
 
-const MiniStat: React.FC<{ icon: React.ReactNode; value: number; color: string }> = ({
-  icon,
-  value,
-  color,
-}) => (
+const MiniStat: React.FC<{ icon: React.ReactNode; value: number; color: string }> = ({ icon, value, color }) => (
   <View style={[styles.miniStat, { backgroundColor: color }]}>
     <View style={styles.miniIcon}>{icon}</View>
     <AppText variant="notes" style={styles.miniValue}>
@@ -45,12 +41,7 @@ const MiniStat: React.FC<{ icon: React.ReactNode; value: number; color: string }
   </View>
 );
 
-const FriendListItem: React.FC<FriendListItemProps> = ({
-  name,
-  avatar,
-  stats,
-  isOnline = false,
-}) => {
+const FriendListItem: React.FC<FriendListItemProps> = ({ name, avatar, stats, isOnline = false }) => {
   const UserIcon = ICONS.user;
   const CheckIcon = ICONS.list;
   const FlameIcon = ICONS.flame;
@@ -65,37 +56,35 @@ const FriendListItem: React.FC<FriendListItemProps> = ({
             <Image source={{ uri: avatar }} style={styles.avatar} />
           ) : (
             <View style={[styles.avatar, styles.avatarPlaceholder]}>
-              <UserIcon size={20} color={COLORS.grayLight} />
+              <UserIcon size={moderateScale(18)} color={COLORS.lightGray} />
             </View>
           )}
         </View>
         {isOnline && <View style={styles.onlineIndicator} />}
       </View>
 
-      {/* Name */}
-      <View style={styles.nameContainer}>
-        <AppText variant="bodyText" style={styles.name} numberOfLines={2}>
+      <View style={styles.contentContainer}>
+        <AppText variant="bodyText" style={styles.name} numberOfLines={1}>
           {name}
         </AppText>
-      </View>
 
-      {/* Mini stats */}
-      <View style={styles.statsRow}>
-        <MiniStat
-          icon={<CheckIcon size={12} color={COLORS.colorWhite} />}
-          value={stats.tasks}
-          color={COLORS.primary6}
-        />
-        <MiniStat
-          icon={<FlameIcon size={12} color={COLORS.colorWhite} />}
-          value={stats.streak}
-          color={COLORS.primary5}
-        />
-        <MiniStat
-          icon={<TrophyIcon size={12} color={COLORS.colorWhite} />}
-          value={stats.points}
-          color={COLORS.primary4}
-        />
+        <View style={styles.statsRow}>
+          <MiniStat
+            icon={<CheckIcon size={moderateScale(16)} color={COLORS.colorWhite} />}
+            value={stats.tasks}
+            color={COLORS.primary6}
+          />
+          <MiniStat
+            icon={<FlameIcon size={moderateScale(16)} color={COLORS.colorWhite} />}
+            value={stats.streak}
+            color={COLORS.primary5}
+          />
+          <MiniStat
+            icon={<TrophyIcon size={moderateScale(16)} color={COLORS.colorWhite} />}
+            value={stats.points}
+            color={COLORS.primary4}
+          />
+        </View>
       </View>
     </View>
   );
@@ -105,12 +94,13 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: 0,
     backgroundColor: "transparent",
-    gap: SPACING.md,
+    gap: SPACING.sm,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(0,0,0,0.04)",
+    alignSelf: "stretch",
   },
   avatarContainer: {
     position: "relative",
@@ -141,34 +131,47 @@ const styles = StyleSheet.create({
   nameContainer: {
     flex: 1,
     minWidth: 0,
+    paddingRight: SPACING.sm,
+  },
+  contentContainer: {
+    flex: 1,
+    minWidth: 0,
+    marginLeft: SPACING.sm,
   },
   name: {
-    color: COLORS.darkGray,
-    fontSize: moderateScale(15),
+    color: COLORS.black,
+    fontSize: moderateScale(16),
     fontWeight: "600",
   },
   statsRow: {
     flexDirection: "row",
     gap: SPACING.sm,
+    alignItems: "center",
+    flexShrink: 0,
+    flexWrap: "wrap",
+    marginTop: 6,
   },
   miniStat: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 4,
+    paddingVertical: 6,
     paddingHorizontal: 8,
-    borderRadius: moderateScale(12),
-    gap: 6,
+    borderRadius: moderateScale(14),
+    gap: 8,
+    minWidth: moderateScale(36),
+    maxWidth: moderateScale(70),
+    justifyContent: "center",
   },
   miniIcon: {
-    width: moderateScale(14),
-    height: moderateScale(14),
+    width: moderateScale(18),
+    height: moderateScale(18),
     alignItems: "center",
     justifyContent: "center",
   },
   miniValue: {
     color: COLORS.colorWhite,
-    fontSize: moderateScale(12),
-    fontWeight: "600",
+    fontSize: moderateScale(13),
+    fontWeight: "700",
   },
   divider: {
     height: 1,

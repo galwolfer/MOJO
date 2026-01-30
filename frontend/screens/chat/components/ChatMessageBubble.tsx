@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
   retryContent: {
     flexDirection: "row",
     alignItems: "center",
-    gap: SPACING.sm / 2,
+    gap: SPACING.xs,
   },
   retryText: {
     marginLeft: SPACING.sm,

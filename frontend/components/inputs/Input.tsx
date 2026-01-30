@@ -142,7 +142,7 @@ function Input<T = any>({
       toValue: 0,
       duration: 220,
       easing: Easing.bezier(0.2, 0.8, 0.2, 1),
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start(() => {
       setIsOpen(false);
       if (multiSelect) onSelect?.(selected);
@@ -163,7 +163,7 @@ function Input<T = any>({
   const providedValue = hasValueProp ? valueProp : defaultValueProp;
 
   const [inputValue, setInputValue] = useState<string>(
-    !hasValueProp && typeof providedValue === "string" ? providedValue : ""
+    !hasValueProp && typeof providedValue === "string" ? providedValue : "",
   );
 
   useEffect(() => {
@@ -310,7 +310,7 @@ function Input<T = any>({
                     toValue: 1,
                     duration: 320,
                     easing: Easing.bezier(0.68, -0.55, 0.265, 1.55),
-                    useNativeDriver: true,
+                    useNativeDriver: false,
                   }).start();
                 });
               });
@@ -422,7 +422,7 @@ function Input<T = any>({
                           toValue: 0,
                           duration: 180,
                           easing: Easing.bezier(0.2, 0.8, 0.2, 1),
-                          useNativeDriver: true,
+                          useNativeDriver: false,
                         }).start(() => {
                           setIsOpen(false);
                         });

@@ -27,7 +27,7 @@ import { ICONS } from "../../components/icons/icons";
 import { setChatAuthToken } from "../../services/chatService";
 import { useKeyboard, useContentInsets } from "../../hooks";
 import { getOjoType } from "../../config/ojoTypeConfig";
-import * as httpClient from "../../services/httpClient";
+import { useOjo } from "../../context/OjoContext";
 import GlassSurface from "../../components/common/GlassSurface";
 import { useChatSessions, useChatMessages } from "../../hooks";
 import { TimelineItem, buildTimelineItems } from "../../utils/chatUtils";
@@ -63,31 +63,12 @@ export default function ChatScreen() {
     }
   }, [token]);
 
-  const [ojoTypeName, setOjoTypeName] = useState<string | null>(null);
-
-  // Fetch user profile with OjoType from API (GET /auth/me)
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      try {
-        const response = await httpClient.get<any>("/auth/me");
-        const ojoType = response?.user?.profile?.ojoType?.name || response?.user?.profile?.ojoType?.name || "mentorjo";
-        setOjoTypeName(ojoType);
-      } catch (error) {
-        console.error("Failed to fetch user profile:", error);
-        setOjoTypeName("mentorjo"); // Fallback to default
-      }
-    };
-
-    if (token) {
-      fetchUserProfile();
-    }
-  }, [token]);
+  const { ojoName } = useOjo();
 
   // Configure Header to use user's OjoType (color + icon) from API
   useEffect(() => {
-    if (!ojoTypeName) return;
-
-    const ojoConfig = getOjoType(ojoTypeName as any);
+    const name = ojoName ?? "mentorjo";
+    const ojoConfig = getOjoType(name as any);
     const OjoIcon = ICONS[ojoConfig.icon as keyof typeof ICONS];
 
     const leftElement = (
@@ -114,7 +95,7 @@ export default function ChatScreen() {
     );
 
     setHeaderConfig({ show: true, leftElement });
-  }, [ojoTypeName, setHeaderConfig]);
+  }, [ojoName, setHeaderConfig]);
 
   // Cleanup when leaving screen
   useEffect(() => {
@@ -160,14 +141,14 @@ export default function ChatScreen() {
       }
       sendText(activeSessionId, trimmed, () => sessionsRef.current);
     },
-    [getTodaySessionId, isLoading, sendText, sessionId, setSessionId]
+    [getTodaySessionId, isLoading, sendText, sessionId, setSessionId],
   );
 
   const onRetry = useCallback(
     (sessionIdToRetry: string, clientId: string) => {
       handleRetry(sessionIdToRetry, clientId, () => sessionsRef.current);
     },
-    [handleRetry]
+    [handleRetry],
   );
 
   // Put the chat input back into the shared NavBar (original behavior)
@@ -183,7 +164,7 @@ export default function ChatScreen() {
     ({ item, index }: { item: TimelineItem; index: number }) => (
       <TimelineItemComponent item={item} isLastItem={index === timelineItems.length - 1} onRetry={onRetry} />
     ),
-    [timelineItems.length, onRetry]
+    [timelineItems.length, onRetry],
   );
 
   const keyExtractor = useCallback((item: TimelineItem) => item.id, []);
@@ -198,7 +179,7 @@ export default function ChatScreen() {
         : contentInsets.bottom + SPACING.md,
       flexGrow: 1,
     }),
-    [contentInsets]
+    [contentInsets],
   );
 
   /**
@@ -215,7 +196,7 @@ export default function ChatScreen() {
       const reachedBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - bottomThreshold;
       setIsAtBottom(reachedBottom);
     },
-    [setScrollPosition]
+    [setScrollPosition],
   );
 
   /**
@@ -249,7 +230,7 @@ export default function ChatScreen() {
       contentHeightRef.current = height;
       handleContentSizeChange();
     },
-    [handleContentSizeChange]
+    [handleContentSizeChange],
   );
 
   useEffect(() => {

@@ -33,7 +33,7 @@ import { logEvent, recordSubCategoryGeneration, recordSubCategoryOverride } from
 import { mapCategoryToLifecycle } from "../algorithms/priority/categorizing.js";
 import { trainTask } from "./mlPredictionService.js";
 import { logger } from "../utils/logger.js";
-import { startOfDay } from "../utils/dateUtils.js";
+import { addDays, formatLocalDate, startOfDay } from "../utils/dateUtils.js";
 import { getIllegalDisplayFields, getIllegalCharsErrorMessage } from "../utils/illegalChars.js";
 
 // =============================================================================
@@ -61,7 +61,7 @@ async function _saveUserSubCategory(userId, categoryName, subCategory) {
         $addToSet: {
           subCategories: { name: subName, category: idx },
         },
-      }
+      },
     );
   } catch (err) {
     // Silent fail if category invalid or user not found, just log warning
@@ -78,6 +78,39 @@ function getSubCategoryLabel(subCategory) {
 
 function buildIllegalCharsError(fields) {
   return getIllegalCharsErrorMessage(fields);
+}
+
+function toId(value) {
+  if (!value) return null;
+  return typeof value === "string" ? value : value.toString();
+}
+
+function buildSubtaskMap(subtasks) {
+  const map = new Map();
+  for (const sub of subtasks) {
+    if (!sub?.taskId || !sub?.index) continue;
+    map.set(`${toId(sub.taskId)}:${sub.index}`, sub);
+  }
+  return map;
+}
+
+function normalizeScheduleSession(session, subtaskMap) {
+  const taskId = toId(session.taskId);
+  const subtaskKey = session.subtaskIndex ? `${taskId}:${session.subtaskIndex}` : null;
+  const subtask = subtaskKey ? subtaskMap.get(subtaskKey) : null;
+
+  return {
+    taskId,
+    id: toId(session._id),
+    start: session.start ? new Date(session.start).toISOString() : null,
+    end: session.end ? new Date(session.end).toISOString() : null,
+    minutes: session.minutes ?? null,
+    status: session.status || null,
+    subtaskIndex: session.subtaskIndex ?? null,
+    subtaskId: subtask ? toId(subtask._id) : null,
+    subtaskTitle: subtask ? subtask.title || null : null,
+    subtaskStatus: subtask ? subtask.status || null : null,
+  };
 }
 
 // =============================================================================
@@ -279,13 +312,94 @@ export async function getOverdueTasks(userId) {
 }
 
 /**
+ * Fetch scheduled tasks grouped by day (today + upcoming).
+ * Returns task details with scheduled sessions and subtask metadata.
+ */
+export async function getScheduledTasksByDay(userId, days = 7) {
+  const windowStart = startOfDay(new Date());
+  const windowEnd = addDays(windowStart, days);
+  const todayKey = formatLocalDate(windowStart);
+
+  const sessions = await TaskSchedule.find({
+    userId,
+    start: { $gte: windowStart, $lt: windowEnd },
+  })
+    .sort({ start: 1 })
+    .lean();
+
+  if (!sessions.length) {
+    return { days, today: { date: todayKey, tasks: [] }, upcoming: [] };
+  }
+
+  const taskIds = Array.from(new Set(sessions.map((s) => toId(s.taskId)).filter(Boolean)));
+  const tasks = await Task.find({ userId, _id: { $in: taskIds } }).lean();
+  const taskMap = new Map(tasks.map((t) => [toId(t._id), t]));
+
+  const subtasks = await SubTask.find({ taskId: { $in: taskIds } })
+    .select({ taskId: 1, index: 1, title: 1, status: 1 })
+    .lean();
+  const subtaskMap = buildSubtaskMap(subtasks);
+
+  const groups = new Map();
+  for (const session of sessions) {
+    const taskId = toId(session.taskId);
+    if (!taskId) continue;
+
+    const task = taskMap.get(taskId);
+    if (!task) continue;
+
+    const dateKey = session.start ? formatLocalDate(new Date(session.start)) : null;
+    if (!dateKey) continue;
+
+    if (!groups.has(dateKey)) groups.set(dateKey, new Map());
+    const groupTasks = groups.get(dateKey);
+
+    if (!groupTasks.has(taskId)) {
+      groupTasks.set(taskId, {
+        id: taskId,
+        title: task.taskname,
+        status: task.status,
+        dueDate: task.dueDate ? new Date(task.dueDate).toISOString() : null,
+        importance: task.importance,
+        effort: task.effort,
+        progressPercentage: task.progressPercentage ?? 0,
+        taskType: task.taskType || null,
+        subCategory: task.subCategory || null,
+        subcategory: task.subCategory ? task.subCategory.label : null,
+        category: task.category || null,
+        description: task.description,
+        estimatedDuration: task.estimatedDuration,
+        canSplit: task.canSplit,
+        scheduledSessions: [],
+      });
+    }
+
+    groupTasks.get(taskId).scheduledSessions.push(normalizeScheduleSession(session, subtaskMap));
+  }
+
+  const sortedKeys = Array.from(groups.keys()).sort();
+  const today = {
+    date: todayKey,
+    tasks: groups.has(todayKey) ? Array.from(groups.get(todayKey).values()) : [],
+  };
+  const upcoming = sortedKeys
+    .filter((key) => key !== todayKey)
+    .map((key) => ({
+      date: key,
+      tasks: Array.from(groups.get(key).values()),
+    }));
+
+  return { days, today, upcoming };
+}
+
+/**
  * Get detailed progress for a task with split parts.
  * Returns the task, all its subtasks, and their associated schedule blocks.
- * 
+ *
  * @param {string} userId - User ID
  * @param {string} taskId - Task ID
  * @returns {Promise<object>} Task with subtasks and schedule info
- * 
+ *
  * Example response:
  * {
  *   task: { _id, taskname, taskType, chunkCount, estimatedDuration, ... },
@@ -324,15 +438,16 @@ export async function getTaskProgress(userId, taskId) {
     .lean();
 
   // Map subtask index to schedule info
-  const subtaskMap = new Map(subtasks.map((st) => [st.index, st]));
+  const subtaskMap = buildSubtaskMap(subtasks);
+  const normalizedSessions = schedules.map((schedule) => normalizeScheduleSession(schedule, subtaskMap));
   const schedulesBySubtaskIndex = new Map();
 
-  for (const schedule of schedules) {
-    if (schedule.subtaskIndex) {
-      if (!schedulesBySubtaskIndex.has(schedule.subtaskIndex)) {
-        schedulesBySubtaskIndex.set(schedule.subtaskIndex, []);
+  for (const session of normalizedSessions) {
+    if (session.subtaskIndex) {
+      if (!schedulesBySubtaskIndex.has(session.subtaskIndex)) {
+        schedulesBySubtaskIndex.set(session.subtaskIndex, []);
       }
-      schedulesBySubtaskIndex.get(schedule.subtaskIndex).push(schedule);
+      schedulesBySubtaskIndex.get(session.subtaskIndex).push(session);
     }
   }
 
@@ -351,6 +466,7 @@ export async function getTaskProgress(userId, taskId) {
   return {
     task,
     subtasks: enrichedSubtasks,
+    scheduledSessions: normalizedSessions,
     completedParts,
     totalParts,
     overallProgress,
@@ -535,7 +651,15 @@ export async function updateTask({ userId, taskId, updates }) {
   });
 
   // If splitting-related fields changed, ensure subtask sync
-  const splitFields = ["taskType", "chunkCount", "chunkMinutes", "minMinutes", "maxMinutes", "minChunk", "estimatedDuration"];
+  const splitFields = [
+    "taskType",
+    "chunkCount",
+    "chunkMinutes",
+    "minMinutes",
+    "maxMinutes",
+    "minChunk",
+    "estimatedDuration",
+  ];
   if (Object.keys(sanitizedUpdates).some((f) => splitFields.includes(f))) {
     try {
       await syncSubTasksForTask({ taskId });
@@ -562,9 +686,10 @@ export async function syncSubTasksForTask({ taskId }) {
   }
 
   const minChunk = task.minChunk || 30;
-  const desiredCount = task.chunkCount && Number.isInteger(task.chunkCount) && task.chunkCount > 0
-    ? task.chunkCount
-    : Math.max(1, Math.ceil((task.estimatedDuration || minChunk) / minChunk));
+  const desiredCount =
+    task.chunkCount && Number.isInteger(task.chunkCount) && task.chunkCount > 0
+      ? task.chunkCount
+      : Math.max(1, Math.ceil((task.estimatedDuration || minChunk) / minChunk));
 
   const existing = await SubTask.find({ taskId }).sort({ index: 1 }).lean();
 
@@ -612,7 +737,6 @@ export async function syncSubTasksForTask({ taskId }) {
   }
 }
 
-
 /**
  * Extend the deadline of a task.
  */
@@ -635,7 +759,7 @@ export async function extendTaskDeadline({ taskId, userId, newDeadline }) {
     const task = await Task.findOneAndUpdate(
       { _id: taskId, userId },
       { $set: { dueDate: newDeadline } },
-      { new: true }
+      { new: true },
     ).lean();
 
     if (!task) {
@@ -674,7 +798,31 @@ export async function deleteTask({ taskId, userId }) {
 
     const taskname = task.taskname;
 
-    await Task.findByIdAndDelete(taskId);
+    // Use a safety-aware findOneAndDelete that includes userId so we never delete across users
+    const deleted = await Task.findOneAndDelete({ _id: taskId, userId });
+
+    if (!deleted) {
+      // If deletion didn't occur, log and return failure so callers don't assume success
+      try {
+        const { logger } = await import("../utils/logger.js");
+        logger.error(`[taskService] Deletion failed: Task ${taskId} still present for user ${userId}`);
+      } catch (e) {
+        // ignore logging failures
+      }
+      return { success: false, error: "Task deletion failed" };
+    }
+
+    // Verify deletion actually removed the document (defensive check)
+    const stillExists = await Task.findById(taskId);
+    if (stillExists) {
+      try {
+        const { logger } = await import("../utils/logger.js");
+        logger.error(`[taskService] Post-delete verification failed: Task ${taskId} still exists after delete call`);
+      } catch (e) {
+        // ignore logging failures
+      }
+      return { success: false, error: "Task deletion did not complete" };
+    }
 
     try {
       await TaskSchedule.deleteMany({ taskId });
@@ -766,7 +914,7 @@ export async function completeTask({ taskId, userId }) {
           actualCompletionMinutes,
         },
       },
-      { new: true }
+      { new: true },
     ).lean(); // Get plain object directly
 
     await logEvent({
@@ -851,7 +999,7 @@ export async function toggleTaskCompletion(taskId, userId) {
         status: nextStatus,
       },
     },
-    { new: true }
+    { new: true },
   ).lean();
 
   await logEvent({

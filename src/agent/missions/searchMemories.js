@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { LightMission } from "./LightMission.js";
 import { memoryStore } from "../../services/memoryService.js";
+import { okFalse } from "../lib/errorFormatter.js";
 
 const searchMemoriesMission = new LightMission({
   name: "search_memories",
@@ -35,15 +36,10 @@ const searchMemoriesMission = new LightMission({
       }
 
       // Format results as structured TOML format
-      const items = memories
-        .map(
-          (m) =>
-            `[[mem]]\ntext="${m.text}"\ntype="${m.type}"\nimp=${m.importance}`
-        )
-        .join("\n");
+      const items = memories.map((m) => `[[mem]]\ntext="${m.text}"\ntype="${m.type}"\nimp=${m.importance}`).join("\n");
       return `ok=true\ncount=${memories.length}\n${items}`;
     } catch (error) {
-      return `ok=false\nerr="${error.message}"`;
+      return okFalse(error.message);
     }
   },
 });

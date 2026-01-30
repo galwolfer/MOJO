@@ -220,13 +220,14 @@ export default function AuthScreen() {
         }
       }
 
+      const { canonicalizeGender } = await import("../../utils/gender");
       const data = await apiRegister({
         username: signupUsername,
         email: signupEmail,
         password: signupPassword,
         displayName,
         profileImage: profileImageUrl,
-        gender: signupGender,
+        gender: canonicalizeGender(signupGender),
       });
 
       if (data.token && data.user) {

@@ -1,16 +1,16 @@
 /**
  * @fileoverview Scheduling Service
  * @module services/schedulingService
- * 
+ *
  * Consolidated service for intelligent task scheduling using CSP algorithms.
  * Manages planning, routine blocks, priority scheduling, and persistence.
- * 
+ *
  * Key responsibilities:
  * - Generate optimal schedules using CSP solver
  * - Manage routine busy blocks (sleep, meals, etc.)
  * - Background priority score updates
  * - Persist and retrieve scheduled sessions
- * 
+ *
  * @requires models/Task - Task database model
  * @requires models/TaskSchedule - Schedule database model
  * @requires algorithms/csp/scheduler - CSP scheduling algorithm
@@ -27,38 +27,82 @@ import { logger } from "../utils/logger.js";
 import { updateAllScores } from "../scripts/updateScores.js";
 import { spawn } from "child_process";
 
+/**
+ * Helper: Trigger scheduler update after task operations
+ * Centralizes the scheduling trigger logic to avoid duplication
+ * across missions and controllers
+ *
+ * @param {string} userId - User ID
+ * @param {string} operationType - Type of operation ("creation", "update", "deletion")
+ * @param {string} [location] - Where the trigger originated ("API" or "LLM")
+ * @returns {Promise<{success: boolean, sessionCount: number, error?: string}>}
+ */
+export async function triggerSchedulerUpdate(userId, operationType = "operation", location = "API") {
+  try {
+    const { plan, unscheduled } = await generatePlan({ userId });
+    await savePlan({ userId, plan, unscheduled });
+    logger.info(`[SCHEDULER] Updated after task ${operationType} (${location}): ${plan.length} sessions scheduled`);
+    return { success: true, sessionCount: plan.length };
+  } catch (error) {
+    logger.error(`[SCHEDULER] Failed to update after task ${operationType} (${location}):`, error);
+    return { success: false, sessionCount: 0, error: error.message };
+  }
+}
+
 // Use Python scheduler CLI instead of JS implementation.
 async function callPythonScheduler(tasks, options) {
-  const py = spawn("python3", ["./src/algorithms/csp/py_scheduler_cli.py"]);
+  // Try python3 first, then fallback to python (Windows)
+  const candidates = process.platform === "win32" ? ["python", "python3"] : ["python3", "python"];
 
-  return new Promise((resolve, reject) => {
-    let stdout = "";
-    let stderr = "";
-    py.stdout.setEncoding("utf8");
-    py.stderr.setEncoding("utf8");
-    py.stdout.on("data", (chunk) => (stdout += chunk));
-    py.stderr.on("data", (chunk) => (stderr += chunk));
-    py.on("error", (err) => reject(err));
-    py.on("close", (code) => {
-      if (code !== 0) return reject(new Error(`Python scheduler failed: ${stderr}`));
-      try {
-        const parsed = JSON.parse(stdout || "{}");
-        // Convert ISO strings back to Date objects for Node consumers
-        parsed.plan = (parsed.plan || []).map((p) => ({
-          ...p,
-          start: new Date(p.start),
-          end: new Date(p.end),
-        }));
-        resolve(parsed);
-      } catch (e) {
-        reject(e);
-      }
-    });
+  let lastError = null;
+  for (const cmd of candidates) {
+    try {
+      const py = spawn(cmd, ["./src/algorithms/csp/py_scheduler_cli.py"]);
 
-    const payload = JSON.stringify({ tasks, options });
-    py.stdin.write(payload);
-    py.stdin.end();
-  });
+      return await new Promise((resolve, reject) => {
+        let stdout = "";
+        let stderr = "";
+        py.stdout.setEncoding("utf8");
+        py.stderr.setEncoding("utf8");
+        py.stdout.on("data", (chunk) => (stdout += chunk));
+        py.stderr.on("data", (chunk) => (stderr += chunk));
+        py.on("error", (err) => reject(err));
+        py.on("close", (code) => {
+          if (code !== 0) return reject(new Error(`Python scheduler (${cmd}) failed: ${stderr || `exit ${code}`}`));
+          try {
+            const parsed = JSON.parse(stdout || "{}");
+            // Convert ISO strings back to Date objects for Node consumers
+            parsed.plan = (parsed.plan || []).map((p) => ({
+              ...p,
+              start: new Date(p.start),
+              end: new Date(p.end),
+            }));
+            resolve(parsed);
+          } catch (e) {
+            reject(e);
+          }
+        });
+
+        const payload = JSON.stringify({ tasks, options });
+        try {
+          py.stdin.write(payload);
+          py.stdin.end();
+        } catch (err) {
+          reject(err);
+        }
+      });
+    } catch (err) {
+      // Keep the last error and try next candidate
+      lastError = err;
+      logger && logger.error && logger.error(`Python scheduler attempt with '${cmd}' failed:`, err.message || err);
+      // Continue to try next candidate
+    }
+  }
+
+  // If we reach here, none of the candidates worked
+  throw new Error(
+    `Python scheduler not available: tried ${candidates.join(", ")}. Last error: ${lastError?.message || lastError}`,
+  );
 }
 
 // =============================================================================
@@ -196,10 +240,10 @@ export function describeRoutineWindows(blocks = DEFAULT_ROUTINE_BLOCKS) {
 
 /**
  * Helper: Assign subtask indices to schedule slots for split tasks.
- * 
+ *
  * For tasks with type "in_parts" or "leaky", this function maps schedule blocks
  * to their corresponding SubTask indices sequentially.
- * 
+ *
  * @param {Array} plan - Array of schedule slots
  * @returns {Promise<Array>} Plan with subtaskIndex populated for split tasks
  */
@@ -256,9 +300,7 @@ export async function persistPlan(userId, plan) {
   const existingTaskIds = await Task.find({ userId }).distinct("_id");
   const existingTaskIdSet = new Set(existingTaskIds.map((id) => id.toString()));
   const allSchedules = await TaskSchedule.find({ userId, start: { $gte: now } }).lean();
-  const orphanIds = allSchedules
-    .filter((s) => !existingTaskIdSet.has(s.taskId?.toString()))
-    .map((s) => s._id);
+  const orphanIds = allSchedules.filter((s) => !existingTaskIdSet.has(s.taskId?.toString())).map((s) => s._id);
   if (orphanIds.length > 0) {
     await TaskSchedule.deleteMany({ _id: { $in: orphanIds } });
   }

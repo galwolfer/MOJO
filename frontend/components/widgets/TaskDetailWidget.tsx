@@ -3,175 +3,224 @@
  * Displays detailed information about a single task
  */
 
-import React from "react";
-import { View, StyleSheet } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, StyleSheet, TouchableOpacity, Image, useWindowDimensions } from "react-native";
 import AppText from "../common/AppText";
 import AppButton from "../common/AppButton";
-import { COLORS, SPACING } from "../../theme";
+import { COLORS, SPACING, ICON_SIZES, paletteIndexFromKey, getPalettePair } from "../../theme";
 import Widget from "../special/Widget";
+import Tag from "../inputs/tag";
+import { ICONS } from "../icons/icons";
+import { ProgressIcon } from "../icons/ProgressIcon";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
+import { Checkbox } from "../icons/Checkbox";
+import { getCategoryMeta } from "../../config/categoryMeta";
+import List, { ListCellProps, ListCellPart } from "../layout/List";
+import Icon from "../icons/Icon";
+import {
+  ScheduledSession,
+  Subtask,
+  formatDate,
+  formatDateTime,
+  formatTimeRange,
+  getStatusStyle,
+  getImportanceLabel,
+  getEffortLabel,
+  formatDuration,
+  getTaskTypeLabel,
+  getSessionLabel,
+  getCategoryDisplay,
+  getSubtaskIdFromSession,
+  sessionRowData,
+  importanceColorIndex,
+  importanceIcon,
+  effortColor,
+  effortIcon,
+  getWidgetEntranceProps,
+  toggleSubtask,
+  toggleSession,
+} from "./widgetHelpers";
+import { TaskTitle, TaskTagsRow, ScheduledSessionsSection, renderTaskField, TwoColumnGrid } from "../special/task";
+import { useTaskContext } from "../../context/TaskContext";
 
 interface TaskDetail {
   id: string;
   title: string;
+  taskname?: string;
   description?: string;
   dueDate?: string;
+  deadline?: string;
   startDate?: string;
   status?: string;
   importance?: number;
   effort?: number;
   category?: string;
+  categoryDisplay?: string;
   subcategory?: string;
+  subcategoryDisplay?: string;
+  subCategory?: {
+    label?: string;
+    source?: string;
+    confidence?: number;
+    updatedAt?: string;
+  };
   notes?: string;
+  progressPercentage?: number;
+  scheduledSessions?: ScheduledSession[];
+  subtasks?: Subtask[];
+  estimatedDuration?: number;
+  duration?: number;
+  priorityScore?: number;
+  taskType?: string;
+  canSplit?: boolean;
+  minChunk?: number | null;
+  chunkCount?: number | null;
+  chunkMinutes?: number | null;
+  minMinutes?: number | null;
+  maxMinutes?: number | null;
+  earliestStart?: string | null;
+  tags?: string[] | null;
 }
 
 /**
  * TaskDetailWidget - Renders detailed view of a single task
  */
-const TaskDetailWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
+const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
+  data,
+  onAction,
+  entranceEnabled,
+  entranceDelay,
+  entranceDuration,
+}) => {
   const task: TaskDetail = data.task || data;
+  const { notifyTaskUpdate } = useTaskContext();
 
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return "Not set";
-    try {
-      const date = new Date(dateStr);
-      return date.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
-    } catch {
-      return dateStr;
-    }
+  const [completedParts, setCompletedParts] = useState<Set<string>>(new Set());
+  const [loadingParts, setLoadingParts] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const completed = new Set<string>();
+    (task.subtasks || []).forEach((st) => {
+      if (st.id && (st.completed || st.status === "done" || st.status === "completed")) {
+        completed.add(st.id);
+      }
+    });
+    (task.scheduledSessions || []).forEach((s) => {
+      const sid = (s as any).subtaskId;
+      if (sid && ((s as any).subtaskStatus === "done" || s.status === "completed")) {
+        completed.add(sid);
+      }
+    });
+    setCompletedParts(completed);
+  }, [task]);
+
+  const handleToggleSubtask = async (subtaskId?: string) => {
+    if (!subtaskId) return;
+    await toggleSubtask({
+      taskId: task.id,
+      subtaskId,
+      completedParts,
+      setCompletedParts,
+      loadingParts,
+      setLoadingParts,
+      notifyTaskUpdate,
+      onAction,
+    });
   };
 
-  const getStatusStyle = (status?: string) => {
-    switch (status?.toLowerCase()) {
-      case "completed":
-        return COLORS.primary6;
-      case "in_progress":
-      case "in progress":
-        return COLORS.primary1;
-      case "pending":
-        return COLORS.primary5;
-      default:
-        return COLORS.darkGray;
-    }
+  const handleToggleSession = async (
+    taskIdParam: string,
+    session: ScheduledSession,
+    index: number,
+    subtasksParam?: Subtask[],
+  ) => {
+    await toggleSession({
+      taskId: taskIdParam,
+      session,
+      index,
+      subtasks: subtasksParam || task.subtasks,
+      completedParts,
+      setCompletedParts,
+      loadingParts,
+      setLoadingParts,
+      notifyTaskUpdate,
+      onAction,
+    });
   };
 
-  const getImportanceLabel = (importance?: number) => {
-    if (!importance) return "Not set";
-    const labels = ["", "Low", "Medium-Low", "Medium", "High", "Critical"];
-    return labels[importance] || `Priority ${importance}`;
-  };
+  const sessionSubtaskIds = new Set<string>();
+  (task.scheduledSessions || []).forEach((s) => {
+    const id = getSubtaskIdFromSession(s, task.subtasks);
+    if (id) sessionSubtaskIds.add(id);
+  });
+  const remainingSubtasks = (task.subtasks || []).filter((st) => !sessionSubtaskIds.has(st.id || ""));
 
-  const handleEdit = () => {
-    onAction?.("edit_task", { taskId: task.id });
-  };
+  const categoryMeta = getCategoryMeta(task.category);
+  const categoryDisplayNormalized = getCategoryDisplay(task.category, task.categoryDisplay);
+  const subLabel = task.subcategoryDisplay || task.subCategory?.label || task.subcategory || "";
+  const subIndex = paletteIndexFromKey(subLabel);
 
-  const handleComplete = () => {
-    onAction?.("complete_task", { taskId: task.id });
-  };
+  const contentNodes: React.ReactNode[] = [
+    /* Header */
+    <View style={styles.header} key="header">
+      <TaskTitle title={task.title} taskname={task.taskname} category={task.category} />
+    </View>,
 
-  const statusColor = getStatusStyle(task.status);
+    /* Tags row (category, subcategory, importance, effort) */
+    <TaskTagsRow
+      key="tags"
+      category={task.category}
+      categoryDisplay={categoryDisplayNormalized}
+      subcategory={task.subcategory}
+      subcategoryDisplay={task.subcategoryDisplay || task.subCategory?.label}
+      importance={task.importance}
+      effort={task.effort}
+    />,
+
+    /* Details Grid */
+    <TwoColumnGrid
+      key="grid"
+      items={[
+        renderTaskField({ dueDate: task.dueDate || task.deadline }, "dueDate"),
+        renderTaskField(task, "startDate"),
+        renderTaskField(task, "earliestStart"),
+        renderTaskField({ estimatedDuration: task.estimatedDuration || task.duration }, "estimatedDuration"),
+      ]}
+    />,
+
+    /* Description */
+    task.description ? (
+      <View style={styles.section} key="desc">
+        <AppText variant="bodyText">{task.description}</AppText>
+      </View>
+    ) : null,
+
+    /* Scheduled Sessions (moved to modular component) */
+    <View style={styles.ScheduledSessionsSectionContainer} key="sessionsSection">
+      <ScheduledSessionsSection
+        key="sessions"
+        taskId={task.id}
+        taskTitle={task.title || task.taskname || "Untitled task"}
+        scheduledSessions={task.scheduledSessions}
+        subtasks={task.subtasks}
+        category={task.category}
+        categoryColor={getCategoryMeta(task.category)?.color}
+        completedParts={completedParts}
+        loadingParts={loadingParts}
+        onToggleSession={handleToggleSession}
+        estimatedDuration={task.estimatedDuration || task.duration}
+        progressPercentage={task.progressPercentage ?? null}
+        sessionHeaderMode="date"
+        dividerColor={COLORS.white}
+      />
+    </View>,
+  ];
+
+  const widgetEntranceProps = getWidgetEntranceProps({ entranceEnabled, entranceDelay, entranceDuration });
 
   return (
-    <Widget skipAnimation>
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <AppText variant="title3" style={styles.title}>
-            {task.title}
-          </AppText>
-          {task.status && (
-            <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
-              <AppText variant="notes" style={styles.statusText}>
-                {task.status.replace("_", " ").toUpperCase()}
-              </AppText>
-            </View>
-          )}
-        </View>
-
-        {/* Description */}
-        {task.description && (
-          <View style={styles.section}>
-            <AppText variant="notes" style={styles.labelText}>
-              Description
-            </AppText>
-            <AppText variant="bodyText" style={styles.description}>
-              {task.description}
-            </AppText>
-          </View>
-        )}
-
-        {/* Details Grid */}
-        <View style={styles.detailsGrid}>
-          <View style={styles.detailItem}>
-            <AppText variant="notes" style={styles.labelText}>
-              📅 Due Date
-            </AppText>
-            <AppText variant="bodyText">{formatDate(task.dueDate)}</AppText>
-          </View>
-
-          {task.startDate && (
-            <View style={styles.detailItem}>
-              <AppText variant="notes" style={styles.labelText}>
-                🗓️ Start Date
-              </AppText>
-              <AppText variant="bodyText">{formatDate(task.startDate)}</AppText>
-            </View>
-          )}
-
-          <View style={styles.detailItem}>
-            <AppText variant="notes" style={styles.labelText}>
-              ⚡ Importance
-            </AppText>
-            <AppText variant="bodyText">{getImportanceLabel(task.importance)}</AppText>
-          </View>
-
-          {task.effort && (
-            <View style={styles.detailItem}>
-              <AppText variant="notes" style={styles.labelText}>
-                💪 Effort
-              </AppText>
-              <AppText variant="bodyText">Level {task.effort}/5</AppText>
-            </View>
-          )}
-
-          {task.category && (
-            <View style={styles.detailItem}>
-              <AppText variant="notes" style={styles.labelText}>
-                📁 Category
-              </AppText>
-              <AppText variant="bodyText">{task.category}</AppText>
-            </View>
-          )}
-
-          {task.subcategory && (
-            <View style={styles.detailItem}>
-              <AppText variant="notes" style={styles.labelText}>
-                📂 Subcategory
-              </AppText>
-              <AppText variant="bodyText">{task.subcategory}</AppText>
-            </View>
-          )}
-        </View>
-
-        {/* Notes */}
-        {task.notes && (
-          <View style={styles.section}>
-            <AppText variant="notes" style={styles.labelText}>
-              📝 Notes
-            </AppText>
-            <AppText variant="bodyText" style={styles.notes}>
-              {task.notes}
-            </AppText>
-          </View>
-        )}
-
-        {/* Action buttons removed for now */}
-      </View>
+    <Widget {...widgetEntranceProps}>
+      <View style={styles.container}>{contentNodes}</View>
     </Widget>
   );
 };
@@ -179,36 +228,36 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({ data, onAction }) => {
 const styles = StyleSheet.create({
   container: {
     gap: SPACING.md,
+    width: "100%",
+    alignSelf: "stretch",
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
     gap: SPACING.sm,
+    // Ensure title alignment matches TaskTitle textAlign
+    textAlign: "left",
   },
   title: {
-    flex: 1,
+    color: COLORS.black,
     fontWeight: "600",
+    flexShrink: 1,
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
   },
-  statusBadge: {
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: COLORS.colorWhite,
+  inlineIconImage: {
+    marginLeft: SPACING.sm,
+    marginBottom: -SPACING.xs,
   },
   section: {
-    gap: 4,
+    gap: SPACING.sm,
   },
   labelText: {
     color: COLORS.darkGray,
   },
-  description: {
-    lineHeight: 20,
-  },
+
   detailsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -216,13 +265,82 @@ const styles = StyleSheet.create({
   },
   detailItem: {
     width: "45%",
-    gap: 2,
+    gap: SPACING.xs,
   },
-  notes: {
-    backgroundColor: COLORS.white2,
+  scheduleList: {
+    gap: SPACING.sm,
+  },
+  scheduleCard: {
     padding: SPACING.sm,
-    borderRadius: 4,
-    lineHeight: 18,
+  },
+  scheduleHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: SPACING.sm,
+  },
+  ScheduledSessionsSectionContainer: {
+    marginStart: SPACING.sm,
+  },
+  scheduleLabelContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+  },
+  scheduleLabel: {
+    fontWeight: "600",
+    flex: 1,
+  },
+  subtaskRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+  },
+  scheduleDateTime: {
+    color: COLORS.primary1,
+    fontWeight: "700",
+    marginBottom: SPACING.xs,
+  },
+  scheduleTime: {
+    color: COLORS.darkGray,
+  },
+  sectionTitle: {
+    fontWeight: "600",
+    marginBottom: SPACING.sm,
+  },
+  subtaskCard: {
+    padding: SPACING.sm,
+    borderLeftWidth: SPACING.xs,
+    borderLeftColor: COLORS.darkGray,
+  },
+  subtaskTitle: {
+    fontWeight: "500",
+    flex: 1,
+  },
+  subtaskCompleted: {
+    textDecorationLine: "line-through",
+    color: COLORS.darkGray,
+  },
+  subtaskDescription: {
+    color: COLORS.darkGray,
+  },
+  subtaskDuration: {
+    color: COLORS.primary1,
+    marginTop: SPACING.xs,
+  },
+  disabled: {
+    opacity: 0.6,
+  },
+  tagRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+    flexWrap: "wrap",
+    marginTop: SPACING.sm,
+  },
+  tagItem: {
+    marginRight: SPACING.sm,
+    marginBottom: SPACING.xs,
   },
   // actions and actionButton styles removed while buttons are disabled
 });

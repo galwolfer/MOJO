@@ -12,6 +12,7 @@ const taskSchema = new mongoose.Schema(
     description: { type: String, default: "", trim: true },
     dueDate: { type: Date }, // optional deadline
     status: { type: String, enum: ["todo", "in_progress", "done"], default: "todo" },
+    progressPercentage: { type: Number, min: 0, max: 100, default: 0 }, // 0-100, synced from subtasks
     importance: { type: Number, min: 1, max: 5, default: 3 }, // 1=low, 5=high
     effort: { type: Number, min: 1, max: 5, default: 3 }, // 1=small, 5=big
     category: {
@@ -244,7 +245,18 @@ taskSchema.pre("save", async function () {
   const hasManualSubCategory = this.subCategory?.label && this.subCategory?.source === "user";
   const shouldRefreshSubCategory = (shouldRefreshCategory || !this.subCategory?.label) && !hasManualSubCategory;
 
+  console.log("[Task.pre-save] Subcategory check:", {
+    isNew: this.isNew,
+    taskname: this.taskname,
+    hasSubCategory: !!this.subCategory?.label,
+    subCategoryLabel: this.subCategory?.label,
+    subCategorySource: this.subCategory?.source,
+    hasManualSubCategory,
+    shouldRefreshSubCategory,
+  });
+
   if (shouldRefreshSubCategory) {
+    console.log("[Task.pre-save] Generating subcategory for:", this.taskname);
     this.subCategory = await generateSubCategory({
       userId: this.userId,
       title: this.taskname,
@@ -253,6 +265,9 @@ taskSchema.pre("save", async function () {
       current: this.subCategory,
       TaskModel: this.constructor,
     });
+    console.log("[Task.pre-save] Generated subcategory:", this.subCategory?.label, "source:", this.subCategory?.source);
+  } else {
+    console.log("[Task.pre-save] Keeping existing subcategory:", this.subCategory?.label);
   }
 
   // ========================================================================
