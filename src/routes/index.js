@@ -10,6 +10,7 @@ import healthRouter from "./health.js";
 import chatRouter from "./chat.js";
 import authRouter from "./auth.js";
 import tasksRouter from "./tasks.js";
+import notificationsRouter from "./notifications.js";
 import {
   // Profile controllers
   profileGet,
@@ -40,6 +41,9 @@ router.use("/chat", chatRouter);
 
 // Tasks routes
 router.use("/tasks", tasksRouter);
+
+// Notifications routes (push notification management)
+router.use("/notifications", notificationsRouter);
 
 // ==================== INFRA — CORE ROUTES (END) ======================
 

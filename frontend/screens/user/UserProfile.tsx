@@ -25,7 +25,7 @@ import { moderateScale } from "react-native-size-matters";
 import { getUserStats } from "../../services/userService";
 import { getTasks, calculateTaskProgress, type Task, type TaskProgress } from "../../services/taskService";
 import UserAvatar from "../../components/common/UserAvatar";
-import { SettingsScreen, EditPreferencesScreen, ChatSettingsScreen } from "../settings";
+import { SettingsScreen, EditPreferencesScreen, ChatSettingsScreen, NotificationSettingsScreen } from "../settings";
 
 /**
  * UserProfileScreen
@@ -79,7 +79,7 @@ export default function UserProfileScreen() {
   const { subscribeToTaskUpdates } = useTaskContext();
 
   // Screen navigation state
-  const [currentScreen, setCurrentScreen] = useState<"profile" | "settings" | "edit-preferences" | "chat-settings">(
+  const [currentScreen, setCurrentScreen] = useState<"profile" | "settings" | "edit-preferences" | "chat-settings" | "notification-settings">(
     "profile",
   );
 
@@ -208,6 +208,7 @@ export default function UserProfileScreen() {
         onBack={() => setCurrentScreen("profile")}
         onEditPreferences={() => setCurrentScreen("edit-preferences")}
         onChatSettings={() => setCurrentScreen("chat-settings")}
+        onNotificationSettings={() => setCurrentScreen("notification-settings")}
       />
     );
   }
@@ -234,6 +235,15 @@ export default function UserProfileScreen() {
           // Optionally refresh data after chat settings are saved
           fetchAllData();
         }}
+      />
+    );
+  }
+
+  // If on Notification Settings screen, render NotificationSettingsScreen
+  if (currentScreen === "notification-settings") {
+    return (
+      <NotificationSettingsScreen
+        onBack={() => setCurrentScreen("settings")}
       />
     );
   }

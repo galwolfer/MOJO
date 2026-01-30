@@ -234,6 +234,50 @@ const userSchema = new mongoose.Schema(
         completedTasks: 0,
       },
     },
+
+    // Push notification settings
+    pushNotifications: {
+      type: new mongoose.Schema(
+        {
+          // Expo Push Token for this device
+          expoPushToken: { type: String, default: null },
+          // Device platform (ios/android)
+          platform: { type: String, enum: ["ios", "android", "web", null], default: null },
+          // Whether notifications are enabled globally
+          enabled: { type: Boolean, default: true },
+          // Morning summary notification (8 AM)
+          morningDigest: {
+            enabled: { type: Boolean, default: true },
+            hour: { type: Number, min: 0, max: 23, default: 8 },
+            minute: { type: Number, min: 0, max: 59, default: 0 },
+          },
+          // Task reminder notifications
+          taskReminders: {
+            enabled: { type: Boolean, default: true },
+            // Default minutes before due date to remind
+            defaultReminderMinutes: { type: Number, default: 60 },
+            // Use ML predictions for smart reminders
+            useSmartReminders: { type: Boolean, default: true },
+          },
+          // Timezone for scheduling (IANA format, e.g., 'America/New_York')
+          timezone: { type: String, default: "UTC" },
+          // Last notification sent timestamps
+          lastMorningDigest: { type: Date, default: null },
+          lastTaskReminder: { type: Date, default: null },
+        },
+        { _id: false }
+      ),
+      default: {
+        expoPushToken: null,
+        platform: null,
+        enabled: true,
+        morningDigest: { enabled: true, hour: 8, minute: 0 },
+        taskReminders: { enabled: true, defaultReminderMinutes: 60, useSmartReminders: true },
+        timezone: "UTC",
+        lastMorningDigest: null,
+        lastTaskReminder: null,
+      },
+    },
   },
   { timestamps: true }
 );

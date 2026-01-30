@@ -27,9 +27,10 @@ type SettingsScreenProps = {
   onBack: () => void;
   onEditPreferences?: () => void;
   onChatSettings?: () => void;
+  onNotificationSettings?: () => void;
 };
 
-export default function SettingsScreen({ onBack, onEditPreferences, onChatSettings }: SettingsScreenProps) {
+export default function SettingsScreen({ onBack, onEditPreferences, onChatSettings, onNotificationSettings }: SettingsScreenProps) {
   const { user, signOut, signIn, token } = useAuth();
   const { setHeaderConfig } = useNavigation();
 
@@ -79,8 +80,11 @@ export default function SettingsScreen({ onBack, onEditPreferences, onChatSettin
   };
 
   const handleNotifications = () => {
-    // TODO: Navigate to notifications settings screen
-    console.log("Notifications pressed");
+    if (onNotificationSettings) {
+      onNotificationSettings();
+    } else {
+      console.log("Notifications pressed - no handler provided");
+    }
   };
 
   const preferenceItems: ListCellProps[] = [

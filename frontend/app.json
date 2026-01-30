@@ -13,7 +13,10 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": ["remote-notification"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -22,15 +25,36 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.mojo.Mojo"
+      "package": "com.mojo.Mojo",
+      "permissions": [
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.POST_NOTIFICATIONS"
+      ],
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-font",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#FF6B6B",
+          "defaultChannel": "default",
+          "sounds": ["./assets/notification-sound.wav"]
+        }
+      ]
     ],
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#FF6B6B",
+      "androidMode": "default",
+      "androidCollapsedTitle": "Mojo"
+    },
     "extra": {
       "eas": {
         "projectId": "963e0c4f-be40-488b-8dee-75114924e74d"

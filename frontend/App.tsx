@@ -12,6 +12,7 @@ import { NavigationProvider } from "./context/NavigationContext";
 import { LayoutProvider } from "./context/LayoutContext";
 import { TaskProvider } from "./context/TaskContext";
 import { OjoProvider } from "./context/OjoContext";
+import { NotificationProvider } from "./context/NotificationContext";
 import MainLayout from "./components/layout/MainLayout";
 import LoadingScreen from "./components/special/LoadingScreen";
 
@@ -93,15 +94,17 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <NavigationProvider>
-        <LayoutProvider>
-          <OjoProvider>
-            <TaskProvider>
-              <AppContent />
-            </TaskProvider>
-          </OjoProvider>
-        </LayoutProvider>
-      </NavigationProvider>
+      <NotificationProvider>
+        <NavigationProvider>
+          <LayoutProvider>
+            <OjoProvider>
+              <TaskProvider>
+                <AppContent />
+              </TaskProvider>
+            </OjoProvider>
+          </LayoutProvider>
+        </NavigationProvider>
+      </NotificationProvider>
     </AuthProvider>
   );
 }
