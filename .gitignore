@@ -60,3 +60,4 @@ data/vector_db/
 # Python bytecode caches
 __pycache__/
 
+android/
