@@ -453,6 +453,7 @@ export async function updateTask(
 /**
  * Update a subtask
  * PATCH /api/tasks/:taskId/subtasks/:subId
+ * Returns gamification data when subtask is completed
  */
 export async function updateSubTask(
   taskId: string,
@@ -460,7 +461,23 @@ export async function updateSubTask(
   updates: Partial<{ status: SubTaskStatus; title?: string; description?: string; minutes?: number }>,
 ): Promise<boolean> {
   try {
-    await patch<{ success: boolean }>(`/tasks/${taskId}/subtasks/${subtaskId}`, updates);
+    const response = await patch<{
+      success: boolean;
+      gamification?: { points: number; currentStreak: number };
+      pointsAwarded?: number;
+      parentTaskCompleted?: boolean;
+    }>(`/tasks/${taskId}/subtasks/${subtaskId}`, updates);
+
+    // Log gamification data if subtask was completed
+    if (response.gamification) {
+      console.log("[taskService] Subtask completion gamification:", {
+        pointsAwarded: response.pointsAwarded,
+        totalPoints: response.gamification.points,
+        streak: response.gamification.currentStreak,
+        parentTaskCompleted: response.parentTaskCompleted,
+      });
+    }
+
     return true;
   } catch (error) {
     console.warn("Failed to update subtask:", error);

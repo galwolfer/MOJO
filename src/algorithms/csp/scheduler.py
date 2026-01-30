@@ -127,7 +127,17 @@ def generate_variables(tasks: List[dict], horizon_end: datetime, rng: Optional[r
         if task.get("dueDate"):
             try:
                 deadline = datetime.fromisoformat(task["dueDate"]) if isinstance(task["dueDate"], str) else task["dueDate"]
+                # normalize to end of day
                 deadline = deadline.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+                # If deadline is timezone-aware, convert it to local timezone and make it naive
+                # so it is comparable to the naive `now` and other naive datetimes used elsewhere.
+                if isinstance(deadline, datetime) and deadline.tzinfo is not None:
+                    try:
+                        deadline = deadline.astimezone().replace(tzinfo=None)
+                    except Exception:
+                        # best-effort fallback to strip tzinfo
+                        deadline = deadline.replace(tzinfo=None)
             except Exception:
                 deadline = horizon_end
         else:

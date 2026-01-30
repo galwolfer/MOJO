@@ -35,7 +35,6 @@ export default function LoadingScreen({ onLoadingComplete, isAppReady }: Loading
   // Keep phase ref in sync
   useEffect(() => {
     phaseRef.current = phase;
-    console.log("[LoadingScreen] Phase changed to:", phase);
   }, [phase]);
 
   // Colorize animation JSON for Android to use COLORS.primary1
@@ -96,14 +95,6 @@ export default function LoadingScreen({ onLoadingComplete, isAppReady }: Loading
 
   useEffect(() => {
     isFullyLoadedRef.current = isFullyLoaded;
-    console.log(
-      "[LoadingScreen] isAppReady:",
-      isAppReady,
-      "serverConnected:",
-      serverConnected,
-      "isFullyLoaded:",
-      isFullyLoaded,
-    );
   }, [isFullyLoaded, isAppReady, serverConnected]);
 
   // Check server connectivity
@@ -115,12 +106,6 @@ export default function LoadingScreen({ onLoadingComplete, isAppReady }: Loading
       try {
         serverCheckAttemptsRef.current += 1;
         const apiBase = getApiBase();
-        console.log(
-          "[LoadingScreen] Checking server health at:",
-          `${apiBase}/health`,
-          "attempt:",
-          serverCheckAttemptsRef.current,
-        );
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout
@@ -130,7 +115,6 @@ export default function LoadingScreen({ onLoadingComplete, isAppReady }: Loading
           method: "GET",
           signal: controller.signal,
         }).catch((err) => {
-          console.log("[LoadingScreen] Server health check failed:", err.message);
           return null;
         });
 
@@ -138,16 +122,13 @@ export default function LoadingScreen({ onLoadingComplete, isAppReady }: Loading
 
         if (isMounted) {
           if (response && response.ok) {
-            console.log("[LoadingScreen] Server connected successfully!");
             setServerConnected(true);
           } else {
             // Keep retrying indefinitely until server is reachable
-            console.log("[LoadingScreen] Server not reachable, will retry in 1s");
             retryTimeout = setTimeout(checkServer, 1000);
           }
         }
       } catch (error) {
-        console.log("[LoadingScreen] Server check error:", error);
         if (isMounted) {
           // Keep retrying indefinitely
           retryTimeout = setTimeout(checkServer, 1000);
@@ -170,7 +151,6 @@ export default function LoadingScreen({ onLoadingComplete, isAppReady }: Loading
       if (phaseRef.current === "initial") {
         if (isFullyLoadedRef.current) {
           // Loaded fast! Complete immediately at 2.25s
-          console.log("[LoadingScreen] Loaded before 2.25s, completing now");
           setPhase("complete");
           onLoadingComplete();
         } else {
@@ -184,7 +164,6 @@ export default function LoadingScreen({ onLoadingComplete, isAppReady }: Loading
       if (phaseRef.current === "waitingForLoop") {
         if (isFullyLoadedRef.current) {
           // Loaded before 4s, complete immediately at 4s
-          console.log("[LoadingScreen] Loaded before 4s, completing now");
           setPhase("complete");
           onLoadingComplete();
         } else {
@@ -209,12 +188,10 @@ export default function LoadingScreen({ onLoadingComplete, isAppReady }: Loading
   // When fully loaded during looping phase, transition to finishing (let current loop complete)
   useEffect(() => {
     if (isFullyLoaded && phase === "looping") {
-      console.log("[LoadingScreen] Loaded during looping, will complete after current loop");
       setPhase("finishing");
     } else if (isFullyLoaded && phase === "waitingForLoop") {
       // Edge case: if app becomes loaded while in waitingForLoop phase (before 4s timer fires)
       // We should complete immediately rather than waiting for the 4s timer
-      console.log("[LoadingScreen] Loaded during waitingForLoop phase, completing now");
       setPhase("complete");
       onLoadingComplete();
     }
@@ -225,24 +202,19 @@ export default function LoadingScreen({ onLoadingComplete, isAppReady }: Loading
     const currentPhase = phaseRef.current;
     const loaded = isFullyLoadedRef.current;
 
-    console.log("[LoadingScreen] Animation finished, phase:", currentPhase, "loaded:", loaded);
-
     if (currentPhase === "complete") return;
 
     if (currentPhase === "finishing") {
       // Animation finished while in finishing phase (during loop) - complete!
-      console.log("[LoadingScreen] Finishing phase complete");
       setPhase("complete");
       onLoadingComplete();
     } else if (currentPhase === "looping") {
       if (loaded) {
         // Loaded during loop, complete now
-        console.log("[LoadingScreen] Loaded during loop, completing");
         setPhase("complete");
         onLoadingComplete();
       } else {
         // Not loaded yet, restart the loop segment
-        console.log("[LoadingScreen] Loop finished, restarting loop");
         if (lottieRef.current) {
           lottieRef.current.play(LOOP_START_FRAME, ANIMATION_END_FRAME);
         }
@@ -250,12 +222,10 @@ export default function LoadingScreen({ onLoadingComplete, isAppReady }: Loading
     } else if (currentPhase === "initial" || currentPhase === "waitingForLoop") {
       // Animation finished during initial/waiting phase (shouldn't happen normally with timers)
       if (loaded) {
-        console.log("[LoadingScreen] Animation finished early with app loaded, completing");
         setPhase("complete");
         onLoadingComplete();
       } else {
         // Keep looping until loaded
-        console.log("[LoadingScreen] Animation finished but not loaded, starting loop");
         setPhase("looping");
         if (lottieRef.current) {
           lottieRef.current.play(LOOP_START_FRAME, ANIMATION_END_FRAME);
@@ -268,7 +238,6 @@ export default function LoadingScreen({ onLoadingComplete, isAppReady }: Loading
   useEffect(() => {
     const safetyTimeout = setTimeout(() => {
       if (phaseRef.current !== "complete") {
-        console.warn("[LoadingScreen] Safety timeout reached (30s), forcing completion");
         setPhase("complete");
         onLoadingComplete();
       }
@@ -277,17 +246,7 @@ export default function LoadingScreen({ onLoadingComplete, isAppReady }: Loading
     return () => clearTimeout(safetyTimeout);
   }, [onLoadingComplete]);
 
-  console.log(
-    "[LoadingScreen] Rendering - phase:",
-    phase,
-    "isAppReady:",
-    isAppReady,
-    "serverConnected:",
-    serverConnected,
-  );
-
   if (phase === "complete") {
-    console.log("[LoadingScreen] Complete - returning null");
     return null;
   }
 

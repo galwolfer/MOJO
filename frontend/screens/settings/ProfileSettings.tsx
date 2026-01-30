@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { View, StyleSheet, Image, Alert, Platform } from "react-native";
 import { moderateScale } from "react-native-size-matters";
 import AppText from "../../components/common/AppText";
@@ -30,12 +30,19 @@ export default function ProfileSettings() {
   const [newProfileImage, setNewProfileImage] = useState<string | File | null>(null);
   const [showPasswordSection, setShowPasswordSection] = useState(false);
 
+  // Use ref to track if we've already set initial values
+  const initializedRef = useRef(false);
+
   useEffect(() => {
-    if (user && !isEditMode) {
+    if (user && !isEditMode && !initializedRef.current) {
       setEditedUsername(user.username || "");
       setEditedEmail(user.email || "");
       setEditedDisplayName(user.displayName || user.username || "");
       setEditedProfileImage(user.profileImage || null);
+      initializedRef.current = true;
+    }
+    if (isEditMode) {
+      initializedRef.current = false;
     }
   }, [user, isEditMode]);
 

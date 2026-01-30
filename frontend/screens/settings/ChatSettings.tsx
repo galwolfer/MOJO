@@ -4,7 +4,7 @@
  * Allows users to change their OjoType (chat personality).
  * Accessed from Settings > Chat settings.
  */
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
 import AppText from "../../components/common/AppText";
 import AppButton from "../../components/common/AppButton";
@@ -20,6 +20,7 @@ import { useKeyboard } from "../../hooks";
 import { getUserPreferences } from "../../services/apiClient";
 import { patch, setAuthToken } from "../../services/httpClient";
 import { useAuth } from "../../context/AuthContext";
+import { useOjo } from "../../context/OjoContext";
 
 type ChatSettingsScreenProps = {
   onBack: () => void;
@@ -31,6 +32,7 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
   const { token } = useAuth();
   const { visible: keyboardVisible, height: keyboardHeight } = useKeyboard();
   const { dimensions } = useLayout();
+  const { refresh: refreshOjo } = useOjo();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -43,6 +45,12 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
   const allOjoTypes = getAllOjoTypes().slice(0, 4);
   const iconSize = moderateScale(64);
   const animatedSetRef = useRef<Set<string>>(new Set());
+
+  // Store onBack in a ref to avoid recreating header config
+  const onBackRef = useRef(onBack);
+  useEffect(() => {
+    onBackRef.current = onBack;
+  }, [onBack]);
 
   const LeftIcon = ICONS.left;
   const OjoIcon = ICONS.ojo;
@@ -71,14 +79,16 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
     fetchPreferences();
   }, []);
 
-  // Setup header
+  // Setup header - only set once on mount
   useEffect(() => {
+    const handleBackPress = () => onBackRef.current();
+
     setHeaderConfig({
       title: "Chat Settings",
       show: true,
       icon: ICONS.ojo,
       leftElement: (
-        <TouchableOpacity onPress={onBack} style={styles.headerRightTouchable}>
+        <TouchableOpacity onPress={handleBackPress} style={styles.headerRightTouchable}>
           <LeftIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
         </TouchableOpacity>
       ),
@@ -88,7 +98,7 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
         </View>
       ),
     });
-  }, [onBack]);
+  }, []);
 
   const handleCancel = () => {
     // Reset to original value
@@ -108,6 +118,10 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
       // Update OjoType if changed
       if (selectedOjo !== originalOjo) {
         await patch("/auth/profile", { ojoTypeName: selectedOjo });
+        // Refresh the OjoContext to update gradient immediately
+        if (refreshOjo) {
+          await refreshOjo();
+        }
       }
 
       // Update original value to reflect saved state

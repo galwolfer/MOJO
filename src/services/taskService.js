@@ -977,6 +977,7 @@ export async function getSubTaskById({ userId, subTaskId }) {
 
 /**
  * Update a subtask fields (title, description, status)
+ * Returns wasAlreadyCompleted flag to help callers decide whether to award points
  */
 export async function updateSubTask({ userId, subTaskId, updates }) {
   if (!subTaskId) return { success: false, error: "SubTask ID is required" };
@@ -997,14 +998,18 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
     return { success: false, error: buildIllegalCharsError(illegalFields) };
   }
 
-  // If marking done, set completedAt
-  if (sanitized.status === "done") sanitized.completedAt = new Date();
-  if (sanitized.status === "todo") sanitized.completedAt = null;
-
   // Use find + save instead of findOneAndUpdate to trigger Mongoose hooks
   const subtask = await SubTask.findOne({ _id: subTaskId, userId });
 
   if (!subtask) return { success: false, error: "SubTask not found or access denied" };
+
+  // Track if this was already completed (to avoid double-awarding points)
+  const wasAlreadyCompleted = subtask.status === "done";
+  const isNewCompletion = sanitized.status === "done" && !wasAlreadyCompleted;
+
+  // If marking done, set completedAt
+  if (sanitized.status === "done") sanitized.completedAt = new Date();
+  if (sanitized.status === "todo") sanitized.completedAt = null;
 
   // Apply updates
   Object.assign(subtask, sanitized);
@@ -1014,14 +1019,27 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
 
   const updated = subtask.toObject();
 
+  // Get parent task for context (used for point calculation)
+  let parentTask = null;
+  try {
+    parentTask = await Task.findById(updated.taskId).lean();
+  } catch (err) {
+    // Non-fatal
+  }
+
   // If all subtasks are done, optionally mark parent task as done. If some done -> in_progress
+  let parentTaskCompleted = false;
   try {
     const remaining = await SubTask.countDocuments({ taskId: updated.taskId, status: { $ne: "done" } });
     const total = await SubTask.countDocuments({ taskId: updated.taskId });
     if (total > 0) {
       let newStatus = "todo";
-      if (remaining === 0) newStatus = "done";
-      else if (remaining < total) newStatus = "in_progress";
+      if (remaining === 0) {
+        newStatus = "done";
+        parentTaskCompleted = true;
+      } else if (remaining < total) {
+        newStatus = "in_progress";
+      }
       await Task.updateOne({ _id: updated.taskId }, { $set: { status: newStatus } });
     }
   } catch (err) {
@@ -1029,7 +1047,14 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
     console.warn("Failed to sync parent task status after subtask update:", err && err.message);
   }
 
-  return { success: true, subtask: updated };
+  return {
+    success: true,
+    subtask: updated,
+    parentTask,
+    wasAlreadyCompleted,
+    isNewCompletion,
+    parentTaskCompleted,
+  };
 }
 
 // =============================================================================

@@ -5,7 +5,7 @@
  * Reuses the CategoryGrid component from the auth flow but with different descriptions
  * and Cancel/Save buttons instead of Next.
  */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
 import AppText from "../../components/common/AppText";
 import AppButton from "../../components/common/AppButton";
@@ -44,6 +44,12 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
   const [originalPriorities, setOriginalPriorities] = useState<Record<string, number>>({});
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey | null>(null);
 
+  // Store onBack in a ref to avoid recreating header config
+  const onBackRef = useRef(onBack);
+  useEffect(() => {
+    onBackRef.current = onBack;
+  }, [onBack]);
+
   const LeftIcon = ICONS.left;
   const PrefIcon = ICONS.prefrences;
 
@@ -81,14 +87,16 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
     fetchPreferences();
   }, []);
 
-  // Setup header (single-line): Pref icon at left, right-arrow at right
+  // Setup header (single-line): Pref icon at left, right-arrow at right - only set once on mount
   useEffect(() => {
+    const handleBackPress = () => onBackRef.current();
+
     setHeaderConfig({
       title: "Edit Preferences",
       show: true,
       icon: ICONS.prefrences,
       leftElement: (
-        <TouchableOpacity onPress={onBack} style={styles.headerRightTouchable}>
+        <TouchableOpacity onPress={handleBackPress} style={styles.headerRightTouchable}>
           <LeftIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
         </TouchableOpacity>
       ),
@@ -98,7 +106,7 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
         </View>
       ),
     });
-  }, [onBack]);
+  }, []);
 
   const handleCancel = () => {
     // Reset to original values

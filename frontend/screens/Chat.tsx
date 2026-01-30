@@ -157,6 +157,7 @@ export default function ChatScreen() {
 
       // Notify TaskContext to trigger updates in UserProfile and other screens
       // Task-related actions: task_toggled, confirmed, completed, created, updated, deleted
+      // Also includes subtask actions which affect stats and progress
       const taskActions = [
         "task_toggled",
         "confirmed",
@@ -168,6 +169,8 @@ export default function ChatScreen() {
         "task_created",
         "task_updated",
         "task_deleted",
+        "subtask_toggled",
+        "subtask_completed",
       ];
 
       if (taskActions.includes(actionId)) {
