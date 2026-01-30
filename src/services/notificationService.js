@@ -775,3 +775,76 @@ export async function sendTestNotification(userId) {
     data: { type: "test" },
   });
 }
+
+// Store active test intervals per user
+const activeTestIntervals = new Map();
+
+/**
+ * Start periodic test notifications (every 1 minute)
+ * 
+ * @param {string} userId - User ID
+ * @returns {Promise<Object>} Start result
+ */
+export async function startPeriodicTestNotifications(userId) {
+  // Stop any existing interval for this user
+  if (activeTestIntervals.has(userId)) {
+    clearInterval(activeTestIntervals.get(userId));
+  }
+
+  let count = 0;
+
+  // Send first notification immediately
+  const firstResult = await sendNotificationToUser(userId, {
+    title: "🧪 Test Mode Started!",
+    body: `Test notification #1 - You'll receive one every minute. Go to settings to stop.`,
+    data: { type: "periodic_test", count: 1 },
+  });
+
+  count = 1;
+
+  // Set up interval for every 1 minute (60000 ms)
+  const intervalId = setInterval(async () => {
+    count++;
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString();
+    
+    await sendNotificationToUser(userId, {
+      title: `🧪 Test Notification #${count}`,
+      body: `Sent at ${timeStr} - Testing push notifications every minute.`,
+      data: { type: "periodic_test", count },
+    });
+    
+    logger.info(`Sent periodic test notification #${count} to user ${userId}`);
+  }, 60000); // 1 minute
+
+  activeTestIntervals.set(userId, intervalId);
+  
+  logger.info(`Started periodic test notifications for user ${userId}`);
+  return { success: true, message: "Periodic test notifications started (every 1 minute)" };
+}
+
+/**
+ * Stop periodic test notifications
+ * 
+ * @param {string} userId - User ID
+ * @returns {Object} Stop result
+ */
+export function stopPeriodicTestNotifications(userId) {
+  if (activeTestIntervals.has(userId)) {
+    clearInterval(activeTestIntervals.get(userId));
+    activeTestIntervals.delete(userId);
+    logger.info(`Stopped periodic test notifications for user ${userId}`);
+    return { success: true, message: "Periodic test notifications stopped" };
+  }
+  return { success: true, message: "No active test notifications to stop" };
+}
+
+/**
+ * Check if periodic test notifications are active for a user
+ * 
+ * @param {string} userId - User ID
+ * @returns {boolean} Whether test mode is active
+ */
+export function isTestModeActive(userId) {
+  return activeTestIntervals.has(userId);
+}

@@ -15,7 +15,9 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       }
     },
     "android": {
@@ -39,26 +41,13 @@
     "plugins": [
       "expo-font",
       "expo-secure-store",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/notification-icon.png",
-          "color": "#FF6B6B",
-          "defaultChannel": "default",
-          "sounds": ["./assets/notification-sound.wav"]
-        }
-      ]
+      "expo-notifications"
     ],
-    "notification": {
-      "icon": "./assets/notification-icon.png",
-      "color": "#FF6B6B",
-      "androidMode": "default",
-      "androidCollapsedTitle": "Mojo"
-    },
     "extra": {
       "eas": {
-        "projectId": "963e0c4f-be40-488b-8dee-75114924e74d"
+        "projectId": "875a7d38-e45f-45b2-9bee-a15823df2f34"
       }
-    }
+    },
+    "owner": "galwolfer"
   }
 }

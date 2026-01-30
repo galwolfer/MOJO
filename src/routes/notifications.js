@@ -15,6 +15,9 @@ import {
   updateNotificationPreferences,
   getNotificationPreferences,
   sendTestNotification,
+  startPeriodicTestNotifications,
+  stopPeriodicTestNotifications,
+  isTestModeActive,
 } from "../services/notificationService.js";
 
 const router = Router();
@@ -39,7 +42,7 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    const result = await registerPushToken(req.userId, token, platform);
+    const result = await registerPushToken(req.user.userId, token, platform);
     
     if (!result.success) {
       return res.status(400).json(result);
@@ -64,7 +67,7 @@ router.post("/register", async (req, res) => {
  */
 router.post("/unregister", async (req, res) => {
   try {
-    const result = await unregisterPushToken(req.userId);
+    const result = await unregisterPushToken(req.user.userId);
     
     if (!result.success) {
       return res.status(400).json(result);
@@ -89,7 +92,7 @@ router.post("/unregister", async (req, res) => {
  */
 router.get("/preferences", async (req, res) => {
   try {
-    const result = await getNotificationPreferences(req.userId);
+    const result = await getNotificationPreferences(req.user.userId);
     
     if (!result.success) {
       return res.status(400).json(result);
@@ -161,7 +164,7 @@ router.put("/preferences", async (req, res) => {
       }
     }
 
-    const result = await updateNotificationPreferences(req.userId, preferences);
+    const result = await updateNotificationPreferences(req.user.userId, preferences);
     
     if (!result.success) {
       return res.status(400).json(result);
@@ -183,7 +186,7 @@ router.put("/preferences", async (req, res) => {
  */
 router.post("/test", async (req, res) => {
   try {
-    const result = await sendTestNotification(req.userId);
+    const result = await sendTestNotification(req.user.userId);
     
     if (!result.success) {
       return res.status(400).json(result);
@@ -200,6 +203,52 @@ router.post("/test", async (req, res) => {
       error: "Failed to send test notification" 
     });
   }
+});
+
+/**
+ * POST /api/notifications/test/start
+ * Start periodic test notifications (every 1 minute)
+ */
+router.post("/test/start", async (req, res) => {
+  try {
+    const result = await startPeriodicTestNotifications(req.user.userId);
+    return res.json(result);
+  } catch (error) {
+    console.error("Error starting periodic test:", error);
+    return res.status(500).json({ 
+      success: false, 
+      error: "Failed to start periodic test notifications" 
+    });
+  }
+});
+
+/**
+ * POST /api/notifications/test/stop
+ * Stop periodic test notifications
+ */
+router.post("/test/stop", async (req, res) => {
+  try {
+    const result = stopPeriodicTestNotifications(req.user.userId);
+    return res.json(result);
+  } catch (error) {
+    console.error("Error stopping periodic test:", error);
+    return res.status(500).json({ 
+      success: false, 
+      error: "Failed to stop periodic test notifications" 
+    });
+  }
+});
+
+/**
+ * GET /api/notifications/test/status
+ * Check if periodic test mode is active
+ */
+router.get("/test/status", (req, res) => {
+  const isActive = isTestModeActive(req.user.userId);
+  return res.json({ 
+    success: true, 
+    testModeActive: isActive 
+  });
 });
 
 export default router;

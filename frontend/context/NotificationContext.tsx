@@ -14,6 +14,9 @@ import {
   getNotificationPreferences,
   updateNotificationPreferences as updatePreferencesApi,
   sendTestNotification,
+  startPeriodicTestNotifications as startPeriodicTestApi,
+  stopPeriodicTestNotifications as stopPeriodicTestApi,
+  getTestModeStatus,
   addNotificationReceivedListener,
   addNotificationResponseListener,
   getLastNotificationResponse,
@@ -24,7 +27,7 @@ import {
 import { useAuth } from "./AuthContext";
 
 // Expo project ID from app.json
-const EXPO_PROJECT_ID = "963e0c4f-be40-488b-8dee-75114924e74d";
+const EXPO_PROJECT_ID = "875a7d38-e45f-45b2-9bee-a15823df2f34";
 
 type NotificationContextType = {
   // State
@@ -35,11 +38,14 @@ type NotificationContextType = {
   preferences: NotificationPreferences | null;
   isPhysicalDevice: boolean;
   error: string | null;
+  testModeActive: boolean;
 
   // Actions
   initialize: () => Promise<void>;
   updatePreferences: (prefs: Partial<NotificationPreferences>) => Promise<boolean>;
   testNotification: () => Promise<boolean>;
+  startPeriodicTest: () => Promise<boolean>;
+  stopPeriodicTest: () => Promise<boolean>;
   refreshPreferences: () => Promise<void>;
 
   // Last notification (if app opened from notification)
@@ -63,6 +69,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
   const [isPhysicalDeviceState, setIsPhysicalDeviceState] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastNotification, setLastNotification] = useState<NotificationData | null>(null);
+  const [testModeActive, setTestModeActive] = useState(false);
 
   // Refs for listeners
   const notificationReceivedListener = useRef<{ remove: () => void } | null>(null);
@@ -79,6 +86,20 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
       initialize();
     }
   }, [user, token]);
+
+  // Check test mode status when initialized
+  useEffect(() => {
+    if (isInitialized && user && token) {
+      checkTestModeStatus();
+    }
+  }, [isInitialized, user, token]);
+
+  const checkTestModeStatus = async () => {
+    const result = await getTestModeStatus();
+    if (result.success && result.testModeActive !== undefined) {
+      setTestModeActive(result.testModeActive);
+    }
+  };
 
   // Set up notification listeners
   useEffect(() => {
@@ -154,6 +175,12 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
    */
   const initialize = useCallback(async () => {
     if (isLoading) return;
+    
+    // Don't try to initialize if user is not authenticated
+    if (!user || !token) {
+      console.log('Skipping notification init - user not authenticated');
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
@@ -166,9 +193,14 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
       setIsInitialized(true);
 
       if (!result.success) {
-        setError(result.error || "Failed to initialize notifications");
-      } else {
-        // Fetch preferences after successful initialization
+        // Don't show Firebase config errors as errors to user - just log them
+        if (result.error?.includes('Firebase') || result.error?.includes('FCM')) {
+          console.warn('Push notifications unavailable:', result.error);
+        } else {
+          setError(result.error || "Failed to initialize notifications");
+        }
+      } else if (result.token) {
+        // Only fetch preferences if we have a valid token
         await refreshPreferences();
       }
     } catch (err: any) {
@@ -177,12 +209,16 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading]);
+  }, [isLoading, user, token]);
 
   /**
    * Refresh notification preferences from server
    */
   const refreshPreferences = useCallback(async () => {
+    if (!user || !token) {
+      console.log('Skipping preferences refresh - user not authenticated');
+      return;
+    }
     try {
       const result = await getNotificationPreferences();
       if (result.success && result.preferences) {
@@ -191,13 +227,17 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     } catch (err) {
       console.error("Error refreshing preferences:", err);
     }
-  }, []);
+  }, [user, token]);
 
   /**
    * Update notification preferences
    */
   const updatePreferences = useCallback(
     async (prefs: Partial<NotificationPreferences>): Promise<boolean> => {
+      if (!user || !token) {
+        console.log('Skipping preferences update - user not authenticated');
+        return false;
+      }
       try {
         const result = await updatePreferencesApi(prefs);
         if (result.success && result.preferences) {
@@ -210,7 +250,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
         return false;
       }
     },
-    []
+    [user, token]
   );
 
   /**
@@ -222,6 +262,38 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
       return result.success;
     } catch (err) {
       console.error("Error sending test notification:", err);
+      return false;
+    }
+  }, []);
+
+  /**
+   * Start periodic test notifications (every 1 minute)
+   */
+  const startPeriodicTest = useCallback(async (): Promise<boolean> => {
+    try {
+      const result = await startPeriodicTestApi();
+      if (result.success) {
+        setTestModeActive(true);
+      }
+      return result.success;
+    } catch (err) {
+      console.error("Error starting periodic test:", err);
+      return false;
+    }
+  }, []);
+
+  /**
+   * Stop periodic test notifications
+   */
+  const stopPeriodicTest = useCallback(async (): Promise<boolean> => {
+    try {
+      const result = await stopPeriodicTestApi();
+      if (result.success) {
+        setTestModeActive(false);
+      }
+      return result.success;
+    } catch (err) {
+      console.error("Error stopping periodic test:", err);
       return false;
     }
   }, []);
@@ -241,9 +313,12 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     preferences,
     isPhysicalDevice: isPhysicalDeviceState,
     error,
+    testModeActive,
     initialize,
     updatePreferences,
     testNotification,
+    startPeriodicTest,
+    stopPeriodicTest,
     refreshPreferences,
     lastNotification,
     clearLastNotification,

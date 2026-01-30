@@ -142,7 +142,22 @@ export async function getExpoPushToken(projectId?: string): Promise<string | nul
     });
 
     return tokenData.data;
-  } catch (error) {
+  } catch (error: any) {
+    // Check if this is a Firebase configuration error
+    const errorMessage = error?.message || '';
+    if (errorMessage.includes('FirebaseApp is not initialized') || 
+        errorMessage.includes('FCM') || 
+        errorMessage.includes('Firebase')) {
+      console.warn(
+        '⚠️ Firebase/FCM is not configured. Push notifications will not work.\n' +
+        'To enable push notifications:\n' +
+        '1. Create a Firebase project at https://console.firebase.google.com\n' +
+        '2. Add an Android app with package name: com.mojo.Mojo\n' +
+        '3. Download google-services.json to frontend/google-services.json\n' +
+        '4. Rebuild the app with: npx expo prebuild --clean && npx expo run:android'
+      );
+      return null;
+    }
     console.error("Error getting Expo push token:", error);
     return null;
   }
@@ -253,6 +268,59 @@ export async function sendTestNotification(): Promise<{ success: boolean; error?
 }
 
 /**
+ * Start periodic test notifications (every 1 minute)
+ * @returns Success status
+ */
+export async function startPeriodicTestNotifications(): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const response = await post<{ success: boolean; message?: string; error?: string }>(
+      "/notifications/test/start",
+      {}
+    );
+
+    return { success: response.success, message: response.message };
+  } catch (error: any) {
+    console.error("Error starting periodic test:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Stop periodic test notifications
+ * @returns Success status
+ */
+export async function stopPeriodicTestNotifications(): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const response = await post<{ success: boolean; message?: string; error?: string }>(
+      "/notifications/test/stop",
+      {}
+    );
+
+    return { success: response.success, message: response.message };
+  } catch (error: any) {
+    console.error("Error stopping periodic test:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Check if periodic test mode is active
+ * @returns Test mode status
+ */
+export async function getTestModeStatus(): Promise<{ success: boolean; testModeActive?: boolean; error?: string }> {
+  try {
+    const response = await get<{ success: boolean; testModeActive: boolean }>(
+      "/notifications/test/status"
+    );
+
+    return { success: true, testModeActive: response.testModeActive };
+  } catch (error: any) {
+    console.error("Error getting test mode status:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * Set up notification channels for Android
  * Required for Android 8+ to display notifications
  */
@@ -310,7 +378,6 @@ export async function setNotificationHandler(
   // Set default notification handler
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
-      shouldShowAlert: true,
       shouldPlaySound: true,
       shouldSetBadge: true,
       shouldShowBanner: true,

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "700532216880",
+    "project_id": "mojo-a8089",
+    "storage_bucket": "mojo-a8089.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:700532216880:android:3a034d62b23bf2869a89f5",
+        "android_client_info": {
+          "package_name": "com.mojo.Mojo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "PLACEHOLDER_REDACTED_KEY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

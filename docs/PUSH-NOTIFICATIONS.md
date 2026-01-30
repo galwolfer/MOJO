@@ -9,6 +9,34 @@ The system uses **Expo Push Notifications** which work seamlessly across develop
 1. **Morning Task Digest** - Daily notification at 8 AM (configurable) summarizing tasks for the day
 2. **Smart Task Reminders** - ML-powered reminders that predict optimal timing and frequency based on user behavior
 
+## ⚠️ Firebase Setup (Required for Android)
+
+Push notifications on Android require Firebase Cloud Messaging (FCM). Follow these steps:
+
+### 1. Create Firebase Project
+1. Go to [Firebase Console](https://console.firebase.google.com)
+2. Click "Add project" and follow the setup wizard
+3. Give your project a name (e.g., "Mojo")
+
+### 2. Add Android App to Firebase
+1. In Firebase Console, click "Add app" → Android
+2. Enter package name: `com.mojo.Mojo`
+3. Enter app nickname: "Mojo"
+4. Click "Register app"
+
+### 3. Download google-services.json
+1. Download the `google-services.json` file
+2. Save it to `frontend/google-services.json`
+
+### 4. Rebuild the App
+```bash
+cd frontend
+npx expo prebuild --clean
+npx expo run:android
+```
+
+**Note**: Without Firebase configured, you'll see a warning about "FirebaseApp is not initialized". The app will still work, but push notifications will not function.
+
 ## Architecture
 
 ### Backend Components
@@ -145,14 +173,37 @@ PUT /api/notifications/preferences
 1. **Development Testing**:
    - Build and install development APK on physical device
    - Enable notifications in the settings screen
-   - Use "Send Test Notification" button
+   - Use "Send Test Notification" button for a single test
+   - Use "Periodic Test Mode" to receive notifications every 1 minute
 
-2. **Backend Testing**:
+2. **Periodic Test Mode**:
+   - Go to Settings → Notification Settings
+   - Scroll down to the yellow "Periodic Test Mode" section
+   - Tap "▶️ Start Test Mode" to begin receiving notifications every minute
+   - You'll see "ACTIVE" indicator when test mode is running
+   - Tap "⏹️ Stop Test Mode" to stop the notifications
+   - **Note**: Test mode runs on the server, so it continues even if you close the app
+   - **Note**: Server restart will automatically stop test mode
+
+3. **Backend Testing**:
    ```javascript
    // Manually trigger notifications
    import { sendMorningDigestNotifications, sendTaskReminderNotifications } from './services/notificationService.js';
    await sendMorningDigestNotifications();
    await sendTaskReminderNotifications();
+   ```
+
+4. **Periodic Test API**:
+   ```javascript
+   // Start test mode (notifications every 1 minute)
+   POST /api/notifications/test/start
+   
+   // Stop test mode
+   POST /api/notifications/test/stop
+   
+   // Check test mode status
+   GET /api/notifications/test/status
+   // Returns: { active: true/false }
    ```
 
 ## Notes

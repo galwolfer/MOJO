@@ -23,13 +23,17 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
     preferences,
     isPhysicalDevice,
     error,
+    testModeActive,
     initialize,
     updatePreferences,
     testNotification,
+    startPeriodicTest,
+    stopPeriodicTest,
   } = useNotifications();
 
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [isTogglingTestMode, setIsTogglingTestMode] = useState(false);
 
   const handleToggleNotifications = async (enabled: boolean) => {
     setIsSaving(true);
@@ -77,6 +81,16 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
     setIsTesting(true);
     await testNotification();
     setIsTesting(false);
+  };
+
+  const handleToggleTestMode = async () => {
+    setIsTogglingTestMode(true);
+    if (testModeActive) {
+      await stopPeriodicTest();
+    } else {
+      await startPeriodicTest();
+    }
+    setIsTogglingTestMode(false);
   };
 
   const handleInitialize = async () => {
@@ -218,6 +232,41 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
               )}
             </TouchableOpacity>
           </View>
+
+          {/* Periodic Test Mode */}
+          <View style={styles.testModeSection}>
+            <View style={styles.testModeHeader}>
+              <Text style={styles.testModeTitle}>🔄 Periodic Test Mode</Text>
+              {testModeActive && (
+                <View style={styles.activeIndicator}>
+                  <Text style={styles.activeIndicatorText}>ACTIVE</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.testModeDescription}>
+              {testModeActive 
+                ? 'Notifications are being sent every minute. Stop to disable.'
+                : 'Start to receive a test notification every 1 minute.'
+              }
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.testModeButton, 
+                testModeActive ? styles.testModeButtonStop : styles.testModeButtonStart,
+                isTogglingTestMode && styles.buttonDisabled
+              ]}
+              onPress={handleToggleTestMode}
+              disabled={isTogglingTestMode}
+            >
+              {isTogglingTestMode ? (
+                <ActivityIndicator color={COLORS.colorWhite} />
+              ) : (
+                <Text style={styles.testModeButtonText}>
+                  {testModeActive ? '⏹️ Stop Test Mode' : '▶️ Start Test Mode'}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </>
       )}
 
@@ -342,5 +391,57 @@ const styles = StyleSheet.create({
     color: COLORS.lightGray,
     marginBottom: 2,
     fontFamily: "monospace",
+  },
+  testModeSection: {
+    marginTop: 20,
+    padding: 16,
+    backgroundColor: "#FFF8E1",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#FFE082",
+  },
+  testModeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  testModeTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#F57C00",
+  },
+  testModeDescription: {
+    fontSize: 13,
+    color: "#795548",
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  activeIndicator: {
+    backgroundColor: "#4CAF50",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  activeIndicatorText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: COLORS.colorWhite,
+  },
+  testModeButton: {
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  testModeButtonStart: {
+    backgroundColor: "#FF9800",
+  },
+  testModeButtonStop: {
+    backgroundColor: "#F44336",
+  },
+  testModeButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.colorWhite,
   },
 });
