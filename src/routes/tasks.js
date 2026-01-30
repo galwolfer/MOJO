@@ -627,6 +627,25 @@ router.get("/schedule/sessions", requireAuth, async (req, res, next) => {
         subtasksByTaskId[subtask.taskId].push(subtask);
       });
       
+      // Deduplicate subtasks per task by their index (keep first occurrence and sort by index)
+      for (const tid of Object.keys(subtasksByTaskId)) {
+        const list = subtasksByTaskId[tid];
+        const seen = new Set();
+        const unique = [];
+        list.sort((a,b) => (a.index || 0) - (b.index || 0));
+        for (const st of list) {
+          const idx = st.index ?? null;
+          const key = idx === null ? st._id.toString() : String(idx);
+          if (!seen.has(key)) {
+            seen.add(key);
+            unique.push(st);
+          } else {
+            console.warn(`[schedule/sessions] Duplicate subtask index detected for task ${tid}, index=${idx}, id=${st._id} - ignoring duplicate`);
+          }
+        }
+        subtasksByTaskId[tid] = unique;
+      }
+
       // Attach subtasks to taskId in sessions
       userSessions.forEach(session => {
         if (subtasksByTaskId[session.taskId._id]) {

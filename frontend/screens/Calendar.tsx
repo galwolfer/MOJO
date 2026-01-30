@@ -95,14 +95,32 @@ export default function CalendarScreen() {
   // Animation for Mojo logo rotation
   const rotationValue = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.loop(
+    let isMounted = true;
+
+    const startRotation = () => {
+      if (!isMounted) return;
+      // Reset to 0 before each run to avoid getting stuck
+      rotationValue.setValue(0);
       Animated.timing(rotationValue, {
         toValue: 1,
         duration: 3000,
         useNativeDriver: true,
-      })
-    ).start();
-  }, [rotationValue]);
+      }).start(({ finished }) => {
+        if (finished && isMounted) {
+          // Start again (recursive loop) - keeps a stable reference to the animation
+          startRotation();
+        }
+      });
+    };
+
+    startRotation();
+
+    return () => {
+      isMounted = false;
+      // Stop any in-flight animation
+      rotationValue.stopAnimation();
+    };
+  }, [rotationValue, selectedDate]);
 
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [completedTasks, setCompletedTasks] = useState<Set<string>>(new Set());
@@ -664,8 +682,9 @@ export default function CalendarScreen() {
                 <AppText style={styles.expandedDescription}>{(task as any).mainTaskDescription}</AppText>
               )}
 
-              {/* Description (Subtask description for multi-day, or task description) */}
-              {task.description && (
+              {/* Description (Subtask description for multi-day, or task description).
+                  Hide when subtasks are present to avoid showing the same subtask description twice. */}
+              {task.description && (!task.subtasks || task.subtasks.length === 0) && (
                 <AppText style={styles.expandedDescription}>{task.description}</AppText>
               )}
 
