@@ -115,7 +115,7 @@ export default function CalendarScreen() {
   };
 
   return (
-    <View>
+    <View style={styles.container}>
       {/* Header */}
       <Header
         title="MY TASKS"
@@ -198,6 +198,11 @@ export default function CalendarScreen() {
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.white3,
+    position: "relative",
+  },
   tasksList: {
     flex: 1,
     backgroundColor: COLORS.white3,
