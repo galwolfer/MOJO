@@ -16,6 +16,7 @@ import { moderateScale } from "react-native-size-matters";
 import { ICONS } from "../../../components/icons/icons";
 import { getAllOjoTypes, type OjoTypeName } from "../../../config/ojoTypeConfig";
 import { setAuthToken, patch } from "../../../services/httpClient";
+import { useOjo } from "../../../context/OjoContext";
 
 interface Props {
   pendingToken?: string | null;
@@ -27,6 +28,7 @@ const OjoTypeStep: React.FC<Props> = ({ pendingToken, onNext }) => {
   const [selectedOjo, setSelectedOjo] = useState<OjoTypeName>("mentorjo");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { refresh } = useOjo();
   const allOjoTypes = getAllOjoTypes().slice(0, 4);
   const iconSize = moderateScale(64);
   const animatedSetRef = useRef<Set<string>>(new Set());
@@ -42,6 +44,13 @@ const OjoTypeStep: React.FC<Props> = ({ pendingToken, onNext }) => {
       }
 
       await patch("/auth/profile", { ojoTypeName: selectedOjo });
+
+      // Refresh OjoContext so the UI updates immediately to the selected Ojo
+      try {
+        await refresh?.();
+      } catch (e) {
+        console.warn("Failed to refresh OjoContext:", e);
+      }
 
       onNext();
     } catch (err: any) {
