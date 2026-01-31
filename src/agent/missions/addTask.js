@@ -12,7 +12,7 @@ const addTaskMission = new GuidedMission({
   group: "task",
   description:
     "Create a task after explicit user confirmation. Required: taskname, deadline, estimatedDuration, category, subcategory. Call get_subcategories before this.",
-  missionInfo: "Create only after user confirms category/subcategory choices.",
+  missionInfo: "Create only after the user explicitly confirms the task_confirmation draft.",
   behavior: [
     "IMPORTANT: User must first choose/confirm category AND subcategory.",
     "Call get_subcategories(category=<chosen>) to fetch options BEFORE calling add_task.",

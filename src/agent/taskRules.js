@@ -120,6 +120,11 @@ export function getTaskFieldInstructions() {
 - CATEGORY USAGE: When talking to the user in conversational text, use the display names (e.g., "Study & Education", "Work & Career"). When making tool calls or populating widgets, use the string values (e.g., "study_and_education", "work_and_career").
 - INVALID CATEGORY HANDLING: If the user provides a category name not in the list, DO NOT simply list all available categories. Instead, ask if they meant to use that name as a SUBCATEGORY within a relevant main category (and suggest 1-2 likely candidates using display names).
 
+TASK CREATION FLOW (REQUIRED):
+1. Collect required details (taskname, deadline, estimatedDuration). If anything is missing, ask for it and wait.
+2. Once details are complete, call get_subcategories, then preview_task to show a task_confirmation draft.
+3. Only call add_task after the user explicitly confirms the draft.
+
 SUBCATEGORY WORKFLOW (IMPORTANT):
 1. After the user chooses or you infer a category, ALWAYS call get_subcategories(category=<category_index>) to see what subcategories the user has saved and historical task labels.
 2. AUTO-SELECT: If a matching subcategory exists in the returned list (exact match or very close to the task name), USE IT IMMEDIATELY in the next tool call (preview_task/add_task). DO NOT ASK the user for confirmation.

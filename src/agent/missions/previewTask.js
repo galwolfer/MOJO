@@ -85,7 +85,7 @@ const previewTaskMission = new GuidedMission({
   description:
     "Return a task_confirmation widget for approval. Keep your message brief - the widget shows all details. Required: taskname, deadline, estimatedDuration, category, subcategory.",
   missionInfo:
-    "Draft and show a task_confirmation widget. Use 1 short, natural sentence before the widget and one short sentence after (confirm/edit/cancel). Prefer the user's language when evident, otherwise default to English. Allow the model to pick an appropriate, natural phrasing (vary wording and tone as needed). Do NOT repeat fields already shown in the widget.",
+    "Draft and show a task_confirmation widget AFTER required details are collected. Use 1 short, natural sentence before the widget and one short sentence after (confirm/edit/cancel). Prefer the user's language when evident, otherwise default to English. Allow the model to pick an appropriate, natural phrasing (vary wording and tone as needed). Do NOT repeat fields already shown in the widget.",
   behavior: [
     "Use when user asks to create a task.",
     "STEP 1: Determine category ",
