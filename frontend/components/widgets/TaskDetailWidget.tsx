@@ -36,10 +36,9 @@ import {
   importanceIcon,
   effortColor,
   effortIcon,
-  getWidgetEntranceProps,
   toggleSubtask,
-  toggleSessionSmart,
-} from "./widgetHelpers";
+} from "./taskHelpers";
+import { getWidgetEntranceProps, toggleSessionSmart } from "./widgetHelpers";
 import { TaskTitle, TaskTagsRow, ScheduledSessionsSection, renderTaskField, TwoColumnGrid } from "../special/task";
 import { useTaskContext } from "../../context/TaskContext";
 

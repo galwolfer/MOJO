@@ -4,7 +4,7 @@ import AppText from "../../common/AppText";
 import SessionRow from "./SessionRow";
 import List from "../../layout/List";
 import { COLORS, ICON_SIZES, SPACING } from "../../../theme";
-import { ScheduledSession, Subtask, getSessionKey } from "../../widgets/widgetHelpers";
+import { ScheduledSession, Subtask, getSessionKey } from "../../widgets/taskHelpers";
 import { useTaskUpdateSubscription } from "../../../context/TaskContext";
 import TaskTitle from "./TaskTitle";
 

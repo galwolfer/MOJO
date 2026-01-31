@@ -16,11 +16,11 @@ import {
   formatDuration,
   getSessionLabel,
   getTaskTypeLabel,
-  getWidgetEntranceProps,
-} from "./widgetHelpers";
+} from "./taskHelpers";
+import { getWidgetEntranceProps } from "./widgetHelpers";
 import { TaskTitle, TaskTagsRow, ScheduledSessionsSection, renderTaskField, TwoColumnGrid } from "../special/task";
 import { getCategoryMeta } from "../../config/categoryMeta";
-import { getCategoryDisplay } from "./widgetHelpers";
+import { getCategoryDisplay } from "./taskHelpers";
 
 interface TaskData {
   id: string;
@@ -167,8 +167,7 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
         {task.subtasks && task.subtasks.length > 0 && (
           <View style={styles.section}>
             <AppText variant="title3" style={styles.sectionTitle}>
-              ✓ Subtasks ({task.subtasks.filter((st) => st.completed || st.status === "completed").length}/
-              {task.subtasks.length})
+              Subtasks
             </AppText>
             <View style={styles.subtaskList}>
               {task.subtasks.map((subtask, index) => (

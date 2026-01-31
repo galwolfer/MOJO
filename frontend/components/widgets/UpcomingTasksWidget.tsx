@@ -26,8 +26,8 @@ import {
   getSubtaskIdFromSession,
   getTimeParts,
   computeTaskProgress,
-  getWidgetEntranceProps,
-} from "./widgetHelpers";
+} from "./taskHelpers";
+import { getWidgetEntranceProps } from "./widgetHelpers";
 
 type TaskItem = {
   id: string;

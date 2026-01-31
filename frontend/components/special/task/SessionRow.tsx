@@ -2,11 +2,9 @@ import React from "react";
 import { View, Pressable } from "react-native";
 import AppText from "../../common/AppText";
 import { Checkbox } from "../../icons/Checkbox";
-import { getTimeParts, getSubtaskIdFromSession } from "../../widgets/widgetHelpers";
+import { getTimeParts, getSubtaskIdFromSession, ScheduledSession, Subtask } from "../../widgets/taskHelpers";
 import { StyleSheet } from "react-native";
 import { ICON_SIZES, SPACING, COLORS } from "../../../theme";
-
-import { ScheduledSession, Subtask } from "../../widgets/widgetHelpers";
 
 export const SessionRow: React.FC<{
   session: ScheduledSession;

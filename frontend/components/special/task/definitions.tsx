@@ -1,4 +1,4 @@
-import { formatDate, formatDuration } from "../../widgets/widgetHelpers";
+import { formatDate, formatDuration } from "../../widgets/taskHelpers";
 import FieldRow from "./FieldRow";
 
 /**
