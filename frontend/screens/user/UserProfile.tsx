@@ -23,7 +23,7 @@ import { StatBadge, ProgressGraph } from "./components";
 import FriendsList from "./components/FriendsList";
 import { moderateScale } from "react-native-size-matters";
 import { getUserStats } from "../../services/userService";
-import { getTasks, calculateTaskProgress, type Task, type TaskProgress } from "../../services/taskService";
+import { getTasks, getScheduledTasksByDay, calculateTaskProgress, type Task, type TaskProgress } from "../../services/taskService";
 import UserAvatar from "../../components/common/UserAvatar";
 import { SettingsScreen, EditPreferencesScreen, ChatSettingsScreen } from "../settings";
 
@@ -160,17 +160,50 @@ export default function UserProfileScreen() {
   }, [currentScreen, headerElement, headerRight, setHeaderConfig]);
 
   const fetchAllData = useCallback(async () => {
-    if (!mountedRef.current) return;
+    if (!mountedRef.current) return null;
     try {
       const [statsData, taskList] = await Promise.all([getUserStats(), getTasks()]);
-      if (!mountedRef.current) return;
+      if (!mountedRef.current) return null;
       setStats(statsData);
       setTasksState(taskList);
-      const progress = calculateTaskProgress(taskList, 14);
-      setTaskProgress(progress);
-      setProgressData(progress.dailyProgress);
+
+      // Also fetch scheduled tasks for today (and next days) so progress can prefer scheduled units
+      try {
+        const sched = await getScheduledTasksByDay(7);
+        if (sched && sched.today && sched.today.tasks) {
+          const scheduledTaskIds = new Set<string>();
+          const scheduledSubtaskKeys = new Set<string>();
+
+          for (const t of sched.today.tasks) {
+            if (t.id) scheduledTaskIds.add(t.id);
+            if (Array.isArray(t.scheduledSessions)) {
+              for (const s of t.scheduledSessions) {
+                if (s.subtaskIndex !== undefined && s.subtaskIndex !== null) {
+                  scheduledSubtaskKeys.add(`${t.id}:${s.subtaskIndex}`);
+                }
+              }
+            }
+          }
+
+          const progress = calculateTaskProgress(taskList, 14, { taskIds: scheduledTaskIds, subtaskKeys: scheduledSubtaskKeys });
+          setTaskProgress(progress);
+          setProgressData(progress.dailyProgress);
+        } else {
+          const progress = calculateTaskProgress(taskList, 14);
+          setTaskProgress(progress);
+          setProgressData(progress.dailyProgress);
+        }
+      } catch (err) {
+        // If scheduled fetch fails, fallback to normal progress calc
+        const progress = calculateTaskProgress(taskList, 14);
+        setTaskProgress(progress);
+        setProgressData(progress.dailyProgress);
+      }
+
+      return taskList;
     } catch (err) {
       console.warn("UserProfile fetch failed", err);
+      return null;
     } finally {
       if (mountedRef.current) setLoading(false);
     }
@@ -178,7 +211,37 @@ export default function UserProfileScreen() {
 
   useEffect(() => {
     mountedRef.current = true;
-    fetchAllData();
+    // Fetch tasks and scheduled tasks so progress can use scheduled tasks for today
+    (async () => {
+      const taskList = await fetchAllData();
+      try {
+        // Load scheduled tasks for 7 days to capture today's scheduled items
+        const sched = await getScheduledTasksByDay(7);
+        if (sched && sched.today && sched.today.tasks && taskList) {
+          const scheduledTaskIds = new Set<string>();
+          const scheduledSubtaskKeys = new Set<string>();
+
+          for (const t of sched.today.tasks) {
+            if (t.id) scheduledTaskIds.add(t.id);
+            if (Array.isArray(t.scheduledSessions)) {
+              for (const s of t.scheduledSessions) {
+                if (s.subtaskIndex !== undefined && s.subtaskIndex !== null) {
+                  scheduledSubtaskKeys.add(`${t.id}:${s.subtaskIndex}`);
+                }
+              }
+            }
+          }
+
+          // Recalculate progress with scheduled info using the freshly fetched task list
+          const progress = calculateTaskProgress(taskList, 14, { taskIds: scheduledTaskIds, subtaskKeys: scheduledSubtaskKeys });
+          setTaskProgress(progress);
+          setProgressData(progress.dailyProgress);
+        }
+      } catch (err) {
+        // ignore schedule fetch errors
+      }
+    })();
+
     return () => {
       mountedRef.current = false;
     };

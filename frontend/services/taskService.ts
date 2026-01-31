@@ -32,6 +32,7 @@ export type SubTask = {
   status?: SubTaskStatus;
   minutes?: number;
   scheduledSessions?: ScheduledSession[];
+  completedAt?: string | null;
 };
 
 export type Task = {
@@ -48,6 +49,7 @@ export type Task = {
   };
   status: TaskStatus;
   completed?: boolean;
+  completedAt?: string | null;
   importance?: number;
   effort?: number;
   dueDate?: string;
@@ -236,8 +238,11 @@ export async function getScheduledTasksByDay(days: number = 7): Promise<Schedule
 /**
  * Calculate task progress from tasks
  * Returns daily completion percentages for the progress graph
+ *
+ * If `scheduledTodayIds` is provided, today's task counts are taken from the scheduled tasks
+ * (i.e., tasks that have scheduled sessions for today) instead of checking `dueDate`.
  */
-export function calculateTaskProgress(tasks: Task[], days: number = 14): TaskProgress {
+export function calculateTaskProgress(tasks: Task[], days: number = 14, scheduledInfo?: { taskIds?: Set<string>; subtaskKeys?: Set<string> }): TaskProgress {
   const now = new Date();
   const dailyProgress: number[] = [];
   const labels: string[] = [];
@@ -251,28 +256,54 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14): TaskPro
     const nextDate = new Date(date);
     nextDate.setDate(nextDate.getDate() + 1);
 
-    // Get tasks that were due on this day (if they have dueDate)
-    const dayTasksWithDue = tasks.filter((task) => {
+    // For historical days, count completed units (tasks and subtasks completed on that day)
+    // and approximate total units as tasks due that day (tasks without subtasks) plus subtasks
+    // whose parent task is due that day or which were completed that day.
+
+    // Tasks due that day (only count tasks without subtasks)
+    const tasksDueNoSubtasks = tasks.filter((task) => {
+      if (task.subCategory || (task as any).subTasks) {
+        // don't rely on subCategory; check subTasks explicitly
+      }
+      const hasSubtasks = Array.isArray((task as any).subTasks) && (task as any).subTasks.length > 0;
+      if (hasSubtasks) return false;
       if (!task.dueDate) return false;
       const dueDate = new Date(task.dueDate);
       return dueDate >= date && dueDate < nextDate;
     });
 
-    // Get tasks created on this specific day (as fallback)
-    const tasksCreatedOnDay = tasks.filter((task) => {
-      const createdAt = new Date(task.createdAt);
-      createdAt.setHours(0, 0, 0, 0);
-      return createdAt >= date && createdAt < nextDate;
-    });
+    // Subtasks completed on this day
+    let subtasksCompletedOnDay = 0;
+    // Subtasks whose parent task's due date is this day (treat as scheduled for the day)
+    let subtasksWithParentDueOnDay = 0;
 
-    // Use tasks with due dates if available, otherwise use created tasks
-    const dayTasks = dayTasksWithDue.length > 0 ? dayTasksWithDue : tasksCreatedOnDay;
+    for (const task of tasks) {
+      const subTasks = (task as any).subTasks || [];
+      if (!Array.isArray(subTasks) || subTasks.length === 0) continue;
 
-    // Calculate completion rate
-    const total = dayTasks.length;
-    const completed = dayTasks.filter((t) => t.status === "done" || t.completed === true).length;
+      for (const st of subTasks) {
+        // completedAt wins for counting completion day
+        if (st?.completedAt) {
+          const completedAt = new Date(st.completedAt);
+          if (completedAt >= date && completedAt < nextDate) subtasksCompletedOnDay += 1;
+        }
+        // if parent task has dueDate matching the day, count subtask as a scheduled unit
+        if (task.dueDate) {
+          const dueDate = new Date(task.dueDate);
+          if (dueDate >= date && dueDate < nextDate) subtasksWithParentDueOnDay += 1;
+        }
+      }
+    }
 
-    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+    // Total units for the day: tasks without subtasks due that day + subtasks scheduled (by parent due) + subtasks completed that day (if not already counted)
+    // To avoid double-counting, ensure we count unique subtasks only once.
+    const totalUnits = tasksDueNoSubtasks.length + Math.max(subtasksWithParentDueOnDay, subtasksCompletedOnDay);
+    const completedUnits =
+      // tasks completed on this day
+      tasks.filter((t) => t.completedAt && new Date(t.completedAt) >= date && new Date(t.completedAt) < nextDate).length +
+      subtasksCompletedOnDay;
+
+    const percentage = totalUnits > 0 ? Math.round((completedUnits / totalUnits) * 100) : 0;
     dailyProgress.push(percentage);
 
     // Format label (e.g., "Mon", "Tue")
@@ -285,21 +316,73 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14): TaskPro
   const todayEnd = new Date(todayStart);
   todayEnd.setDate(todayEnd.getDate() + 1);
 
-  // Tasks due today OR tasks without dueDate that were created today
-  const todayTasks = tasks.filter((task) => {
-    // If has dueDate, check if it's today
-    if (task.dueDate) {
-      const dueDate = new Date(task.dueDate);
-      return dueDate >= todayStart && dueDate < todayEnd;
-    }
-    // If no dueDate, check if created today (consider it a "today" task)
-    const createdAt = new Date(task.createdAt);
-    return createdAt >= todayStart && createdAt < todayEnd;
-  });
+  // Determine today's units. If scheduledInfo is provided, prefer scheduled tasks and subtasks for today
+  let todayTotal = 0;
+  let todayCompleted = 0;
 
-  // Only count tasks that are actually due today (or created today with no due date)
-  const todayTotal = todayTasks.length;
-  const todayCompleted = todayTasks.filter((t) => t.status === "done" || t.completed === true).length;
+  if (scheduledInfo && (scheduledInfo.taskIds?.size || scheduledInfo.subtaskKeys?.size)) {
+    const taskIds = scheduledInfo.taskIds || new Set<string>();
+    const subtaskKeys = scheduledInfo.subtaskKeys || new Set<string>();
+
+    // Count scheduled subtasks as individual units
+    for (const task of tasks) {
+      const subs: any[] = (task as any).subTasks || [];
+      // count subtasks scheduled today
+      for (let idx = 0; idx < subs.length; idx++) {
+        const key = `${task._id}:${subs[idx].index ?? idx}`;
+        if (subtaskKeys.has(key)) {
+          todayTotal += 1;
+          // completed if status done or completedAt within today
+          const completedAt = subs[idx]?.completedAt ? new Date(subs[idx].completedAt) : null;
+          if (subs[idx].status === "done" && completedAt && completedAt >= todayStart && completedAt < todayEnd) {
+            todayCompleted += 1;
+          }
+        }
+      }
+
+      // If task has no subtasks but is scheduled today, treat the task as a unit
+      const hasSubtasks = Array.isArray((task as any).subTasks) && (task as any).subTasks.length > 0;
+      if (!hasSubtasks && taskIds.has(task._id)) {
+        todayTotal += 1;
+        const completedAt = task?.completedAt ? new Date(task.completedAt) : null;
+        if ((task.status === "done" || task.completed) && completedAt && completedAt >= todayStart && completedAt < todayEnd) {
+          todayCompleted += 1;
+        }
+      }
+    }
+  } else {
+    // Fallback: Tasks due today OR tasks without dueDate that were created today
+    const todayTasks = tasks.filter((task) => {
+      // If has dueDate, check if it's today
+      if (task.dueDate) {
+        const dueDate = new Date(task.dueDate);
+        return dueDate >= todayStart && dueDate < todayEnd;
+      }
+      // If no dueDate, check if created today (consider it a "today" task)
+      const createdAt = new Date(task.createdAt);
+      return createdAt >= todayStart && createdAt < todayEnd;
+    });
+
+    // Count tasks and subtasks: tasks without subtasks count as 1, tasks with subtasks count each subtask as a unit
+    for (const task of todayTasks) {
+      const subs: any[] = (task as any).subTasks || [];
+      if (subs.length > 0) {
+        todayTotal += subs.length;
+        for (const st of subs) {
+          const completedAt = st?.completedAt ? new Date(st.completedAt) : null;
+          if (st.status === "done" && completedAt && completedAt >= todayStart && completedAt < todayEnd) {
+            todayCompleted += 1;
+          }
+        }
+      } else {
+        todayTotal += 1;
+        const completedAt = task?.completedAt ? new Date(task.completedAt) : null;
+        if ((task.status === "done" || task.completed) && completedAt && completedAt >= todayStart && completedAt < todayEnd) {
+          todayCompleted += 1;
+        }
+      }
+    }
+  }
 
   // Calculate week's progress using Sunday -> Saturday boundaries
   // Determine the start of the current week (Sunday 00:00)
