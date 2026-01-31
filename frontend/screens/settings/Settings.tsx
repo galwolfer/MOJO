@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { View, StyleSheet, TouchableOpacity, Alert, Platform } from "react-native";
 import AppText from "../../components/common/AppText";
 import AppButton from "../../components/common/AppButton";
@@ -37,6 +37,12 @@ export default function SettingsScreen({ onBack, onEditPreferences, onChatSettin
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Store onBack in a ref to avoid recreating header config
+  const onBackRef = useRef(onBack);
+  useEffect(() => {
+    onBackRef.current = onBack;
+  }, [onBack]);
+
   const LeftIcon = ICONS.left;
   const SettingsIcon = ICONS.settings;
   const UserIcon = ICONS.user;
@@ -46,12 +52,14 @@ export default function SettingsScreen({ onBack, onEditPreferences, onChatSettin
   const PencilIcon = ICONS.edit;
 
   useEffect(() => {
+    const handleBackPress = () => onBackRef.current();
+
     setHeaderConfig({
       title: "Settings",
       show: true,
       icon: ICONS.settings,
       leftElement: (
-        <TouchableOpacity onPress={onBack} style={styles.headerRightTouchable}>
+        <TouchableOpacity onPress={handleBackPress} style={styles.headerRightTouchable}>
           <LeftIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
         </TouchableOpacity>
       ),
