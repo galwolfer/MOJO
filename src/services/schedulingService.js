@@ -314,15 +314,38 @@ export async function persistPlan(userId, plan) {
 
   if (!planWithSubtasks.length) return;
 
-  const docs = planWithSubtasks.map((slot) => ({
-    userId,
-    taskId: slot.taskId,
-    subtaskIndex: slot.subtaskIndex || null, // Only set if assigned
-    start: slot.start,
-    end: slot.end,
-    minutes: slot.minutes,
-    status: "planned",
-  }));
+  // Fetch all tasks to get subtask titles and descriptions for the schedule
+  const taskIds = Array.from(new Set(planWithSubtasks.map((p) => p.taskId.toString())));
+  const tasks = await Task.find({ _id: { $in: taskIds } }).populate('subTasks');
+  const taskMap = new Map(tasks.map((t) => [t._id.toString(), t]));
+
+  const docs = planWithSubtasks.map((slot) => {
+    let subtaskTitle = null;
+    let description = null;
+    
+    // If this slot has a subtaskIndex, get the subtask title and description
+    if (slot.subtaskIndex !== null && slot.subtaskIndex !== undefined) {
+      const task = taskMap.get(slot.taskId.toString());
+      if (task && task.subTasks && task.subTasks[slot.subtaskIndex - 1]) {
+        // subtaskIndex is 1-indexed, subTasks array is 0-indexed
+        const subtask = task.subTasks[slot.subtaskIndex - 1];
+        subtaskTitle = subtask.title || null;
+        description = subtask.description || null;
+      }
+    }
+
+    return {
+      userId,
+      taskId: slot.taskId,
+      subtaskIndex: slot.subtaskIndex || null,
+      subtaskTitle, // Subtask title for multi-day tasks
+      description, // Subtask description
+      start: slot.start,
+      end: slot.end,
+      minutes: slot.minutes,
+      status: "planned",
+    };
+  });
 
   await TaskSchedule.insertMany(docs);
 }
@@ -342,9 +365,19 @@ export async function generatePlan({ userId, profile = {}, planningHorizonDays =
   const tasks = await Task.find({
     userId,
     status: { $in: ["todo", "in_progress"] },
-  }).lean();
+  })
+    .populate("subTasks") // Populate subtasks so we can use their durations
+    .lean();
 
-  if (!tasks.length) {
+  // Sort subtasks by index to maintain creation order
+  const tasksWithOrderedSubtasks = tasks.map(task => ({
+    ...task,
+    subTasks: task.subTasks && Array.isArray(task.subTasks) 
+      ? task.subTasks.sort((a, b) => (a.index || 0) - (b.index || 0))
+      : task.subTasks
+  }));
+
+  if (!tasksWithOrderedSubtasks.length) {
     return { plan: [], unscheduled: [], message: "No open tasks to plan." };
   }
 
@@ -368,7 +401,9 @@ export async function generatePlan({ userId, profile = {}, planningHorizonDays =
     status: "completed",
   }).lean();
 
-  const remainingByTaskId = new Map(tasks.map((task) => [task._id.toString(), task.estimatedDuration || 0]));
+  const remainingByTaskId = new Map(
+    tasksWithOrderedSubtasks.map((task) => [task._id.toString(), task.estimatedDuration || 0])
+  );
 
   for (const session of completedSessions) {
     const key = session.start.toISOString().slice(0, 10);
@@ -394,7 +429,7 @@ export async function generatePlan({ userId, profile = {}, planningHorizonDays =
     busyBlocksByDate[key].push({ start: new Date(block.start), end: new Date(block.end) });
   }
 
-  const tasksForPlanning = tasks
+  const tasksForPlanning = tasksWithOrderedSubtasks
     .map((task) => {
       const remaining = remainingByTaskId.get(task._id.toString());
       return { ...task, estimatedDuration: remaining };

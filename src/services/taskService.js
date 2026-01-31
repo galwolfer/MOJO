@@ -140,6 +140,7 @@ export async function createTask({
   category = "",
   subCategory = null,
   recurrence = null,
+  tags = [],
   subtasks = [],
 }) {
   const illegalFields = getIllegalDisplayFields({
@@ -169,6 +170,8 @@ export async function createTask({
     category,
     subCategory,
     recurrence,
+    tags: tags || [],
+    _pendingSubtasks: subtasks && subtasks.length > 0 ? subtasks : undefined,
   });
 
   // Note: SubTask documents are automatically created by the Task model's post-save hook
@@ -249,7 +252,49 @@ export async function getTasks(userId, filters = {}) {
   if (filters.dueBefore) q.dueDate = { ...q.dueDate, $lte: new Date(filters.dueBefore) };
   if (filters.dueAfter) q.dueDate = { ...q.dueDate, $gte: new Date(filters.dueAfter) };
   if (filters.search) q.taskname = { $regex: filters.search, $options: "i" };
-  return Task.find(q).lean();
+  
+  const tasks = await Task.find(q).lean();
+  console.log(`[getTasks] Query: ${JSON.stringify(q)}`);
+  console.log(`[getTasks] Found ${tasks.length} tasks matching filters`);
+  tasks.forEach(t => {
+    console.log(`  - ${t._id} (${t.taskname}) taskType: ${t.taskType}`);
+  });
+  
+  // For ALL tasks, fetch their subtasks (not just split tasks)
+  // This ensures we always have subtask data when needed
+  const taskIds = tasks.map(task => task._id);
+  if (taskIds.length > 0) {
+    const subtasks = await SubTask.find({ userId, taskId: { $in: taskIds } }).lean();
+    console.log(`[getTasks] Query subtasks: { userId: ${userId}, taskId: { $in: [${taskIds.length} ids] } }`);
+    console.log(`[getTasks] Found ${subtasks.length} subtasks for ${taskIds.length} tasks`);
+    if (subtasks.length > 0) {
+      subtasks.forEach(st => {
+        console.log(`  - SubTask ${st._id} for Task ${st.taskId} (title: ${st.title}) status: ${st.status}`);
+      });
+    }
+    
+    // Group subtasks by taskId
+    const subtasksByTaskId = {};
+    subtasks.forEach(subtask => {
+      if (!subtasksByTaskId[subtask.taskId]) {
+        subtasksByTaskId[subtask.taskId] = [];
+      }
+      subtasksByTaskId[subtask.taskId].push(subtask);
+    });
+    
+    // Attach subtasks to tasks
+    tasks.forEach(task => {
+      if (subtasksByTaskId[task._id]) {
+        task.subTasks = subtasksByTaskId[task._id];
+        console.log(`[getTasks] Task ${task._id} (${task.taskname}) has ${task.subTasks.length} subtasks`);
+      } else {
+        task.subTasks = []; // Ensure empty array if no subtasks
+        console.log(`[getTasks] Task ${task._id} (${task.taskname}) has NO subtasks`);
+      }
+    });
+  }
+  
+  return tasks;
 }
 
 /**
@@ -512,6 +557,8 @@ export async function updateTask({ userId, taskId, updates }) {
     "category",
     "subCategory",
     "actualCompletionMinutes",
+    "tags",
+    "subtasks",
   ];
 
   const sanitizedUpdates = {};
@@ -885,7 +932,20 @@ export async function completeTask({ taskId, userId }) {
     // ML TRAINING: Train with completion data (with comprehensive error handling)
     // ========================================================================
     try {
-      console.log(`🎯 Training ML model for completed task: ${task.taskname}`);
+      // Structured log before training
+      try {
+        console.log(JSON.stringify({
+          event: 'task_completed_training_start',
+          taskId: taskId.toString(),
+          userId,
+          taskname: task.taskname,
+          estimatedDuration: task.estimatedDuration,
+          actualCompletionMinutes,
+          sessionCount: completedSessions.length,
+        }));
+      } catch (err) {
+        console.log('[task_completed_training_start] taskId=%s userId=%s estimated=%s actual=%s', taskId.toString(), userId, task.estimatedDuration, actualCompletionMinutes);
+      }
 
       const trainingResult = await trainTask(updated);
 
@@ -999,10 +1059,26 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
   }
 
   // Use find + save instead of findOneAndUpdate to trigger Mongoose hooks
-  const subtask = await SubTask.findOne({ _id: subTaskId, userId });
+    console.log(`[updateSubTask] Querying SubTask with:`, { _id: subTaskId, userId });
+    const subtask = await SubTask.findOne({ _id: subTaskId, userId });
+    console.log(`[updateSubTask] Query result:`, { found: !!subtask, subtaskId: subtask?._id, subtaskUserId: subtask?.userId });
 
-  if (!subtask) return { success: false, error: "SubTask not found or access denied" };
+    if (!subtask) {
+      console.error(`[updateSubTask] SubTask not found! Queried with _id=${subTaskId}, userId=${userId}`);
+      // Debug: try to find without userId to see if it exists for other users
+      const anySubtask = await SubTask.findOne({ _id: subTaskId });
+      if (anySubtask) {
+        console.error(`[updateSubTask] SubTask exists with different userId! Expected userId=${userId}, actual userId=${anySubtask.userId}`);
+      } else {
+        console.error(`[updateSubTask] SubTask with _id=${subTaskId} doesn't exist in database at all`);
+      }
+      return { success: false, error: "SubTask not found or access denied" };
+    }
 
+    // Apply the sanitized updates to the subtask
+    for (const key in sanitized) {
+      subtask[key] = sanitized[key];
+    }
   // Track if this was already completed (to avoid double-awarding points)
   const wasAlreadyCompleted = subtask.status === "done";
   const isNewCompletion = sanitized.status === "done" && !wasAlreadyCompleted;
@@ -1017,6 +1093,8 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
   // Save to trigger post-save hooks (which sync parent Task progress)
   await subtask.save();
 
+    await subtask.save();
+  
   const updated = subtask.toObject();
 
   // Get parent task for context (used for point calculation)
@@ -1231,3 +1309,4 @@ export function stopExpiredTaskChecker() {
 export async function triggerExpiredTaskCheck() {
   return runExpiredTaskCheck();
 }
+

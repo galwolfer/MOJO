@@ -148,6 +148,7 @@ export async function createTask(req, res) {
       canSplit,
       minChunk,
       description,
+      tags,
       subtasks,
       taskType,
       chunkCount,
@@ -164,6 +165,7 @@ export async function createTask(req, res) {
       canSplit,
       minChunk,
       description,
+      tags,
       subtasks,
       taskType,
       chunkCount,
@@ -173,7 +175,7 @@ export async function createTask(req, res) {
     });
 
     const title = (taskname || name || "").trim();
-    const descriptionValue = typeof bodyDescription === "string" ? bodyDescription : req.body.description || "";
+    const descriptionValue = typeof description === "string" ? description : req.body.description || "";
 
     // Validation
     if (!title) {
@@ -253,6 +255,7 @@ export async function createTask(req, res) {
       minMinutes: typeof minMinutes === "number" ? minMinutes : undefined,
       maxMinutes: typeof maxMinutes === "number" ? maxMinutes : undefined,
       recurrence,
+      tags: Array.isArray(tags) && tags.length > 0 ? tags : undefined,
       subtasks: subtasks || undefined,
     });
 
@@ -579,23 +582,37 @@ export async function updateTask(req, res) {
       }
     }
 
-    // Recurrence
-    if (raw.recurrence !== undefined) {
-      const rec = {
-        type: raw.recurrence.type,
-        interval: raw.recurrence.interval || 1,
-        endDate: raw.recurrence.endDate ? new Date(raw.recurrence.endDate) : null,
-        count: raw.recurrence.count || null,
-        completedDates: [],
-      };
-
-      if (rec.endDate && isNaN(rec.endDate.getTime())) {
-        return res
-          .status(400)
-          .json({ success: false, error: "Invalid recurrence.endDate. Use ISO 8601 (YYYY-MM-DD)." });
+    // Tags
+    if (raw.tags !== undefined) {
+      if (Array.isArray(raw.tags)) {
+        // Validate each tag
+        const validTags = raw.tags
+          .filter(tag => typeof tag === "string")
+          .map(tag => tag.trim())
+          .filter(tag => tag.length > 0);
+        updates.tags = validTags;
       }
+    }
 
-      updates.recurrence = rec;
+    // Subtasks
+    if (raw.subtasks !== undefined) {
+      if (Array.isArray(raw.subtasks)) {
+        // Validate each subtask
+        const validSubtasks = raw.subtasks
+          .filter(sub => sub && typeof sub === "object")
+          .map(sub => ({
+            id: sub.id || undefined,
+            title: sub.title ? String(sub.title).trim() : "",
+            description: sub.description ? String(sub.description).trim() : "",
+            minutes: sub.minutes ? Number(sub.minutes) : 30,
+            index: sub.index !== undefined ? Number(sub.index) : undefined,
+          }))
+          .filter(sub => sub.title.length > 0);
+        
+        if (validSubtasks.length > 0) {
+          updates.subtasks = validSubtasks;
+        }
+      }
     }
 
     if (Object.keys(updates).length === 0) {
@@ -1034,7 +1051,15 @@ export async function updateSubTask(req, res) {
 export async function markSubTaskComplete(req, res) {
   try {
     const userId = req.user.userId;
-    const { subId } = req.params;
+    const { taskId, subId } = req.params;
+
+    console.log(`[markSubTaskComplete] Controller received:`, {
+      userId,
+      taskId,
+      subId,
+      requestUrl: req.originalUrl,
+      requestPath: req.path,
+    });
 
     const result = await taskService.updateSubTask({
       userId,
@@ -1042,8 +1067,14 @@ export async function markSubTaskComplete(req, res) {
       updates: { status: "done" },
     });
 
+    console.log(`[markSubTaskComplete] Service result:`, {
+      success: result?.success,
+      error: result?.error,
+      subtaskId: result?.subtask?._id,
+    });
+
     if (!result || result.success === false) {
-      return res.status(404).json({ success: false, error: result ? result.error : "Subtask not found" });
+      return res.status(404).json({ success: false, error: result ? result.error : "Subtask not found" }); 
     }
 
     // Award points for subtask completion (only if this was a NEW completion)
@@ -1081,6 +1112,7 @@ export async function markSubTaskComplete(req, res) {
       message: "Subtask marked as complete",
     });
   } catch (error) {
+    console.error("[markSubTaskComplete] Controller error:", error);
     logger.error("Error in markSubTaskComplete controller:", error);
     return res.status(500).json({ success: false, error: "Failed to mark subtask complete" });
   }
