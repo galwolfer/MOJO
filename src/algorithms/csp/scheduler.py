@@ -3,7 +3,7 @@
 Provides `schedule_tasks_csp` as the main entrypoint and helper functions for
 variable/domain generation and the backtracking search.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Tuple, Optional
 import random
 
@@ -17,8 +17,9 @@ MAX_BACKTRACK_ITERATIONS = 10000
 
 
 def start_of_day(dt: datetime) -> datetime:
-    # Normalize a datetime to midnight of the same day
-    return datetime(dt.year, dt.month, dt.day)
+    # Normalize a datetime to midnight of the same day, preserving timezone
+    tz = dt.tzinfo if dt.tzinfo else timezone.utc
+    return datetime(dt.year, dt.month, dt.day, tzinfo=tz)
 
 
 def add_days(dt: datetime, days: int) -> datetime:
@@ -33,8 +34,10 @@ def add_minutes(dt: datetime, minutes: int) -> datetime:
 
 def build_working_window(day: datetime, working_hours: Dict) -> Dict:
     # Build start/end datetimes for the given day according to working hours
-    start = datetime(day.year, day.month, day.day, working_hours.get("startHour", 9), working_hours.get("startMinute", 0))
-    end = datetime(day.year, day.month, day.day, working_hours.get("endHour", 18), working_hours.get("endMinute", 0))
+    # Preserve timezone from input day
+    tz = day.tzinfo if day.tzinfo else timezone.utc
+    start = datetime(day.year, day.month, day.day, working_hours.get("startHour", 9), working_hours.get("startMinute", 0), tzinfo=tz)
+    end = datetime(day.year, day.month, day.day, working_hours.get("endHour", 18), working_hours.get("endMinute", 0), tzinfo=tz)
     return {"start": start, "end": end}
 
 
@@ -45,7 +48,7 @@ def schedule_tasks_csp(tasks: List[dict], options: Dict = None) -> Dict:
     planning_horizon_days = options.get("planningHorizonDays", 14)
     daily_cap_minutes = options.get("dailyCapMinutes", DEFAULT_DAILY_CAP_MINUTES)
 
-    today = start_of_day(datetime.now())
+    today = start_of_day(datetime.now(timezone.utc))
     horizon_end = add_days(today, planning_horizon_days)
 
     # Controlled randomness: set rng when randomize enabled (for deterministic ties)
@@ -114,7 +117,8 @@ def schedule_tasks_csp(tasks: List[dict], options: Dict = None) -> Dict:
 def generate_variables(tasks: List[dict], horizon_end: datetime, rng: Optional[random.Random] = None, distribution_strategy: str = "balanced") -> List[dict]:
     # Convert tasks into chunk variables used by the CSP
     variables = []
-    now = datetime.now()
+    # Use UTC timezone-aware datetime to avoid comparison errors
+    now = datetime.now(timezone.utc)
 
     for task in tasks:
         total_minutes = task.get("estimatedDuration", 0) or 0
@@ -148,112 +152,125 @@ def generate_variables(tasks: List[dict], horizon_end: datetime, rng: Optional[r
 
         chunks = []
 
-        if task_type == "leaky":
-            # Leaky splitting: choose a chunk count and distribute STEPs
-            # according to the chosen `distribution_strategy` and optional `rng`.
-            import math
+        # Check if task has explicit subtasks with durations
+        subtasks = task.get("subTasks") or task.get("subtasks") or []
+        if subtasks and len(subtasks) > 0:
+            # Use subtask durations directly
+            for subtask in subtasks:
+                # Get duration from subtask (could be "minutes", "estimatedMinutes", or "duration")
+                duration = subtask.get("minutes") or subtask.get("estimatedMinutes") or subtask.get("duration") or 0
+                if duration > 0:
+                    chunks.append(duration)
+        
+        # Only calculate chunks if no explicit subtasks with durations
+        if not chunks:
+            if task_type == "leaky":
+                # Leaky splitting: choose a chunk count and distribute STEPs
+                # according to the chosen `distribution_strategy` and optional `rng`.
+                import math
 
-            STEP = 10
-            min_chunk = task.get("minMinutes", 60)
-            max_chunk = task.get("maxMinutes", min_chunk)
-            rounded_min = math.ceil(min_chunk / STEP) * STEP
-            rounded_max = (max_chunk // STEP) * STEP
-            rounded_total = (total_minutes // STEP) * STEP
+                STEP = 10
+                # Handle None/null values: use minChunk if available, otherwise 60
+                min_chunk = task.get("minMinutes") or task.get("minChunk") or 60
+                max_chunk = task.get("maxMinutes") or task.get("maxChunk") or min_chunk
+                rounded_min = math.ceil(min_chunk / STEP) * STEP
+                rounded_max = (max_chunk // STEP) * STEP
+                rounded_total = (total_minutes // STEP) * STEP
 
-            if rounded_min > rounded_max or rounded_total <= 0:
-                # Fallback to single chunk
-                chunks.append(max(rounded_total, 0))
-            else:
-                # feasible number of chunks
-                min_count = (rounded_total + rounded_max - 1) // rounded_max  # ceil(total/max)
-                max_count = rounded_total // rounded_min  # floor(total/min)
-
-                if min_count > max_count:
-                    # can't satisfy bounds, fallback
-                    chunks.append(rounded_total)
+                if rounded_min > rounded_max or rounded_total <= 0:
+                    # Fallback to single chunk
+                    chunks.append(max(rounded_total, 0))
                 else:
-                    # pick chunk_count close to average chunk size
-                    avg = (rounded_min + rounded_max) / 2.0
-                    ideal = max(1, int(round(rounded_total / avg)))
-                    count = max(min_count, min(max_count, ideal))
+                    # feasible number of chunks
+                    min_count = (rounded_total + rounded_max - 1) // rounded_max  # ceil(total/max)
+                    max_count = rounded_total // rounded_min  # floor(total/min)
 
-                    # base size per chunk (multiple of STEP)
-                    base = (rounded_total // count) // STEP * STEP
-                    if base < rounded_min:
-                        base = rounded_min
-                    remaining = rounded_total - base * count
-
-                    # allocate remaining STEPs across chunks with weights according to strategy
-                    steps = remaining // STEP
-                    if distribution_strategy == "increasing":
-                        # bias toward larger chunks later
-                        weights = [ (i + 1) ** 2 for i in range(count) ]
-                    elif distribution_strategy == "decreasing":
-                        # bias toward larger chunks earlier
-                        weights = [ (count - i) ** 2 for i in range(count) ]
+                    if min_count > max_count:
+                        # can't satisfy bounds, fallback
+                        chunks.append(rounded_total)
                     else:
-                        # balanced linear weights
-                        weights = [ i + 1 for i in range(count) ]
-                    total_w = sum(weights)
-                    extra_steps = [ (steps * w) // total_w for w in weights ]
-                    assigned = sum(extra_steps)
-                    leftover = steps - assigned
-                    # assign leftover steps using weighted random (if rng) or deterministic bias
-                    if rng:
-                        # randomized leftover assignment weighted by the chosen weights
-                        while leftover > 0:
-                            idx = rng.choices(range(count), weights=weights, k=1)[0]
-                            extra_steps[idx] += 1
-                            leftover -= 1
-                    else:
-                        # deterministic leftover assignment: bias larger later chunks
-                        idx = count - 1
-                        while leftover > 0:
-                            extra_steps[idx] += 1
-                            leftover -= 1
-                            idx -= 1
-                            if idx < 0:
-                                idx = count - 1
+                        # pick chunk_count close to average chunk size
+                        avg = (rounded_min + rounded_max) / 2.0
+                        ideal = max(1, int(round(rounded_total / avg)))
+                        count = max(min_count, min(max_count, ideal))
 
-                    chunks = [ base + s * STEP for s in extra_steps ]
+                        # base size per chunk (multiple of STEP)
+                        base = (rounded_total // count) // STEP * STEP
+                        if base < rounded_min:
+                            base = rounded_min
+                        remaining = rounded_total - base * count
 
-                    # enforce upper bound and redistribute any overflow
-                    overflow = 0
-                    for i in range(count):
-                        if chunks[i] > rounded_max:
-                            overflow += chunks[i] - rounded_max
-                            chunks[i] = rounded_max
+                        # allocate remaining STEPs across chunks with weights according to strategy
+                        steps = remaining // STEP
+                        if distribution_strategy == "increasing":
+                            # bias toward larger chunks later
+                            weights = [ (i + 1) ** 2 for i in range(count) ]
+                        elif distribution_strategy == "decreasing":
+                            # bias toward larger chunks earlier
+                            weights = [ (count - i) ** 2 for i in range(count) ]
+                        else:
+                            # balanced linear weights
+                            weights = [ i + 1 for i in range(count) ]
+                        total_w = sum(weights)
+                        extra_steps = [ (steps * w) // total_w for w in weights ]
+                        assigned = sum(extra_steps)
+                        leftover = steps - assigned
+                        # assign leftover steps using weighted random (if rng) or deterministic bias
+                        if rng:
+                            # randomized leftover assignment weighted by the chosen weights
+                            while leftover > 0:
+                                idx = rng.choices(range(count), weights=weights, k=1)[0]
+                                extra_steps[idx] += 1
+                                leftover -= 1
+                        else:
+                            # deterministic leftover assignment: bias larger later chunks
+                            idx = count - 1
+                            while leftover > 0:
+                                extra_steps[idx] += 1
+                                leftover -= 1
+                                idx -= 1
+                                if idx < 0:
+                                    idx = count - 1
 
-                    if overflow > 0:
-                        # try to redistribute overflow to chunks below max
+                        chunks = [ base + s * STEP for s in extra_steps ]
+
+                        # enforce upper bound and redistribute any overflow
+                        overflow = 0
                         for i in range(count):
-                            can = rounded_max - chunks[i]
-                            give = min(can, overflow)
-                            if give > 0:
-                                chunks[i] += give
-                                overflow -= give
-                            if overflow <= 0:
-                                break
+                            if chunks[i] > rounded_max:
+                                overflow += chunks[i] - rounded_max
+                                chunks[i] = rounded_max
 
-                    # final cleanup: ensure all multiples of STEP and >0
-                    chunks = [ (c // STEP) * STEP for c in chunks if c > 0 ]
+                        if overflow > 0:
+                            # try to redistribute overflow to chunks below max
+                            for i in range(count):
+                                can = rounded_max - chunks[i]
+                                give = min(can, overflow)
+                                if give > 0:
+                                    chunks[i] += give
+                                    overflow -= give
+                                if overflow <= 0:
+                                    break
 
-        elif task_type == "perfect" or not task.get("canSplit"):
-            chunks.append(total_minutes)
-        elif task_type == "in_parts" and task.get("chunkCount"):
-            chunk_size = -(-total_minutes // task["chunkCount"])  # ceil
-            remaining = total_minutes
-            while remaining > 0:
-                size = min(chunk_size, remaining)
-                chunks.append(size)
-                remaining -= size
-        else:
-            chunk_size = task.get("minChunk", 30)
-            remaining = total_minutes
-            while remaining > 0:
-                size = min(chunk_size, remaining)
-                chunks.append(size)
-                remaining -= size
+                        # final cleanup: ensure all multiples of STEP and >0
+                        chunks = [ (c // STEP) * STEP for c in chunks if c > 0 ]
+
+            elif task_type == "perfect" or not task.get("canSplit"):
+                chunks.append(total_minutes)
+            elif task_type == "in_parts" and task.get("chunkCount"):
+                chunk_size = -(-total_minutes // task["chunkCount"])  # ceil
+                remaining = total_minutes
+                while remaining > 0:
+                    size = min(chunk_size, remaining)
+                    chunks.append(size)
+                    remaining -= size
+            else:
+                chunk_size = task.get("minChunk", 30)
+                remaining = total_minutes
+                while remaining > 0:
+                    size = min(chunk_size, remaining)
+                    chunks.append(size)
+                    remaining -= size
 
         for i, c in enumerate(chunks):
             variables.append({
@@ -278,7 +295,7 @@ def generate_domain(variable: dict, today: datetime, horizon_end: datetime, busy
     slots = []
     deadline = variable["deadline"] if variable["deadline"] < horizon_end else horizon_end
     chunk_minutes = variable["chunkMinutes"]
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
 
     current_day = start_of_day(today)
     while current_day <= deadline:

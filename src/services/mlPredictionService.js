@@ -274,9 +274,38 @@ export async function trainTask(task) {
       subcategory_map: subcategoryMap
     };
 
+    // Structured log: Emit training request details (for debugging/monitoring)
+    try {
+      console.log(JSON.stringify({
+        event: 'ml_train_request',
+        userId,
+        taskId: String(task._id),
+        reward: reward,
+        rewardType,
+        mlInput,
+      }));
+    } catch (err) {
+      // Fallback logging
+      console.log('[ml_train_request] userId=%s taskId=%s reward=%s rewardType=%s', userId, String(task._id), reward, rewardType);
+    }
+
     // Call Python service with userId, payload, and reward
     const jsonInput = JSON.stringify(payload);
     const result = await callPythonService('train', [userId, jsonInput, String(reward)]);
+
+    // Structured log: Emit training result
+    try {
+      console.log(JSON.stringify({
+        event: 'ml_train_result',
+        userId,
+        taskId: String(task._id),
+        success: !!result.success,
+        returnedReward: result.reward,
+        message: result.message,
+      }));
+    } catch (err) {
+      console.log('[ml_train_result] userId=%s taskId=%s success=%s returnedReward=%s', userId, String(task._id), !!result.success, result.reward);
+    }
 
     if (!result.success) {
       throw new Error(result.error || 'Training failed');
@@ -318,6 +347,13 @@ export async function checkHealth() {
     };
   }
 }
+
+export async function callPythonServiceWrapper(command, jsonInput = null) {
+  // Backward-compatible wrapper (tests can import callPythonService directly if needed)
+  return callPythonService(command, jsonInput);
+}
+
+export { callPythonService };
 
 export default {
   predictTask,

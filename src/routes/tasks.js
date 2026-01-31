@@ -8,6 +8,7 @@ import { requireAuth } from "../middlewares/auth.js";
 import * as taskController from "../controllers/taskController.js";
 import { Task } from "../models/Task.js";
 import { TaskSchedule } from "../models/TaskSchedule.js";
+import { SubTask } from "../models/SubTask.js";
 import { User } from "../models/User.js";
 import { logger } from "../utils/logger.js";
 import { getCategoryIndex, isValidCategory, getDisplayName } from "../config/categories.js";
@@ -542,6 +543,130 @@ router.patch("/:taskId/subtasks/:subId/status", taskController.updateSubTaskStat
 // Bulk update task with subtasks in one call
 router.patch("/:id/full", taskController.bulkUpdateTaskWithSubtasks);
 
+/* ─────────────────────────────────────────────────────────────────────────
+   SCHEDULED SESSIONS RETRIEVAL
+   Get scheduled sessions for a date range
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Get all scheduled sessions for a user within a date range
+ * GET /api/tasks/schedule/sessions?startDate=ISO&endDate=ISO
+ * 
+ * Query parameters:
+ * - startDate: ISO string for start of range
+ * - endDate: ISO string for end of range
+ * 
+ * Response:
+ * {
+ *   success: boolean,
+ *   sessions: Array<{
+ *     _id, start, end, minutes, taskId, status, subtaskIndex,
+ *     taskId: { populated task data }
+ *   }>
+ * }
+ */
+router.get("/schedule/sessions", requireAuth, async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+    const { startDate, endDate } = req.query;
+
+    // Validate date parameters
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        error: "startDate and endDate query parameters are required"
+      });
+    }
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid date format. Use ISO string format (YYYY-MM-DDTHH:mm:ss.sssZ)"
+      });
+    }
+
+    // Fetch scheduled sessions for the date range, filtering by user via the task reference
+    const sessions = await TaskSchedule.find({
+      start: { $gte: start, $lte: end }
+    })
+      .populate({
+        path: "taskId",
+        match: { userId }, // Only include sessions for tasks owned by this user
+        select: "taskname description category tags dueDate subTasks"
+      })
+      .sort({ start: 1 })
+      .lean();
+
+    // Filter out sessions where the task doesn't belong to the user
+    const userSessions = sessions.filter(session => session.taskId !== null);
+
+    console.log(`[schedule/sessions] Found ${userSessions.length} sessions for user`);
+    userSessions.forEach(session => {
+      console.log(`  - Session ${session._id}: taskId=${session.taskId._id}, subtaskIndex=${session.subtaskIndex}, start=${new Date(session.start).toISOString()}`);
+    });
+
+    // Manually populate subtasks for ALL tasks with userId filter
+    // This ensures we have subtask data when needed
+    const taskIds = userSessions.map(session => session.taskId._id);
+    if (taskIds.length > 0) {
+      const subtasks = await SubTask.find({ userId, taskId: { $in: taskIds } }).lean();
+      console.log(`[schedule/sessions] Found ${subtasks.length} subtasks`);
+      subtasks.forEach(st => {
+        console.log(`  - Subtask ${st._id} for task ${st.taskId} index=${st.index} (${st.title})`);
+      });
+      
+      // Group subtasks by taskId
+      const subtasksByTaskId = {};
+      subtasks.forEach(subtask => {
+        if (!subtasksByTaskId[subtask.taskId]) {
+          subtasksByTaskId[subtask.taskId] = [];
+        }
+        subtasksByTaskId[subtask.taskId].push(subtask);
+      });
+      
+      // Deduplicate subtasks per task by their index (keep first occurrence and sort by index)
+      for (const tid of Object.keys(subtasksByTaskId)) {
+        const list = subtasksByTaskId[tid];
+        const seen = new Set();
+        const unique = [];
+        list.sort((a,b) => (a.index || 0) - (b.index || 0));
+        for (const st of list) {
+          const idx = st.index ?? null;
+          const key = idx === null ? st._id.toString() : String(idx);
+          if (!seen.has(key)) {
+            seen.add(key);
+            unique.push(st);
+          } else {
+            console.warn(`[schedule/sessions] Duplicate subtask index detected for task ${tid}, index=${idx}, id=${st._id} - ignoring duplicate`);
+          }
+        }
+        subtasksByTaskId[tid] = unique;
+      }
+
+      // Attach subtasks to taskId in sessions
+      userSessions.forEach(session => {
+        if (subtasksByTaskId[session.taskId._id]) {
+          session.taskId.subTasks = subtasksByTaskId[session.taskId._id];
+          console.log(`[schedule/sessions] Attached ${session.taskId.subTasks.length} subtasks to task ${session.taskId._id}`);
+        } else {
+          session.taskId.subTasks = []; // Ensure empty array if no subtasks
+          console.log(`[schedule/sessions] No subtasks for task ${session.taskId._id}`);
+        }
+      });
+    }
+
+    res.json({
+      success: true,
+      sessions: userSessions
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Get a single task by ID
 router.get("/:id", taskController.getTaskById);
 
@@ -556,5 +681,101 @@ router.post("/:id/toggle", taskController.toggleTaskCompletion);
 
 // Complete a task (with ML training)
 router.post("/:id/complete", taskController.completeTask);
+
+/* ─────────────────────────────────────────────────────────────────────────
+   TASK SCHEDULING
+   Generate and save automatic plans for tasks
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Generate and save an automatic schedule/plan for a task
+ * POST /api/tasks/:id/schedule
+ * 
+ * Generates an optimal schedule using CSP algorithm considering:
+ * - Task estimated duration
+ * - User's working hours and daily capacity
+ * - Routine blocks (sleep, meals, etc.)
+ * - Existing busy blocks and completed sessions
+ * 
+ * Body (optional): 
+ * {
+ *   planningHorizonDays?: number (default 14),
+ *   includeSubtasks?: boolean (default true)
+ * }
+ * 
+ * Response: 
+ * {
+ *   success: boolean,
+ *   message: string,
+ *   plan: Array<{ start, end, minutes, taskId, subtaskIndex }>,
+ *   unscheduled: Array<{ taskId, reason }>,
+ *   scheduledCount: number
+ * }
+ */
+router.post("/:id/schedule", async (req, res, next) => {
+  try {
+    const { id: taskId } = req.params;
+    const { planningHorizonDays = 14 } = req.body;
+    const userId = req.user.userId;
+
+    // Import scheduling service
+    const { generatePlan, savePlan } = await import("../services/schedulingService.js");
+
+    // Verify task exists and belongs to user
+    const task = await Task.findOne({ _id: taskId, userId });
+    if (!task) {
+      return res.status(404).json({ 
+        success: false, 
+        error: "Task not found" 
+      });
+    }
+
+    // Get user profile for scheduling preferences
+    const user = await User.findById(userId).select("profile subCategories").lean();
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        error: "User not found" 
+      });
+    }
+
+    // Generate plan
+    const { plan, unscheduled } = await generatePlan({ 
+      userId, 
+      profile: user.profile,
+      planningHorizonDays 
+    });
+
+    if (!plan || plan.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Unable to generate schedule. Task may already be fully scheduled or no available time slots.",
+        unscheduled
+      });
+    }
+
+    // Save plan to database
+    await savePlan({ userId, plan, unscheduled });
+
+    logger.info(`Generated schedule for task ${taskId}: ${plan.length} sessions planned`);
+
+    res.status(201).json({
+      success: true,
+      message: `Schedule created successfully. ${plan.length} session(s) scheduled.`,
+      scheduledCount: plan.length,
+      unscheduledCount: unscheduled.length,
+      plan: plan.map(p => ({
+        start: p.start,
+        end: p.end,
+        minutes: p.minutes,
+        taskId: p.taskId,
+        subtaskIndex: p.subtaskIndex || null
+      })),
+      unscheduled
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 export default router;
