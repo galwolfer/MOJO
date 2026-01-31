@@ -127,6 +127,16 @@ const previewTaskMission = new GuidedMission({
         count: z.number().optional(),
       })
       .optional(),
+    subtasks: z
+      .array(
+        z.object({
+          title: z.string(),
+          description: z.string().optional(),
+          minutes: z.number().optional(),
+          duration: z.number().optional(),
+        }),
+      )
+      .optional(),
   }),
   execute: async ({ userId, args }) => {
     const {
@@ -147,6 +157,7 @@ const previewTaskMission = new GuidedMission({
       earliestStart,
       taskType,
       recurrence,
+      subtasks,
     } = args;
 
     try {
@@ -177,14 +188,51 @@ const previewTaskMission = new GuidedMission({
         return okFalse(`Invalid deadline date: ${finalDeadline}`);
       }
 
+      // Normalize subtasks (if provided)
+      const normalizedSubtasks = Array.isArray(subtasks)
+        ? subtasks
+            .map((st, index) => {
+              if (!st || typeof st !== "object") return null;
+              const title = typeof st.title === "string" ? st.title.trim() : "";
+              if (!title) return null;
+              const rawMinutes =
+                typeof st.minutes === "number"
+                  ? st.minutes
+                  : typeof st.duration === "number"
+                    ? st.duration
+                    : null;
+              const minutes = typeof rawMinutes === "number" && isFinite(rawMinutes) && rawMinutes > 0
+                ? Math.round(rawMinutes)
+                : null;
+              return {
+                title,
+                description: typeof st.description === "string" ? st.description : "",
+                minutes: minutes ?? undefined,
+                duration: minutes ?? undefined,
+                order: index + 1,
+              };
+            })
+            .filter(Boolean)
+        : [];
+      const hasSubtasks = normalizedSubtasks.length > 0;
+      const derivedDuration = hasSubtasks
+        ? normalizedSubtasks.reduce((sum, st) => sum + (st.minutes || 0), 0)
+        : null;
+
       // Infer properties from task name if not provided
       const inferred = inferTaskProperties(taskname);
 
       // Apply defaults and inference
       let finalImportance = importance !== undefined && importance !== null ? importance : null;
       const finalEffort = effort !== undefined && effort !== null ? effort : (inferred.effort ?? null);
-      const finalDuration = duration !== undefined && duration !== null ? duration : (inferred.duration ?? null);
-      const finalCanSplit = canSplit !== undefined ? canSplit : TASK_CONFIG.defaults.splitable;
+      const finalDuration =
+        duration !== undefined && duration !== null
+          ? duration
+          : derivedDuration !== null && derivedDuration > 0
+            ? derivedDuration
+            : (inferred.duration ?? null);
+      const finalCanSplit =
+        canSplit !== undefined ? canSplit : hasSubtasks ? true : TASK_CONFIG.defaults.splitable;
 
       // If duration isn't provided, request it from the user
       if (!finalDuration || typeof finalDuration !== "number" || isNaN(finalDuration) || finalDuration <= 0) {
@@ -226,6 +274,14 @@ const previewTaskMission = new GuidedMission({
       let finalTaskType;
       if (taskType) {
         finalTaskType = taskType;
+      } else if (hasSubtasks) {
+        const minutes = normalizedSubtasks.map((st) => st.minutes).filter((m) => typeof m === "number" && m > 0);
+        if (minutes.length >= 2) {
+          const allSame = minutes.every((m) => m === minutes[0]);
+          finalTaskType = allSame ? "in_parts" : "leaky";
+        } else {
+          finalTaskType = "in_parts";
+        }
       } else if (minMinutes !== undefined || maxMinutes !== undefined) {
         finalTaskType = "leaky";
       } else if (chunkCount !== undefined || chunkMinutes !== undefined) {
@@ -235,10 +291,32 @@ const previewTaskMission = new GuidedMission({
       }
 
       const previewMinChunk = finalTaskType === "in_parts" ? finalMinChunk : null;
-      const previewChunkCount = finalTaskType === "in_parts" ? finalChunkCount : null;
+      const previewChunkCount =
+        finalTaskType === "in_parts"
+          ? finalChunkCount !== null && finalChunkCount !== undefined
+            ? finalChunkCount
+            : hasSubtasks
+              ? normalizedSubtasks.length
+              : null
+          : null;
       const previewChunkMinutes = finalTaskType === "in_parts" ? finalChunkMinutes : null;
-      const previewMinMinutes = finalTaskType === "leaky" ? finalMinMinutes : null;
-      const previewMaxMinutes = finalTaskType === "leaky" ? finalMaxMinutes : null;
+      const subtaskMinutes = hasSubtasks
+        ? normalizedSubtasks.map((st) => st.minutes || 0).filter((m) => m > 0)
+        : [];
+      const subtaskMin = subtaskMinutes.length > 0 ? Math.min(...subtaskMinutes) : null;
+      const subtaskMax = subtaskMinutes.length > 0 ? Math.max(...subtaskMinutes) : null;
+      const previewMinMinutes =
+        finalTaskType === "leaky"
+          ? finalMinMinutes !== null && finalMinMinutes !== undefined
+            ? finalMinMinutes
+            : subtaskMin
+          : null;
+      const previewMaxMinutes =
+        finalTaskType === "leaky"
+          ? finalMaxMinutes !== null && finalMaxMinutes !== undefined
+            ? finalMaxMinutes
+            : subtaskMax
+          : null;
 
       // Infer splitting params if not explicitly provided for this taskType
       const inferredParams = inferSplittingParams(finalTaskType, finalDuration);
@@ -296,6 +374,7 @@ const previewTaskMission = new GuidedMission({
         recurrence: recurrence || null,
         progressPercentage: 0,
         scheduledSessions: [],
+        subtasks: hasSubtasks ? normalizedSubtasks : [],
         // Small human-readable short description for listing/preview
         shortDescription,
         // Store internal category key for task creation

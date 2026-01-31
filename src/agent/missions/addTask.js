@@ -49,6 +49,16 @@ const addTaskMission = new GuidedMission({
         count: z.number().optional(),
       })
       .optional(),
+    subtasks: z
+      .array(
+        z.object({
+          title: z.string(),
+          description: z.string().optional(),
+          minutes: z.number().optional(),
+          duration: z.number().optional(),
+        }),
+      )
+      .optional(),
   }),
   execute: async ({ userId, args }) => {
     const {
@@ -69,6 +79,7 @@ const addTaskMission = new GuidedMission({
       earliestStart,
       taskType,
       recurrence,
+      subtasks,
     } = args;
     try {
       const illegalFields = getIllegalDisplayFields({
@@ -79,6 +90,36 @@ const addTaskMission = new GuidedMission({
       if (illegalFields.length > 0) {
         return okFalse("illegal_characters", { msg: getIllegalCharsErrorMessage(illegalFields) });
       }
+
+      // Normalize subtasks (if provided)
+      const normalizedSubtasks = Array.isArray(subtasks)
+        ? subtasks
+            .map((st) => {
+              if (!st || typeof st !== "object") return null;
+              const title = typeof st.title === "string" ? st.title.trim() : "";
+              if (!title) return null;
+              const rawMinutes =
+                typeof st.minutes === "number"
+                  ? st.minutes
+                  : typeof st.duration === "number"
+                    ? st.duration
+                    : null;
+              const minutes =
+                typeof rawMinutes === "number" && isFinite(rawMinutes) && rawMinutes > 0
+                  ? Math.round(rawMinutes)
+                  : null;
+              return {
+                title,
+                description: typeof st.description === "string" ? st.description : "",
+                minutes: minutes ?? undefined,
+              };
+            })
+            .filter(Boolean)
+        : [];
+      const hasSubtasks = normalizedSubtasks.length > 0;
+      const derivedDuration = hasSubtasks
+        ? normalizedSubtasks.reduce((sum, st) => sum + (st.minutes || 0), 0)
+        : null;
 
       // Infer properties from task title if not provided
       const inferred = inferTaskProperties(taskname);
@@ -93,7 +134,12 @@ const addTaskMission = new GuidedMission({
         finalImportance = null; // placeholder, will be set after category priority lookup
       }
       const finalEffort = effort !== undefined && effort !== null ? effort : (inferred.effort ?? null);
-      const finalDuration = duration !== undefined && duration !== null ? duration : (inferred.duration ?? null);
+      const finalDuration =
+        duration !== undefined && duration !== null
+          ? duration
+          : derivedDuration !== null && derivedDuration > 0
+            ? derivedDuration
+            : (inferred.duration ?? null);
       const finalCategory = category || inferred.category || "";
       const finalSubcategory = subcategory || inferred.subcategory || "";
 
@@ -130,11 +176,13 @@ const addTaskMission = new GuidedMission({
         ? { label: finalSubcategory, source: "user", confidence: 1, updatedAt: new Date() }
         : null;
 
-      const finalCanSplit = canSplit !== undefined ? canSplit : TASK_CONFIG.defaults.splitable;
+      const finalCanSplit =
+        canSplit !== undefined ? canSplit : hasSubtasks ? true : TASK_CONFIG.defaults.splitable;
 
       // Compute splitting defaults and validation
       const finalMinChunk = typeof minChunk === "number" && minChunk > 0 ? minChunk : TASK_CONFIG.defaults.minChunk;
-      const finalChunkCount = typeof chunkCount === "number" && chunkCount > 0 ? chunkCount : null;
+      const finalChunkCount =
+        typeof chunkCount === "number" && chunkCount > 0 ? chunkCount : hasSubtasks ? normalizedSubtasks.length : null;
       const finalChunkMinutes = typeof chunkMinutes === "number" && chunkMinutes > 0 ? chunkMinutes : null;
       const finalMinMinutes = typeof minMinutes === "number" && minMinutes > 0 ? minMinutes : null;
       const finalMaxMinutes = typeof maxMinutes === "number" && maxMinutes > 0 ? maxMinutes : null;
@@ -144,6 +192,14 @@ const addTaskMission = new GuidedMission({
       let finalTaskType;
       if (taskType) {
         finalTaskType = taskType;
+      } else if (hasSubtasks) {
+        const minutes = normalizedSubtasks.map((st) => st.minutes).filter((m) => typeof m === "number" && m > 0);
+        if (minutes.length >= 2) {
+          const allSame = minutes.every((m) => m === minutes[0]);
+          finalTaskType = allSame ? "in_parts" : "leaky";
+        } else {
+          finalTaskType = "in_parts";
+        }
       } else if (minMinutes !== undefined || maxMinutes !== undefined) {
         finalTaskType = "leaky";
       } else if (chunkCount !== undefined || chunkMinutes !== undefined) {
@@ -187,6 +243,7 @@ const addTaskMission = new GuidedMission({
         taskType: finalTaskType,
         dueDate: new Date(deadline),
         recurrence: recurrence || null,
+        subtasks: hasSubtasks ? normalizedSubtasks : undefined,
       };
 
       // Add recurrence pattern if specified

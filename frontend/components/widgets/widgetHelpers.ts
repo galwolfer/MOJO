@@ -9,6 +9,7 @@ export interface Subtask {
   completed?: boolean;
   order?: number;
   duration?: number;
+  minutes?: number;
 }
 
 export interface ScheduledSession {
@@ -524,7 +525,7 @@ export function sessionRowData(
     dateText: formatDate(session?.start),
     timeRangeText,
     label: getSessionLabel(session || ({} as ScheduledSession), index),
-    durationMinutes: subtask?.duration,
+    durationMinutes: subtask?.duration ?? subtask?.minutes,
   };
 }
 

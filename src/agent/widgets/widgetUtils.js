@@ -29,6 +29,7 @@ const TASK_FIELDS = [
   "subCategory",
   "canSplit",
   "scheduledSessions",
+  "subtasks",
 ];
 
 const SCHEDULE_FIELDS = [
@@ -61,6 +62,9 @@ function normalizeTaskItem(task = {}) {
     out.scheduledSessions = out.scheduledSessions.map(normalizeScheduleSession);
   } else if (out.scheduledSessions == null) {
     out.scheduledSessions = [];
+  }
+  if (!Array.isArray(out.subtasks)) {
+    out.subtasks = [];
   }
   return out;
 }

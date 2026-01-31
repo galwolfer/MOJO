@@ -82,6 +82,7 @@ interface Subtask {
   completed?: boolean;
   order?: number;
   duration?: number;
+  minutes?: number;
 }
 
 /**
@@ -187,9 +188,9 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
                       {subtask.description}
                     </AppText>
                   ) : null}
-                  {subtask.duration && (
+                  {(subtask.duration || subtask.minutes) && (
                     <AppText variant="notes" style={styles.subtaskDuration}>
-                      {formatDuration(subtask.duration)}
+                      {formatDuration(subtask.duration || subtask.minutes || 0)}
                     </AppText>
                   )}
                 </View>
