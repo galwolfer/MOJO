@@ -18,7 +18,9 @@
     "test:no-premade-messages": "node scripts/check_no_premade_task_messages.cjs",
     "lint": "echo \"(add ESLint if you want)\"",
     "pytest": "pip install -r requirements.txt && pytest -q",
-    "test": "node --test"
+    "test": "node --test",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   },
   "keywords": [
     "ai",
@@ -50,7 +52,9 @@
     "node-fetch": "^2.7.0",
     "react-native-size-matters": "^0.4.2",
     "start": "^5.1.0",
-    "zod": "^4.1.12"
+    "zod": "^4.1.12",
+    "react": "19.1.0",
+    "react-native": "0.81.5"
   },
   "devDependencies": {
     "@babel/core": "^7.28.5",

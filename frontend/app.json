@@ -13,7 +13,12 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -22,18 +27,25 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.mojo.Mojo"
+      "package": "com.mojo.Mojo",
+      "permissions": [
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.POST_NOTIFICATIONS"
+      ],
+      "googleServicesFile": "./services/secrets/google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-font",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-notifications"
     ],
     "extra": {
       "eas": {
-        "projectId": "963e0c4f-be40-488b-8dee-75114924e74d"
+        "projectId": "875a7d38-e45f-45b2-9bee-a15823df2f34"
       }
     }
   }

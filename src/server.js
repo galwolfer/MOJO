@@ -10,6 +10,7 @@ import { logger } from "./utils/logger.js";
 import { startPriorityScheduler } from "./services/schedulingService.js";
 import { startExpiredTaskChecker } from "./services/taskService.js";
 import { startStreakChecker } from "./services/streakService.js";
+import { startNotificationSchedulers } from "./services/notificationScheduler.js";
 import { initializeOjoTypes } from "./utils/ojoTypeUtils.js";
 
 const server = createServer(app);
@@ -31,6 +32,10 @@ connectDatabase()
       // Start streak checker (runs daily at midnight)
       // Resets streaks for users who didn't complete tasks yesterday
       startStreakChecker();
+
+      // Start notification schedulers (morning digest + task reminders)
+      // Sends push notifications based on user preferences and ML predictions
+      startNotificationSchedulers();
     });
   })
   .catch((error) => {

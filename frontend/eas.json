@@ -9,7 +9,10 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_DEFAULT_MACHINE_IP": "192.168.11.19"
+      }
     },
     "production": {
       "autoIncrement": true
