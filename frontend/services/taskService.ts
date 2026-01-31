@@ -647,6 +647,24 @@ export async function updateTask(
 }
 
 /**
+ * Gamification result returned from task/subtask completion
+ */
+export type GamificationResult = {
+  points?: number;
+  currentStreak?: number;
+  pointsAwarded?: number;
+  parentTaskCompleted?: boolean;
+};
+
+/**
+ * Result from updating a subtask
+ */
+export type UpdateSubTaskResult = {
+  success: boolean;
+  gamification?: GamificationResult;
+};
+
+/**
  * Update a subtask
  * PATCH /api/tasks/:taskId/subtasks/:subId
  * Returns gamification data when subtask is completed
@@ -655,7 +673,7 @@ export async function updateSubTask(
   taskId: string,
   subtaskId: string,
   updates: Partial<{ status: SubTaskStatus; title?: string; description?: string; minutes?: number }>,
-): Promise<boolean> {
+): Promise<UpdateSubTaskResult> {
   try {
     const response = await patch<{
       success: boolean;
@@ -674,17 +692,31 @@ export async function updateSubTask(
       });
     }
 
-    return true;
+    return {
+      success: true,
+      gamification: response.gamification
+        ? {
+            points: response.gamification.points,
+            currentStreak: response.gamification.currentStreak,
+            pointsAwarded: response.pointsAwarded,
+            parentTaskCompleted: response.parentTaskCompleted,
+          }
+        : undefined,
+    };
   } catch (error) {
     console.warn("Failed to update subtask:", error);
-    return false;
+    return { success: false };
   }
 }
 
 /**
  * Update a subtask status (deprecated) — use updateSubTask instead
  */
-export async function updateSubTaskStatus(taskId: string, subtaskId: string, status: SubTaskStatus): Promise<boolean> {
+export async function updateSubTaskStatus(
+  taskId: string,
+  subtaskId: string,
+  status: SubTaskStatus,
+): Promise<UpdateSubTaskResult> {
   return updateSubTask(taskId, subtaskId, { status });
 }
 

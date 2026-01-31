@@ -26,6 +26,7 @@ import { getUserStats } from "../../services/userService";
 import { getTasks, getScheduledTasksByDay, calculateTaskProgress, type Task, type TaskProgress } from "../../services/taskService";
 import UserAvatar from "../../components/common/UserAvatar";
 import { SettingsScreen, EditPreferencesScreen, ChatSettingsScreen, NotificationSettingsScreen } from "../settings";
+import { useStatsContext } from "../../context/StatsContext";
 
 /**
  * UserProfileScreen
@@ -77,13 +78,13 @@ export default function UserProfileScreen() {
   const { setHeaderConfig } = useNavigation();
   const { width } = useWindowDimensions();
   const { subscribeToTaskUpdates } = useTaskContext();
+  const { stats, isLoading: statsLoading, refreshStats } = useStatsContext();
 
   // Screen navigation state
   const [currentScreen, setCurrentScreen] = useState<"profile" | "settings" | "edit-preferences" | "chat-settings" | "notification-settings">(
     "profile",
   );
 
-  const [stats, setStats] = useState({ tasks: 0, points: 0, streak: 0 });
   const [loading, setLoading] = useState(true);
   const [progressData, setProgressData] = useState<number[]>(DEFAULT_PROGRESS);
   const [taskProgress, setTaskProgress] = useState<TaskProgress | null>(null);
@@ -115,7 +116,7 @@ export default function UserProfileScreen() {
 
         {/* Stats Row */}
         <View style={{ width: "100%" }}>
-          {loading ? (
+          {loading || statsLoading ? (
             <ActivityIndicator size="small" color={COLORS.primary1} />
           ) : (
             <View style={styles.headerStatsRow}>
@@ -142,7 +143,7 @@ export default function UserProfileScreen() {
         </View>
       </View>
     ),
-    [user?.profileImage, user?.displayName, user?.username, loading, stats],
+    [user?.profileImage, user?.displayName, user?.username, loading, statsLoading, stats],
   );
 
   const headerRight = useMemo(
@@ -162,9 +163,9 @@ export default function UserProfileScreen() {
   const fetchAllData = useCallback(async () => {
     if (!mountedRef.current) return null;
     try {
-      const [statsData, taskList] = await Promise.all([getUserStats(), getTasks()]);
+      // Fetch tasks (stats are now managed by StatsContext)
+      const taskList = await getTasks();
       if (!mountedRef.current) return null;
-      setStats(statsData);
       setTasksState(taskList);
 
       // Also fetch scheduled tasks for today (and next days) so progress can prefer scheduled units
@@ -251,16 +252,19 @@ export default function UserProfileScreen() {
     const onState = (state: AppStateStatus) => {
       if (state === "active") {
         fetchAllData();
+        refreshStats(); // Also refresh stats when app becomes active
       }
     };
     const sub = AppState.addEventListener("change", onState);
     return () => sub.remove();
-  }, [fetchAllData]);
-
+  }, [fetchAllData, refreshStats]);
   useEffect(() => {
-    const unsubscribe = subscribeToTaskUpdates(() => fetchAllData());
+    const unsubscribe = subscribeToTaskUpdates(() => {
+      fetchAllData();
+      refreshStats(); // Also refresh stats when tasks are updated
+    });
     return unsubscribe;
-  }, [subscribeToTaskUpdates, fetchAllData]);
+  }, [subscribeToTaskUpdates, fetchAllData, refreshStats]);
 
   const graphWidth = Math.min(width - SPACING.xlg * 2 - SPACING.md * 2, 500);
 

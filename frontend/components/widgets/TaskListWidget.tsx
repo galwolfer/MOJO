@@ -14,6 +14,7 @@ import List, { ListCellProps } from "../layout/List";
 import { getCategoryMeta } from "../../config/categoryMeta";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
 import { useTaskContext } from "../../context/TaskContext";
+import { useOptionalStatsContext } from "../../context/StatsContext";
 import { completeTask, toggleTaskCompletion } from "../../services/taskService";
 import { TaskTagsRow, ScheduledSessionsSection, getSessionKey } from "../special/task";
 import {
@@ -71,6 +72,7 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({
   const [checkedTasks, setCheckedTasks] = useState<Set<string>>(new Set());
   const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
   const { notifyTaskUpdate } = useTaskContext();
+  const { notifyStatsChange } = useOptionalStatsContext();
 
   // Selected task id (only one task may be selected/expanded at a time)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -170,6 +172,7 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({
       loadingParts,
       setLoadingParts,
       notifyTaskUpdate,
+      notifyStatsChange,
       onAction,
     });
   };

@@ -42,6 +42,7 @@ import {
 } from "./widgetHelpers";
 import { TaskTitle, TaskTagsRow, ScheduledSessionsSection, renderTaskField, TwoColumnGrid } from "../special/task";
 import { useTaskContext } from "../../context/TaskContext";
+import { useOptionalStatsContext } from "../../context/StatsContext";
 
 interface TaskDetail {
   id: string;
@@ -94,6 +95,7 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
 }) => {
   const task: TaskDetail = data.task || data;
   const { notifyTaskUpdate } = useTaskContext();
+  const { notifyStatsChange } = useOptionalStatsContext();
 
   const [completedParts, setCompletedParts] = useState<Set<string>>(new Set());
   const [loadingParts, setLoadingParts] = useState<Set<string>>(new Set());
@@ -124,6 +126,7 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
       loadingParts,
       setLoadingParts,
       notifyTaskUpdate,
+      notifyStatsChange,
       onAction,
     });
   };
@@ -144,6 +147,7 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
       loadingParts,
       setLoadingParts,
       notifyTaskUpdate,
+      notifyStatsChange,
       onAction,
     });
   };
