@@ -260,6 +260,16 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
     return new Date(completedAt) < dayStart;
   };
 
+  // Helper to check if a task/subtask has a scheduled session on a specific day
+  const hasScheduledSessionOnDay = (sessions: any[] | undefined, dayStart: Date, dayEnd: Date): boolean => {
+    if (!sessions || !Array.isArray(sessions)) return false;
+    return sessions.some(session => {
+      if (!session?.start) return false;
+      const sessionStart = new Date(session.start);
+      return sessionStart >= dayStart && sessionStart < dayEnd;
+    });
+  };
+
   // Calculate progress for each of the last N days
   for (let i = days - 1; i >= 0; i--) {
     const dayStart = new Date(now);
@@ -277,8 +287,6 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
     for (const task of tasks) {
       const subTasks: any[] = (task as any).subTasks || [];
       const hasSubtasks = subTasks.length > 0;
-      const taskDueDate = task.dueDate ? new Date(task.dueDate) : null;
-      const isTaskScheduledForDay = taskDueDate && taskDueDate >= dayStart && taskDueDate < dayEnd;
 
       if (hasSubtasks) {
         // For tasks with subtasks, each subtask is a unit
@@ -288,10 +296,13 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
           const wasCompletedOnThisDay = isWithinDay(stCompletedAt, dayStart, dayEnd);
           const assumeCompletedToday = isToday && stIsDone && !stCompletedAt;
           
+          // Check if subtask has a scheduled session on this day
+          const isSubtaskScheduledForDay = hasScheduledSessionOnDay(st?.scheduledSessions, dayStart, dayEnd);
+          
           // Count in total if:
           // 1. Scheduled for this day AND not completed before this day started, OR
           // 2. Was completed on this day (so it shows as work done on this day)
-          if (isTaskScheduledForDay && !isCompletedBefore(stCompletedAt, dayStart)) {
+          if (isSubtaskScheduledForDay && !isCompletedBefore(stCompletedAt, dayStart)) {
             totalUnits += 1;
             if (wasCompletedOnThisDay || assumeCompletedToday) {
               completedUnits += 1;
@@ -303,11 +314,14 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
           }
         }
       } else {
-        // Task without subtasks
+        // Task without subtasks - check task-level scheduled sessions
         const taskCompletedAt = task.completedAt;
         const taskIsDone = task.status === "done" || task.completed === true;
         const wasCompletedOnThisDay = isWithinDay(taskCompletedAt, dayStart, dayEnd);
         const assumeCompletedToday = isToday && taskIsDone && !taskCompletedAt;
+        
+        // Check if task has a scheduled session on this day
+        const isTaskScheduledForDay = hasScheduledSessionOnDay((task as any).scheduledSessions, dayStart, dayEnd);
 
         // Count in total if:
         // 1. Scheduled for this day AND not completed before this day started, OR
@@ -402,17 +416,8 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
       }
     }
   } else {
-    // Fallback: use dueDate to determine what's scheduled for today
+    // Fallback: use scheduledSessions to determine what's scheduled for today
     for (const task of tasks) {
-      const taskDueDate = task.dueDate ? new Date(task.dueDate) : null;
-      const isTaskScheduledToday = taskDueDate && taskDueDate >= todayStart && taskDueDate < todayEnd;
-
-      // Also include tasks created today without a dueDate
-      const createdAt = new Date(task.createdAt);
-      const isCreatedToday = !task.dueDate && createdAt >= todayStart && createdAt < todayEnd;
-
-      if (!isTaskScheduledToday && !isCreatedToday) continue;
-
       const subs: any[] = (task as any).subTasks || [];
       const hasSubtasks = subs.length > 0;
 
@@ -420,31 +425,39 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
         for (const st of subs) {
           const stCompletedAt = st?.completedAt;
           const stIsDone = st?.status === "done";
+          const isSubtaskScheduledToday = hasScheduledSessionOnDay(st?.scheduledSessions, todayStart, todayEnd);
+          const wasCompletedToday = isWithinDay(stCompletedAt, todayStart, todayEnd);
+          const assumeCompletedToday = stIsDone && !stCompletedAt;
 
-          // Only count if NOT completed before today
-          if (!isCompletedBefore(stCompletedAt, todayStart)) {
+          // Count if scheduled today and not completed before today, OR completed today
+          if (isSubtaskScheduledToday && !isCompletedBefore(stCompletedAt, todayStart)) {
             todayTotal += 1;
-
-            if (isWithinDay(stCompletedAt, todayStart, todayEnd)) {
-              todayCompleted += 1;
-            } else if (stIsDone && !stCompletedAt) {
+            if (wasCompletedToday || assumeCompletedToday) {
               todayCompleted += 1;
             }
+          } else if (wasCompletedToday || assumeCompletedToday) {
+            // Completed today but wasn't scheduled - count as both
+            todayTotal += 1;
+            todayCompleted += 1;
           }
         }
       } else {
         const taskCompletedAt = task.completedAt;
         const taskIsDone = task.status === "done" || task.completed === true;
+        const isTaskScheduledToday = hasScheduledSessionOnDay((task as any).scheduledSessions, todayStart, todayEnd);
+        const wasCompletedToday = isWithinDay(taskCompletedAt, todayStart, todayEnd);
+        const assumeCompletedToday = taskIsDone && !taskCompletedAt;
 
-        // Only count if NOT completed before today
-        if (!isCompletedBefore(taskCompletedAt, todayStart)) {
+        // Count if scheduled today and not completed before today, OR completed today
+        if (isTaskScheduledToday && !isCompletedBefore(taskCompletedAt, todayStart)) {
           todayTotal += 1;
-
-          if (isWithinDay(taskCompletedAt, todayStart, todayEnd)) {
-            todayCompleted += 1;
-          } else if (taskIsDone && !taskCompletedAt) {
+          if (wasCompletedToday || assumeCompletedToday) {
             todayCompleted += 1;
           }
+        } else if (wasCompletedToday || assumeCompletedToday) {
+          // Completed today but wasn't scheduled - count as both
+          todayTotal += 1;
+          todayCompleted += 1;
         }
       }
     }
@@ -472,30 +485,41 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
   let weekTotal = 0;
   let weekCompleted = 0;
 
+  // Helper to check if any scheduled session falls within the week
+  const hasScheduledSessionInWeek = (sessions: any[] | undefined): boolean => {
+    if (!sessions || !Array.isArray(sessions)) return false;
+    return sessions.some(session => {
+      if (!session?.start) return false;
+      const sessionStart = new Date(session.start);
+      return sessionStart >= sundayStart && sessionStart < weekEndExclusive;
+    });
+  };
+
   for (const task of tasks) {
-    const taskDueDate = task.dueDate ? new Date(task.dueDate) : null;
-    const isScheduledThisWeek = taskDueDate && taskDueDate >= sundayStart && taskDueDate < weekEndExclusive;
-
-    // Also include tasks created this week without a dueDate
-    const createdAt = new Date(task.createdAt);
-    const isCreatedThisWeek = !task.dueDate && createdAt >= sundayStart && createdAt < weekEndExclusive;
-
-    if (!isScheduledThisWeek && !isCreatedThisWeek) continue;
-
     const subs: any[] = (task as any).subTasks || [];
     const hasSubtasks = subs.length > 0;
 
     if (hasSubtasks) {
       for (const st of subs) {
-        weekTotal += 1;
-        if (st?.status === "done") {
-          weekCompleted += 1;
+        const isScheduledThisWeek = hasScheduledSessionInWeek(st?.scheduledSessions);
+        const wasCompletedThisWeek = st?.completedAt && isWithinDay(st.completedAt, sundayStart, weekEndExclusive);
+        
+        if (isScheduledThisWeek || wasCompletedThisWeek) {
+          weekTotal += 1;
+          if (st?.status === "done") {
+            weekCompleted += 1;
+          }
         }
       }
     } else {
-      weekTotal += 1;
-      if (task.status === "done" || task.completed === true) {
-        weekCompleted += 1;
+      const isScheduledThisWeek = hasScheduledSessionInWeek((task as any).scheduledSessions);
+      const wasCompletedThisWeek = task.completedAt && isWithinDay(task.completedAt, sundayStart, weekEndExclusive);
+      
+      if (isScheduledThisWeek || wasCompletedThisWeek) {
+        weekTotal += 1;
+        if (task.status === "done" || task.completed === true) {
+          weekCompleted += 1;
+        }
       }
     }
   }
