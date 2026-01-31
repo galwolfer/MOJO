@@ -243,6 +243,23 @@ export async function getScheduledTasksByDay(days: number = 7): Promise<Schedule
  * (i.e., tasks that have scheduled sessions for today) instead of checking `dueDate`.
  */
 export function calculateTaskProgress(tasks: Task[], days: number = 14, scheduledInfo?: { taskIds?: Set<string>; subtaskKeys?: Set<string> }): TaskProgress {
+  console.log("[calculateTaskProgress] Called with:", {
+    taskCount: tasks.length,
+    days,
+    hasScheduledInfo: !!scheduledInfo,
+    scheduledTaskIds: scheduledInfo?.taskIds?.size || 0,
+    scheduledSubtaskKeys: scheduledInfo?.subtaskKeys?.size || 0,
+    tasksSample: tasks.slice(0, 2).map(t => ({
+      id: t._id || (t as any).id,
+      name: (t as any).taskname,
+      status: t.status,
+      completedAt: t.completedAt,
+      subtaskCount: ((t as any).subTasks || []).length,
+      scheduledSessionCount: ((t as any).scheduledSessions || []).length,
+      dueDate: (t as any).dueDate,
+    })),
+  });
+  
   const now = new Date();
   const dailyProgress: number[] = [];
   const labels: string[] = [];
@@ -270,6 +287,17 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
     });
   };
 
+  // Helper to check if a task's deadline falls within a day range
+  const hasDueDateOnDay = (dueDate: Date | string | null | undefined, dayStart: Date, dayEnd: Date): boolean => {
+    if (!dueDate) return false;
+    const d = new Date(dueDate);
+    // Normalize to midnight for comparison (deadline date only, ignoring time)
+    d.setHours(0, 0, 0, 0);
+    const dayStartNorm = new Date(dayStart);
+    dayStartNorm.setHours(0, 0, 0, 0);
+    return d.getTime() === dayStartNorm.getTime();
+  };
+
   // Calculate progress for each of the last N days
   for (let i = days - 1; i >= 0; i--) {
     const dayStart = new Date(now);
@@ -287,6 +315,7 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
     for (const task of tasks) {
       const subTasks: any[] = (task as any).subTasks || [];
       const hasSubtasks = subTasks.length > 0;
+      const taskDueDate = (task as any).dueDate || (task as any).deadline;
 
       if (hasSubtasks) {
         // For tasks with subtasks, each subtask is a unit
@@ -299,9 +328,13 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
           // Check if subtask has a scheduled session on this day
           const isSubtaskScheduledForDay = hasScheduledSessionOnDay(st?.scheduledSessions, dayStart, dayEnd);
           
+          // Fallback: if task is due on this day, count subtasks as planned work
+          const isTaskDueThisDay = hasDueDateOnDay(taskDueDate, dayStart, dayEnd);
+          
           // Count in total if:
           // 1. Scheduled for this day AND not completed before this day started, OR
-          // 2. Was completed on this day (so it shows as work done on this day)
+          // 2. Was completed on this day (so it shows as work done on this day), OR
+          // 3. Task is due this day AND not completed before this day (fallback for no sessions)
           if (isSubtaskScheduledForDay && !isCompletedBefore(stCompletedAt, dayStart)) {
             totalUnits += 1;
             if (wasCompletedOnThisDay || assumeCompletedToday) {
@@ -311,6 +344,12 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
             // Completed on this day but wasn't scheduled for it - count as both total and completed
             totalUnits += 1;
             completedUnits += 1;
+          } else if (isToday && isTaskDueThisDay && !isCompletedBefore(stCompletedAt, dayStart) && !isSubtaskScheduledForDay) {
+            // Today only: task due today with no scheduled session - count as pending work
+            totalUnits += 1;
+            if (stIsDone) {
+              completedUnits += 1;
+            }
           }
         }
       } else {
@@ -322,10 +361,14 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
         
         // Check if task has a scheduled session on this day
         const isTaskScheduledForDay = hasScheduledSessionOnDay((task as any).scheduledSessions, dayStart, dayEnd);
+        
+        // Fallback: check if task is due on this day
+        const isTaskDueThisDay = hasDueDateOnDay(taskDueDate, dayStart, dayEnd);
 
         // Count in total if:
         // 1. Scheduled for this day AND not completed before this day started, OR
-        // 2. Was completed on this day (so it shows as work done on this day)
+        // 2. Was completed on this day (so it shows as work done on this day), OR
+        // 3. Task is due this day AND not completed before this day (fallback for no sessions)
         if (isTaskScheduledForDay && !isCompletedBefore(taskCompletedAt, dayStart)) {
           totalUnits += 1;
           if (wasCompletedOnThisDay || assumeCompletedToday) {
@@ -335,6 +378,12 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
           // Completed on this day but wasn't scheduled for it - count as both total and completed
           totalUnits += 1;
           completedUnits += 1;
+        } else if (isToday && isTaskDueThisDay && !isCompletedBefore(taskCompletedAt, dayStart) && !isTaskScheduledForDay) {
+          // Today only: task due today with no scheduled session - count as pending work
+          totalUnits += 1;
+          if (taskIsDone) {
+            completedUnits += 1;
+          }
         }
       }
     }
@@ -358,6 +407,7 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
 
   if (scheduledInfo && (scheduledInfo.taskIds?.size || scheduledInfo.subtaskKeys?.size)) {
     // Use scheduled info for more accurate today calculations
+    // Also include tasks due today that aren't in the scheduled set
     const taskIds = scheduledInfo.taskIds || new Set<string>();
     const subtaskKeys = scheduledInfo.subtaskKeys || new Set<string>();
 
@@ -365,6 +415,8 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
       const subs: any[] = (task as any).subTasks || [];
       const taskId = task._id || (task as any).id;
       const hasSubtasks = subs.length > 0;
+      const taskDueDate = (task as any).dueDate || (task as any).deadline;
+      const isTaskDueToday = hasDueDateOnDay(taskDueDate, todayStart, todayEnd);
 
       if (hasSubtasks) {
         // Check each subtask
@@ -374,10 +426,10 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
           const keyWithId = `${(task as any).id}:${st.index ?? idx}`;
           const isScheduledToday = subtaskKeys.has(keyWithUnderscore) || subtaskKeys.has(keyWithId);
 
-          if (isScheduledToday) {
-            const stCompletedAt = st?.completedAt;
-            const stIsDone = st?.status === "done";
+          const stCompletedAt = st?.completedAt;
+          const stIsDone = st?.status === "done";
 
+          if (isScheduledToday) {
             // Only count in total if NOT completed before today
             if (!isCompletedBefore(stCompletedAt, todayStart)) {
               todayTotal += 1;
@@ -390,16 +442,24 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
                 todayCompleted += 1;
               }
             }
+          } else if (isTaskDueToday && !isCompletedBefore(stCompletedAt, todayStart)) {
+            // Fallback: Task due today but not in scheduled set - count as pending
+            todayTotal += 1;
+            if (isWithinDay(stCompletedAt, todayStart, todayEnd)) {
+              todayCompleted += 1;
+            } else if (stIsDone && !stCompletedAt) {
+              todayCompleted += 1;
+            }
           }
         }
       } else {
         // Task without subtasks
         const isScheduledToday = taskIds.has(task._id) || taskIds.has(taskId);
 
-        if (isScheduledToday) {
-          const taskCompletedAt = task.completedAt;
-          const taskIsDone = task.status === "done" || task.completed === true;
+        const taskCompletedAt = task.completedAt;
+        const taskIsDone = task.status === "done" || task.completed === true;
 
+        if (isScheduledToday) {
           // Only count in total if NOT completed before today
           if (!isCompletedBefore(taskCompletedAt, todayStart)) {
             todayTotal += 1;
@@ -412,14 +472,25 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
               todayCompleted += 1;
             }
           }
+        } else if (isTaskDueToday && !isCompletedBefore(taskCompletedAt, todayStart)) {
+          // Fallback: Task due today but not in scheduled set - count as pending
+          todayTotal += 1;
+          if (isWithinDay(taskCompletedAt, todayStart, todayEnd)) {
+            todayCompleted += 1;
+          } else if (taskIsDone && !taskCompletedAt) {
+            todayCompleted += 1;
+          }
         }
       }
     }
   } else {
     // Fallback: use scheduledSessions to determine what's scheduled for today
+    // Also include tasks due today that have no sessions
     for (const task of tasks) {
       const subs: any[] = (task as any).subTasks || [];
       const hasSubtasks = subs.length > 0;
+      const taskDueDate = (task as any).dueDate || (task as any).deadline;
+      const isTaskDueToday = hasDueDateOnDay(taskDueDate, todayStart, todayEnd);
 
       if (hasSubtasks) {
         for (const st of subs) {
@@ -439,6 +510,12 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
             // Completed today but wasn't scheduled - count as both
             todayTotal += 1;
             todayCompleted += 1;
+          } else if (isTaskDueToday && !isCompletedBefore(stCompletedAt, todayStart) && !isSubtaskScheduledToday) {
+            // Task due today with no scheduled session - count as pending work
+            todayTotal += 1;
+            if (stIsDone) {
+              todayCompleted += 1;
+            }
           }
         }
       } else {
@@ -458,6 +535,12 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
           // Completed today but wasn't scheduled - count as both
           todayTotal += 1;
           todayCompleted += 1;
+        } else if (isTaskDueToday && !isCompletedBefore(taskCompletedAt, todayStart) && !isTaskScheduledToday) {
+          // Task due today with no scheduled session - count as pending work
+          todayTotal += 1;
+          if (taskIsDone) {
+            todayCompleted += 1;
+          }
         }
       }
     }
@@ -524,7 +607,7 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
     }
   }
 
-  return {
+  const result = {
     today: {
       total: todayTotal,
       completed: todayCompleted,
@@ -538,6 +621,17 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
     dailyProgress,
     labels,
   };
+  
+  console.log("[calculateTaskProgress] Result:", {
+    todayTotal,
+    todayCompleted,
+    todayPercentage,
+    weekTotal,
+    weekCompleted,
+    dailyProgressSample: dailyProgress.slice(-3), // Last 3 days
+  });
+  
+  return result;
 }
 
 /**

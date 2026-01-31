@@ -273,6 +273,18 @@ export async function getTasks(userId, filters = {}) {
       });
     }
     
+    // Fetch scheduled sessions for all tasks (last 14 days + future)
+    const fourteenDaysAgo = new Date();
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+    fourteenDaysAgo.setHours(0, 0, 0, 0);
+    
+    const schedules = await TaskSchedule.find({
+      userId,
+      taskId: { $in: taskIds },
+      start: { $gte: fourteenDaysAgo }
+    }).lean();
+    console.log(`[getTasks] Found ${schedules.length} scheduled sessions for tasks`);
+    
     // Group subtasks by taskId
     const subtasksByTaskId = {};
     subtasks.forEach(subtask => {
@@ -282,15 +294,59 @@ export async function getTasks(userId, filters = {}) {
       subtasksByTaskId[subtask.taskId].push(subtask);
     });
     
-    // Attach subtasks to tasks
+    // Group schedules by taskId (and also track subtask schedules)
+    const schedulesByTaskId = {};
+    const schedulesBySubtaskKey = {}; // key: "taskId:subtaskIndex"
+    schedules.forEach(sched => {
+      const taskIdStr = sched.taskId.toString();
+      if (!schedulesByTaskId[taskIdStr]) {
+        schedulesByTaskId[taskIdStr] = [];
+      }
+      schedulesByTaskId[taskIdStr].push({
+        id: sched._id,
+        start: sched.start,
+        end: sched.end,
+        minutes: sched.minutes,
+        status: sched.status,
+        subtaskIndex: sched.subtaskIndex,
+        subtaskTitle: sched.subtaskTitle,
+      });
+      
+      // Also track by subtask key for attaching to subtasks
+      if (sched.subtaskIndex !== undefined && sched.subtaskIndex !== null) {
+        const key = `${taskIdStr}:${sched.subtaskIndex}`;
+        if (!schedulesBySubtaskKey[key]) {
+          schedulesBySubtaskKey[key] = [];
+        }
+        schedulesBySubtaskKey[key].push({
+          id: sched._id,
+          start: sched.start,
+          end: sched.end,
+          minutes: sched.minutes,
+          status: sched.status,
+        });
+      }
+    });
+    
+    // Attach subtasks and schedules to tasks
     tasks.forEach(task => {
+      const taskIdStr = task._id.toString();
+      
+      // Attach subtasks
       if (subtasksByTaskId[task._id]) {
-        task.subTasks = subtasksByTaskId[task._id];
+        task.subTasks = subtasksByTaskId[task._id].map(st => ({
+          ...st,
+          // Attach scheduled sessions to each subtask
+          scheduledSessions: schedulesBySubtaskKey[`${taskIdStr}:${st.index}`] || []
+        }));
         console.log(`[getTasks] Task ${task._id} (${task.taskname}) has ${task.subTasks.length} subtasks`);
       } else {
         task.subTasks = []; // Ensure empty array if no subtasks
         console.log(`[getTasks] Task ${task._id} (${task.taskname}) has NO subtasks`);
       }
+      
+      // Attach scheduled sessions to task (for tasks without subtasks or for task-level view)
+      task.scheduledSessions = schedulesByTaskId[taskIdStr] || [];
     });
   }
   
