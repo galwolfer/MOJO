@@ -2,7 +2,7 @@ import React from "react";
 import { View, Pressable } from "react-native";
 import AppText from "../../common/AppText";
 import { Checkbox } from "../../icons/Checkbox";
-import { getTimeParts } from "../../widgets/widgetHelpers";
+import { getTimeParts, getSubtaskIdFromSession } from "../../widgets/widgetHelpers";
 import { StyleSheet } from "react-native";
 import { ICON_SIZES, SPACING, COLORS } from "../../../theme";
 
@@ -41,6 +41,15 @@ export const SessionRow: React.FC<{
 }) => {
   const checkboxHandler = checkboxOnToggle ?? rowOnPress ?? undefined;
   const rowPressHandler = rowOnPress ?? (canToggle ? (checkboxOnToggle ?? undefined) : undefined);
+
+  const onCheckboxPress = async () => {
+    if (isLoading) return;
+    const subtaskId = getSubtaskIdFromSession(session, subtasks);
+    const status = !isDone ? "done" : "todo";
+    console.debug("[SessionRow] sending fields to server", { taskId, subtaskId, sessionId: session.id, status });
+    await checkboxHandler?.();
+  };
+
   const startParts = getTimeParts(session.start);
   const endParts = getTimeParts(session.end);
   const subtaskTitle = session.subtaskTitle || `Part ${session.subtaskIndex ?? sessionIndex + 1}`;
@@ -95,7 +104,7 @@ export const SessionRow: React.FC<{
 
         <View style={styles.sessionCheckbox}>
           {canToggle ? (
-            <Checkbox checked={isDone} onChange={() => checkboxHandler?.()} size={ICON_SIZES.sm} />
+            <Checkbox checked={isDone} onChange={onCheckboxPress} size={ICON_SIZES.sm} />
           ) : (
             <View style={styles.checkboxSpacer} />
           )}

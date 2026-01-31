@@ -587,9 +587,9 @@ export async function updateTask(req, res) {
       if (Array.isArray(raw.tags)) {
         // Validate each tag
         const validTags = raw.tags
-          .filter(tag => typeof tag === "string")
-          .map(tag => tag.trim())
-          .filter(tag => tag.length > 0);
+          .filter((tag) => typeof tag === "string")
+          .map((tag) => tag.trim())
+          .filter((tag) => tag.length > 0);
         updates.tags = validTags;
       }
     }
@@ -599,16 +599,16 @@ export async function updateTask(req, res) {
       if (Array.isArray(raw.subtasks)) {
         // Validate each subtask
         const validSubtasks = raw.subtasks
-          .filter(sub => sub && typeof sub === "object")
-          .map(sub => ({
+          .filter((sub) => sub && typeof sub === "object")
+          .map((sub) => ({
             id: sub.id || undefined,
             title: sub.title ? String(sub.title).trim() : "",
             description: sub.description ? String(sub.description).trim() : "",
             minutes: sub.minutes ? Number(sub.minutes) : 30,
             index: sub.index !== undefined ? Number(sub.index) : undefined,
           }))
-          .filter(sub => sub.title.length > 0);
-        
+          .filter((sub) => sub.title.length > 0);
+
         if (validSubtasks.length > 0) {
           updates.subtasks = validSubtasks;
         }
@@ -806,11 +806,13 @@ export async function toggleTaskCompletion(req, res) {
     // Get subtasks BEFORE toggling to know which ones are uncompleted
     // This ensures we don't double-count points for already completed subtasks
     const allSubtasks = await taskService.getSubTasksForTask({ userId, taskId: id });
-    const uncompletedSubtasks = allSubtasks.filter(st => st.status !== "done");
+    const uncompletedSubtasks = allSubtasks.filter((st) => st.status !== "done");
     const hasSubtasks = allSubtasks.length > 0;
     const allSubtasksAlreadyDone = hasSubtasks && uncompletedSubtasks.length === 0;
-    
-    logger.info(`[toggleTaskCompletion] Task ${id}: ${allSubtasks.length} total subtasks, ${uncompletedSubtasks.length} uncompleted`);
+
+    logger.info(
+      `[toggleTaskCompletion] Task ${id}: ${allSubtasks.length} total subtasks, ${uncompletedSubtasks.length} uncompleted`,
+    );
 
     const result = await taskService.toggleTaskCompletion(id, userId);
 
@@ -835,14 +837,18 @@ export async function toggleTaskCompletion(req, res) {
           const reward = await awardTaskCompletionBonus(userId, task);
           pointsAwarded = reward.points;
           gamification = reward.gamification;
-          logger.info(`[toggleTaskCompletion] All subtasks done, awarded ${reward.points} bonus points to user ${userId} for completing task ${id}`);
+          logger.info(
+            `[toggleTaskCompletion] All subtasks done, awarded ${reward.points} bonus points to user ${userId} for completing task ${id}`,
+          );
         } else {
           // Either no subtasks or some uncompleted - award full points for remaining subtasks
           const { awardTaskCompletionPoints } = await import("./userController.js");
           const reward = await awardTaskCompletionPoints(userId, task, uncompletedSubtasks);
           pointsAwarded = reward.points;
           gamification = reward.gamification;
-          logger.info(`[toggleTaskCompletion] Awarded ${reward.points} points to user ${userId} for completing task ${id} via toggle`);
+          logger.info(
+            `[toggleTaskCompletion] Awarded ${reward.points} points to user ${userId} for completing task ${id} via toggle`,
+          );
         }
       } catch (pointsError) {
         logger.warn("Failed to award points on toggle completion:", pointsError.message);
@@ -1013,7 +1019,9 @@ export async function updateSubTask(req, res) {
         const reward = await awardSubtaskCompletionPoints(userId, result.subtask, result.parentTask);
         pointsAwarded = reward.points;
         gamification = reward.gamification;
-        logger.info(`[updateSubTask] Awarded ${pointsAwarded} points to user ${userId} for completing subtask ${subId}`);
+        logger.info(
+          `[updateSubTask] Awarded ${pointsAwarded} points to user ${userId} for completing subtask ${subId}`,
+        );
 
         // If this subtask completion caused the parent task to complete, award task completion BONUS only
         // (not full task points, since subtask points were already awarded throughout)
@@ -1074,7 +1082,7 @@ export async function markSubTaskComplete(req, res) {
     });
 
     if (!result || result.success === false) {
-      return res.status(404).json({ success: false, error: result ? result.error : "Subtask not found" }); 
+      return res.status(404).json({ success: false, error: result ? result.error : "Subtask not found" });
     }
 
     // Award points for subtask completion (only if this was a NEW completion)
@@ -1087,7 +1095,9 @@ export async function markSubTaskComplete(req, res) {
         const reward = await awardSubtaskCompletionPoints(userId, result.subtask, result.parentTask);
         pointsAwarded = reward.points;
         gamification = reward.gamification;
-        logger.info(`[markSubTaskComplete] Awarded ${pointsAwarded} points to user ${userId} for completing subtask ${subId}`);
+        logger.info(
+          `[markSubTaskComplete] Awarded ${pointsAwarded} points to user ${userId} for completing subtask ${subId}`,
+        );
 
         // If this subtask completion caused the parent task to complete, award task completion BONUS only
         if (result.parentTaskCompleted && result.parentTask) {
@@ -1266,7 +1276,7 @@ export async function bulkUpdateTaskWithSubtasks(req, res) {
 /**
  * Complete a task (with ML training)
  * POST /api/tasks/:id/complete
- * 
+ *
  * Point calculation:
  * - If task has uncompleted subtasks: awards points for each remaining subtask + task completion bonus
  * - If task has no subtasks: awards base task points + task completion bonus
@@ -1280,11 +1290,13 @@ export async function completeTask(req, res) {
 
     // Get subtasks BEFORE completing the task (for point calculation)
     const allSubtasks = await taskService.getSubTasksForTask({ userId, taskId: id });
-    const remainingSubtasks = allSubtasks.filter(st => st.status !== "done");
+    const remainingSubtasks = allSubtasks.filter((st) => st.status !== "done");
     const hasSubtasks = allSubtasks.length > 0;
     const allSubtasksAlreadyDone = hasSubtasks && remainingSubtasks.length === 0;
-    
-    logger.info(`[completeTask] Task ${id}: ${allSubtasks.length} total subtasks, ${remainingSubtasks.length} uncompleted`);
+
+    logger.info(
+      `[completeTask] Task ${id}: ${allSubtasks.length} total subtasks, ${remainingSubtasks.length} uncompleted`,
+    );
 
     const result = await taskService.completeTask({ taskId: id, userId });
 
@@ -1312,14 +1324,18 @@ export async function completeTask(req, res) {
           const reward = await awardTaskCompletionBonus(userId, result.task);
           pointsAwarded = reward.points;
           gamification = reward.gamification;
-          logger.info(`[completeTask] All subtasks done, awarded ${reward.points} bonus points to user ${userId} for completing task ${id}`);
+          logger.info(
+            `[completeTask] All subtasks done, awarded ${reward.points} bonus points to user ${userId} for completing task ${id}`,
+          );
         } else {
           // Either no subtasks or some uncompleted - award full points for remaining subtasks
           const { awardTaskCompletionPoints } = await import("./userController.js");
           const reward = await awardTaskCompletionPoints(userId, result.task, remainingSubtasks);
           pointsAwarded = reward.points;
           gamification = reward.gamification;
-          logger.info(`[completeTask] Awarded ${reward.points} points (bonus: ${reward.bonus}) to user ${userId} for completing task ${id}`);
+          logger.info(
+            `[completeTask] Awarded ${reward.points} points (bonus: ${reward.bonus}) to user ${userId} for completing task ${id}`,
+          );
         }
       } catch (pointsError) {
         logger.warn("[completeTask] Failed to award points for task completion:", pointsError.message);
