@@ -153,7 +153,7 @@ export async function getExpoPushToken(projectId?: string): Promise<string | nul
         'To enable push notifications:\n' +
         '1. Create a Firebase project at https://console.firebase.google.com\n' +
         '2. Add an Android app with package name: com.mojo.Mojo\n' +
-        '3. Download google-services.json to frontend/google-services.json\n' +
+        '3. Download google-services.json to frontend/services/secrets/google-services.json\n' +
         '4. Rebuild the app with: npx expo prebuild --clean && npx expo run:android'
       );
       return null;

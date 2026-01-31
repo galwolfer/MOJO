@@ -26,7 +26,7 @@ Push notifications on Android require Firebase Cloud Messaging (FCM). Follow the
 
 ### 3. Download google-services.json
 1. Download the `google-services.json` file
-2. Save it to `frontend/google-services.json`
+2. Save it to `frontend/services/secrets/google-services.json`
 
 ### 4. Upload FCM V1 Service Account Key to Expo
 The Legacy FCM API is deprecated. You must use FCM V1 with a Service Account:
@@ -134,14 +134,14 @@ No additional setup needed - the scheduler starts automatically when the server 
 
 2. **Production (EAS Build)**: Create `google-services.json` for Android:
    ```bash
-   # Place google-services.json in frontend/ directory
+   # Place google-services.json in `frontend/services/secrets/` directory
    eas build --platform android
    ```
 
 3. **Firebase Setup** (for production):
    - Create a Firebase project
    - Add an Android app with package name `com.mojo.Mojo`
-   - Download `google-services.json` and place in `frontend/`
+   - Download `google-services.json` and place in `frontend/services/secrets/`
 
 ## How It Works
 
@@ -257,7 +257,7 @@ PUT /api/notifications/preferences
 - Rebuild and reinstall the app after changing project IDs
 
 ### "FirebaseApp is not initialized" error
-- Add `google-services.json` to `frontend/` directory
+- Add `google-services.json` to `frontend/services/secrets/` directory
 - Run `npx expo prebuild --clean` and rebuild
 
 ### Notifications not appearing

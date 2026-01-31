@@ -65,3 +65,7 @@ android/
 # Firebase / Google service config (local, sensitive)
 **/google-services.json
 **/GoogleService-Info.plist
+
+# Local secrets (do not commit)
+**/services/secrets/
+**/secrets/
