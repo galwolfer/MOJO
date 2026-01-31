@@ -61,3 +61,7 @@ data/vector_db/
 __pycache__/
 
 android/
+
+# Firebase / Google service config (local, sensitive)
+**/google-services.json
+**/GoogleService-Info.plist
