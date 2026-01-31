@@ -983,6 +983,17 @@ export async function completeTask({ taskId, userId }) {
       console.warn(`[completeTask] Failed to mark subtasks completed for task ${taskId}:`, err && err.message);
     }
 
+    // Mark all planned TaskSchedule sessions for this task as completed
+    try {
+      await TaskSchedule.updateMany(
+        { taskId, status: "planned" },
+        { $set: { status: "completed" } }
+      );
+      console.log(`[completeTask] Marked TaskSchedule sessions as completed for task ${taskId}`);
+    } catch (schedErr) {
+      console.warn(`[completeTask] Failed to update TaskSchedule status:`, schedErr && schedErr.message);
+    }
+
     await logEvent({
       type: "task_completed",
       userId,
@@ -1083,6 +1094,29 @@ export async function toggleTaskCompletion(taskId, userId) {
 
   // Attach previousEarnedPoints to the returned task for reversal calculation
   updated.previousEarnedPoints = previousEarnedPoints;
+
+  // Update TaskSchedule entries for this task
+  // When completing: mark all planned sessions as completed
+  // When uncompleting: mark all completed sessions as planned (so they don't get deleted)
+  try {
+    if (nextStatus === "done") {
+      // Mark all planned sessions for this task as completed
+      await TaskSchedule.updateMany(
+        { taskId, status: "planned" },
+        { $set: { status: "completed" } }
+      );
+      console.log(`[toggleTaskCompletion] Marked TaskSchedule sessions as completed for task ${taskId}`);
+    } else {
+      // Mark all completed sessions for this task as planned (reverting)
+      await TaskSchedule.updateMany(
+        { taskId, status: "completed" },
+        { $set: { status: "planned" } }
+      );
+      console.log(`[toggleTaskCompletion] Reverted TaskSchedule sessions to planned for task ${taskId}`);
+    }
+  } catch (schedErr) {
+    console.warn(`[toggleTaskCompletion] Failed to update TaskSchedule status:`, schedErr && schedErr.message);
+  }
 
   await logEvent({
     type: nextStatus === "done" ? "task_completed_toggle" : "task_uncompleted_toggle",
@@ -1196,6 +1230,29 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
   if (sanitized.status === "todo") {
     sanitized.completedAt = null;
     sanitized.earnedPoints = 0;
+  }
+
+  // Update TaskSchedule entries for this subtask
+  // When completing: mark sessions for this subtask as completed
+  // When uncompleting: mark sessions for this subtask as planned
+  try {
+    if (isNewCompletion) {
+      // Mark scheduled sessions for this subtask as completed
+      await TaskSchedule.updateMany(
+        { taskId: subtask.taskId, subtaskIndex: subtask.index, status: "planned" },
+        { $set: { status: "completed" } }
+      );
+      console.log(`[updateSubTask] Marked TaskSchedule sessions as completed for subtask index ${subtask.index} of task ${subtask.taskId}`);
+    } else if (isNewUncompletion) {
+      // Mark scheduled sessions for this subtask as planned (reverting)
+      await TaskSchedule.updateMany(
+        { taskId: subtask.taskId, subtaskIndex: subtask.index, status: "completed" },
+        { $set: { status: "planned" } }
+      );
+      console.log(`[updateSubTask] Reverted TaskSchedule sessions to planned for subtask index ${subtask.index} of task ${subtask.taskId}`);
+    }
+  } catch (schedErr) {
+    console.warn(`[updateSubTask] Failed to update TaskSchedule status:`, schedErr && schedErr.message);
   }
 
   // Apply updates
