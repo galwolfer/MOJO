@@ -358,7 +358,7 @@ export const getColoredDataUri = (fileName: string, color: string) => {
 };
 
 import { getCategoryMeta } from "../../config/categoryMeta";
-import { updateSubTask } from "../../services/taskService";
+import { updateSubTask, toggleTaskCompletion } from "../../services/taskService";
 
 /**
  * getCategoryDisplay
@@ -619,6 +619,7 @@ export const toggleSubtask = async ({
  * toggleSession
  * Handles toggling the completion state of a session by finding its associated subtask.
  * Used in TaskDetailWidget where sessions are directly tied to subtasks.
+ * If no subtask exists (task with scheduled session but no subtasks), toggles the entire task.
  * Delegates to toggleSubtask after extracting the subtask ID.
  * @param params - Object containing session details and state management functions
  */
@@ -647,7 +648,59 @@ export const toggleSession = async ({
 }) => {
   // Find the subtask ID associated with this session
   const subtaskId = getSubtaskIdFromSession(session, subtasks);
-  if (!subtaskId) return;
+
+  if (!subtaskId) {
+    // No subtask found - this is a task with scheduled session but no subtasks
+    // Toggle the entire task completion instead
+    const key = getSessionKey(taskId, session, index, subtasks);
+    const isCompleted = completedParts.has(key);
+    const nextCompleted = !isCompleted;
+
+    // Optimistically update UI
+    setCompletedParts((prev) => {
+      const updated = new Set(prev);
+      if (nextCompleted) updated.add(key);
+      else updated.delete(key);
+      return updated;
+    });
+
+    // Set loading state
+    setLoadingParts((prev) => new Set(prev).add(key));
+
+    try {
+      // Toggle the entire task completion
+      console.debug(`[toggleSession] Toggling task completion for task ${taskId} (no subtask)`);
+      const success = await toggleTaskCompletion(taskId);
+      if (!success) throw new Error("Toggle task failed");
+
+      // Notify task update
+      notifyTaskUpdate({ taskId });
+      notifyTaskUpdate({ taskId }, 300);
+
+      // Trigger action
+      onAction?.("task_toggled", {
+        taskId,
+        completed: nextCompleted,
+      });
+    } catch (error) {
+      // Revert optimistic update on failure
+      setCompletedParts((prev) => {
+        const updated = new Set(prev);
+        if (isCompleted) updated.add(key);
+        else updated.delete(key);
+        return updated;
+      });
+    } finally {
+      // Clear loading state
+      setLoadingParts((prev) => {
+        const updated = new Set(prev);
+        updated.delete(key);
+        return updated;
+      });
+    }
+    return;
+  }
+
   // Delegate to subtask toggle logic
   await toggleSubtask({
     taskId,
