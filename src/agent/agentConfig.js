@@ -69,8 +69,18 @@ export const TOOL_DESCRIPTIONS = missionRegistry.getToolDescriptions();
 
 export function getBaseIdentity() {
   // Compose identity once per call to allow current timestamp
-  const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const today = `${year}-${month}-${day}`;
+  
+  const tomorrowDate = new Date(now);
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrowYear = tomorrowDate.getFullYear();
+  const tomorrowMonth = String(tomorrowDate.getMonth() + 1).padStart(2, '0');
+  const tomorrowDay = String(tomorrowDate.getDate()).padStart(2, '0');
+  const tomorrow = `${tomorrowYear}-${tomorrowMonth}-${tomorrowDay}`;
 
   return `You are MOJO, a helpful AI assistant for task management.
 
