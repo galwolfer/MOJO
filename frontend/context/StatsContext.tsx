@@ -99,14 +99,21 @@ export function StatsProvider({ children }: { children: React.ReactNode }) {
 
   // Notify that stats have changed - triggers a debounced refresh
   const notifyStatsChange = useCallback(
-    (gamificationData?: { points?: number; currentStreak?: number }) => {
+    (gamificationData?: { points?: number; currentStreak?: number; completedTasks?: number }) => {
+      console.log("[StatsContext] notifyStatsChange called with:", gamificationData);
+      
       // If gamification data is provided, optimistically update stats immediately
       if (gamificationData) {
-        setStats((prev) => ({
-          ...prev,
-          points: gamificationData.points ?? prev.points,
-          streak: gamificationData.currentStreak ?? prev.streak,
-        }));
+        setStats((prev) => {
+          const newStats = {
+            ...prev,
+            points: gamificationData.points ?? prev.points,
+            streak: gamificationData.currentStreak ?? prev.streak,
+            tasks: gamificationData.completedTasks ?? prev.tasks,
+          };
+          console.log("[StatsContext] Updating stats from", prev, "to", newStats);
+          return newStats;
+        });
       }
 
       // Debounce the refresh to avoid multiple rapid calls

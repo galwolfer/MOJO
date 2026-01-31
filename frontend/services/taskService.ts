@@ -616,16 +616,64 @@ export async function completeTask(id: string): Promise<Task | null> {
 }
 
 /**
+ * Result from toggling a task completion
+ */
+export type ToggleTaskResult = {
+  success: boolean;
+  task: Task | null;
+  gamification?: GamificationResult;
+  wasCompletion?: boolean;
+  wasUncompletion?: boolean;
+};
+
+/**
  * Toggle task completion
  * POST /api/tasks/:id/toggle
  */
-export async function toggleTaskCompletion(id: string): Promise<Task | null> {
+export async function toggleTaskCompletion(id: string): Promise<ToggleTaskResult> {
   try {
-    const response = await post<{ success: boolean; task: Task }>(`/tasks/${id}/toggle`, {});
-    return response.task || null;
+    const response = await post<{
+      success: boolean;
+      task: Task;
+      gamification?: {
+        points?: number;
+        currentStreak?: number;
+        completedTasks?: number;
+      };
+      pointsAwarded?: number;
+      pointsSubtracted?: number;
+      wasCompletion?: boolean;
+      wasUncompletion?: boolean;
+    }>(`/tasks/${id}/toggle`, {});
+    
+    console.log("[taskService] toggleTaskCompletion response:", {
+      success: response.success,
+      hasGamification: !!response.gamification,
+      gamification: response.gamification,
+      wasCompletion: response.wasCompletion,
+      wasUncompletion: response.wasUncompletion,
+    });
+    
+    return {
+      success: response.success,
+      task: response.task || null,
+      gamification: response.gamification
+        ? {
+            points: response.gamification.points,
+            currentStreak: response.gamification.currentStreak,
+            completedTasks: response.gamification.completedTasks,
+            pointsAwarded: response.pointsAwarded,
+            pointsSubtracted: response.pointsSubtracted,
+            wasCompletion: response.wasCompletion,
+            wasUncompletion: response.wasUncompletion,
+          }
+        : undefined,
+      wasCompletion: response.wasCompletion,
+      wasUncompletion: response.wasUncompletion,
+    };
   } catch (error) {
     console.warn("Failed to toggle task:", error);
-    return null;
+    return { success: false, task: null };
   }
 }
 
@@ -647,13 +695,19 @@ export async function updateTask(
 }
 
 /**
- * Gamification result returned from task/subtask completion
+ * Gamification result returned from task/subtask completion or reversal
  */
 export type GamificationResult = {
   points?: number;
   currentStreak?: number;
+  completedTasks?: number;
   pointsAwarded?: number;
+  pointsSubtracted?: number;
+  taskBonusSubtracted?: number;
   parentTaskCompleted?: boolean;
+  parentTaskUncompleted?: boolean;
+  wasCompletion?: boolean;
+  wasUncompletion?: boolean;
 };
 
 /**
@@ -667,7 +721,7 @@ export type UpdateSubTaskResult = {
 /**
  * Update a subtask
  * PATCH /api/tasks/:taskId/subtasks/:subId
- * Returns gamification data when subtask is completed
+ * Returns gamification data when subtask is completed or reverted
  */
 export async function updateSubTask(
   taskId: string,
@@ -677,18 +731,28 @@ export async function updateSubTask(
   try {
     const response = await patch<{
       success: boolean;
-      gamification?: { points: number; currentStreak: number };
+      gamification?: { points: number; currentStreak: number; completedTasks?: number };
       pointsAwarded?: number;
+      pointsSubtracted?: number;
+      taskBonusSubtracted?: number;
       parentTaskCompleted?: boolean;
+      parentTaskUncompleted?: boolean;
+      wasCompletion?: boolean;
+      wasUncompletion?: boolean;
     }>(`/tasks/${taskId}/subtasks/${subtaskId}`, updates);
 
-    // Log gamification data if subtask was completed
+    // Log gamification data if subtask was completed or reverted
     if (response.gamification) {
-      console.log("[taskService] Subtask completion gamification:", {
+      console.log("[taskService] Subtask gamification:", {
         pointsAwarded: response.pointsAwarded,
+        pointsSubtracted: response.pointsSubtracted,
         totalPoints: response.gamification.points,
+        completedTasks: response.gamification.completedTasks,
         streak: response.gamification.currentStreak,
         parentTaskCompleted: response.parentTaskCompleted,
+        parentTaskUncompleted: response.parentTaskUncompleted,
+        wasCompletion: response.wasCompletion,
+        wasUncompletion: response.wasUncompletion,
       });
     }
 
@@ -698,8 +762,14 @@ export async function updateSubTask(
         ? {
             points: response.gamification.points,
             currentStreak: response.gamification.currentStreak,
+            completedTasks: response.gamification.completedTasks,
             pointsAwarded: response.pointsAwarded,
+            pointsSubtracted: response.pointsSubtracted,
+            taskBonusSubtracted: response.taskBonusSubtracted,
             parentTaskCompleted: response.parentTaskCompleted,
+            parentTaskUncompleted: response.parentTaskUncompleted,
+            wasCompletion: response.wasCompletion,
+            wasUncompletion: response.wasUncompletion,
           }
         : undefined,
     };

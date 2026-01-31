@@ -10,6 +10,7 @@ const subTaskSchema = new mongoose.Schema(
     minutes: { type: Number }, // optional estimated/minutes for this subtask
     status: { type: String, enum: ["todo", "done"], default: "todo" },
     completedAt: { type: Date },
+    earnedPoints: { type: Number, default: 0 }, // points awarded when subtask was completed (reset to 0 if undone)
   },
   { timestamps: true }
 );

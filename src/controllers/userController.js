@@ -396,6 +396,174 @@ export async function awardSubtaskCompletionPoints(userId, subtask, parentTask =
   }
 }
 
+// =============================================================================
+// REVERSAL FUNCTIONS - Handle undoing completions
+// =============================================================================
+
+/**
+ * Helper: Subtract user points (used when reverting a completion)
+ */
+async function subtractUserPoints(userId, points) {
+  if (!points || points <= 0) return;
+  
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      logger.warn(`[subtractUserPoints] User ${userId} not found`);
+      return null;
+    }
+
+    ensureGamification(user);
+    // Prevent going negative
+    user.gamification.points = Math.max(0, (user.gamification.points || 0) - points);
+    await user.save();
+
+    logger.info(`[subtractUserPoints] Subtracted ${points} points from user ${userId}, new total: ${user.gamification.points}`);
+    return user.gamification.points;
+  } catch (error) {
+    logger.error(`[subtractUserPoints] Error:`, error);
+    return null;
+  }
+}
+
+/**
+ * Helper: Decrement completed tasks counter
+ */
+async function decrementCompletedTasks(userId) {
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      logger.warn(`[decrementCompletedTasks] User ${userId} not found`);
+      return null;
+    }
+
+    ensureGamification(user);
+    // Prevent going negative
+    user.gamification.completedTasks = Math.max(0, (user.gamification.completedTasks || 0) - 1);
+    await user.save();
+
+    logger.info(`[decrementCompletedTasks] User ${userId}: completedTasks = ${user.gamification.completedTasks}`);
+    return user.gamification.completedTasks;
+  } catch (error) {
+    logger.error(`[decrementCompletedTasks] Error:`, error);
+    return null;
+  }
+}
+
+/**
+ * Helper: Decrement completed subtasks counter
+ */
+async function decrementCompletedSubtasks(userId) {
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      logger.warn(`[decrementCompletedSubtasks] User ${userId} not found`);
+      return null;
+    }
+
+    ensureGamification(user);
+    // Prevent going negative
+    user.gamification.completedSubtasks = Math.max(0, (user.gamification.completedSubtasks || 0) - 1);
+    await user.save();
+
+    logger.info(`[decrementCompletedSubtasks] User ${userId}: completedSubtasks = ${user.gamification.completedSubtasks}`);
+    return user.gamification.completedSubtasks;
+  } catch (error) {
+    logger.error(`[decrementCompletedSubtasks] Error:`, error);
+    return null;
+  }
+}
+
+/**
+ * Reverse task completion - subtract points and decrement task count
+ * Called when a completed task is marked as undone/incomplete
+ *
+ * @param {string} userId - User ID
+ * @param {Object} task - Task object with earnedPoints field
+ * @returns {Promise<{ pointsSubtracted: number, gamification: Object }>}
+ */
+export async function reverseTaskCompletion(userId, task) {
+  try {
+    const pointsToSubtract = task.earnedPoints || 0;
+
+    logger.info(`[reverseTaskCompletion] Reversing task ${task._id}, subtracting ${pointsToSubtract} points`);
+
+    if (pointsToSubtract > 0) {
+      await subtractUserPoints(userId, pointsToSubtract);
+    }
+    await decrementCompletedTasks(userId);
+
+    // Get updated gamification state
+    const user = await User.findById(userId).lean();
+    const gamification = user?.gamification || {};
+
+    return { 
+      pointsSubtracted: pointsToSubtract, 
+      gamification: {
+        points: gamification.points || 0,
+        currentStreak: gamification.currentStreak || 0,
+        completedTasks: gamification.completedTasks || 0,
+      }
+    };
+  } catch (error) {
+    logger.error(`[reverseTaskCompletion] Error:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Reverse subtask completion - subtract points and decrement subtask count
+ * If this causes the parent task to become incomplete, also reverse the task completion bonus
+ *
+ * @param {string} userId - User ID
+ * @param {Object} subtask - Subtask object with earnedPoints field
+ * @param {Object} parentTask - Parent task object (may have earnedPoints from completion bonus)
+ * @param {boolean} parentTaskWasCompleted - Whether the parent task was completed before this reversal
+ * @returns {Promise<{ pointsSubtracted: number, taskBonusSubtracted: number, gamification: Object }>}
+ */
+export async function reverseSubtaskCompletion(userId, subtask, parentTask = null, parentTaskWasCompleted = false) {
+  try {
+    const subtaskPoints = subtask.earnedPoints || 0;
+
+    logger.info(`[reverseSubtaskCompletion] Reversing subtask ${subtask._id}, subtracting ${subtaskPoints} points`);
+
+    if (subtaskPoints > 0) {
+      await subtractUserPoints(userId, subtaskPoints);
+    }
+    await decrementCompletedSubtasks(userId);
+
+    // If this subtask reversal causes the parent task to become incomplete,
+    // also reverse the task completion bonus
+    let taskBonusSubtracted = 0;
+    if (parentTaskWasCompleted && parentTask) {
+      const taskBonus = parentTask.earnedPoints || 0;
+      if (taskBonus > 0) {
+        await subtractUserPoints(userId, taskBonus);
+        taskBonusSubtracted = taskBonus;
+        logger.info(`[reverseSubtaskCompletion] Parent task no longer complete, subtracting ${taskBonus} bonus points`);
+      }
+      await decrementCompletedTasks(userId);
+    }
+
+    // Get updated gamification state
+    const user = await User.findById(userId).lean();
+    const gamification = user?.gamification || {};
+
+    return { 
+      pointsSubtracted: subtaskPoints, 
+      taskBonusSubtracted,
+      gamification: {
+        points: gamification.points || 0,
+        currentStreak: gamification.currentStreak || 0,
+        completedTasks: gamification.completedTasks || 0,
+      }
+    };
+  } catch (error) {
+    logger.error(`[reverseSubtaskCompletion] Error:`, error);
+    throw error;
+  }
+}
+
 export default {
   getUserStats,
   updateUserStreak,
@@ -403,4 +571,6 @@ export default {
   awardTaskCompletionPoints,
   awardTaskCompletionBonus,
   awardSubtaskCompletionPoints,
+  reverseTaskCompletion,
+  reverseSubtaskCompletion,
 };

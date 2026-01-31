@@ -989,7 +989,9 @@ export async function completeTask({ taskId, userId }) {
 /**
  * Toggle task completion status.
  * If marking as done, set status="done"; if already done, revert to "todo".
- * Returns { task, wasNewCompletion } where wasNewCompletion indicates if this toggle resulted in a new completion.
+ * Returns { task, wasNewCompletion, wasNewUncompletion } where:
+ * - wasNewCompletion indicates if this toggle resulted in a new completion
+ * - wasNewUncompletion indicates if this toggle reverted a completion (for point subtraction)
  */
 export async function toggleTaskCompletion(taskId, userId) {
   if (!taskId) {
@@ -999,6 +1001,7 @@ export async function toggleTaskCompletion(taskId, userId) {
   const task = await Task.findOne({ _id: taskId, userId });
   if (!task) return null;
 
+  const wasCompleted = task.status === "done";
   const wasIncomplete = task.status !== "done";
   const nextStatus = task.status === "done" ? "todo" : "done";
 
@@ -1007,7 +1010,12 @@ export async function toggleTaskCompletion(taskId, userId) {
     updatePayload.completedAt = new Date();
   } else {
     updatePayload.completedAt = null;
+    // Reset earnedPoints when marking as incomplete (the controller will use this value first)
+    updatePayload.earnedPoints = 0;
   }
+
+  // Store the earnedPoints before resetting (for reversal calculation)
+  const previousEarnedPoints = task.earnedPoints || 0;
 
   const updated = await Task.findByIdAndUpdate(
     taskId,
@@ -1016,6 +1024,9 @@ export async function toggleTaskCompletion(taskId, userId) {
     },
     { new: true },
   ).lean();
+
+  // Attach previousEarnedPoints to the returned task for reversal calculation
+  updated.previousEarnedPoints = previousEarnedPoints;
 
   await logEvent({
     type: nextStatus === "done" ? "task_completed_toggle" : "task_uncompleted_toggle",
@@ -1027,9 +1038,32 @@ export async function toggleTaskCompletion(taskId, userId) {
     },
   });
 
-  // Return both the task and whether this was a NEW completion (not already done before)
-  return { task: updated, wasNewCompletion: wasIncomplete && nextStatus === "done" };
+  // Return both the task and completion state flags
+  return { 
+    task: updated, 
+    wasNewCompletion: wasIncomplete && nextStatus === "done",
+    wasNewUncompletion: wasCompleted && nextStatus === "todo",
+  };
 }
+
+/**
+ * Update a task's earnedPoints field
+ * Called after awarding points to store how many points were earned
+ */
+export async function updateTaskEarnedPoints(taskId, earnedPoints) {
+  if (!taskId) return null;
+  return Task.findByIdAndUpdate(taskId, { $set: { earnedPoints } }, { new: true }).lean();
+}
+
+/**
+ * Update a subtask's earnedPoints field
+ * Called after awarding points to store how many points were earned
+ */
+export async function updateSubTaskEarnedPoints(subTaskId, earnedPoints) {
+  if (!subTaskId) return null;
+  return SubTask.findByIdAndUpdate(subTaskId, { $set: { earnedPoints } }, { new: true }).lean();
+}
+
 // -----------------------------
 // Subtask helpers
 // -----------------------------
@@ -1052,7 +1086,7 @@ export async function getSubTaskById({ userId, subTaskId }) {
 
 /**
  * Update a subtask fields (title, description, status)
- * Returns wasAlreadyCompleted flag to help callers decide whether to award points
+ * Returns wasAlreadyCompleted and isNewUncompletion flags to help callers decide on points
  */
 export async function updateSubTask({ userId, subTaskId, updates }) {
   if (!subTaskId) return { success: false, error: "SubTask ID is required" };
@@ -1074,54 +1108,66 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
   }
 
   // Use find + save instead of findOneAndUpdate to trigger Mongoose hooks
-    console.log(`[updateSubTask] Querying SubTask with:`, { _id: subTaskId, userId });
-    const subtask = await SubTask.findOne({ _id: subTaskId, userId });
-    console.log(`[updateSubTask] Query result:`, { found: !!subtask, subtaskId: subtask?._id, subtaskUserId: subtask?.userId });
+  console.log(`[updateSubTask] Querying SubTask with:`, { _id: subTaskId, userId });
+  const subtask = await SubTask.findOne({ _id: subTaskId, userId });
+  console.log(`[updateSubTask] Query result:`, { found: !!subtask, subtaskId: subtask?._id, subtaskUserId: subtask?.userId });
 
-    if (!subtask) {
-      console.error(`[updateSubTask] SubTask not found! Queried with _id=${subTaskId}, userId=${userId}`);
-      // Debug: try to find without userId to see if it exists for other users
-      const anySubtask = await SubTask.findOne({ _id: subTaskId });
-      if (anySubtask) {
-        console.error(`[updateSubTask] SubTask exists with different userId! Expected userId=${userId}, actual userId=${anySubtask.userId}`);
-      } else {
-        console.error(`[updateSubTask] SubTask with _id=${subTaskId} doesn't exist in database at all`);
-      }
-      return { success: false, error: "SubTask not found or access denied" };
+  if (!subtask) {
+    console.error(`[updateSubTask] SubTask not found! Queried with _id=${subTaskId}, userId=${userId}`);
+    // Debug: try to find without userId to see if it exists for other users
+    const anySubtask = await SubTask.findOne({ _id: subTaskId });
+    if (anySubtask) {
+      console.error(`[updateSubTask] SubTask exists with different userId! Expected userId=${userId}, actual userId=${anySubtask.userId}`);
+    } else {
+      console.error(`[updateSubTask] SubTask with _id=${subTaskId} doesn't exist in database at all`);
     }
+    return { success: false, error: "SubTask not found or access denied" };
+  }
 
-    // Apply the sanitized updates to the subtask
-    for (const key in sanitized) {
-      subtask[key] = sanitized[key];
-    }
-  // Track if this was already completed (to avoid double-awarding points)
+  // Track completion state changes
   const wasAlreadyCompleted = subtask.status === "done";
   const isNewCompletion = sanitized.status === "done" && !wasAlreadyCompleted;
+  const isNewUncompletion = sanitized.status === "todo" && wasAlreadyCompleted;
+
+  // Store previous earned points for reversal calculation
+  const previousEarnedPoints = subtask.earnedPoints || 0;
 
   // If marking done, set completedAt
-  if (sanitized.status === "done") sanitized.completedAt = new Date();
-  if (sanitized.status === "todo") sanitized.completedAt = null;
+  if (sanitized.status === "done") {
+    sanitized.completedAt = new Date();
+  }
+  // If marking todo (uncompleting), reset completedAt and earnedPoints
+  if (sanitized.status === "todo") {
+    sanitized.completedAt = null;
+    sanitized.earnedPoints = 0;
+  }
 
   // Apply updates
   Object.assign(subtask, sanitized);
 
   // Save to trigger post-save hooks (which sync parent Task progress)
   await subtask.save();
-
-    await subtask.save();
   
   const updated = subtask.toObject();
+  // Attach previousEarnedPoints for reversal calculation
+  updated.previousEarnedPoints = previousEarnedPoints;
 
   // Get parent task for context (used for point calculation)
   let parentTask = null;
+  let parentTaskWasCompleted = false;
   try {
     parentTask = await Task.findById(updated.taskId).lean();
+    parentTaskWasCompleted = parentTask?.status === "done";
   } catch (err) {
     // Non-fatal
   }
 
-  // If all subtasks are done, optionally mark parent task as done. If some done -> in_progress
+  // Store parent task's previous earned points (for task completion bonus reversal)
+  const parentTaskPreviousEarnedPoints = parentTask?.earnedPoints || 0;
+
+  // If all subtasks are done, mark parent task as done. If some done -> in_progress. If marking undone, task may become incomplete
   let parentTaskCompleted = false;
+  let parentTaskUncompleted = false;
   try {
     const remaining = await SubTask.countDocuments({ taskId: updated.taskId, status: { $ne: "done" } });
     const total = await SubTask.countDocuments({ taskId: updated.taskId });
@@ -1132,12 +1178,33 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
         parentTaskCompleted = true;
       } else if (remaining < total) {
         newStatus = "in_progress";
+        // If parent was completed before but now has remaining subtasks, it's been uncompleted
+        if (parentTaskWasCompleted) {
+          parentTaskUncompleted = true;
+        }
       }
-      await Task.updateOne({ _id: updated.taskId }, { $set: { status: newStatus } });
+      
+      const updatePayload = { status: newStatus };
+      // If task is being uncompleted, reset its earnedPoints
+      if (parentTaskUncompleted) {
+        updatePayload.earnedPoints = 0;
+        updatePayload.completedAt = null;
+      }
+      // If task is being completed, set completedAt
+      if (parentTaskCompleted && !parentTaskWasCompleted) {
+        updatePayload.completedAt = new Date();
+      }
+      
+      await Task.updateOne({ _id: updated.taskId }, { $set: updatePayload });
     }
   } catch (err) {
     // Non-fatal
     console.warn("Failed to sync parent task status after subtask update:", err && err.message);
+  }
+
+  // Attach parent task info for reversal calculation
+  if (parentTask) {
+    parentTask.previousEarnedPoints = parentTaskPreviousEarnedPoints;
   }
 
   return {
@@ -1146,7 +1213,10 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
     parentTask,
     wasAlreadyCompleted,
     isNewCompletion,
+    isNewUncompletion,
     parentTaskCompleted,
+    parentTaskUncompleted,
+    parentTaskWasCompleted,
   };
 }
 

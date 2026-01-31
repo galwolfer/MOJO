@@ -583,10 +583,21 @@ export const toggleSubtask = async ({
     // Also schedule a delayed notify to give backend time to settle and ensure list widgets refresh
     notifyTaskUpdate({ taskId }, 300);
 
-    // If gamification data was returned (subtask completed), notify stats context
+    // If gamification data was returned, notify stats context
+    console.log("[toggleSubtask] Result from API:", { 
+      success: result.success, 
+      hasGamification: !!result.gamification,
+      gamification: result.gamification,
+      notifyStatsChangeExists: !!notifyStatsChange 
+    });
+    
     if (result.gamification && notifyStatsChange) {
-      console.log("[toggleSubtask] Gamification update:", result.gamification);
+      console.log("[toggleSubtask] Calling notifyStatsChange with:", result.gamification);
       notifyStatsChange(result.gamification);
+    } else if (!result.gamification) {
+      console.log("[toggleSubtask] No gamification data in result");
+    } else if (!notifyStatsChange) {
+      console.log("[toggleSubtask] notifyStatsChange callback not provided");
     }
 
     // Trigger action callback for widget interactions
@@ -673,15 +684,29 @@ export const toggleSession = async ({
       // Toggle the entire task completion
       console.debug(`[toggleSession] Toggling task completion for task ${taskId} (no subtask)`);
       const result = await toggleTaskCompletion(taskId);
-      if (!result) throw new Error("Toggle task failed");
+      if (!result.success) throw new Error("Toggle task failed");
 
       // Notify task update
       notifyTaskUpdate({ taskId });
       notifyTaskUpdate({ taskId }, 300);
 
-      // Notify stats change for task completion
-      if (notifyStatsChange) {
-        notifyStatsChange();
+      // Notify stats change for task completion with gamification data
+      console.log("[toggleSession] Task toggle result:", {
+        success: result.success,
+        hasGamification: !!result.gamification,
+        gamification: result.gamification,
+        notifyStatsChangeExists: !!notifyStatsChange,
+      });
+      
+      if (result.gamification && notifyStatsChange) {
+        console.log("[toggleSession] Calling notifyStatsChange with:", result.gamification);
+        notifyStatsChange(result.gamification);
+      } else if (!result.gamification) {
+        console.log("[toggleSession] No gamification data in task toggle result");
+        // Still refresh stats as fallback
+        if (notifyStatsChange) {
+          notifyStatsChange();
+        }
       }
 
       // Trigger action

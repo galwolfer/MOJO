@@ -36,8 +36,25 @@ const TASK_ACTION_KEYWORDS = [
   "deleted the task",
 ];
 
+// Keywords that indicate stats/gamification changed (task completion, points, streak)
+const STATS_CHANGE_KEYWORDS = [
+  "completed the task",
+  "marked as done",
+  "marked as complete",
+  "marked as incomplete",
+  "marked as uncomplete",
+  "uncompleted",
+  "reverted",
+  "points",
+  "streak",
+  "earned",
+  "awarded",
+  "subtracted",
+];
+
 interface UseChatMessagesOptions {
   onTaskChange?: () => void;
+  onStatsChange?: () => void;
 }
 
 type SendMessageOptions = UseChatMessagesOptions & { clientId?: string; isRetry?: boolean };
@@ -54,6 +71,7 @@ export function useChatMessages(
   const { currentOjoType } = useOjoType();
 
   const hookOnTaskChange = options?.onTaskChange;
+  const hookOnStatsChange = options?.onStatsChange;
 
   const buildSessionUpdate = (
     sessionId: string,
@@ -187,6 +205,18 @@ export function useChatMessages(
             const hasTaskAction = TASK_ACTION_KEYWORDS.some((keyword) => responseText.includes(keyword.toLowerCase()));
             if (hasTaskAction) {
               effectiveOnTaskChange();
+            }
+          }
+
+          // Check if response indicates stats/gamification change and notify.
+          // This triggers stats refresh when tasks are completed/uncompleted via chat.
+          const effectiveOnStatsChange = options?.onStatsChange || hookOnStatsChange;
+          if (effectiveOnStatsChange && response.response) {
+            const responseText = response.response.toLowerCase();
+            const hasStatsChange = STATS_CHANGE_KEYWORDS.some((keyword) => responseText.includes(keyword.toLowerCase()));
+            if (hasStatsChange) {
+              console.log("[useChatMessages] Stats change detected, calling onStatsChange");
+              effectiveOnStatsChange();
             }
           }
         } else {
