@@ -6,6 +6,8 @@
 import * as taskService from "../services/taskService.js";
 import { logger } from "../utils/logger.js";
 import { User } from "../models/User.js";
+import { Task } from "../models/Task.js";
+import { SubTask } from "../models/SubTask.js";
 import { getCategoryIndex, isValidCategory } from "../config/categories.js";
 import { hasIllegalDisplayChars } from "../utils/illegalChars.js";
 import { triggerSchedulerUpdate } from "../services/schedulingService.js";
@@ -14,6 +16,84 @@ import { triggerSchedulerUpdate } from "../services/schedulingService.js";
  * Task Controller
  * Handles HTTP requests for task operations
  */
+
+/**
+ * DEBUG: Update completedAt for a task (for testing purposes)
+ * PATCH /api/tasks/:id/debug/completed-at
+ * Body: { completedAt: "2026-01-30T10:00:00Z" } or { completedAt: null }
+ */
+export async function debugUpdateTaskCompletedAt(req, res) {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+    const { completedAt, status } = req.body;
+
+    const task = await Task.findOne({ _id: id, userId });
+    if (!task) {
+      return res.status(404).json({ success: false, error: "Task not found" });
+    }
+
+    const updates = {};
+    if (completedAt !== undefined) {
+      updates.completedAt = completedAt ? new Date(completedAt) : null;
+    }
+    if (status !== undefined) {
+      updates.status = status;
+    }
+
+    const updated = await Task.findByIdAndUpdate(id, { $set: updates }, { new: true }).lean();
+
+    logger.info(`[DEBUG] Updated task ${id} completedAt to ${updates.completedAt}, status to ${updates.status}`);
+
+    return res.status(200).json({
+      success: true,
+      task: updated,
+      message: "Task completedAt updated (DEBUG)",
+    });
+  } catch (error) {
+    logger.error("[DEBUG] Error updating task completedAt:", error);
+    return res.status(500).json({ success: false, error: "Failed to update task completedAt" });
+  }
+}
+
+/**
+ * DEBUG: Update completedAt for a subtask (for testing purposes)
+ * PATCH /api/tasks/:taskId/subtasks/:subId/debug/completed-at
+ * Body: { completedAt: "2026-01-30T10:00:00Z" } or { completedAt: null }
+ */
+export async function debugUpdateSubtaskCompletedAt(req, res) {
+  try {
+    const userId = req.user.userId;
+    const { taskId, subId } = req.params;
+    const { completedAt, status } = req.body;
+
+    const subtask = await SubTask.findOne({ _id: subId, userId, taskId });
+    if (!subtask) {
+      return res.status(404).json({ success: false, error: "Subtask not found" });
+    }
+
+    const updates = {};
+    if (completedAt !== undefined) {
+      updates.completedAt = completedAt ? new Date(completedAt) : null;
+    }
+    if (status !== undefined) {
+      updates.status = status;
+    }
+
+    const updated = await SubTask.findByIdAndUpdate(subId, { $set: updates }, { new: true }).lean();
+
+    logger.info(`[DEBUG] Updated subtask ${subId} completedAt to ${updates.completedAt}, status to ${updates.status}`);
+
+    return res.status(200).json({
+      success: true,
+      subtask: updated,
+      message: "Subtask completedAt updated (DEBUG)",
+    });
+  } catch (error) {
+    logger.error("[DEBUG] Error updating subtask completedAt:", error);
+    return res.status(500).json({ success: false, error: "Failed to update subtask completedAt" });
+  }
+}
 
 /**
  * Auto-save subcategory to user profile

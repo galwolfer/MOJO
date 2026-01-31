@@ -11,6 +11,7 @@ import { COLORS, SPACING } from "../theme";
 import { useNavigation } from "../context/NavigationContext";
 import { ICONS } from "../components/icons/icons";
 import ScrollableContent from "../components/layout/ScrollableContent";
+import useContentInsets from "../hooks/useContentInsets";
 
 export default function CalendarScreen() {
   const { setHeaderConfig, setActiveTab } = useNavigation();
@@ -29,6 +30,8 @@ export default function CalendarScreen() {
       element: Calendar,
     });
   }, []);
+
+  const insets = useContentInsets();
 
   const handleAddTask = () => {
     setActiveTab("create");
@@ -49,7 +52,10 @@ export default function CalendarScreen() {
 
       {/* Floating ADD TASK Button */}
       <TouchableOpacity
-        style={styles.floatingButton}
+        style={[
+          styles.floatingButton,
+          { bottom: Math.max(100, insets.bottom + SPACING.lg) },
+        ]}
         activeOpacity={0.8}
         onPress={handleAddTask}
       >

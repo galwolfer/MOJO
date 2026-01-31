@@ -906,16 +906,26 @@ export async function completeTask({ taskId, userId }) {
       // Still proceed - user might have completed task without tracking sessions
     }
 
+    const now = new Date();
+
     const updated = await Task.findByIdAndUpdate(
       taskId,
       {
         $set: {
           status: "done",
           actualCompletionMinutes,
+          completedAt: now,
         },
       },
       { new: true },
     ).lean(); // Get plain object directly
+
+    // Mark any remaining subtasks as completed (set status and completedAt)
+    try {
+      await SubTask.updateMany({ taskId, status: { $ne: "done" } }, { $set: { status: "done", completedAt: now } });
+    } catch (err) {
+      console.warn(`[completeTask] Failed to mark subtasks completed for task ${taskId}:`, err && err.message);
+    }
 
     await logEvent({
       type: "task_completed",
@@ -992,12 +1002,17 @@ export async function toggleTaskCompletion(taskId, userId) {
   const wasIncomplete = task.status !== "done";
   const nextStatus = task.status === "done" ? "todo" : "done";
 
+  const updatePayload = { status: nextStatus };
+  if (nextStatus === 'done') {
+    updatePayload.completedAt = new Date();
+  } else {
+    updatePayload.completedAt = null;
+  }
+
   const updated = await Task.findByIdAndUpdate(
     taskId,
     {
-      $set: {
-        status: nextStatus,
-      },
+      $set: updatePayload,
     },
     { new: true },
   ).lean();
