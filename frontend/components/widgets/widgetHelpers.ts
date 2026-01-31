@@ -437,9 +437,9 @@ export const handleTaskPress = ({
 
 /**
  * toggleSessionSmart
- * Choose the correct toggle behavior for a scheduled session:
+ * Wrapper to toggle a scheduled session:
  * - If the session maps to a real subtask (via subtaskId or subtaskIndex), delegate to `toggleSession` so the subtask is persisted.
- * - Otherwise, fall back to list-specific `toggleSessionList` which uses synthetic session keys.
+ * - If no subtask exists, `toggleSession` will toggle the entire task completion.
  */
 export const toggleSessionSmart = async ({
   taskId,
@@ -464,36 +464,19 @@ export const toggleSessionSmart = async ({
   notifyTaskUpdate: (params: { taskId: string }, delayMs?: number) => void;
   onAction?: (action: string, data: any) => void;
 }) => {
-  const subtaskId = getSubtaskIdFromSession(session, subtasks);
-  if (subtaskId) {
-    // Delegate to toggleSession which will find the subtask and call toggleSubtask
-    await toggleSession({
-      taskId,
-      session,
-      index,
-      subtasks,
-      completedParts,
-      setCompletedParts,
-      loadingParts,
-      setLoadingParts,
-      notifyTaskUpdate,
-      onAction,
-    });
-  } else {
-    // No persistent subtask, use list toggle semantics
-    await toggleSessionList({
-      taskId,
-      session,
-      index,
-      subtasks,
-      completedParts,
-      setCompletedParts,
-      loadingParts,
-      setLoadingParts,
-      notifyTaskUpdate,
-      onAction,
-    });
-  }
+  // Delegate to toggleSession which handles both subtask and no-subtask cases
+  await toggleSession({
+    taskId,
+    session,
+    index,
+    subtasks,
+    completedParts,
+    setCompletedParts,
+    loadingParts,
+    setLoadingParts,
+    notifyTaskUpdate,
+    onAction,
+  });
 };
 
 /**
@@ -712,96 +695,4 @@ export const toggleSession = async ({
     notifyTaskUpdate,
     onAction,
   });
-};
-
-/**
- * toggleSessionList
- * Handles toggling the completion state of a session in list view (TaskListWidget).
- * Uses session keys for state tracking instead of subtask IDs, allowing synthetic toggles.
- * Supports sessions without persistent subtasks (synthetic: true).
- * Triggers "part_toggled" action for list-specific interactions.
- * @param params - Object containing session details and state management functions
- */
-export const toggleSessionList = async ({
-  taskId,
-  session,
-  index,
-  subtasks,
-  completedParts,
-  setCompletedParts,
-  loadingParts,
-  setLoadingParts,
-  notifyTaskUpdate,
-  onAction,
-}: {
-  taskId: string;
-  session: ScheduledSession;
-  index: number;
-  subtasks?: Subtask[];
-  completedParts: Set<string>;
-  setCompletedParts: React.Dispatch<React.SetStateAction<Set<string>>>;
-  loadingParts: Set<string>;
-  setLoadingParts: React.Dispatch<React.SetStateAction<Set<string>>>;
-  notifyTaskUpdate: (params: { taskId: string }, delayMs?: number) => void;
-  onAction?: (action: string, data: any) => void;
-}) => {
-  // Extract subtask ID if available (for persistence)
-  const subtaskId = (session as any).subtaskId || undefined;
-  // Generate stable key for this session (may be subtaskId or synthetic key)
-  const key = getSessionKey(taskId, session, index, subtasks);
-  // Only persist if there's an actual subtask to update
-  const canPersist = Boolean(subtaskId);
-
-  const isCompleted = completedParts.has(key);
-  const nextCompleted = !isCompleted;
-
-  // Optimistically update UI state using session key
-  setCompletedParts((prev) => {
-    const updated = new Set(prev);
-    if (nextCompleted) updated.add(key);
-    else updated.delete(key);
-    return updated;
-  });
-
-  // Set loading state if persistence is possible
-  if (canPersist) setLoadingParts((prev) => new Set(prev).add(key));
-
-  try {
-    // Persist to server only if subtask exists
-    if (canPersist && subtaskId) {
-      const success = await updateSubTask(taskId, subtaskId, { status: nextCompleted ? "done" : "todo" });
-      if (!success) throw new Error("Update failed");
-    }
-
-    // Debug: log toggle session
-    console.debug(`[toggleSessionList] task=${taskId} key=${key} completed=${nextCompleted} canPersist=${canPersist}`);
-    // Notify task update
-    notifyTaskUpdate({ taskId });
-    // Also schedule a delayed notify to give backend time to settle and ensure list widgets refresh
-    notifyTaskUpdate({ taskId }, 300);
-    // Trigger list-specific action with synthetic flag
-    onAction?.("part_toggled", {
-      taskId,
-      sessionId: session.id,
-      subtaskId: subtaskId || null,
-      completed: nextCompleted,
-      synthetic: !canPersist, // Indicates if this was a UI-only toggle
-    });
-  } catch (error) {
-    // Revert optimistic update on failure
-    setCompletedParts((prev) => {
-      const updated = new Set(prev);
-      if (isCompleted) updated.add(key);
-      else updated.delete(key);
-      return updated;
-    });
-  } finally {
-    // Clear loading state
-    if (canPersist)
-      setLoadingParts((prev) => {
-        const updated = new Set(prev);
-        updated.delete(key);
-        return updated;
-      });
-  }
 };

@@ -38,7 +38,7 @@ import {
   effortIcon,
   getWidgetEntranceProps,
   toggleSubtask,
-  toggleSession,
+  toggleSessionSmart,
 } from "./widgetHelpers";
 import { TaskTitle, TaskTagsRow, ScheduledSessionsSection, renderTaskField, TwoColumnGrid } from "../special/task";
 import { useTaskContext } from "../../context/TaskContext";
@@ -134,7 +134,7 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
     index: number,
     subtasksParam?: Subtask[],
   ) => {
-    await toggleSession({
+    await toggleSessionSmart({
       taskId: taskIdParam,
       session,
       index,
