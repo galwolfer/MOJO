@@ -19,7 +19,7 @@ export const COLORS = {
   brightP5: "#FFD796",
   brightP6: "#A7F7B6",
   brightP7: "#FFADAD",
-  lightGray: "#99a3c6",
+  lightGray: "#7d87a7",
 
   // Dark palette
   darkP1: "#1F3BC0",
@@ -29,7 +29,7 @@ export const COLORS = {
   darkP5: "#D38911",
   darkP6: "#118826",
   darkP7: "#DA2727",
-  darkGray: "#2a2e41",
+  darkGray: "#30364b",
 
   // Neutrals
   white: "#F2F5FF",
