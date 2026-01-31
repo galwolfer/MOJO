@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
   container: {
     width: "100%",
     justifyContent: "space-between",
-    overflow: "visible",
+    overflow: "hidden",
     flex: 1,
   },
   emptyText: {
