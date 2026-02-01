@@ -32,6 +32,50 @@ def add_minutes(dt: datetime, minutes: int) -> datetime:
     return dt + timedelta(minutes=minutes)
 
 
+def parse_datetime(value) -> datetime:
+    """Parse a datetime from string or return as-is if already datetime."""
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        # Try ISO format first
+        try:
+            # Handle ISO strings with Z suffix
+            if value.endswith('Z'):
+                value = value[:-1] + '+00:00'
+            return datetime.fromisoformat(value)
+        except ValueError:
+            pass
+        # Try common formats
+        for fmt in ["%Y-%m-%dT%H:%M:%S.%f%z", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S"]:
+            try:
+                dt = datetime.strptime(value, fmt)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return dt
+            except ValueError:
+                continue
+    raise ValueError(f"Cannot parse datetime from: {value}")
+
+
+def normalize_busy_blocks(busy_blocks_by_date: Dict) -> Dict:
+    """Convert busy block start/end values from strings to datetime objects."""
+    normalized = {}
+    for date_key, blocks in busy_blocks_by_date.items():
+        normalized_blocks = []
+        for block in blocks:
+            try:
+                normalized_block = {
+                    "start": parse_datetime(block["start"]),
+                    "end": parse_datetime(block["end"]),
+                }
+                normalized_blocks.append(normalized_block)
+            except (KeyError, ValueError) as e:
+                # Skip malformed blocks
+                continue
+        normalized[date_key] = normalized_blocks
+    return normalized
+
+
 def build_working_window(day: datetime, working_hours: Dict) -> Dict:
     # Build start/end datetimes for the given day according to working hours
     # Preserve timezone from input day
@@ -43,7 +87,9 @@ def build_working_window(day: datetime, working_hours: Dict) -> Dict:
 
 def schedule_tasks_csp(tasks: List[dict], options: Dict = None) -> Dict:
     options = options or {}
-    busy_blocks_by_date = options.get("busyBlocksByDate", {})
+    busy_blocks_by_date_raw = options.get("busyBlocksByDate", {})
+    # Normalize busy blocks to ensure start/end are datetime objects
+    busy_blocks_by_date = normalize_busy_blocks(busy_blocks_by_date_raw)
     working_hours = options.get("workingHours", DEFAULT_WORKING_HOURS)
     planning_horizon_days = options.get("planningHorizonDays", 14)
     daily_cap_minutes = options.get("dailyCapMinutes", DEFAULT_DAILY_CAP_MINUTES)

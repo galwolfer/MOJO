@@ -903,11 +903,13 @@ export async function toggleTaskCompletion(req, res) {
       });
     }
 
-    const { task, wasNewCompletion } = result;
+    const { task, wasNewCompletion, wasNewUncompletion } = result;
 
     // If toggled to completed (and was a NEW completion), award points and update streak
     let gamification = null;
     let pointsAwarded = 0;
+    let pointsSubtracted = 0;
+    
     if (wasNewCompletion) {
       try {
         if (allSubtasksAlreadyDone) {
@@ -917,6 +919,10 @@ export async function toggleTaskCompletion(req, res) {
           const reward = await awardTaskCompletionBonus(userId, task);
           pointsAwarded = reward.points;
           gamification = reward.gamification;
+          
+          // Save earnedPoints to the task
+          await taskService.updateTaskEarnedPoints(id, pointsAwarded);
+          
           logger.info(
             `[toggleTaskCompletion] All subtasks done, awarded ${reward.points} bonus points to user ${userId} for completing task ${id}`,
           );
@@ -926,6 +932,10 @@ export async function toggleTaskCompletion(req, res) {
           const reward = await awardTaskCompletionPoints(userId, task, uncompletedSubtasks);
           pointsAwarded = reward.points;
           gamification = reward.gamification;
+          
+          // Save earnedPoints to the task
+          await taskService.updateTaskEarnedPoints(id, pointsAwarded);
+          
           logger.info(
             `[toggleTaskCompletion] Awarded ${reward.points} points to user ${userId} for completing task ${id} via toggle`,
           );
@@ -934,12 +944,45 @@ export async function toggleTaskCompletion(req, res) {
         logger.warn("Failed to award points on toggle completion:", pointsError.message);
       }
     }
+    
+    // If toggled to incomplete (and was previously complete), reverse points and decrement task count
+    if (wasNewUncompletion) {
+      try {
+        const { reverseTaskCompletion } = await import("./userController.js");
+        // Use previousEarnedPoints attached by taskService
+        const taskWithPoints = { ...task, earnedPoints: task.previousEarnedPoints || 0 };
+        const reversal = await reverseTaskCompletion(userId, taskWithPoints);
+        pointsSubtracted = reversal.pointsSubtracted;
+        gamification = reversal.gamification;
+        logger.info(
+          `[toggleTaskCompletion] Reversed completion, subtracted ${pointsSubtracted} points from user ${userId} for task ${id}`,
+        );
+      } catch (reversalError) {
+        logger.warn("Failed to reverse points on toggle uncompletion:", reversalError.message);
+      }
+    }
+
+    // Log the response being sent
+    logger.info(`[toggleTaskCompletion] Sending response:`, {
+      taskId: task._id,
+      status: task.status,
+      gamification: gamification ? { 
+        points: gamification.points, 
+        currentStreak: gamification.currentStreak,
+        completedTasks: gamification.completedTasks 
+      } : null,
+      wasCompletion: wasNewCompletion,
+      wasUncompletion: wasNewUncompletion,
+    });
 
     return res.status(200).json({
       success: true,
       task,
       gamification,
       pointsAwarded,
+      pointsSubtracted,
+      wasCompletion: wasNewCompletion,
+      wasUncompletion: wasNewUncompletion,
       message: `Task marked as ${task.status === "done" ? "completed" : "incomplete"}`,
     });
   } catch (error) {
@@ -1093,12 +1136,19 @@ export async function updateSubTask(req, res) {
     let gamification = null;
     let pointsAwarded = 0;
     let completionBonus = 0;
+    let pointsSubtracted = 0;
+    let taskBonusSubtracted = 0;
+    
     if (result.isNewCompletion) {
       try {
         const { awardSubtaskCompletionPoints, awardTaskCompletionBonus } = await import("./userController.js");
         const reward = await awardSubtaskCompletionPoints(userId, result.subtask, result.parentTask);
         pointsAwarded = reward.points;
         gamification = reward.gamification;
+        
+        // Save earnedPoints to the subtask
+        await taskService.updateSubTaskEarnedPoints(subId, pointsAwarded);
+        
         logger.info(
           `[updateSubTask] Awarded ${pointsAwarded} points to user ${userId} for completing subtask ${subId}`,
         );
@@ -1110,12 +1160,63 @@ export async function updateSubTask(req, res) {
           completionBonus = bonusReward.points;
           pointsAwarded += completionBonus;
           gamification = bonusReward.gamification; // Use latest gamification state
+          
+          // Save earnedPoints to the parent task
+          await taskService.updateTaskEarnedPoints(result.parentTask._id, completionBonus);
+          
           logger.info(`[updateSubTask] Parent task completed! Awarded ${completionBonus} bonus points`);
         }
       } catch (pointsError) {
         logger.warn("[updateSubTask] Failed to award points for subtask completion:", pointsError.message);
       }
     }
+    
+    // Reverse points for subtask uncompletion (only if this was a NEW uncompletion)
+    if (result.isNewUncompletion) {
+      try {
+        const { reverseSubtaskCompletion } = await import("./userController.js");
+        // Use previousEarnedPoints attached by taskService
+        const subtaskWithPoints = { 
+          ...result.subtask, 
+          earnedPoints: result.subtask.previousEarnedPoints || 0 
+        };
+        const parentTaskWithPoints = result.parentTask ? {
+          ...result.parentTask,
+          earnedPoints: result.parentTask.previousEarnedPoints || 0
+        } : null;
+        
+        const reversal = await reverseSubtaskCompletion(
+          userId, 
+          subtaskWithPoints, 
+          parentTaskWithPoints, 
+          result.parentTaskUncompleted
+        );
+        pointsSubtracted = reversal.pointsSubtracted;
+        taskBonusSubtracted = reversal.taskBonusSubtracted;
+        gamification = reversal.gamification;
+        
+        logger.info(
+          `[updateSubTask] Reversed subtask completion, subtracted ${pointsSubtracted} points (+ ${taskBonusSubtracted} task bonus) from user ${userId}`,
+        );
+      } catch (reversalError) {
+        logger.warn("[updateSubTask] Failed to reverse points for subtask uncompletion:", reversalError.message);
+      }
+    }
+
+    // Log the response being sent
+    logger.info(`[updateSubTask] Sending response:`, {
+      subtaskId: result.subtask?._id,
+      status: result.subtask?.status,
+      gamification: gamification ? { 
+        points: gamification.points, 
+        currentStreak: gamification.currentStreak,
+        completedTasks: gamification.completedTasks 
+      } : null,
+      wasCompletion: result.isNewCompletion || false,
+      wasUncompletion: result.isNewUncompletion || false,
+      parentTaskCompleted: result.parentTaskCompleted || false,
+      parentTaskUncompleted: result.parentTaskUncompleted || false,
+    });
 
     return res.status(200).json({
       success: true,
@@ -1123,7 +1224,12 @@ export async function updateSubTask(req, res) {
       gamification: gamification,
       pointsAwarded: pointsAwarded,
       completionBonus: completionBonus,
+      pointsSubtracted: pointsSubtracted,
+      taskBonusSubtracted: taskBonusSubtracted,
       parentTaskCompleted: result.parentTaskCompleted || false,
+      parentTaskUncompleted: result.parentTaskUncompleted || false,
+      wasCompletion: result.isNewCompletion || false,
+      wasUncompletion: result.isNewUncompletion || false,
       message: "Subtask updated successfully",
     });
   } catch (error) {
@@ -1175,6 +1281,10 @@ export async function markSubTaskComplete(req, res) {
         const reward = await awardSubtaskCompletionPoints(userId, result.subtask, result.parentTask);
         pointsAwarded = reward.points;
         gamification = reward.gamification;
+        
+        // Save earnedPoints to the subtask
+        await taskService.updateSubTaskEarnedPoints(subId, pointsAwarded);
+        
         logger.info(
           `[markSubTaskComplete] Awarded ${pointsAwarded} points to user ${userId} for completing subtask ${subId}`,
         );
@@ -1185,6 +1295,10 @@ export async function markSubTaskComplete(req, res) {
           completionBonus = bonusReward.points;
           pointsAwarded += completionBonus;
           gamification = bonusReward.gamification;
+          
+          // Save earnedPoints to the parent task
+          await taskService.updateTaskEarnedPoints(result.parentTask._id, completionBonus);
+          
           logger.info(`[markSubTaskComplete] Parent task completed! Awarded ${completionBonus} bonus points`);
         }
       } catch (pointsError) {
@@ -1226,10 +1340,48 @@ export async function markSubTaskTodo(req, res) {
     if (!result || result.success === false) {
       return res.status(404).json({ success: false, error: result ? result.error : "Subtask not found" });
     }
+    
+    // Reverse points for subtask uncompletion
+    let gamification = null;
+    let pointsSubtracted = 0;
+    let taskBonusSubtracted = 0;
+    if (result.isNewUncompletion) {
+      try {
+        const { reverseSubtaskCompletion } = await import("./userController.js");
+        const subtaskWithPoints = { 
+          ...result.subtask, 
+          earnedPoints: result.subtask.previousEarnedPoints || 0 
+        };
+        const parentTaskWithPoints = result.parentTask ? {
+          ...result.parentTask,
+          earnedPoints: result.parentTask.previousEarnedPoints || 0
+        } : null;
+        
+        const reversal = await reverseSubtaskCompletion(
+          userId, 
+          subtaskWithPoints, 
+          parentTaskWithPoints, 
+          result.parentTaskUncompleted
+        );
+        pointsSubtracted = reversal.pointsSubtracted;
+        taskBonusSubtracted = reversal.taskBonusSubtracted;
+        gamification = reversal.gamification;
+        
+        logger.info(
+          `[markSubTaskTodo] Reversed subtask completion, subtracted ${pointsSubtracted} points from user ${userId}`,
+        );
+      } catch (reversalError) {
+        logger.warn("[markSubTaskTodo] Failed to reverse points:", reversalError.message);
+      }
+    }
 
     return res.status(200).json({
       success: true,
       subtask: result.subtask,
+      gamification: gamification,
+      pointsSubtracted: pointsSubtracted,
+      taskBonusSubtracted: taskBonusSubtracted,
+      parentTaskUncompleted: result.parentTaskUncompleted || false,
       message: "Subtask marked as todo",
     });
   } catch (error) {

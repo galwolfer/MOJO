@@ -57,6 +57,7 @@ const taskSchema = new mongoose.Schema(
     predictionScore: { type: Number, min: 0, max: 1 }, // confidence score (0-1)
     actualCompletionMinutes: { type: Number }, // minutes taken when task completes (for reward calculation)
     completedAt: { type: Date }, // timestamp when task was marked complete
+    earnedPoints: { type: Number, default: 0 }, // points awarded when task was completed (reset to 0 if undone)
     subCategory: {
       label: { type: String, default: "", trim: true },
       source: { type: String, default: "heuristic", trim: true },

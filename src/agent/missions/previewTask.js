@@ -16,16 +16,24 @@ function parseRelativeDate(dateString) {
 
   const lowerStr = dateString.toLowerCase().trim();
 
+  // Helper to format date as YYYY-MM-DD in local timezone
+  const toLocalDateString = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Handle: "tomorrow"
   if (lowerStr === "tomorrow") {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split("T")[0];
+    return toLocalDateString(tomorrow);
   }
 
   // Handle: "today"
   if (lowerStr === "today") {
-    return today.toISOString().split("T")[0];
+    return toLocalDateString(today);
   }
 
   // Handle: "next Thursday", "this Thursday", "Thursday", etc.
@@ -49,7 +57,7 @@ function parseRelativeDate(dateString) {
 
       const targetDate = new Date(today);
       targetDate.setDate(targetDate.getDate() + daysToAdd);
-      return targetDate.toISOString().split("T")[0];
+      return toLocalDateString(targetDate);
     }
   }
 
@@ -65,7 +73,7 @@ function parseRelativeDate(dateString) {
     else if (unit.includes("week")) futureDate.setDate(futureDate.getDate() + amount * 7);
     else if (unit.includes("hour")) futureDate.setHours(futureDate.getHours() + amount);
 
-    return futureDate.toISOString().split("T")[0];
+    return toLocalDateString(futureDate);
   }
 
   // If already in ISO format (YYYY-MM-DD), return as-is
@@ -348,7 +356,7 @@ const previewTaskMission = new GuidedMission({
         taskname: taskname,
         // Include human-consumable deadline and machine ISO dueDate
         deadline: finalDeadline,
-        dueDate: new Date(finalDeadline).toISOString(),
+        dueDate: finalDeadline + "T00:00:00.000Z",
         description: description || "",
         status: "draft",
         // Use internal category key for the 'category' field (for internal operations)

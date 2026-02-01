@@ -11,6 +11,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { NavigationProvider } from "./context/NavigationContext";
 import { LayoutProvider } from "./context/LayoutContext";
 import { TaskProvider } from "./context/TaskContext";
+import { StatsProvider } from "./context/StatsContext";
 import { OjoProvider } from "./context/OjoContext";
 import { NotificationProvider } from "./context/NotificationContext";
 import MainLayout from "./components/layout/MainLayout";
@@ -99,7 +100,9 @@ export default function App() {
           <LayoutProvider>
             <OjoProvider>
               <TaskProvider>
-                <AppContent />
+                <StatsProvider>
+                  <AppContent />
+                </StatsProvider>
               </TaskProvider>
             </OjoProvider>
           </LayoutProvider>
