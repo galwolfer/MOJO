@@ -6,9 +6,12 @@
 import React, { useEffect } from "react";
 import { View, StyleSheet, ScrollView } from "react-native";
 import AppText from "../common/AppText";
-import { COLORS, SPACING } from "../../theme";
+import { Checkbox } from "../icons/Checkbox";
+import { ICONS } from "../icons/icons";
+import { COLORS, ICON_SIZES, SPACING } from "../../theme";
 import Widget from "../special/Widget";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
+import List from "../layout/List";
 import {
   formatDate,
   formatDateTime,
@@ -16,11 +19,11 @@ import {
   formatDuration,
   getSessionLabel,
   getTaskTypeLabel,
-  getWidgetEntranceProps,
-} from "./widgetHelpers";
+} from "./taskHelpers";
+import { getWidgetEntranceProps } from "./widgetHelpers";
 import { TaskTitle, TaskTagsRow, ScheduledSessionsSection, renderTaskField, TwoColumnGrid } from "../special/task";
 import { getCategoryMeta } from "../../config/categoryMeta";
-import { getCategoryDisplay } from "./widgetHelpers";
+import { getCategoryDisplay } from "./taskHelpers";
 
 interface TaskData {
   id: string;
@@ -82,6 +85,7 @@ interface Subtask {
   completed?: boolean;
   order?: number;
   duration?: number;
+  minutes?: number;
 }
 
 /**
@@ -165,36 +169,54 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
         {/* Subtasks */}
         {task.subtasks && task.subtasks.length > 0 && (
           <View style={styles.section}>
-            <AppText variant="title3" style={styles.sectionTitle}>
-              ✓ Subtasks ({task.subtasks.filter((st) => st.completed || st.status === "completed").length}/
-              {task.subtasks.length})
+            <AppText variant="boldText" style={{ color: getCategoryMeta(task.category)?.color || COLORS.primary1 }}>
+              {`${task.subtasks.length}`} Subtasks
             </AppText>
-            <View style={styles.subtaskList}>
-              {task.subtasks.map((subtask, index) => (
-                <View key={subtask.id || `subtask-${index}`} style={styles.subtaskCard}>
-                  <AppText
-                    variant="bodyText"
-                    style={[
-                      styles.subtaskTitle,
-                      (subtask.completed || subtask.status === "completed") && styles.subtaskCompleted,
-                    ]}
-                  >
-                    {subtask.completed || subtask.status === "completed" ? "✓ " : "○ "}
-                    {subtask.title}
-                  </AppText>
-                  {subtask.description ? (
-                    <AppText variant="notes" style={styles.subtaskDescription}>
-                      {subtask.description}
-                    </AppText>
-                  ) : null}
-                  {subtask.duration && (
-                    <AppText variant="notes" style={styles.subtaskDuration}>
-                      {formatDuration(subtask.duration)}
-                    </AppText>
-                  )}
-                </View>
-              ))}
-            </View>
+            <List
+              data={task.subtasks.map((subtask, index) => ({
+                id: subtask.id || `subtask-${index}`,
+                content: (
+                  <View style={styles.subtaskCard}>
+                    <View style={styles.subtaskTitleRow}>
+                      <View style={styles.subtaskTitleCheck}>
+                        <Checkbox checked={subtask.completed || subtask.status === "completed"} size={16} />
+                        <AppText
+                          variant="bodyText"
+                          style={[
+                            styles.subtaskTitle,
+                            (subtask.completed || subtask.status === "completed") && styles.subtaskCompleted,
+                          ]}
+                        >
+                          {subtask.title}
+                        </AppText>
+                      </View>
+
+                      {(subtask.duration || subtask.minutes) && (
+                        <View style={styles.subtaskDurationRow}>
+                          <AppText
+                            variant="notes"
+                            style={{ color: getCategoryMeta(task.category)?.color || COLORS.primary1 }}
+                          >
+                            {formatDuration(subtask.duration || subtask.minutes || 0)}
+                          </AppText>{" "}
+                          <ICONS.clock
+                            size={ICON_SIZES.sm / 2}
+                            color={getCategoryMeta(task.category)?.color || COLORS.primary1}
+                          />
+                        </View>
+                      )}
+                    </View>
+                    {subtask.description ? (
+                      <AppText variant="notes" style={styles.subtaskDescription}>
+                        {subtask.description}
+                      </AppText>
+                    ) : null}
+                  </View>
+                ),
+                divider: index < (task.subtasks?.length || 0) - 1,
+              }))}
+              dividerColor={COLORS.white2}
+            />
           </View>
         )}
 
@@ -245,10 +267,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.md,
     gap: SPACING.sm,
   },
-  sectionTitle: {
-    fontWeight: "600",
-    marginBottom: SPACING.sm,
-  },
+
   scheduleList: {
     gap: SPACING.sm,
   },
@@ -270,15 +289,27 @@ const styles = StyleSheet.create({
   scheduleTime: {
     color: COLORS.darkGray,
   },
-  subtaskList: {
+  subtaskCard: {
+    width: "100%",
+  },
+  subtaskTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    gap: SPACING.sm,
+    flex: 1,
+  },
+  subtaskTitleCheck: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: SPACING.sm,
   },
-  subtaskCard: {
-    backgroundColor: COLORS.white2,
-    padding: SPACING.sm,
-    borderRadius: SPACING.sm,
-    borderLeftWidth: SPACING.xs,
-    borderLeftColor: COLORS.darkGray,
+  subtaskDurationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: SPACING.xs,
   },
   subtaskTitle: {
     fontWeight: "500",
@@ -287,14 +318,15 @@ const styles = StyleSheet.create({
     textDecorationLine: "line-through",
     color: COLORS.darkGray,
   },
+  subtaskDuration: {
+    color: COLORS.primary1,
+  },
   subtaskDescription: {
     color: COLORS.darkGray,
     marginTop: SPACING.xs,
+    marginLeft: SPACING.sm,
   },
-  subtaskDuration: {
-    color: COLORS.primary1,
-    marginTop: SPACING.sm,
-  },
+
   // actions and button styles removed while buttons are disabled
 });
 

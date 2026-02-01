@@ -405,7 +405,7 @@ const styles = StyleSheet.create({
   },
   userInfo: {
     alignItems: "center",
-    gap: 4,
+    gap: SPACING.sm,
   },
   userName: {
     color: COLORS.primary1,
@@ -413,7 +413,7 @@ const styles = StyleSheet.create({
   },
   userUsername: {
     color: COLORS.lightGray,
-    marginTop: 2,
+    marginTop: SPACING.xs,
   },
   userEmail: {
     color: COLORS.lightGray,
@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
     marginBottom: SPACING.md,
     paddingBottom: SPACING.md,
-    borderBottomWidth: 1,
+    borderBottomWidth: SPACING.xs,
     borderBottomColor: COLORS.white2,
   },
   imageSectionTitle: {
@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
     marginTop: SPACING.md,
     paddingTop: SPACING.md,
-    borderTopWidth: 1,
+    borderTopWidth: SPACING.xs,
     borderTopColor: COLORS.white2,
   },
   passwordSectionTitle: {

@@ -88,7 +88,10 @@ CURRENT DATE: ${today}
 TOMORROW: ${tomorrow}
 
 CRITICAL:
-- To add: preview_task -> task_confirmation -> add_task on confirm.
+- Task creation flow:
+  1) Gather required details first (ask for anything missing).
+  2) preview_task -> task_confirmation to show the draft.
+  3) add_task ONLY after the user explicitly confirms.
 - To list: call get_tasks/get_upcoming_tasks/get_overdue_tasks first.
 - Use RECENT ENTITIES only for reference resolution, not for lists.
 - ALWAYS use <WIDGET_JSON> tags when showing tasks. NEVER output raw JSON without these tags.

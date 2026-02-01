@@ -65,6 +65,8 @@ export type Task = {
   priorityScore?: number;
   progressPercentage?: number;
   tags?: string[] | null;
+  subtasks?: SubTask[];
+  scheduledSessions?: ScheduledSession[];
   createdAt: string;
   updatedAt: string;
 };
@@ -155,7 +157,13 @@ export async function getTasks(filters?: {
     const endpoint = queryString ? `/tasks?${queryString}` : "/tasks";
 
     const response = await get<TasksResponse>(endpoint);
-    return response.tasks || [];
+    const tasks = response.tasks || [];
+    
+    // Map subTasks to subtasks for consistent naming across frontend
+    return tasks.map((task: any) => ({
+      ...task,
+      subtasks: task.subTasks || task.subtasks || [],
+    }));
   } catch (error) {
     console.warn("Failed to fetch tasks:", error);
     return [];
@@ -169,7 +177,14 @@ export async function getTasks(filters?: {
 export async function getTaskById(id: string): Promise<Task | null> {
   try {
     const response = await get<{ success: boolean; task: Task }>(`/tasks/${id}`);
-    return response.task || null;
+    const task = response.task || null;
+    if (task) {
+      return {
+        ...task,
+        subtasks: (task as any).subTasks || task.subtasks || [],
+      };
+    }
+    return null;
   } catch (error) {
     console.warn("Failed to fetch task:", error);
     return null;
@@ -183,7 +198,13 @@ export async function getTaskById(id: string): Promise<Task | null> {
 export async function getOverdueTasks(): Promise<Task[]> {
   try {
     const response = await get<{ success: boolean; tasks: Task[] }>(`/tasks/overdue`);
-    return response.tasks || [];
+    const tasks = response.tasks || [];
+    
+    // Map subTasks to subtasks for consistent naming across frontend
+    return tasks.map((task: any) => ({
+      ...task,
+      subtasks: task.subTasks || task.subtasks || [],
+    }));
   } catch (error) {
     console.warn("Failed to fetch overdue tasks:", error);
     return [];
@@ -313,7 +334,7 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
     let completedUnits = 0;
 
     for (const task of tasks) {
-      const subTasks: any[] = (task as any).subTasks || [];
+      const subTasks: any[] = task.subtasks || [];
       const hasSubtasks = subTasks.length > 0;
       const taskDueDate = (task as any).dueDate || (task as any).deadline;
 
@@ -412,7 +433,7 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
     const subtaskKeys = scheduledInfo.subtaskKeys || new Set<string>();
 
     for (const task of tasks) {
-      const subs: any[] = (task as any).subTasks || [];
+      const subs: any[] = task.subtasks || [];
       const taskId = task._id || (task as any).id;
       const hasSubtasks = subs.length > 0;
       const taskDueDate = (task as any).dueDate || (task as any).deadline;
@@ -487,7 +508,7 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
     // Fallback: use scheduledSessions to determine what's scheduled for today
     // Also include tasks due today that have no sessions
     for (const task of tasks) {
-      const subs: any[] = (task as any).subTasks || [];
+      const subs: any[] = task.subtasks || [];
       const hasSubtasks = subs.length > 0;
       const taskDueDate = (task as any).dueDate || (task as any).deadline;
       const isTaskDueToday = hasDueDateOnDay(taskDueDate, todayStart, todayEnd);

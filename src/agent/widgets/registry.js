@@ -90,6 +90,7 @@ export const widgetRegistry = new WidgetRegistry([
       recurrence: "Recurrence config object (optional)",
       progressPercentage: "Progress percentage 0-100",
       scheduledSessions: "Optional scheduled sessions (array)",
+      subtasks: "Optional subtasks (array of { title, description, minutes, duration, status, completed })",
     },
   }),
   new WidgetDefinition({

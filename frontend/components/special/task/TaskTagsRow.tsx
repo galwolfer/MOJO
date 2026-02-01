@@ -4,7 +4,7 @@ import Tag from "../../inputs/tag";
 import { getCategoryMeta } from "../../../config/categoryMeta";
 import { StyleSheet } from "react-native";
 import { SPACING } from "../../../theme";
-import { getImportanceLabel, getEffortLabel } from "../../widgets/widgetHelpers";
+import { getImportanceLabel, getEffortLabel } from "../../widgets/taskHelpers";
 
 export const TaskTagsRow: React.FC<{
   category?: string;

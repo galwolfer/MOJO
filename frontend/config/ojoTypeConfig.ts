@@ -32,7 +32,7 @@ export const OJO_TYPES: Record<OjoTypeName, OjoTypeConfig> = {
     persona: "A wise mentor who helps you think long-term and grow.",
     tones: ["Thoughtful", "Professional", "Supportive"],
     icon: "mentorjo",
-    color: COLORS.primary1, // Blue #4361EE
+    color: COLORS.primary1,
     description: "A wise mentor who helps you think long-term and grow.",
     isDefault: true,
     gradient: [COLORS.primary1, COLORS.brightP1, COLORS.primary2, COLORS.primary1, COLORS.darkP1, COLORS.primary2],
@@ -46,8 +46,8 @@ export const OJO_TYPES: Record<OjoTypeName, OjoTypeConfig> = {
     color: COLORS.primary2, // Cyan #4CC9F0
     description: "Your bro, friend who's always got your back.",
     isDefault: false,
-     gradient: [COLORS.primary2, COLORS.brightP6, COLORS.primary6, COLORS.primary2, COLORS.darkP6, COLORS.primary6],
-     gradient2: [COLORS.primary2, COLORS.brightP2, COLORS.primary2, COLORS.brightP2, COLORS.primary2, COLORS.brightP2],
+    gradient: [COLORS.primary2, COLORS.brightP6, COLORS.primary6, COLORS.primary2, COLORS.darkP6, COLORS.primary6],
+    gradient2: [COLORS.primary2, COLORS.brightP2, COLORS.primary2, COLORS.brightP2, COLORS.primary2, COLORS.brightP2],
   },
   strictojo: {
     name: "strictojo",
@@ -66,7 +66,7 @@ export const OJO_TYPES: Record<OjoTypeName, OjoTypeConfig> = {
     persona: "A supportive best friend who listens and encourages you.",
     tones: ["Warm", "Caring", "Positive"],
     icon: "bestojo",
-    color: COLORS.primary3, // Pink #F72585
+    color: COLORS.primary3,
     description: "A supportive best friend who listens and encourages you.",
     isDefault: false,
     gradient: [COLORS.primary3, COLORS.primary4, COLORS.brightP3, COLORS.primary3, COLORS.darkP4, COLORS.primary4],
