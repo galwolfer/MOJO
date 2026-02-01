@@ -2,11 +2,9 @@ import React from "react";
 import { View, Pressable } from "react-native";
 import AppText from "../../common/AppText";
 import { Checkbox } from "../../icons/Checkbox";
-import { getTimeParts, getSubtaskIdFromSession } from "../../widgets/widgetHelpers";
+import { getTimeParts, getSubtaskIdFromSession, ScheduledSession, Subtask } from "../../widgets/taskHelpers";
 import { StyleSheet } from "react-native";
 import { ICON_SIZES, SPACING, COLORS } from "../../../theme";
-
-import { ScheduledSession, Subtask } from "../../widgets/widgetHelpers";
 
 export const SessionRow: React.FC<{
   session: ScheduledSession;
@@ -56,7 +54,7 @@ export const SessionRow: React.FC<{
 
   const Container: any = rowPressHandler ? Pressable : View;
   return (
-    <View>
+    <View style={styles.sessionRoot}>
       {showTaskDate && (
         <AppText variant="notes" style={[styles.sessionDateText, { color: categoryColor || COLORS.primary1 }]}>
           {session.start ? startParts.date : "Date"}
@@ -110,7 +108,7 @@ export const SessionRow: React.FC<{
           )}
         </View>
         <View style={styles.sessionTitleRow}>
-          <AppText variant="bodyText" style={[isDone && styles.sessionLabelDone]}>
+          <AppText variant="bodyText" style={[styles.sessionLabel, isDone && styles.sessionLabelDone]}>
             <AppText variant="boldText" style={styles.sessionSubtask}>
               {subtaskTitle}
             </AppText>
@@ -135,8 +133,13 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     paddingVertical: 4,
     width: "100%",
-    height: 2 * SPACING.xlg,
+    minHeight: 2 * SPACING.xlg,
     marginBottom: -SPACING.sm,
+  },
+  sessionRoot: {
+    flex: 1,
+    minWidth: 0,
+    width: "100%",
   },
   sessionDateText: {
     fontWeight: "600",
@@ -180,16 +183,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-start",
-    flexWrap: "nowrap",
-    gap: SPACING.xs,
+    flex: 1,
+    minWidth: 0,
+  },
+  sessionLabel: {
+    flexGrow: 1,
+    flexShrink: 1,
+    width: 0,
+    flexWrap: "wrap",
   },
   sessionLabelDone: {
     textDecorationLine: "line-through",
   },
   sessionSubtask: {
     fontWeight: "600",
+    flexShrink: 1,
   },
   sessionTask: {
     color: COLORS.black,
+    flexShrink: 1,
   },
 });

@@ -1,5 +1,6 @@
 import React from "react";
 import { View, StyleSheet } from "react-native";
+import { useWindowDimensions } from "react-native";
 import AppText from "../../../components/common/AppText";
 import { COLORS, SPACING, SHADOWS } from "../../../theme";
 import { moderateScale } from "react-native-size-matters";
@@ -25,6 +26,25 @@ type StatBadgeProps = {
 };
 
 const StatBadge: React.FC<StatBadgeProps> = ({ icon, value, label, color = COLORS.primary1 }) => {
+  const { width } = useWindowDimensions();
+  const isSmall = width < 450;
+
+  if (isSmall) {
+    return (
+      <View style={[styles.container, styles.smallContainer, { backgroundColor: color }]}>
+        <View style={styles.topRow}>
+          <View style={styles.iconCircle}>{icon}</View>
+          <AppText variant="boldText" style={styles.value}>
+            {value}
+          </AppText>
+        </View>
+        <AppText variant="notes" style={styles.label}>
+          {label}
+        </AppText>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: color }]}>
       <View style={styles.iconCircle}>{icon}</View>
@@ -47,14 +67,28 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(25),
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.md,
-    gap: SPACING.sm,
+    gap: SPACING.xs,
     ...SHADOWS.card,
   },
-  iconCircle: {
-    width: moderateScale(32),
-    height: moderateScale(32),
+  smallContainer: {
+    flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
+    paddingVertical: SPACING.md,
+    width: "30%",
+    gap: 0,
+  },
+  topRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: SPACING.xs,
+    marginBottom: SPACING.xs,
+  },
+  iconCircle: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: SPACING.xs,
   },
   textContainer: {
     alignItems: "flex-start",
@@ -68,6 +102,7 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(10),
     color: COLORS.colorWhite,
     lineHeight: moderateScale(12),
+    textAlign: "center",
   },
 });
 

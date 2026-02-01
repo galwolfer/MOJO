@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
     borderRadius: SPACING.lg,
     backgroundColor: COLORS.white2,
-    overflow: "visible",
+    overflow: "hidden",
   },
   titleWrap: {
     minHeight: SPACING.xlg + 2,
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
   content: {
     padding: SPACING.md,
     alignSelf: "stretch",
-    overflow: "visible",
+    overflow: "hidden",
   },
 });
 

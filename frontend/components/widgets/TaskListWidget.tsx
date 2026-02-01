@@ -16,13 +16,8 @@ import { BaseWidgetProps } from "../../utils/widgetFactory";
 import { useTaskContext } from "../../context/TaskContext";
 import { completeTask, toggleTaskCompletion } from "../../services/taskService";
 import { TaskTagsRow, ScheduledSessionsSection, getSessionKey } from "../special/task";
-import {
-  getCategoryDisplay,
-  toggleSessionSmart,
-  computeTaskProgress,
-  handleTaskPress,
-  getWidgetEntranceProps,
-} from "./widgetHelpers";
+import { getCategoryDisplay, computeTaskProgress } from "./taskHelpers";
+import { toggleSessionSmart, handleTaskPress, getWidgetEntranceProps } from "./widgetHelpers";
 import { getTaskProgress } from "../../services/taskService";
 import { useTaskUpdateSubscription } from "../../context/TaskContext";
 import { ProgressIcon } from "../icons/ProgressIcon";
@@ -289,7 +284,7 @@ const styles = StyleSheet.create({
   container: {
     width: "100%",
     justifyContent: "space-between",
-    overflow: "visible",
+    overflow: "hidden",
     flex: 1,
   },
   emptyText: {

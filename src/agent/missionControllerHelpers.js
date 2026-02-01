@@ -59,6 +59,7 @@ export async function createTaskViaController(userId, taskData) {
         minMinutes: taskData.minMinutes,
         maxMinutes: taskData.maxMinutes,
         taskType: taskData.taskType,
+        subtasks: taskData.subtasks,
       },
     };
 
