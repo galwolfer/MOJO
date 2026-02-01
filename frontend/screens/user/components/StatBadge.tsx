@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(25),
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.md,
-    gap: SPACING.sm,
+    gap: SPACING.xs,
     ...SHADOWS.card,
   },
   smallContainer: {
@@ -81,13 +81,14 @@ const styles = StyleSheet.create({
   topRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: SPACING.sm,
+    justifyContent: "center",
+    gap: SPACING.xs,
+    marginBottom: SPACING.xs,
   },
   iconCircle: {
-    width: moderateScale(32),
-    height: moderateScale(32),
     alignItems: "center",
     justifyContent: "center",
+    gap: SPACING.xs,
   },
   textContainer: {
     alignItems: "flex-start",
