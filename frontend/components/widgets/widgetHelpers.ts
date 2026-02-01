@@ -1,33 +1,9 @@
 import { COLORS } from "../../theme";
 import { SVG_DATA_URIS } from "../icons/svg-data-uris";
-import { ScheduledSession, Subtask, toggleSession } from "./taskHelpers";
+import { ScheduledSession, Subtask } from "./taskHelpers";
 
-export {
-  Subtask,
-  ScheduledSession,
-  getSubtaskIdFromSession,
-  formatDate,
-  formatDateTime,
-  formatTimeRange,
-  getStatusStyle,
-  getImportanceLabel,
-  getEffortLabel,
-  formatDuration,
-  importanceColorIndex,
-  importanceIcon,
-  effortColor,
-  effortIcon,
-  getTaskTypeLabel,
-  getSessionLabel,
-  getSessionKey,
-  getTimeParts,
-  getColoredDataUri,
-  getCategoryDisplay,
-  computeTaskProgress,
-  sessionRowData,
-  toggleSubtask,
-  toggleSession,
-} from "./taskHelpers";
+// Re-export types only from taskHelpers (functions are defined locally in this file)
+export { Subtask, ScheduledSession } from "./taskHelpers";
 
 export type WidgetEntranceProps = {
   entranceEnabled?: boolean;
