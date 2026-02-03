@@ -304,37 +304,79 @@ export function extractWidgetFromText(text) {
     // Try to repair common JSON issues
     console.warn("[widgetUtils] Initial parse failed, attempting repair:", err.message);
 
-    // Attempt 1: Add missing closing brace if needed
-    if (!jsonStr.endsWith("}")) {
-      try {
-        const repaired = jsonStr + "}";
-        console.log("[widgetUtils] Trying with added closing brace");
-        return JSON.parse(repaired);
-      } catch (e) {
-        // Continue to next attempt
+    // Helper: compute unmatched brace/bracket counts while ignoring strings
+    function computeDepths(s) {
+      let braceDepth = 0;
+      let bracketDepth = 0;
+      let inString = false;
+      let escape = false;
+      for (let i = 0; i < s.length; i++) {
+        const ch = s[i];
+        if (inString) {
+          if (escape) {
+            escape = false;
+          } else if (ch === "\\") {
+            escape = true;
+          } else if (ch === '"') {
+            inString = false;
+          }
+        } else {
+          if (ch === '"') {
+            inString = true;
+          } else if (ch === '{') {
+            braceDepth++;
+          } else if (ch === '}') {
+            braceDepth--;
+          } else if (ch === '[') {
+            bracketDepth++;
+          } else if (ch === ']') {
+            bracketDepth--;
+          }
+        }
       }
+      return {
+        braceDepth: Math.max(0, braceDepth),
+        bracketDepth: Math.max(0, bracketDepth),
+      };
     }
 
-    // Attempt 2: Remove trailing commas before closing braces
+    // Attempt A: Balance by appending the required closing chars
     try {
-      const repaired = jsonStr.replace(/,\s*([}\]])/g, "$1");
-      console.log("[widgetUtils] Trying with removed trailing commas");
-      return JSON.parse(repaired);
+      const depths = computeDepths(jsonStr);
+      if (depths.braceDepth > 0 || depths.bracketDepth > 0) {
+        const closers = ']'.repeat(depths.bracketDepth) + '}'.repeat(depths.braceDepth);
+        const repaired = jsonStr + closers;
+        console.log('[widgetUtils] Trying with added closers:', closers);
+        return JSON.parse(repaired);
+      }
     } catch (e) {
-      // Continue
+      // continue to further attempts
     }
 
-    // Attempt 3: Both fixes
+    // Attempt B: Remove trailing commas then balance closers
     try {
       let repaired = jsonStr.replace(/,\s*([}\]])/g, "$1");
-      if (!repaired.endsWith("}")) {
-        repaired += "}";
+      const depths2 = computeDepths(repaired);
+      if (depths2.braceDepth > 0 || depths2.bracketDepth > 0) {
+        repaired += ']'.repeat(depths2.bracketDepth) + '}'.repeat(depths2.braceDepth);
       }
-      console.log("[widgetUtils] Trying with both fixes");
+      console.log('[widgetUtils] Trying with removed trailing commas and balanced closers');
       return JSON.parse(repaired);
     } catch (e) {
-      console.error("[widgetUtils] All repair attempts failed");
-      return null;
+      // continue
     }
+
+    // Attempt C: legacy single-closing-brace heuristic
+    try {
+      if (!jsonStr.endsWith('}')) {
+        console.log('[widgetUtils] Trying with single added closing brace');
+        return JSON.parse(jsonStr + '}');
+      }
+    } catch (e) {
+      // continue
+    }
+
+    console.error("[widgetUtils] All repair attempts failed");
+    return null;
   }
 }

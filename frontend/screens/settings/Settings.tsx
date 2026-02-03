@@ -28,9 +28,16 @@ type SettingsScreenProps = {
   onEditPreferences?: () => void;
   onChatSettings?: () => void;
   onNotificationSettings?: () => void;
+  onSubcategoryManager?: () => void;
 };
 
-export default function SettingsScreen({ onBack, onEditPreferences, onChatSettings, onNotificationSettings }: SettingsScreenProps) {
+export default function SettingsScreen({
+  onBack,
+  onEditPreferences,
+  onChatSettings,
+  onNotificationSettings,
+  onSubcategoryManager,
+}: SettingsScreenProps) {
   const { user, signOut, signIn, token } = useAuth();
   const { setHeaderConfig } = useNavigation();
 
@@ -50,6 +57,7 @@ export default function SettingsScreen({ onBack, onEditPreferences, onChatSettin
   const ChatIcon = ICONS.ojo;
   const NotificationIcon = ICONS.notifications;
   const PencilIcon = ICONS.edit;
+  const ListIcon = ICONS.list;
 
   useEffect(() => {
     const handleBackPress = () => onBackRef.current();
@@ -95,11 +103,25 @@ export default function SettingsScreen({ onBack, onEditPreferences, onChatSettin
     }
   };
 
+  const handleSubcategoryManager = () => {
+    if (onSubcategoryManager) {
+      onSubcategoryManager();
+    } else {
+      console.log("Subcategory manager pressed - no handler provided");
+    }
+  };
+
   const preferenceItems: ListCellProps[] = [
     makeListCell("edit-preferences", {
       title: "Edit my prefrences",
       logo: <EditIcon size={24} color={COLORS.primary2} />,
       onPress: handleEditPreferences,
+      divider: true,
+    }),
+    makeListCell("subcategories", {
+      title: "Subcategories",
+      logo: <ListIcon size={24} color={COLORS.primary4} />,
+      onPress: handleSubcategoryManager,
       divider: true,
     }),
     makeListCell("chat-settings", {

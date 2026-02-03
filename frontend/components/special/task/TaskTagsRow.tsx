@@ -11,9 +11,10 @@ export const TaskTagsRow: React.FC<{
   categoryDisplay?: string;
   subcategory?: string;
   subcategoryDisplay?: string;
+  subCategory?: { icon?: string | null; color?: string | null; source?: string | null; parent?: string | null } | null;
   importance?: number | null;
   effort?: number | null;
-}> = ({ category, categoryDisplay, subcategory, subcategoryDisplay, importance, effort }) => {
+}> = ({ category, categoryDisplay, subcategory, subcategoryDisplay, subCategory, importance, effort }) => {
   const categoryMeta = getCategoryMeta(category);
   const subLabel = subcategoryDisplay || subcategory || "";
 
@@ -56,9 +57,43 @@ export const TaskTagsRow: React.FC<{
         />
       )}
 
-      {subLabel ? (
-        <Tag label={subLabel} colorIndex={Math.max(0, Math.min(17, subLabel.length % 9))} style={styles.tagItem} />
-      ) : null}
+      {subLabel
+        ? (() => {
+            // If subcategory is a system 'General' subcategory, use category icon and color
+            if (subCategory && subCategory.source === "category-default") {
+              return (
+                <Tag
+                  label={subLabel}
+                  leftIcon={categoryMeta.icon}
+                  colorIndex={categoryMeta.colorIndex}
+                  style={styles.tagItem}
+                />
+              );
+            }
+
+            // If subcategory has its own color, use explicit bgColor
+            if (subCategory && subCategory.color) {
+              return (
+                <Tag
+                  label={subLabel}
+                  leftIcon={subCategory.icon || undefined}
+                  bgColor={subCategory.color}
+                  textColor="#FFFFFF"
+                  style={styles.tagItem}
+                />
+              );
+            }
+
+            // Fallback: use generated color index
+            return (
+              <Tag
+                label={subLabel}
+                colorIndex={Math.max(0, Math.min(17, subLabel.length % 9))}
+                style={styles.tagItem}
+              />
+            );
+          })()
+        : null}
 
       {importance ? (
         <Tag

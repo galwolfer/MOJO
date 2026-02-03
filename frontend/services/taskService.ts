@@ -35,18 +35,26 @@ export type SubTask = {
   completedAt?: string | null;
 };
 
+export type SubcategoryRef = {
+  _id?: string;
+  id?: string;
+  name?: string;
+  label?: string;
+  parent?: string;
+  icon?: string | null;
+  color?: string | null;
+  source?: string;
+  confidence?: number;
+  updatedAt?: string;
+};
+
 export type Task = {
   _id: string;
   userId: string;
   taskname: string;
   description?: string;
   category?: string;
-  subCategory?: {
-    label: string;
-    source: string;
-    confidence: number;
-    updatedAt?: string;
-  };
+  subCategory?: SubcategoryRef | null;
   status: TaskStatus;
   completed?: boolean;
   completedAt?: string | null;
@@ -119,6 +127,7 @@ export type ScheduledDayGroup = {
     progressPercentage?: number;
     taskType?: string | null;
     category?: string | null;
+    subCategory?: SubcategoryRef | null;
     subcategory?: string | null;
     description?: string;
     estimatedDuration?: number;

@@ -4,7 +4,9 @@ import { CATEGORY_STRING_VALUES, getDisplayName, isValidCategory } from "../conf
 
 function normalizeCategoryKey(category) {
   if (!category) return "";
-  return String(category).toLowerCase().replace(/[^a-z_]/g, "");
+  return String(category)
+    .toLowerCase()
+    .replace(/[^a-z_]/g, "");
 }
 
 function normalizeName(name) {
@@ -87,9 +89,7 @@ export async function resolveSubcategoryId({
   source = "user",
   confidence = 1,
 } = {}) {
-  let candidateId =
-    subcategoryId ||
-    (subcategory && (subcategory._id || subcategory.id || subcategory.subcategoryId));
+  let candidateId = subcategoryId || (subcategory && (subcategory._id || subcategory.id || subcategory.subcategoryId));
 
   if (!candidateId && typeof subcategory === "string" && /^[a-fA-F0-9]{24}$/.test(subcategory)) {
     candidateId = subcategory;
@@ -111,15 +111,31 @@ export async function resolveSubcategoryId({
 
 export async function ensureGeneralSubcategory({ userId, parent } = {}) {
   if (!userId || !parent || !isValidCategory(parent)) return null;
+
+  // Use a system-wide general subcategory (userId = "system")
+  const systemUserId = "000000000000000000000000"; // Special system user ID
   const displayName = getDisplayName(parent) || parent;
-  const generalName = `General ${displayName}`;
-  return findOrCreateSubcategory({
-    userId,
-    name: generalName,
+  const generalName = `General`;
+
+  let sub = await Subcategory.findOne({
+    userId: systemUserId,
     parent,
-    source: "system",
-    confidence: 1,
+    nameLower: generalName.toLowerCase(),
   });
+
+  if (!sub) {
+    sub = await Subcategory.create({
+      userId: systemUserId,
+      name: generalName,
+      parent,
+      icon: null, // Will use category icon in frontend
+      color: null,
+      source: "category-default",
+      confidence: 1,
+    });
+  }
+
+  return sub.toObject ? sub.toObject() : sub;
 }
 
 export function getSubcategoryLabel(subCategory) {

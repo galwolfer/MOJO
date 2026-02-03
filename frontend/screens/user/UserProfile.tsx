@@ -25,7 +25,13 @@ import { moderateScale } from "react-native-size-matters";
 import { getUserStats } from "../../services/userService";
 import { getTasks, getScheduledTasksByDay, calculateTaskProgress, type Task, type TaskProgress } from "../../services/taskService";
 import UserAvatar from "../../components/common/UserAvatar";
-import { SettingsScreen, EditPreferencesScreen, ChatSettingsScreen, NotificationSettingsScreen } from "../settings";
+import {
+  SettingsScreen,
+  EditPreferencesScreen,
+  ChatSettingsScreen,
+  NotificationSettingsScreen,
+  SubcategoryManager,
+} from "../settings";
 import { useStatsContext } from "../../context/StatsContext";
 
 /**
@@ -81,9 +87,9 @@ export default function UserProfileScreen() {
   const { stats, isLoading: statsLoading, refreshStats } = useStatsContext();
 
   // Screen navigation state
-  const [currentScreen, setCurrentScreen] = useState<"profile" | "settings" | "edit-preferences" | "chat-settings" | "notification-settings">(
-    "profile",
-  );
+  const [currentScreen, setCurrentScreen] = useState<
+    "profile" | "settings" | "edit-preferences" | "chat-settings" | "notification-settings" | "subcategory-manager"
+  >("profile");
 
   const [loading, setLoading] = useState(true);
   const [progressData, setProgressData] = useState<number[]>(DEFAULT_PROGRESS);
@@ -308,6 +314,7 @@ export default function UserProfileScreen() {
         onEditPreferences={() => setCurrentScreen("edit-preferences")}
         onChatSettings={() => setCurrentScreen("chat-settings")}
         onNotificationSettings={() => setCurrentScreen("notification-settings")}
+        onSubcategoryManager={() => setCurrentScreen("subcategory-manager")}
       />
     );
   }
@@ -345,6 +352,10 @@ export default function UserProfileScreen() {
         onBack={() => setCurrentScreen("settings")}
       />
     );
+  }
+
+  if (currentScreen === "subcategory-manager") {
+    return <SubcategoryManager onBack={() => setCurrentScreen("settings")} />;
   }
 
   return (

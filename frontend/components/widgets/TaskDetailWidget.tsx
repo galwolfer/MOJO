@@ -60,6 +60,9 @@ interface TaskDetail {
   subcategoryDisplay?: string;
   subCategory?: {
     label?: string;
+    name?: string;
+    icon?: string | null;
+    parent?: string;
     source?: string;
     confidence?: number;
     updatedAt?: string;
@@ -160,7 +163,8 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
 
   const categoryMeta = getCategoryMeta(task.category);
   const categoryDisplayNormalized = getCategoryDisplay(task.category, task.categoryDisplay);
-  const subLabel = task.subcategoryDisplay || task.subCategory?.label || task.subcategory || "";
+  const subLabel =
+    task.subcategoryDisplay || task.subCategory?.label || task.subCategory?.name || task.subcategory || "";
   const subIndex = paletteIndexFromKey(subLabel);
 
   const contentNodes: React.ReactNode[] = [
@@ -175,7 +179,8 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
       category={task.category}
       categoryDisplay={categoryDisplayNormalized}
       subcategory={task.subcategory}
-      subcategoryDisplay={task.subcategoryDisplay || task.subCategory?.label}
+      subcategoryDisplay={task.subcategoryDisplay || task.subCategory?.label || task.subCategory?.name}
+      subCategory={task.subCategory}
       importance={task.importance}
       effort={task.effort}
     />,
