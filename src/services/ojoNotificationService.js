@@ -17,7 +17,8 @@
  *   - User selects which Ojo type to use
  */
 
-import { GeminiAdapter } from "../agent/geminiAdapter.js";
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { config } from "../config/env.js";
 import { logger } from "../utils/logger.js";
 import OjoType from "../models/OjoType.js";
@@ -102,21 +103,17 @@ PERSONALITY:
 - Style: ${ojoType.style}
 
 YOUR TASK:
-Generate a short, personalized push notification message for a task reminder.
-The notification should motivate the user to work on their task.
+Generate a short push notification for a task reminder.
 
-RULES:
-1. Keep the message under 100 characters for the title
-2. Keep the body under 200 characters
-3. Match your personality and tone exactly
-4. Include the task context naturally
-5. Make it feel personal and motivating
-6. Do NOT use generic phrases like "Time to work on..."
-7. Be creative and vary your messages
+STRICT RULES:
+1. Title: MAX 50 characters (short and punchy)
+2. Body: MAX 100 characters (brief motivation)
+3. Match your personality tone
+4. Make it personal and motivating
+5. Return ONLY valid JSON - nothing else
 
-OUTPUT FORMAT:
-Return ONLY a JSON object with "title" and "body" fields. No markdown, no explanation.
-Example: {"title": "Hey! 💪", "body": "That project won't finish itself. Let's crush it together!"}`;
+OUTPUT FORMAT (return EXACTLY this format):
+{"title": "Your Title", "body": "Your message here"}`;
 }
 
 /**
@@ -186,7 +183,14 @@ export async function generateOjoNotification(ojoTypeName, task, options = {}) {
   const ojoType = OJO_DEFINITIONS[ojoTypeName] || OJO_DEFINITIONS.mentorjo;
   
   try {
-    const gemini = new GeminiAdapter(config.geminiApiKey);
+    // Use LangChain ChatGoogleGenerativeAI - same as chat (AgentController)
+    const notificationModel = config.geminiModel || "gemini-3.0-flash";
+    const llm = new ChatGoogleGenerativeAI({
+      model: notificationModel,
+      apiKey: config.geminiApiKey,
+      temperature: 0.7, // Slightly higher than chat (0.2) for varied notifications
+      maxOutputTokens: 256, // Short notifications (chat uses 768)
+    });
     
     const systemPrompt = buildOjoNotificationPrompt(ojoType);
     const taskContext = buildTaskContext(task, subtask, timing, source);
@@ -196,22 +200,38 @@ export async function generateOjoNotification(ojoTypeName, task, options = {}) {
       userPrompt += `\n\nUser's name: ${userName}`;
     }
     
+    // Log prompt length
+    const promptLength = (systemPrompt + "\n\n" + userPrompt).length;
+    logger.info(`🤖 Ojo prompt length: ${promptLength} chars, model: ${notificationModel}`);
+    
+    // Use LangChain message format
     const messages = [
-      { role: "user", content: systemPrompt + "\n\n" + userPrompt },
+      new SystemMessage(systemPrompt),
+      new HumanMessage(userPrompt),
     ];
     
-    const response = await gemini.generateContent(messages);
+    const response = await llm.invoke(messages);
     
     // Extract the text response
-    const textContent = response?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const textContent = response?.content;
     
     if (!textContent) {
       throw new Error("No text content in response");
     }
     
+    // Log raw AI response for debugging
+    logger.info(`🤖 Ojo AI raw response (${ojoTypeName}): ${textContent}`);
+    
     // Parse the JSON response
     // Remove any markdown code blocks if present
-    const cleanedText = textContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    let cleanedText = textContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    
+    // Try to extract JSON object if there's extra text
+    const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      cleanedText = jsonMatch[0];
+    }
+    
     const notification = JSON.parse(cleanedText);
     
     if (!notification.title || !notification.body) {
@@ -221,6 +241,8 @@ export async function generateOjoNotification(ojoTypeName, task, options = {}) {
     // Add Ojo branding
     const ojoEmoji = getOjoEmoji(ojoTypeName);
     
+    logger.info(`✅ Ojo AI SUCCESS (${ojoTypeName}): Generated notification for task "${task.taskname}" - "${notification.title}"`);
+    
     return {
       title: `${ojoEmoji} ${notification.title}`,
       body: notification.body,
@@ -228,7 +250,7 @@ export async function generateOjoNotification(ojoTypeName, task, options = {}) {
       generated: true,
     };
   } catch (error) {
-    logger.warn(`Failed to generate Ojo notification (${ojoTypeName}):`, error.message);
+    logger.warn(`❌ Ojo AI FAILED (${ojoTypeName}): ${error.message} - Using fallback template for "${task.taskname}"`);
     // Fall back to default notification format
     return getFallbackNotification(ojoTypeName, task, subtask, timing, source);
   }
