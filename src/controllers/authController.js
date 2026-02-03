@@ -393,16 +393,20 @@ export async function updateProfile(req, res, next) {
 export async function deleteAccount(req, res, next) {
   try {
     const userId = req.user.userId;
+    console.log(`🗑️  Delete account request for userId: ${userId}`);
 
     // First verify user exists before deleting data
     const user = await User.findById(userId);
 
     if (!user) {
+      console.log(`❌ User not found: ${userId}`);
       return res.status(404).json({
         success: false,
         error: "User not found",
       });
     }
+
+    console.log(`📧 Deleting account for user: ${user.username} (${user.email})`);
 
     // Import all models
     const { Task, Session, Memory, TaskSchedule, SubTask, BusyBlock, EventLog } = await import("../models/index.js");
@@ -425,21 +429,26 @@ export async function deleteAccount(req, res, next) {
       EventLog?.deleteMany({ userId }),
     ]);
 
-    // Log any deletion failures (but don't fail the request)
+    // Log deletion results
+    const collectionNames = ["Task", "SubTask", "TaskSchedule", "Session", "Memory", "BusyBlock", "EventLog"];
     deletionResults.forEach((result, index) => {
-      if (result.status === "rejected") {
-        console.error(`Failed to delete data at index ${index}:`, result.reason);
+      if (result.status === "fulfilled" && result.value) {
+        console.log(`  ✅ Deleted ${result.value.deletedCount || 0} ${collectionNames[index]}(s)`);
+      } else if (result.status === "rejected") {
+        console.error(`  ❌ Failed to delete ${collectionNames[index]}:`, result.reason);
       }
     });
 
     // Finally delete the user
     await User.findByIdAndDelete(userId);
+    console.log(`✅ Account deleted successfully for user: ${user.username}`);
 
     res.json({
       success: true,
       message: "Account and all associated data deleted successfully",
     });
   } catch (error) {
+    console.error(`❌ Error deleting account:`, error);
     next(error);
   }
 }
