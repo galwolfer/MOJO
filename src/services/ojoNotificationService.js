@@ -98,22 +98,18 @@ export function mapPredictionToOjoType(predictionCategory, urgency) {
 function buildOjoNotificationPrompt(ojoType) {
   return `You are ${ojoType.displayName}, ${ojoType.persona}
 
-PERSONALITY:
-- Tone: ${ojoType.tones.join(", ")}
-- Style: ${ojoType.style}
+PERSONALITY: ${ojoType.tones.join(", ")}
+STYLE: ${ojoType.style}
 
-YOUR TASK:
-Generate a short push notification for a task reminder.
+Generate a push notification. Keep it SHORT.
 
-STRICT RULES:
-1. Title: MAX 50 characters (short and punchy)
-2. Body: MAX 100 characters (brief motivation)
-3. Match your personality tone
-4. Make it personal and motivating
-5. Return ONLY valid JSON - nothing else
+RESPOND WITH EXACTLY 2 LINES:
+TITLE: (your title here, max 40 chars)
+BODY: (your message here, max 80 chars)
 
-OUTPUT FORMAT (return EXACTLY this format):
-{"title": "Your Title", "body": "Your message here"}`;
+Example:
+TITLE: Let's Go! 💪
+BODY: Time to crush that task!`;
 }
 
 /**
@@ -189,7 +185,7 @@ export async function generateOjoNotification(ojoTypeName, task, options = {}) {
       model: notificationModel,
       apiKey: config.geminiApiKey,
       temperature: 0.7, // Slightly higher than chat (0.2) for varied notifications
-      maxOutputTokens: 256, // Short notifications (chat uses 768)
+      maxOutputTokens: 768, // Same as chat
     });
     
     const systemPrompt = buildOjoNotificationPrompt(ojoType);
@@ -222,30 +218,40 @@ export async function generateOjoNotification(ojoTypeName, task, options = {}) {
     // Log raw AI response for debugging
     logger.info(`🤖 Ojo AI raw response (${ojoTypeName}): ${textContent}`);
     
-    // Parse the JSON response
-    // Remove any markdown code blocks if present
-    let cleanedText = textContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    // Parse the response - expect "TITLE: ...\nBODY: ..." format
+    let title = "";
+    let body = "";
     
-    // Try to extract JSON object if there's extra text
-    const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      cleanedText = jsonMatch[0];
+    // Try to extract TITLE: and BODY: lines
+    const titleMatch = textContent.match(/TITLE:\s*(.+)/i);
+    const bodyMatch = textContent.match(/BODY:\s*(.+)/i);
+    
+    if (titleMatch && bodyMatch) {
+      title = titleMatch[1].trim();
+      body = bodyMatch[1].trim();
+    } else {
+      // Fallback: try JSON parsing
+      const cleanedText = textContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const notification = JSON.parse(jsonMatch[0]);
+        title = notification.title;
+        body = notification.body;
+      }
     }
     
-    const notification = JSON.parse(cleanedText);
-    
-    if (!notification.title || !notification.body) {
-      throw new Error("Invalid notification format");
+    if (!title || !body) {
+      throw new Error("Could not parse title/body from response");
     }
     
     // Add Ojo branding
     const ojoEmoji = getOjoEmoji(ojoTypeName);
     
-    logger.info(`✅ Ojo AI SUCCESS (${ojoTypeName}): Generated notification for task "${task.taskname}" - "${notification.title}"`);
+    logger.info(`✅ Ojo AI SUCCESS (${ojoTypeName}): Generated notification for task "${task.taskname}" - "${title}"`);
     
     return {
-      title: `${ojoEmoji} ${notification.title}`,
-      body: notification.body,
+      title: `${ojoEmoji} ${title}`,
+      body: body,
       ojoType: ojoTypeName,
       generated: true,
     };
