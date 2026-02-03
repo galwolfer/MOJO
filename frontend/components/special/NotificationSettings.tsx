@@ -12,6 +12,8 @@ import { useNotifications } from "../../context/NotificationContext";
 import { COLORS, SPACING, FONT_SIZES } from "../../theme";
 import { post, get } from "../../services/httpClient";
 import { OjoType, OjoTypeOption } from "../../services/notificationService";
+import { getOjoType, OjoTypeName } from "../../config/ojoTypeConfig";
+import { ICONS } from "../icons/icons";
 import AppText from "../common/AppText";
 import AppButton from "../common/AppButton";
 import Box from "../layout/Box";
@@ -454,41 +456,61 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
                     Select the personality for your reminders
                   </AppText>
                   <View style={styles.ojoTypeGrid}>
-                    {availableOjoTypes.map((ojo) => (
-                      <TouchableOpacity
-                        key={ojo.name}
-                        style={[
-                          styles.ojoTypeCard,
-                          preferences?.ojoNotifications?.selectedOjoType === ojo.name && styles.ojoTypeCardSelected,
-                        ]}
-                        onPress={() => handleSelectOjoType(ojo.name)}
-                        disabled={isSaving}
-                      >
-                        <AppText 
-                          variant="boldText" 
+                    {availableOjoTypes.map((ojo) => {
+                      const ojoConfig = getOjoType(ojo.name as OjoTypeName);
+                      const IconComponent = ICONS[ojoConfig.icon as keyof typeof ICONS];
+                      const isSelected = preferences?.ojoNotifications?.selectedOjoType === ojo.name;
+                      const ojoColor = ojoConfig.color;
+                      const iconSize = moderateScale(40);
+                      
+                      return (
+                        <TouchableOpacity
+                          key={ojo.name}
                           style={[
-                            styles.ojoTypeName,
-                            preferences?.ojoNotifications?.selectedOjoType === ojo.name && styles.ojoTypeNameSelected,
+                            styles.ojoTypeCard,
+                            isSelected && { borderColor: ojoColor, backgroundColor: ojoColor + "15" },
                           ]}
+                          onPress={() => handleSelectOjoType(ojo.name)}
+                          disabled={isSaving}
                         >
-                          {ojo.name === 'mentorjo' && '🧙 '}
-                          {ojo.name === 'brojo' && '💪 '}
-                          {ojo.name === 'bestojo' && '💖 '}
-                          {ojo.name === 'strictojo' && '⚡ '}
-                          {ojo.displayName}
-                        </AppText>
-                        <AppText 
-                          variant="notes" 
-                          style={[
-                            styles.ojoTypePersona,
-                            preferences?.ojoNotifications?.selectedOjoType === ojo.name && styles.ojoTypePersonaSelected,
-                          ]}
-                          numberOfLines={2}
-                        >
-                          {ojo.persona}
-                        </AppText>
-                      </TouchableOpacity>
-                    ))}
+                          {/* Ojo Icon Circle */}
+                          <View
+                            style={[
+                              styles.ojoIconCircle,
+                              {
+                                backgroundColor: ojoColor,
+                                width: iconSize,
+                                height: iconSize,
+                                borderRadius: iconSize / 2,
+                              },
+                            ]}
+                          >
+                            {typeof IconComponent === "function" && (
+                              <IconComponent size={iconSize * 0.55} color={COLORS.colorWhite} />
+                            )}
+                          </View>
+                          <AppText 
+                            variant="boldText" 
+                            style={[
+                              styles.ojoTypeName,
+                              { color: isSelected ? ojoColor : COLORS.darkGray },
+                            ]}
+                          >
+                            {ojo.displayName}
+                          </AppText>
+                          <AppText 
+                            variant="notes" 
+                            style={[
+                              styles.ojoTypePersona,
+                              { color: isSelected ? ojoColor : COLORS.lightGray },
+                            ]}
+                            numberOfLines={2}
+                          >
+                            {ojo.persona}
+                          </AppText>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
                 </View>
               )}
@@ -888,26 +910,24 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(10),
     borderWidth: 2,
     borderColor: "transparent",
+    alignItems: "center",
   },
-  ojoTypeCardSelected: {
-    borderColor: COLORS.primary3,
-    backgroundColor: COLORS.primary3 + "15",
+  ojoIconCircle: {
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: SPACING.xs,
   },
   ojoTypeName: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.darkGray,
     marginBottom: 4,
-  },
-  ojoTypeNameSelected: {
-    color: COLORS.primary3,
+    textAlign: "center",
   },
   ojoTypePersona: {
     fontSize: FONT_SIZES.sm - 1,
     color: COLORS.lightGray,
     lineHeight: (FONT_SIZES.sm - 1) * 1.3,
-  },
-  ojoTypePersonaSelected: {
-    color: COLORS.primary3,
+    textAlign: "center",
   },
   ojoInfoBox: {
     marginTop: SPACING.sm,
