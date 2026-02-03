@@ -258,6 +258,105 @@ const tests = {
       console.log('❌ Failed to update preferences:', result.data?.error || result.error);
       return { success: false, error: result.data?.error };
     }
+  },
+
+  /**
+   * Test 10: Test Ojo notification (with AI-generated content)
+   */
+  async testOjoNotification(ojoType = null) {
+    console.log('\n🤖 TEST 10: Ojo Notification (AI-Generated)');
+    console.log('─'.repeat(50));
+    
+    const body = ojoType ? { ojoType } : {};
+    const result = await apiCall('POST', '/notifications/test/ojo-reminder', body);
+    
+    if (result.data.success) {
+      console.log('✅ Ojo notification test sent');
+      console.log('   Task:', result.data.task?.name);
+      console.log('   Ojo Type Used:', result.data.ojoType);
+      console.log('   Selection Method:', result.data.ojoSelectionMethod);
+      console.log('   Prediction Category:', result.data.predictionCategory || 'N/A');
+      console.log('   \n📝 AI-Generated Notification:');
+      console.log('   Title:', result.data.notification?.title);
+      console.log('   Body:', result.data.notification?.body);
+      return { success: true, data: result.data };
+    } else {
+      console.log('❌ Failed to test Ojo notification:', result.data?.error || result.error);
+      return { success: false, error: result.data?.error };
+    }
+  },
+
+  /**
+   * Test 11: Get available Ojo types
+   */
+  async getOjoTypes() {
+    console.log('\n🎭 TEST 11: Get Available Ojo Types');
+    console.log('─'.repeat(50));
+    
+    const result = await apiCall('GET', '/notifications/preferences');
+    
+    if (result.data.success && result.data.availableOjoTypes) {
+      console.log('✅ Available Ojo types:');
+      result.data.availableOjoTypes.forEach(ojo => {
+        console.log(`\n   🤖 ${ojo.name} (${ojo.id})`);
+        console.log(`      ${ojo.description}`);
+        console.log(`      Tone: ${ojo.tone}`);
+      });
+      console.log('\n   Current Ojo Settings:');
+      console.log('   Enabled:', result.data.preferences?.ojoNotifications?.enabled);
+      console.log('   Selected Type:', result.data.preferences?.ojoNotifications?.selectedOjoType || 'None (auto-select)');
+      return { success: true, data: result.data.availableOjoTypes };
+    } else {
+      console.log('❌ Failed to get Ojo types:', result.data?.error || result.error);
+      return { success: false, error: result.data?.error };
+    }
+  },
+
+  /**
+   * Test 12: Enable Ojo notifications with specific type
+   */
+  async enableOjoNotifications(ojoType) {
+    console.log('\n✨ TEST 12: Enable Ojo Notifications');
+    console.log('─'.repeat(50));
+    
+    const result = await apiCall('PUT', '/notifications/preferences', {
+      ojoNotifications: {
+        enabled: true,
+        selectedOjoType: ojoType
+      }
+    });
+    
+    if (result.data.success) {
+      console.log('✅ Ojo notifications enabled');
+      console.log('   Selected Ojo:', ojoType);
+      return { success: true };
+    } else {
+      console.log('❌ Failed to enable Ojo notifications:', result.data?.error || result.error);
+      return { success: false, error: result.data?.error };
+    }
+  },
+
+  /**
+   * Test 13: Disable Ojo notifications
+   */
+  async disableOjoNotifications() {
+    console.log('\n🚫 TEST 13: Disable Ojo Notifications');
+    console.log('─'.repeat(50));
+    
+    const result = await apiCall('PUT', '/notifications/preferences', {
+      ojoNotifications: {
+        enabled: false,
+        selectedOjoType: null
+      }
+    });
+    
+    if (result.data.success) {
+      console.log('✅ Ojo notifications disabled');
+      return { success: true };
+    } else {
+      console.log('❌ Failed to disable Ojo notifications:', result.data?.error || result.error);
+      return { success: false, error: result.data?.error };
+    }
   }
 };
 
@@ -291,6 +390,8 @@ async function runAllTests() {
     { name: 'Smart Reminder Calculation', fn: () => tests.testSmartReminderCalc() },
     { name: 'Morning Digest', fn: () => tests.testMorningDigest() },
     { name: 'Check Test Status', fn: () => tests.checkTestStatus() },
+    { name: 'Get Ojo Types', fn: () => tests.getOjoTypes() },
+    { name: 'Ojo Notification', fn: () => tests.testOjoNotification() },
   ];
 
   for (const test of testSequence) {
@@ -353,10 +454,30 @@ async function interactiveTest(testName) {
       return tests.stopPeriodicTest();
     case 'status':
       return tests.checkTestStatus();
+    case 'ojo':
+      return tests.testOjoNotification();
+    case 'ojo-mentor':
+      return tests.testOjoNotification('mentorjo');
+    case 'ojo-bro':
+      return tests.testOjoNotification('brojo');
+    case 'ojo-best':
+      return tests.testOjoNotification('bestojo');
+    case 'ojo-strict':
+      return tests.testOjoNotification('strictojo');
+    case 'ojo-types':
+      return tests.getOjoTypes();
+    case 'ojo-enable':
+      return tests.enableOjoNotifications(process.argv[3] || 'mentorjo');
+    case 'ojo-disable':
+      return tests.disableOjoNotifications();
     case 'all':
       return runAllTests();
     default:
-      console.log('Available tests: prefs, test, reminder, reminder-default, subtask, subtask-default, smart, digest, start, stop, status, all');
+      console.log('Available tests:');
+      console.log('  Basic: prefs, test, reminder, reminder-default, subtask, subtask-default, smart, digest');
+      console.log('  Periodic: start, stop, status');
+      console.log('  Ojo: ojo, ojo-mentor, ojo-bro, ojo-best, ojo-strict, ojo-types, ojo-enable [type], ojo-disable');
+      console.log('  Full: all');
   }
 }
 
