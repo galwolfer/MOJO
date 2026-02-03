@@ -299,6 +299,31 @@ router.post("/test/task-reminder", async (req, res) => {
 });
 
 /**
+ * POST /api/notifications/test/subtask-reminder
+ * Test subtask reminder notification for the authenticated user
+ * 
+ * Body: { 
+ *   useSmartReminders?: boolean (default: true)
+ * }
+ */
+router.post("/test/subtask-reminder", async (req, res) => {
+  try {
+    const { useSmartReminders = true } = req.body;
+    const { testSubtaskReminderNotification } = await import("../services/notificationService.js");
+    
+    const result = await testSubtaskReminderNotification(req.user.userId, { useSmartReminders });
+    
+    return res.json(result);
+  } catch (error) {
+    console.error("Error testing subtask reminder:", error);
+    return res.status(500).json({ 
+      success: false, 
+      error: "Failed to test subtask reminder" 
+    });
+  }
+});
+
+/**
  * POST /api/notifications/test/smart-reminder
  * Test smart reminder calculation (shows ML prediction without sending notification)
  * 
