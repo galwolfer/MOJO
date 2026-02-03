@@ -10,29 +10,59 @@ The Ojo notification system uses AI (via Gemini) to generate personalized task r
 
 | Ojo Type | Name | Tone | Description |
 |----------|------|------|-------------|
-| `mentorjo` | Mentorjo | Wise, encouraging, growth-focused | Professional mentor who believes in your potential |
-| `brojo` | Brojo | Casual, motivating, friendly | Your supportive gym buddy who keeps it real |
-| `bestojo` | Bestojo | Warm, understanding, supportive | Your best friend who always has your back |
-| `strictojo` | Strictojo | Direct, no-nonsense, accountability-focused | Tough love coach who demands your best |
+| `mentorjo` | Mentorjo | Thoughtful, professional, supportive | A wise mentor who helps you think long-term and grow |
+| `brojo` | Brojo | Friendly, motivating, funny | Your bro, a friend who's always got your back |
+| `bestojo` | Bestojo | Warm, caring, positive | A supportive best friend who listens and encourages you |
+| `strictojo` | StrictOjo | Firm, focused, honest | A no-nonsense mentor who holds you accountable and expects results |
 
-## How Ojo Selection Works
+## How Notifications Work
 
-### When Smart Reminders are ON (`useSmartReminders: true`)
+The notification system has two independent settings:
 
-The Ojo type is **automatically selected** based on the ML prediction score:
+### 1. Smart Reminders (Prediction Model)
+Controls **when** you get reminded (timing optimization based on ML prediction):
+- **ON**: Uses ML prediction to calculate optimal reminder timing
+- **OFF**: Uses fixed default timing (e.g., 60 minutes before)
 
-| Prediction Category | Ojo Type | Reasoning |
-|---------------------|----------|-----------|
-| 1 (Very quick completion) | mentorjo | Light encouragement |
-| 2 (Quick completion) | bestojo | Friendly support |
-| 3 (Moderate) | mentorjo | Professional guidance |
-| 4 (Slow completion) | brojo | Motivational push |
-| 5 (Unlikely quick) | strictojo | Accountability needed |
+### 2. Ojo Personality (AI-Generated Content)
+Controls **what** the notification says:
+- **ON**: AI generates personalized notification text with Ojo personality
+- **OFF**: Fixed/standard notification text
 
-### When Smart Reminders are OFF (`useSmartReminders: false`)
+### Behavior Matrix
 
-- If Ojo is enabled: Uses the user's **selected Ojo type**
-- If no Ojo selected: Uses `mentorjo` as default
+| Smart Reminders | Ojo Personality | Timing | Content | Ojo Type Selection |
+|-----------------|-----------------|--------|---------|-------------------|
+| OFF | OFF | Fixed default | Fixed text | N/A |
+| ON | OFF | ML prediction | Fixed text | N/A |
+| OFF | ON | Fixed default | AI-generated | User-selected |
+| ON | ON | ML prediction | AI-generated | Auto-selected by prediction |
+
+### When Ojo Toggle is OFF (`ojoNotifications.enabled: false`)
+
+Standard fixed notifications are used - no AI generation occurs. The notification text is templated.
+
+### When Ojo Toggle is ON (`ojoNotifications.enabled: true`)
+
+#### With Smart Reminders ON (`useSmartReminders: true`)
+
+- **Timing**: Uses ML prediction for optimal reminder timing
+- **Ojo Type**: Automatically selected based on the ML prediction score:
+
+| Condition | Ojo Type | Reasoning |
+|-----------|----------|-----------|
+| Critical urgency (any category) | `strictojo` | Strict accountability needed |
+| Category 1 (Very quick completion) | `bestojo` | Warm encouragement |
+| Category 2 (Quick completion) | `brojo` | Friendly motivation |
+| Category 3 (Moderate) | `mentorjo` | Wise guidance |
+| Category 4 (Slow completion) | `strictojo` | Need accountability |
+| Category 5 (Unlikely quick) | `strictojo` | Strict push needed |
+
+#### With Smart Reminders OFF (`useSmartReminders: false`)
+
+- **Timing**: Uses fixed default timing (no prediction)
+- **Ojo Type**: Uses the user's **selected Ojo type** (`selectedOjoType`)
+- If no Ojo type selected: defaults to `mentorjo`
 
 ## User Settings
 
@@ -69,19 +99,36 @@ Body: {
 }
 ```
 
+### Test Task Reminder (with options)
+```
+POST /api/notifications/test/task-reminder
+Body: {
+  useSmartReminders?: boolean,  // Use ML prediction for timing (default: true)
+  useOjo?: boolean              // Use Ojo AI-generated content (default: false)
+}
+```
+
 ### Test Ojo Notification
 ```
 POST /api/notifications/test/ojo-reminder
 Body: {
-  ojoType?: "mentorjo" | "brojo" | "bestojo" | "strictojo"  // Optional, auto-selects if not provided
+  ojoType?: "mentorjo" | "brojo" | "bestojo" | "strictojo"  // Optional, uses user's selection if not provided
 }
 ```
+
+## Test Buttons in App
+
+| Button | Smart Reminders | Ojo | Description |
+|--------|-----------------|-----|-------------|
+| **🧠 Smart** | ✅ ON | ❌ OFF | Uses ML prediction for timing, fixed text |
+| **📋 Default** | ❌ OFF | ❌ OFF | No prediction, fixed text |
+| **🤖 Test Ojo** | ❌ OFF | ✅ ON | No prediction, AI-generated text |
 
 ## Test Script Commands
 
 ```bash
 # Run specific Ojo tests
-node scripts/test-notifications.js ojo          # Auto-select Ojo
+node scripts/test-notifications.js ojo          # Ojo with user's selected type
 node scripts/test-notifications.js ojo-mentor   # Force Mentorjo
 node scripts/test-notifications.js ojo-bro      # Force Brojo
 node scripts/test-notifications.js ojo-best     # Force Bestojo
@@ -106,20 +153,20 @@ node scripts/test-notifications.js ojo-disable
 ## Example Notifications
 
 ### Mentorjo (Category 3 - Moderate)
-> **Title:** Time to grow 🌱
-> **Body:** "Project Report" is an opportunity to demonstrate your capabilities. Take 60 minutes to show what you're made of.
+> **Title:** 🧙 Time for Progress
+> **Body:** Remember, every step counts. "Project Report" is due in 1h 0m.
 
-### Brojo (Category 4 - Needs Push)
-> **Title:** Let's crush this! 💪
-> **Body:** Hey! "Gym Session" is waiting for you. No excuses - you've got this! 45 minutes is all it takes.
+### Brojo (Category 2 - Quick task)
+> **Title:** 💪 Let's Go!
+> **Body:** Hey! "Gym Session" is coming up in 45m. You got this!
 
-### Bestojo (Category 2 - Supportive)
-> **Title:** You've got this! ✨
-> **Body:** Just a friendly reminder about "Birthday Planning" - I know you'll make it amazing! Ready when you are.
+### Bestojo (Category 1 - Easy task)
+> **Title:** 💖 Gentle Reminder
+> **Body:** Just checking in! "Birthday Planning" is due in 30m. I believe in you!
 
-### Strictojo (Category 5 - Accountability)
-> **Title:** No more delays.
-> **Body:** "Tax Filing" deadline is approaching. You've had enough time. Get it done in the next 2 hours. No excuses.
+### Strictojo (Category 4-5 or Critical urgency)
+> **Title:** ⚡ Action Required
+> **Body:** "Tax Filing" - 2h until due. No excuses. Get it done.
 
 ## Architecture
 

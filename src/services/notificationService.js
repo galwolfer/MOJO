@@ -945,7 +945,8 @@ export async function sendTaskReminderNotifications() {
  * @returns {Promise<Object>} Test result
  */
 export async function testTaskReminderNotification(userId, options = {}) {
-  const { useSmartReminders = true, useOjo, ojoType: forceOjoType } = options;
+  // useOjo defaults to false - tests should explicitly enable Ojo if needed
+  const { useSmartReminders = true, useOjo = false, ojoType: forceOjoType } = options;
   
   logger.info(`🧪 Testing task reminder for user ${userId}, smartReminders=${useSmartReminders}, useOjo=${useOjo}`);
 
@@ -1015,9 +1016,10 @@ export async function testTaskReminderNotification(userId, options = {}) {
     const source = nextSchedule ? "schedule" : "dueDate";
 
     // Determine Ojo settings for test
+    // useOjo parameter takes precedence - if explicitly false, don't use Ojo
     const ojoDecision = determineOjoTypeForNotification(user, timing);
-    const shouldUseOjo = useOjo !== undefined ? useOjo : ojoDecision.useOjo;
-    const selectedOjoType = forceOjoType || ojoDecision.ojoType;
+    const shouldUseOjo = useOjo === true ? true : (useOjo === false ? false : ojoDecision.useOjo);
+    const selectedOjoType = shouldUseOjo ? (forceOjoType || ojoDecision.ojoType) : null;
 
     let notification;
     if (shouldUseOjo && selectedOjoType) {
@@ -1279,8 +1281,13 @@ export async function testOjoReminderNotification(userId, options = {}) {
       logger.info("🧪 No tasks found, using mock task for Ojo testing");
     }
 
-    // Calculate timing for context
-    const timing = await calculateSmartReminderTiming(task, user);
+    // Use default timing (NOT smart/prediction-based) for Ojo test
+    // Ojo notification test is purely about the AI-generated content, not timing optimization
+    const timing = {
+      minutesBefore: user.pushNotifications?.taskReminders?.defaultReminderMinutes || 60,
+      remindCount: 1,
+      urgency: "normal",
+    };
     
     // Check for scheduled sessions for this task
     const nextSchedule = await TaskSchedule.findOne({
@@ -1293,18 +1300,23 @@ export async function testOjoReminderNotification(userId, options = {}) {
     const source = nextSchedule ? "schedule" : "dueDate";
 
     // Determine Ojo type
+    // For Ojo test: use forced type, user's selected type, or default to mentorjo
+    // We do NOT use prediction-based auto-selection here since this test is about Ojo content, not smart timing
     let selectedOjoType;
     let ojoSelectionMethod;
     
     if (forceOjoType) {
-      // Use forced Ojo type
+      // Use forced Ojo type (from test parameter)
       selectedOjoType = forceOjoType;
       ojoSelectionMethod = "forced";
+    } else if (user.pushNotifications?.ojoNotifications?.selectedOjoType) {
+      // Use user's selected Ojo type
+      selectedOjoType = user.pushNotifications.ojoNotifications.selectedOjoType;
+      ojoSelectionMethod = "user_selected";
     } else {
-      // Auto-select based on user settings and ML prediction
-      const ojoDecision = determineOjoTypeForNotification(user, timing);
-      selectedOjoType = ojoDecision.ojoType || "mentorjo"; // Default to mentorjo
-      ojoSelectionMethod = ojoDecision.source;
+      // Default to mentorjo
+      selectedOjoType = "mentorjo";
+      ojoSelectionMethod = "default";
     }
 
     // Generate Ojo notification

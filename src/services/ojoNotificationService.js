@@ -296,10 +296,22 @@ function getFallbackNotification(ojoTypeName, task, subtask, timing, source) {
  * 
  * @param {Object} user - User document
  * @param {Object} timing - Timing info with prediction data
- * @returns {Object} { useOjo: boolean, ojoType: string|null }
+ * @returns {Object} { useOjo: boolean, ojoType: string|null, source: string }
  */
 export function determineOjoTypeForNotification(user, timing) {
   const prefs = user.pushNotifications;
+  const ojoEnabled = prefs?.ojoNotifications?.enabled === true;
+  
+  // If Ojo toggle is OFF, always use fixed notifications
+  if (!ojoEnabled) {
+    return {
+      useOjo: false,
+      ojoType: null,
+      source: "disabled",
+    };
+  }
+  
+  // Ojo is enabled - determine which type to use
   const useSmartReminders = prefs?.taskReminders?.useSmartReminders !== false;
   
   if (useSmartReminders) {
@@ -313,11 +325,10 @@ export function determineOjoTypeForNotification(user, timing) {
       source: "smart_prediction",
     };
   } else {
-    // Smart reminders OFF: check if Ojo notifications are manually enabled
-    const ojoEnabled = prefs?.ojoNotifications?.enabled === true;
+    // Smart reminders OFF: use user's selected Ojo type
     const selectedOjoType = prefs?.ojoNotifications?.selectedOjoType;
     
-    if (ojoEnabled && selectedOjoType) {
+    if (selectedOjoType) {
       return {
         useOjo: true,
         ojoType: selectedOjoType,
@@ -325,11 +336,11 @@ export function determineOjoTypeForNotification(user, timing) {
       };
     }
     
-    // Ojo disabled - use normal notifications
+    // Ojo enabled but no type selected - use default mentorjo
     return {
-      useOjo: false,
-      ojoType: null,
-      source: "disabled",
+      useOjo: true,
+      ojoType: "mentorjo",
+      source: "default",
     };
   }
 }

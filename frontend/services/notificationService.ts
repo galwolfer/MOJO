@@ -13,6 +13,15 @@ import { Platform } from "react-native";
 import { post, get, put } from "./httpClient";
 
 // Types
+export type OjoType = "mentorjo" | "brojo" | "bestojo" | "strictojo";
+
+export type OjoTypeOption = {
+  name: OjoType;
+  displayName: string;
+  persona: string;
+  tones: string[];
+};
+
 export type NotificationPreferences = {
   enabled: boolean;
   morningDigest: {
@@ -24,6 +33,10 @@ export type NotificationPreferences = {
     enabled: boolean;
     defaultReminderMinutes: number;
     useSmartReminders: boolean;
+  };
+  ojoNotifications?: {
+    enabled: boolean;
+    selectedOjoType: OjoType | null;
   };
   timezone: string;
   expoPushToken?: string | null;

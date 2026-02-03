@@ -5,12 +5,13 @@
  * Matches the styling of other settings screens (ChatSettings, ProfileSettings, etc.)
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, StyleSheet, Switch, TouchableOpacity, Text } from "react-native";
 import { moderateScale } from "react-native-size-matters";
 import { useNotifications } from "../../context/NotificationContext";
 import { COLORS, SPACING, FONT_SIZES } from "../../theme";
-import { post } from "../../services/httpClient";
+import { post, get } from "../../services/httpClient";
+import { OjoType, OjoTypeOption } from "../../services/notificationService";
 import AppText from "../common/AppText";
 import AppButton from "../common/AppButton";
 import Box from "../layout/Box";
@@ -43,6 +44,25 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
   const [isTestingSmartReminder, setIsTestingSmartReminder] = useState(false);
   const [isTestingDefaultReminder, setIsTestingDefaultReminder] = useState(false);
   const [smartReminderResult, setSmartReminderResult] = useState<any>(null);
+  const [availableOjoTypes, setAvailableOjoTypes] = useState<OjoTypeOption[]>([]);
+  const [isTestingOjo, setIsTestingOjo] = useState(false);
+
+  // Fetch available Ojo types when component mounts
+  useEffect(() => {
+    const fetchOjoTypes = async () => {
+      try {
+        const result = await get<{ success: boolean; availableOjoTypes?: OjoTypeOption[] }>("/notifications/preferences");
+        if (result.success && result.availableOjoTypes) {
+          setAvailableOjoTypes(result.availableOjoTypes);
+        }
+      } catch (error) {
+        console.error('Error fetching Ojo types:', error);
+      }
+    };
+    if (isInitialized) {
+      fetchOjoTypes();
+    }
+  }, [isInitialized]);
 
   const handleToggleNotifications = async (enabled: boolean) => {
     setIsSaving(true);
@@ -98,6 +118,40 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
     setIsSaving(false);
   };
 
+  const handleToggleOjoNotifications = async (enabled: boolean) => {
+    setIsSaving(true);
+    await updatePreferences({
+      ojoNotifications: { 
+        enabled,
+        selectedOjoType: preferences?.ojoNotifications?.selectedOjoType ?? null,
+      },
+    });
+    setIsSaving(false);
+  };
+
+  const handleSelectOjoType = async (ojoType: OjoType) => {
+    setIsSaving(true);
+    await updatePreferences({
+      ojoNotifications: { 
+        enabled: preferences?.ojoNotifications?.enabled ?? true,
+        selectedOjoType: ojoType,
+      },
+    });
+    setIsSaving(false);
+  };
+
+  const handleTestOjoNotification = async (ojoType?: OjoType) => {
+    setIsTestingOjo(true);
+    try {
+      const result = await post("/notifications/test/ojo-reminder", { ojoType });
+      console.log('Ojo reminder test triggered:', result);
+    } catch (error) {
+      console.error('Error testing Ojo notification:', error);
+    } finally {
+      setIsTestingOjo(false);
+    }
+  };
+
   const handleTestNotification = async () => {
     setIsTesting(true);
     await testNotification();
@@ -119,7 +173,8 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
   const handleTestSmartReminder = async () => {
     setIsTestingSmartReminder(true);
     try {
-      const result = await post("/notifications/test/task-reminder", { useSmartReminders: true });
+      // Smart test: uses prediction model for timing, but NO Ojo (fixed notification text)
+      const result = await post("/notifications/test/task-reminder", { useSmartReminders: true, useOjo: false });
       console.log('Smart reminder test triggered:', result);
     } catch (error) {
       console.error('Error testing smart reminder:', error);
@@ -131,7 +186,8 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
   const handleTestDefaultReminder = async () => {
     setIsTestingDefaultReminder(true);
     try {
-      const result = await post("/notifications/test/task-reminder", { useSmartReminders: false });
+      // Default test: NO prediction model, NO Ojo (completely fixed notification)
+      const result = await post("/notifications/test/task-reminder", { useSmartReminders: false, useOjo: false });
       console.log('Default reminder test triggered:', result);
     } catch (error) {
       console.error('Error testing default reminder:', error);
@@ -367,6 +423,86 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
                   />
                 </View>
               )}
+
+              {/* Ojo Notifications */}
+              {preferences?.taskReminders?.enabled && (
+                <View style={[styles.settingRow, styles.nestedSetting]}>
+                  <View style={styles.settingInfo}>
+                    <AppText variant="boldText" style={styles.settingLabel}>🤖 Ojo Personality</AppText>
+                    <AppText variant="notes" style={styles.settingDescription}>
+                      AI-crafted notifications with personality
+                    </AppText>
+                  </View>
+                  <Switch
+                    value={preferences?.ojoNotifications?.enabled ?? false}
+                    onValueChange={handleToggleOjoNotifications}
+                    disabled={isSaving}
+                    trackColor={{ false: COLORS.white2, true: COLORS.primary3 }}
+                    thumbColor={preferences?.ojoNotifications?.enabled ? COLORS.colorWhite : COLORS.lightGray}
+                  />
+                </View>
+              )}
+
+              {/* Ojo Type Selector - only show when Ojo is enabled and Smart Reminders are OFF */}
+              {preferences?.taskReminders?.enabled && 
+               preferences?.ojoNotifications?.enabled && 
+               !preferences?.taskReminders?.useSmartReminders && 
+               availableOjoTypes.length > 0 && (
+                <View style={styles.ojoTypeContainer}>
+                  <AppText variant="boldText" style={styles.ojoTypeTitle}>Choose Your Ojo</AppText>
+                  <AppText variant="notes" style={styles.ojoTypeDescription}>
+                    Select the personality for your reminders
+                  </AppText>
+                  <View style={styles.ojoTypeGrid}>
+                    {availableOjoTypes.map((ojo) => (
+                      <TouchableOpacity
+                        key={ojo.name}
+                        style={[
+                          styles.ojoTypeCard,
+                          preferences?.ojoNotifications?.selectedOjoType === ojo.name && styles.ojoTypeCardSelected,
+                        ]}
+                        onPress={() => handleSelectOjoType(ojo.name)}
+                        disabled={isSaving}
+                      >
+                        <AppText 
+                          variant="boldText" 
+                          style={[
+                            styles.ojoTypeName,
+                            preferences?.ojoNotifications?.selectedOjoType === ojo.name && styles.ojoTypeNameSelected,
+                          ]}
+                        >
+                          {ojo.name === 'mentorjo' && '🧙 '}
+                          {ojo.name === 'brojo' && '💪 '}
+                          {ojo.name === 'bestojo' && '💖 '}
+                          {ojo.name === 'strictojo' && '⚡ '}
+                          {ojo.displayName}
+                        </AppText>
+                        <AppText 
+                          variant="notes" 
+                          style={[
+                            styles.ojoTypePersona,
+                            preferences?.ojoNotifications?.selectedOjoType === ojo.name && styles.ojoTypePersonaSelected,
+                          ]}
+                          numberOfLines={2}
+                        >
+                          {ojo.persona}
+                        </AppText>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Info about auto-selection when Smart Reminders are ON */}
+              {preferences?.taskReminders?.enabled && 
+               preferences?.ojoNotifications?.enabled && 
+               preferences?.taskReminders?.useSmartReminders && (
+                <View style={styles.ojoInfoBox}>
+                  <AppText variant="notes" style={styles.ojoInfoText}>
+                    ℹ️ With Smart Reminders on, Ojo type is automatically selected based on task difficulty prediction.
+                  </AppText>
+                </View>
+              )}
             </>
           )}
         </View>
@@ -424,6 +560,19 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
                     style={styles.testBtn}
                   />
                 </View>
+
+                {/* Ojo Test - only show when Ojo is enabled */}
+                {preferences?.ojoNotifications?.enabled && (
+                  <AppButton
+                    title={isTestingOjo ? "Sending..." : "🤖 Test Ojo Notification"}
+                    onPress={() => handleTestOjoNotification()}
+                    mode="filled"
+                    color="primary1"
+                    disabled={isTestingOjo}
+                    style={styles.testModeBtn}
+                  />
+                )}
+
                 <AppButton
                   title="📊 View Smart Calculation"
                   onPress={handleTestSmartCalculation}
@@ -708,5 +857,70 @@ const styles = StyleSheet.create({
     color: COLORS.lightGray,
     marginBottom: 2,
     fontFamily: "monospace",
+  },
+  // Ojo Type Selector
+  ojoTypeContainer: {
+    marginTop: SPACING.md,
+    marginLeft: SPACING.lg,
+    padding: SPACING.md,
+    backgroundColor: COLORS.white3,
+    borderRadius: moderateScale(12),
+  },
+  ojoTypeTitle: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.darkGray,
+    marginBottom: 4,
+  },
+  ojoTypeDescription: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.lightGray,
+    marginBottom: SPACING.md,
+  },
+  ojoTypeGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm,
+  },
+  ojoTypeCard: {
+    width: "47%",
+    padding: SPACING.sm,
+    backgroundColor: COLORS.white2,
+    borderRadius: moderateScale(10),
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  ojoTypeCardSelected: {
+    borderColor: COLORS.primary3,
+    backgroundColor: COLORS.primary3 + "15",
+  },
+  ojoTypeName: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.darkGray,
+    marginBottom: 4,
+  },
+  ojoTypeNameSelected: {
+    color: COLORS.primary3,
+  },
+  ojoTypePersona: {
+    fontSize: FONT_SIZES.sm - 1,
+    color: COLORS.lightGray,
+    lineHeight: (FONT_SIZES.sm - 1) * 1.3,
+  },
+  ojoTypePersonaSelected: {
+    color: COLORS.primary3,
+  },
+  ojoInfoBox: {
+    marginTop: SPACING.sm,
+    marginLeft: SPACING.lg,
+    padding: SPACING.sm,
+    backgroundColor: COLORS.primary3 + "15",
+    borderRadius: moderateScale(8),
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.primary3,
+  },
+  ojoInfoText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.primary3,
+    lineHeight: FONT_SIZES.sm * 1.4,
   },
 });
