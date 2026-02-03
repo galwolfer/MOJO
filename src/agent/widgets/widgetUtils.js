@@ -323,13 +323,13 @@ export function extractWidgetFromText(text) {
         } else {
           if (ch === '"') {
             inString = true;
-          } else if (ch === '{') {
+          } else if (ch === "{") {
             braceDepth++;
-          } else if (ch === '}') {
+          } else if (ch === "}") {
             braceDepth--;
-          } else if (ch === '[') {
+          } else if (ch === "[") {
             bracketDepth++;
-          } else if (ch === ']') {
+          } else if (ch === "]") {
             bracketDepth--;
           }
         }
@@ -340,13 +340,29 @@ export function extractWidgetFromText(text) {
       };
     }
 
-    // Attempt A: Balance by appending the required closing chars
+    // Attempt A: Balance by inserting closing braces BEFORE brackets when needed
     try {
       const depths = computeDepths(jsonStr);
       if (depths.braceDepth > 0 || depths.bracketDepth > 0) {
-        const closers = ']'.repeat(depths.bracketDepth) + '}'.repeat(depths.braceDepth);
-        const repaired = jsonStr + closers;
-        console.log('[widgetUtils] Trying with added closers:', closers);
+        let repaired = jsonStr;
+
+        // Find the last non-whitespace character position
+        const trimmedEnd = jsonStr.trimEnd();
+        const lastChar = trimmedEnd[trimmedEnd.length - 1];
+
+        // If ends with ] but we have unclosed braces
+        if (lastChar === "]" && depths.braceDepth > 0) {
+          // Insert missing } before the ]
+          // For nested arrays with objects, we need to close the object before the array closes
+          // Pattern: "value\n  ]" becomes "value\n    }\n  ]\n}"
+          repaired = jsonStr.replace(/\n  \]$/, "\n    }\n  ]\n}");
+        } else {
+          // Simple append if doesn't end with ]
+          const closers = "]".repeat(depths.bracketDepth) + "}".repeat(depths.braceDepth);
+          repaired = jsonStr + closers;
+        }
+
+        console.log("[widgetUtils] Trying with balanced closers");
         return JSON.parse(repaired);
       }
     } catch (e) {
@@ -358,9 +374,9 @@ export function extractWidgetFromText(text) {
       let repaired = jsonStr.replace(/,\s*([}\]])/g, "$1");
       const depths2 = computeDepths(repaired);
       if (depths2.braceDepth > 0 || depths2.bracketDepth > 0) {
-        repaired += ']'.repeat(depths2.bracketDepth) + '}'.repeat(depths2.braceDepth);
+        repaired += "]".repeat(depths2.bracketDepth) + "}".repeat(depths2.braceDepth);
       }
-      console.log('[widgetUtils] Trying with removed trailing commas and balanced closers');
+      console.log("[widgetUtils] Trying with removed trailing commas and balanced closers");
       return JSON.parse(repaired);
     } catch (e) {
       // continue
@@ -368,9 +384,9 @@ export function extractWidgetFromText(text) {
 
     // Attempt C: legacy single-closing-brace heuristic
     try {
-      if (!jsonStr.endsWith('}')) {
-        console.log('[widgetUtils] Trying with single added closing brace');
-        return JSON.parse(jsonStr + '}');
+      if (!jsonStr.endsWith("}")) {
+        console.log("[widgetUtils] Trying with single added closing brace");
+        return JSON.parse(jsonStr + "}");
       }
     } catch (e) {
       // continue
