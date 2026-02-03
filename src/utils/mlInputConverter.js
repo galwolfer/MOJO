@@ -202,7 +202,12 @@ function taskToMLInput(task) {
   const effort = task.effort || 3; // 1-5, default 3
   const estimatedDuration = task.estimatedDuration || 60; // minutes, default 60
   const dueDate = task.dueDate;
-  const subCategoryLabel = task.subCategory?.label || "";
+  const subCategoryLabel =
+    task.subCategoryLabel ||
+    (task.subCategory && typeof task.subCategory === "object"
+      ? task.subCategory.label || task.subCategory.name || ""
+      : "") ||
+    (typeof task.subcategory === "string" ? task.subcategory : "");
   const category = task.category || "";
 
   // Calculate delta_hours: time remaining until deadline in hours

@@ -44,7 +44,12 @@ export async function createTaskViaController(userId, taskData) {
         taskname: taskData.taskname,
         name: taskData.taskname,
         category: taskData.category,
-        subcategory: taskData.subcategory || taskData.subCategory?.label,
+        subcategory:
+          taskData.subcategory ||
+          taskData.subCategory?.label ||
+          taskData.subCategory?.name ||
+          (typeof taskData.subCategory === "string" ? taskData.subCategory : undefined),
+        subcategoryId: taskData.subCategoryId || taskData.subcategoryId,
         deadline: taskData.dueDate || taskData.deadline,
         recurrence: taskData.recurrence,
         description: taskData.description,

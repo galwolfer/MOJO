@@ -29,8 +29,8 @@ export function buildTaskDetailData(task, scheduledSessions = []) {
     subCategory: task.subCategory || null,
     category: task.category || null,
     categoryDisplay: getDisplayName(task.category),
-    subcategoryDisplay: task.subCategory ? task.subCategory.label : null,
-    subcategory: task.subCategory ? task.subCategory.label : null,
+    subcategoryDisplay: task.subCategory ? task.subCategory.label || task.subCategory.name : null,
+    subcategory: task.subCategory ? task.subCategory.label || task.subCategory.name : null,
     canSplit: task.canSplit,
     scheduledSessions: scheduledSessions || [],
   };

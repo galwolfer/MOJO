@@ -104,7 +104,7 @@ const uncompleteTaskMission = new LightMission({
           subCategory: task.subCategory || null,
           category: task.category,
           categoryDisplay: getDisplayName(task.category),
-          subcategoryDisplay: task.subCategory ? task.subCategory.label : null,
+          subcategoryDisplay: task.subCategory ? task.subCategory.label || task.subCategory.name : null,
           canSplit: task.canSplit,
         },
       };

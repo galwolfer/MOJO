@@ -24,17 +24,23 @@ import cron from "node-cron";
  * Purpose: Business logic for task persistence and expired checks
  */
 import { Task } from "../models/Task.js";
-import { User } from "../models/User.js";
 import { TaskSchedule } from "../models/TaskSchedule.js";
 import { SubTask } from "../models/SubTask.js";
 import { BusyBlock } from "../models/BusyBlock.js";
-import { CATEGORIES, getCategoryIndex } from "../config/categories.js";
+import { CATEGORIES } from "../config/categories.js";
 import { logEvent, recordSubCategoryGeneration, recordSubCategoryOverride } from "./telemetryService.js";
 import { mapCategoryToLifecycle } from "../algorithms/priority/categorizing.js";
 import { trainTask } from "./mlPredictionService.js";
 import { logger } from "../utils/logger.js";
 import { addDays, formatLocalDate, startOfDay } from "../utils/dateUtils.js";
 import { getIllegalDisplayFields, getIllegalCharsErrorMessage } from "../utils/illegalChars.js";
+import {
+  addSubcategoryToUser,
+  findOrCreateSubcategory,
+  findSubcategoryById,
+  getSubcategoryLabel,
+  resolveSubcategoryId,
+} from "./subcategoryService.js";
 
 // =============================================================================
 // INTERNAL HELPERS
@@ -49,31 +55,25 @@ import { getIllegalDisplayFields, getIllegalCharsErrorMessage } from "../utils/i
 async function _saveUserSubCategory(userId, categoryName, subCategory) {
   if (!userId || !categoryName || !subCategory) return;
 
+  if (typeof subCategory === "string" && /^[a-fA-F0-9]{24}$/.test(subCategory)) {
+    return;
+  }
+
   const subName = typeof subCategory === "string" ? subCategory : subCategory.label || subCategory.name;
   if (!subName) return;
 
   try {
-    const idx = getCategoryIndex(categoryName);
-    // Add to user's subCategories set if not exists
-    await User.updateOne(
-      { _id: userId },
-      {
-        $addToSet: {
-          subCategories: { name: subName, category: idx },
-        },
-      },
-    );
+    await findOrCreateSubcategory({
+      userId,
+      name: subName,
+      parent: categoryName,
+      source: "user",
+      confidence: 1,
+    });
   } catch (err) {
     // Silent fail if category invalid or user not found, just log warning
     logger.warn(`Failed to sync subcategory "${subName}" for user ${userId}: ${err.message}`);
   }
-}
-
-function getSubCategoryLabel(subCategory) {
-  if (!subCategory) return "";
-  if (typeof subCategory === "string") return subCategory;
-  if (typeof subCategory === "object") return subCategory.label || subCategory.name || "";
-  return "";
 }
 
 function buildIllegalCharsError(fields) {
@@ -146,11 +146,31 @@ export async function createTask({
   const illegalFields = getIllegalDisplayFields({
     taskname,
     description,
-    subcategory: getSubCategoryLabel(subCategory),
+    subcategory: getSubcategoryLabel(subCategory),
   });
   if (illegalFields.length > 0) {
     throw new Error(buildIllegalCharsError(illegalFields));
   }
+
+  const isSubcategoryIdString = typeof subCategory === "string" && /^[a-fA-F0-9]{24}$/.test(subCategory);
+  const resolvedSubCategoryId = subCategory
+    ? await resolveSubcategoryId({
+        userId,
+        subcategory: subCategory,
+        subcategoryName: typeof subCategory === "string" && !isSubcategoryIdString ? subCategory : undefined,
+        parent: category,
+        icon: typeof subCategory === "object" ? subCategory.icon : null,
+        source: typeof subCategory === "object" ? subCategory.source || "user" : "user",
+        confidence: typeof subCategory === "object" ? subCategory.confidence ?? 1 : 1,
+      })
+    : null;
+
+  const subCategoryForLog =
+    typeof subCategory === "string" && !isSubcategoryIdString
+      ? { label: subCategory, source: "user", confidence: 1 }
+      : typeof subCategory === "object"
+        ? subCategory
+        : null;
 
   const created = await Task.create({
     userId,
@@ -168,7 +188,7 @@ export async function createTask({
     maxMinutes,
     dueDate,
     category,
-    subCategory,
+    subCategory: resolvedSubCategoryId,
     recurrence,
     tags: tags || [],
     _pendingSubtasks: subtasks && subtasks.length > 0 ? subtasks : undefined,
@@ -176,6 +196,10 @@ export async function createTask({
 
   // Note: SubTask documents are automatically created by the Task model's post-save hook
   // based on taskType and chunkCount. No need to create them manually here.
+
+  if (resolvedSubCategoryId) {
+    await addSubcategoryToUser(userId, resolvedSubCategoryId);
+  }
 
   if (category && subCategory) {
     await _saveUserSubCategory(userId, category, subCategory);
@@ -188,7 +212,7 @@ export async function createTask({
       taskId: created._id.toString(),
       taskname: created.taskname,
       category: created.category || "",
-      subCategory: created.subCategory || null,
+      subCategory: subCategoryForLog,
       importance: created.importance,
       effort: created.effort,
       estimatedDuration: created.estimatedDuration,
@@ -201,7 +225,7 @@ export async function createTask({
     userId,
     taskId: created._id.toString(),
     category: created.category || "",
-    subCategory: created.subCategory || null,
+    subCategory: subCategoryForLog,
     context: "service_create",
   });
 
@@ -237,7 +261,18 @@ export async function checkSuggestionFollowed({ userId, task, lastSuggestion, wi
  * Fetch all tasks for a user.
  */
 export async function getTasksForUser(userId, filter = {}) {
-  return Task.find({ userId, ...filter }).lean();
+  const tasks = await Task.find({ userId, ...filter }).populate("subCategory").lean();
+  tasks.forEach(attachSubcategoryLabel);
+  return tasks;
+}
+
+function attachSubcategoryLabel(task) {
+  if (task && task.subCategory && typeof task.subCategory === "object") {
+    if (!task.subCategory.label && task.subCategory.name) {
+      task.subCategory.label = task.subCategory.name;
+    }
+  }
+  return task;
 }
 
 /**
@@ -253,7 +288,8 @@ export async function getTasks(userId, filters = {}) {
   if (filters.dueAfter) q.dueDate = { ...q.dueDate, $gte: new Date(filters.dueAfter) };
   if (filters.search) q.taskname = { $regex: filters.search, $options: "i" };
   
-  const tasks = await Task.find(q).lean();
+  const tasks = await Task.find(q).populate("subCategory").lean();
+  tasks.forEach(attachSubcategoryLabel);
   console.log(`[getTasks] Query: ${JSON.stringify(q)}`);
   console.log(`[getTasks] Found ${tasks.length} tasks matching filters`);
   tasks.forEach(t => {
@@ -354,17 +390,31 @@ export async function getTasks(userId, filters = {}) {
 }
 
 /**
+ * Fetch a single task by ID (with subcategory populated).
+ */
+export async function getTaskById(taskId, userId) {
+  if (!taskId) return null;
+  const query = userId ? { _id: taskId, userId } : { _id: taskId };
+  const task = await Task.findOne(query).populate("subCategory").lean();
+  return attachSubcategoryLabel(task);
+}
+
+/**
  * Fetch upcoming tasks for a user.
  */
 export async function getUpcomingTasks(userId, days = 7) {
-  return Task.findUpcoming(userId, days).lean();
+  const tasks = await Task.findUpcoming(userId, days).populate("subCategory").lean();
+  tasks.forEach(attachSubcategoryLabel);
+  return tasks;
 }
 
 /**
  * Fetch overdue tasks for a user.
  */
 export async function getOverdueTasks(userId) {
-  return Task.findOverdue(userId).lean();
+  const tasks = await Task.findOverdue(userId).populate("subCategory").lean();
+  tasks.forEach(attachSubcategoryLabel);
+  return tasks;
 }
 
 /**
@@ -388,7 +438,8 @@ export async function getScheduledTasksByDay(userId, days = 7) {
   }
 
   const taskIds = Array.from(new Set(sessions.map((s) => toId(s.taskId)).filter(Boolean)));
-  const tasks = await Task.find({ userId, _id: { $in: taskIds } }).lean();
+  const tasks = await Task.find({ userId, _id: { $in: taskIds } }).populate("subCategory").lean();
+  tasks.forEach(attachSubcategoryLabel);
   const taskMap = new Map(tasks.map((t) => [toId(t._id), t]));
 
   const subtasks = await SubTask.find({ taskId: { $in: taskIds } })
@@ -421,7 +472,7 @@ export async function getScheduledTasksByDay(userId, days = 7) {
         progressPercentage: task.progressPercentage ?? 0,
         taskType: task.taskType || null,
         subCategory: task.subCategory || null,
-        subcategory: task.subCategory ? task.subCategory.label : null,
+        subcategory: task.subCategory ? task.subCategory.label || task.subCategory.name : null,
         category: task.category || null,
         description: task.description,
         estimatedDuration: task.estimatedDuration,
@@ -473,7 +524,11 @@ export async function getTaskProgress(userId, taskId) {
   const task = await Task.findOne({
     _id: taskId,
     userId,
-  }).lean();
+  })
+    .populate("subCategory")
+    .lean();
+
+  attachSubcategoryLabel(task);
 
   if (!task) {
     return null;
@@ -637,7 +692,7 @@ export async function updateTask({ userId, taskId, updates }) {
   const illegalFields = getIllegalDisplayFields({
     taskname: sanitizedUpdates.taskname,
     description: sanitizedUpdates.description,
-    subcategory: getSubCategoryLabel(sanitizedUpdates.subCategory),
+    subcategory: getSubcategoryLabel(sanitizedUpdates.subCategory),
   });
   if (illegalFields.length > 0) {
     return { success: false, error: buildIllegalCharsError(illegalFields) };
@@ -662,24 +717,58 @@ export async function updateTask({ userId, taskId, updates }) {
   const existing = await Task.findOne({ _id: taskId, userId }).lean();
   const cat = sanitizedUpdates.category || existing?.category || "";
 
-  // If user provided a subCategory, save it to the user profile and record generation/override telemetry
+  // If user provided a subCategory, resolve to ID and record telemetry
   if (sanitizedUpdates.subCategory) {
-    const newSub = sanitizedUpdates.subCategory;
+    const rawSub = sanitizedUpdates.subCategory;
+    const isSubIdString = typeof rawSub === "string" && /^[a-fA-F0-9]{24}$/.test(rawSub);
 
-    // Persist to user profile
-    try {
-      await _saveUserSubCategory(userId, cat, newSub);
-    } catch (err) {
-      logger.warn(`Failed to persist subcategory during update: ${err.message}`);
+    const resolvedSubCategoryId = await resolveSubcategoryId({
+      userId,
+      subcategory: rawSub,
+      subcategoryName: typeof rawSub === "string" && !isSubIdString ? rawSub : undefined,
+      parent: cat,
+      icon: typeof rawSub === "object" ? rawSub.icon : null,
+      source: typeof rawSub === "object" ? rawSub.source || "user" : "user",
+      confidence: typeof rawSub === "object" ? rawSub.confidence ?? 1 : 1,
+    });
+
+    if (!resolvedSubCategoryId) {
+      return { success: false, error: "Invalid subcategory selection." };
     }
 
-    if (existing && existing.subCategory && existing.subCategory.label && existing.subCategory.label !== newSub.label) {
+    sanitizedUpdates.subCategory = resolvedSubCategoryId;
+
+    await addSubcategoryToUser(userId, resolvedSubCategoryId);
+
+    // Persist to user profile only when a name is provided
+    if (!isSubIdString || typeof rawSub === "object") {
+      try {
+        await _saveUserSubCategory(userId, cat, rawSub);
+      } catch (err) {
+        logger.warn(`Failed to persist subcategory during update: ${err.message}`);
+      }
+    }
+
+    const existingSub = existing?.subCategory
+      ? await findSubcategoryById({ userId, subcategoryId: existing.subCategory })
+      : null;
+    const existingLabel = existingSub?.name || existingSub?.label || "";
+
+    const subCategoryForLog =
+      typeof rawSub === "string" && !isSubIdString
+        ? { label: rawSub, source: "user", confidence: 1 }
+        : typeof rawSub === "object"
+          ? rawSub
+          : await findSubcategoryById({ userId, subcategoryId: resolvedSubCategoryId });
+    const newLabel = subCategoryForLog?.label || subCategoryForLog?.name || "";
+
+    if (existingLabel && newLabel && existingLabel !== newLabel) {
       // User replaced an existing subcategory
       await recordSubCategoryOverride({
         userId,
         taskId: taskId.toString(),
-        previous: existing.subCategory,
-        replacement: newSub,
+        previous: existingSub || existing?.subCategory,
+        replacement: subCategoryForLog,
         context: "service_update",
       });
     } else {
@@ -688,7 +777,7 @@ export async function updateTask({ userId, taskId, updates }) {
         userId,
         taskId: taskId.toString(),
         categories: [sanitizedUpdates.category || existing?.category || ""],
-        subCategory: newSub,
+        subCategory: subCategoryForLog,
         context: "service_update",
       });
     }

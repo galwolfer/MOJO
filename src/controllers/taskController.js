@@ -5,12 +5,12 @@
 
 import * as taskService from "../services/taskService.js";
 import { logger } from "../utils/logger.js";
-import { User } from "../models/User.js";
 import { Task } from "../models/Task.js";
 import { SubTask } from "../models/SubTask.js";
-import { getCategoryIndex, isValidCategory } from "../config/categories.js";
+import { isValidCategory } from "../config/categories.js";
 import { hasIllegalDisplayChars } from "../utils/illegalChars.js";
 import { triggerSchedulerUpdate } from "../services/schedulingService.js";
+import { findOrCreateSubcategory } from "../services/subcategoryService.js";
 
 /**
  * Task Controller
@@ -117,32 +117,13 @@ export async function autoSaveSubcategory(userId, subcategoryName, categoryKey) 
     }
 
     const trimmedName = subcategoryName.trim();
-
-    // Get category index (0-17)
-    const categoryIndex = getCategoryIndex(categoryKey);
-
-    // Find user and check if subcategory already exists
-    const user = await User.findById(userId);
-    if (!user) {
-      return; // User not found, skip silently
-    }
-
-    // Check if this subcategory already exists for this category (case-insensitive)
-    const exists = user.subCategories.some(
-      (sub) => sub.category === categoryIndex && sub.name.toLowerCase() === trimmedName.toLowerCase(),
-    );
-
-    if (exists) {
-      return; // Already exists, nothing to do
-    }
-
-    // Add new subcategory to user profile
-    user.subCategories.push({
+    await findOrCreateSubcategory({
+      userId,
       name: trimmedName,
-      category: categoryIndex,
+      parent: categoryKey,
+      source: "user",
+      confidence: 1,
     });
-
-    await user.save();
     logger.info(`Auto-saved subcategory "${trimmedName}" to category ${categoryKey} for user ${userId}`);
   } catch (error) {
     // Log error but don't fail the task operation
@@ -219,6 +200,8 @@ export async function createTask(req, res) {
       taskname,
       category,
       subcategory,
+      subcategoryId,
+      subCategoryId,
       deadline,
       recurrence,
       importance,
@@ -270,7 +253,11 @@ export async function createTask(req, res) {
       return res.status(400).json({ success: false, error: "Deadline is required" });
     }
 
-    if (subcategory && hasIllegalDisplayChars(subcategory)) {
+    const rawSubcategory = subcategoryId || subCategoryId || subcategory;
+    const isSubcategoryId =
+      typeof rawSubcategory === "string" && /^[a-fA-F0-9]{24}$/.test(rawSubcategory);
+
+    if (typeof rawSubcategory === "string" && !isSubcategoryId && hasIllegalDisplayChars(rawSubcategory)) {
       return res.status(400).json({ success: false, error: "Subcategory cannot include angle brackets." });
     }
 
@@ -299,9 +286,20 @@ export async function createTask(req, res) {
     }
 
     // Auto-save subcategory to user profile if provided
-    if (subcategory && category) {
-      console.log("[taskController.createTask] Auto-saving subcategory:", { subcategory, category, userId });
-      await autoSaveSubcategory(userId, subcategory, category);
+    const subcategoryName =
+      typeof rawSubcategory === "string" && !isSubcategoryId
+        ? rawSubcategory
+        : typeof rawSubcategory === "object"
+          ? rawSubcategory.label || rawSubcategory.name
+          : null;
+
+    if (subcategoryName && category) {
+      console.log("[taskController.createTask] Auto-saving subcategory:", {
+        subcategory: subcategoryName,
+        category,
+        userId,
+      });
+      await autoSaveSubcategory(userId, subcategoryName, category);
     }
 
     // Use estimatedDuration (from agent) OR estimatedMinutes (from frontend)
@@ -310,8 +308,13 @@ export async function createTask(req, res) {
     console.log("[taskController.createTask] Creating task with:", {
       taskname: title,
       category,
-      subcategory,
-      subCategoryObject: subcategory ? { label: subcategory, source: "user", confidence: 1 } : null,
+      subcategory: rawSubcategory,
+      subCategoryObject:
+        rawSubcategory && !isSubcategoryId
+          ? typeof rawSubcategory === "string"
+            ? { label: rawSubcategory, source: "user", confidence: 1 }
+            : rawSubcategory
+          : null,
     });
 
     // Preserve explicit nulls for minChunk (to allow clearing); only use default when undefined
@@ -322,7 +325,11 @@ export async function createTask(req, res) {
       taskname: title,
       description: descriptionValue,
       category: category || "",
-      subCategory: subcategory ? { label: subcategory, source: "user", confidence: 1, updatedAt: new Date() } : null,
+      subCategory: rawSubcategory
+        ? typeof rawSubcategory === "string" && !isSubcategoryId
+          ? { label: rawSubcategory, source: "user", confidence: 1, updatedAt: new Date() }
+          : rawSubcategory
+        : null,
       dueDate: deadline ? new Date(deadline) : null,
       importance: importance !== undefined ? importance : 3,
       effort: effort !== undefined ? effort : 3,
@@ -510,16 +517,31 @@ export async function updateTask(req, res) {
     if (raw.category !== undefined) updates.category = raw.category;
 
     // Subcategory
-    if (raw.subcategory !== undefined) {
-      if (typeof raw.subcategory === "string" && hasIllegalDisplayChars(raw.subcategory)) {
+    const rawSubcategory = raw.subcategoryId || raw.subCategoryId || raw.subcategory;
+    if (rawSubcategory !== undefined) {
+      const isSubcategoryId =
+        typeof rawSubcategory === "string" && /^[a-fA-F0-9]{24}$/.test(rawSubcategory);
+      if (typeof rawSubcategory === "string" && !isSubcategoryId && hasIllegalDisplayChars(rawSubcategory)) {
         return res.status(400).json({ success: false, error: "Subcategory cannot include angle brackets." });
       }
-      updates.subCategory = { label: raw.subcategory, source: "user", confidence: 1, updatedAt: new Date() };
+
+      updates.subCategory =
+        rawSubcategory && !isSubcategoryId
+          ? typeof rawSubcategory === "string"
+            ? { label: rawSubcategory, source: "user", confidence: 1, updatedAt: new Date() }
+            : rawSubcategory
+          : rawSubcategory || null;
 
       // Auto-save subcategory to user profile
       const taskCategory = raw.category || updates.category;
-      if (taskCategory && raw.subcategory) {
-        await autoSaveSubcategory(userId, raw.subcategory, taskCategory);
+      const subcategoryName =
+        typeof rawSubcategory === "string" && !isSubcategoryId
+          ? rawSubcategory
+          : typeof rawSubcategory === "object"
+            ? rawSubcategory.label || rawSubcategory.name
+            : null;
+      if (taskCategory && subcategoryName) {
+        await autoSaveSubcategory(userId, subcategoryName, taskCategory);
       }
     }
 

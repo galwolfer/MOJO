@@ -55,7 +55,8 @@ export async function recordSubCategoryGeneration({
   subCategory = null,
   context = "",
 }) {
-  if (!userId || !taskId || !subCategory?.label) return;
+  const label = subCategory?.label || subCategory?.name;
+  if (!userId || !taskId || !label) return;
   await logEvent({
     type: "sub_category_generated",
     userId,
@@ -63,7 +64,7 @@ export async function recordSubCategoryGeneration({
       taskId,
       categories,
       suggestion: {
-        label: subCategory.label,
+        label,
         source: subCategory.source,
         confidence: subCategory.confidence ?? null,
       },
@@ -77,7 +78,8 @@ export async function recordSubCategoryGeneration({
  * @param {{ userId: string, taskId: string, previous?: object, replacement?: object, context?: string }} params
  */
 export async function recordSubCategoryOverride({ userId, taskId, previous = null, replacement = null, context = "" }) {
-  if (!userId || !taskId || !replacement?.label) return;
+  const label = replacement?.label || replacement?.name;
+  if (!userId || !taskId || !label) return;
   await logEvent({
     type: "sub_category_corrected",
     userId,
@@ -85,7 +87,7 @@ export async function recordSubCategoryOverride({ userId, taskId, previous = nul
       taskId,
       previous,
       replacement: {
-        label: replacement.label,
+        label,
         source: replacement.source ?? "user",
       },
     },

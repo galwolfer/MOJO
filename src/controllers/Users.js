@@ -3,6 +3,8 @@
  * Purpose: Basic user listing and creation (mostly used by admin/CLI)
  */
 import { User } from "../models/User.js";
+import { Subcategory } from "../models/Subcategory.js";
+import { CATEGORY_INDEX_TO_KEY, isValidCategory } from "../config/categories.js";
 import bcrypt from "bcryptjs";
 import { getDefaultOjoType } from "../utils/ojoTypeUtils.js";
 
@@ -70,26 +72,33 @@ export async function getSubcategories(req, res, next) {
     const { category } = req.query;
     if (!id) return res.status(400).json({ error: "user id is required" });
 
-    const user = await User.findById(id).lean();
-    if (!user) return res.status(404).json({ error: "user not found" });
-
-    let subs = Array.isArray(user.subCategories)
-      ? user.subCategories.map((s) => ({ name: s.name, category: s.category }))
-      : [];
-
-    // Optional category filter by index
+    const query = { userId: id };
     if (category !== undefined && category !== "") {
-      try {
-        const catIdx = parseInt(category, 10);
-        if (!Number.isNaN(catIdx)) {
-          subs = subs.filter((s) => s.category === catIdx);
-        }
-      } catch (err) {
-        // Ignore parse errors, return all
+      let categoryKey = "";
+      const parsed = parseInt(category, 10);
+      if (!Number.isNaN(parsed)) {
+        categoryKey = CATEGORY_INDEX_TO_KEY[parsed] || "";
+      } else if (typeof category === "string") {
+        categoryKey = category.toLowerCase().replace(/[^a-z_]/g, "");
+      }
+
+      if (categoryKey && isValidCategory(categoryKey)) {
+        query.parent = categoryKey;
       }
     }
 
-    res.json({ success: true, subCategories: subs });
+    const subs = await Subcategory.find(query).sort({ parent: 1, nameLower: 1 }).lean();
+    const payload = subs.map((s) => ({
+      id: s._id,
+      name: s.name,
+      parent: s.parent,
+      icon: s.icon || null,
+      color: s.color || null,
+      source: s.source,
+      confidence: s.confidence,
+    }));
+
+    res.json({ success: true, subCategories: payload });
   } catch (e) {
     next(e);
   }
@@ -104,71 +113,24 @@ export async function getAvailableSubcategories(req, res, next) {
     const { category } = req.query;
     if (!id) return res.status(400).json({ error: "user id is required" });
 
-    const user = await User.findById(id).lean();
-    if (!user) return res.status(404).json({ error: "user not found" });
+    const query = { userId: id };
 
-    let userSubs = [];
-    let taskSubs = [];
-
-    // If category is specified, filter by numeric index
     if (category !== undefined && category !== "") {
-      try {
-        const catIdx = parseInt(category, 10);
-        if (!Number.isNaN(catIdx) && catIdx >= 0 && catIdx <= 17) {
-          // User-saved subs filtered by category
-          userSubs = (user.subCategories || [])
-            .filter((s) => s && typeof s.name === "string" && s.category === catIdx)
-            .map((s) => s.name.trim());
-
-          // Task-derived subs filtered by category (need to query tasks)
-          const categoryMap = {
-            0: "study_and_education",
-            1: "skill_building",
-            2: "workout",
-            3: "reflection",
-            4: "home_and_chores",
-            5: "family",
-            6: "life_management",
-            7: "work_and_career",
-            8: "creative_projects",
-            9: "hobbies",
-            10: "relationship",
-            11: "goals",
-            12: "mindfulness",
-            13: "health",
-            14: "social_activity",
-            15: "recovery",
-            16: "exploration",
-            17: "uncategorized",
-          };
-          const catKey = categoryMap[catIdx];
-          if (catKey) {
-            const { Task } = await import("../../models/Task.js");
-            const tasks = await Task.find({ userId: id, category: catKey }).select("subCategory.label").lean();
-            taskSubs = tasks
-              .filter((t) => t.subCategory && t.subCategory.label && typeof t.subCategory.label === "string")
-              .map((t) => t.subCategory.label.trim())
-              .filter((label) => label.length > 0);
-          }
-        }
-      } catch (err) {
-        // Ignore parse/import errors
+      let categoryKey = "";
+      const parsed = parseInt(category, 10);
+      if (!Number.isNaN(parsed)) {
+        categoryKey = CATEGORY_INDEX_TO_KEY[parsed] || "";
+      } else if (typeof category === "string") {
+        categoryKey = category.toLowerCase().replace(/[^a-z_]/g, "");
       }
-    } else {
-      // No category filter: return all user-saved subs and all task-derived subs
-      userSubs = (user.subCategories || []).filter((s) => s && typeof s.name === "string").map((s) => s.name.trim());
 
-      const { Task } = await import("../../models/Task.js");
-      const tasks = await Task.find({ userId: id }).select("subCategory.label").lean();
-      taskSubs = tasks
-        .filter((t) => t.subCategory && t.subCategory.label && typeof t.subCategory.label === "string")
-        .map((t) => t.subCategory.label.trim())
-        .filter((label) => label.length > 0);
+      if (categoryKey && isValidCategory(categoryKey)) {
+        query.parent = categoryKey;
+      }
     }
 
-    // Merge and dedupe
-    const combined = new Set([...userSubs, ...taskSubs]);
-    const available = Array.from(combined).sort();
+    const subs = await Subcategory.find(query).select("name").lean();
+    const available = Array.from(new Set(subs.map((s) => s.name).filter(Boolean))).sort();
 
     res.json({ success: true, available });
   } catch (e) {
