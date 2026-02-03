@@ -394,8 +394,8 @@ export async function deleteAccount(req, res, next) {
   try {
     const userId = req.user.userId;
 
-    // Delete user and all associated data
-    const user = await User.findByIdAndDelete(userId);
+    // First verify user exists before deleting data
+    const user = await User.findById(userId);
 
     if (!user) {
       return res.status(404).json({
@@ -404,23 +404,36 @@ export async function deleteAccount(req, res, next) {
       });
     }
 
-    // Delete all tasks associated with the user
-    const Task = (await import("../models/index.js")).Task;
-    if (Task) {
-      await Task.deleteMany({ userId });
-    }
+    // Import all models
+    const { Task, Session, Memory, TaskSchedule, SubTask, BusyBlock, EventLog } = await import("../models/index.js");
 
-    // Delete all chat sessions associated with the user
-    const ChatSession = (await import("../models/index.js")).ChatSession;
-    if (ChatSession) {
-      await ChatSession.deleteMany({ userId });
-    }
+    // Delete all user data from all collections
+    const deletionResults = await Promise.allSettled([
+      // Delete all tasks
+      Task?.deleteMany({ userId }),
+      // Delete all subtasks
+      SubTask?.deleteMany({ userId }),
+      // Delete all task schedules
+      TaskSchedule?.deleteMany({ userId }),
+      // Delete all sessions (chat history)
+      Session?.deleteMany({ userId }),
+      // Delete all memories (deprecated but may still have data)
+      Memory?.deleteMany({ userId }),
+      // Delete all busy blocks
+      BusyBlock?.deleteMany({ userId }),
+      // Delete all event logs
+      EventLog?.deleteMany({ userId }),
+    ]);
 
-    // Delete all chat messages associated with the user
-    const ChatMessage = (await import("../models/index.js")).ChatMessage;
-    if (ChatMessage) {
-      await ChatMessage.deleteMany({ userId });
-    }
+    // Log any deletion failures (but don't fail the request)
+    deletionResults.forEach((result, index) => {
+      if (result.status === "rejected") {
+        console.error(`Failed to delete data at index ${index}:`, result.reason);
+      }
+    });
+
+    // Finally delete the user
+    await User.findByIdAndDelete(userId);
 
     res.json({
       success: true,
