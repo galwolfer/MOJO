@@ -21,7 +21,6 @@ import { useAuth } from "../../context/AuthContext";
  * - Profile settings section with user info
  * - My Preferences section with various settings options
  * - Sign out button
- * hi
  */
 
 type SettingsScreenProps = {
