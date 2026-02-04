@@ -149,11 +149,7 @@ function Input<T = any>({
 
   const normalizedOptions = useMemo(() => {
     if (!options) return undefined;
-    return options.map((option) =>
-      typeof option === "string"
-        ? { label: option, value: option }
-        : option,
-    );
+    return options.map((option) => (typeof option === "string" ? { label: option, value: option } : option));
   }, [options]);
 
   const optionLabelMap = useMemo(() => {
@@ -168,6 +164,12 @@ function Input<T = any>({
     if (!options) return selected;
     return selected.map((value) => optionLabelMap.get(value) ?? value);
   }, [options, selected, optionLabelMap]);
+
+  // For single-select dropdowns, extract the selected option's icon and iconColor
+  const selectedOption = useMemo(() => {
+    if (!options || multiSelect || selected.length === 0) return undefined;
+    return normalizedOptions?.find((opt) => opt.value === selected[0]);
+  }, [options, multiSelect, selected, normalizedOptions]);
 
   const closeDropdown = () => {
     Animated.timing(dropdownAnim, {
@@ -353,12 +355,23 @@ function Input<T = any>({
           collapsable={false}
           style={[styles.inputWrapper, { borderColor: animatedBorderColor }]}
         >
+          {/* Display selected option's icon for single-select dropdowns */}
+          {selectedOption?.icon && (
+            <View style={styles.selectedIconWrapper}>
+              {React.createElement(selectedOption.icon, {
+                size: ICON_SIZES[iconSize],
+                color: selectedOption.iconColor || COLORS.primary1,
+              })}
+            </View>
+          )}
           <TextInput
             ref={inputRef}
             style={[
               styles.input,
               type === "longtext" ? styles.textarea : undefined,
               (Platform as any).OS === "web" ? ({ outlineWidth: 0 } as any) : undefined,
+              // Add left padding if there's a selected icon to prevent text overlap
+              selectedOption?.icon ? { paddingLeft: SPACING.xs } : undefined,
             ]}
             // Use the native placeholder on all platforms so tapping it focuses the input reliably
             placeholder={effectivePlaceholder}
@@ -442,52 +455,51 @@ function Input<T = any>({
                 const optionIconBackground = option.iconBackground || COLORS.white2;
                 const isSelected = selected.includes(optionValue);
                 return (
-                <React.Fragment key={optionValue}>
-                  <Pressable
-                    onPress={() => {
-                      if (!multiSelect) {
-                        const newSelected = [optionValue];
-                        // update selection state immediately so UI updates
-                        setSelected(newSelected);
-                        // call onSelect immediately to be responsive
-                        onSelect?.(newSelected);
-                        // start closing animation but don't wait for it to complete
-                        Animated.timing(dropdownAnim, {
-                          toValue: 0,
-                          duration: 180,
-                          easing: Easing.bezier(0.2, 0.8, 0.2, 1),
-                          useNativeDriver: false,
-                        }).start(() => {
-                          setIsOpen(false);
-                        });
-                      } else {
-                        const newSelected = selected.includes(optionValue)
-                          ? selected.filter((s) => s !== optionValue)
-                          : [...selected, optionValue];
-                        setSelected(newSelected);
-                        onSelect?.(newSelected);
-                      }
-                    }}
-                    style={styles.option}
-                  >
-                    <View style={styles.optionContent}>
-                      {optionIcon && (
-                        <View style={[styles.optionIcon, { backgroundColor: optionIconBackground }]}>
-                          {React.createElement(optionIcon, {
-                            size: ICON_SIZES[iconSize],
-                            color: optionIconColor,
-                          })}
-                        </View>
-                      )}
-                      <AppText style={{ flex: 1 }}>{optionLabel}</AppText>
-                    </View>
-                    {multiSelect && (
-                      <Checkbox checked={isSelected} onChange={() => {}} size={ICON_SIZES[iconSize]} />
-                    )}
-                  </Pressable>
-                  {index < (normalizedOptions || []).length - 1 && <View style={styles.optionDivider} />}
-                </React.Fragment>
-              )})}
+                  <React.Fragment key={optionValue}>
+                    <Pressable
+                      onPress={() => {
+                        if (!multiSelect) {
+                          const newSelected = [optionValue];
+                          // update selection state immediately so UI updates
+                          setSelected(newSelected);
+                          // call onSelect immediately to be responsive
+                          onSelect?.(newSelected);
+                          // start closing animation but don't wait for it to complete
+                          Animated.timing(dropdownAnim, {
+                            toValue: 0,
+                            duration: 180,
+                            easing: Easing.bezier(0.2, 0.8, 0.2, 1),
+                            useNativeDriver: false,
+                          }).start(() => {
+                            setIsOpen(false);
+                          });
+                        } else {
+                          const newSelected = selected.includes(optionValue)
+                            ? selected.filter((s) => s !== optionValue)
+                            : [...selected, optionValue];
+                          setSelected(newSelected);
+                          onSelect?.(newSelected);
+                        }
+                      }}
+                      style={styles.option}
+                    >
+                      <View style={styles.optionContent}>
+                        {optionIcon && (
+                          <View style={[styles.optionIcon, { backgroundColor: optionIconBackground }]}>
+                            {React.createElement(optionIcon, {
+                              size: ICON_SIZES[iconSize],
+                              color: optionIconColor,
+                            })}
+                          </View>
+                        )}
+                        <AppText style={{ flex: 1 }}>{optionLabel}</AppText>
+                      </View>
+                      {multiSelect && <Checkbox checked={isSelected} onChange={() => {}} size={ICON_SIZES[iconSize]} />}
+                    </Pressable>
+                    {index < (normalizedOptions || []).length - 1 && <View style={styles.optionDivider} />}
+                  </React.Fragment>
+                );
+              })}
             </Animated.View>
           </Pressable>
         </Modal>
@@ -591,6 +603,11 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.md,
     paddingBottom: SPACING.md,
     textAlignVertical: "top",
+  },
+  selectedIconWrapper: {
+    marginLeft: SPACING.md,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
 

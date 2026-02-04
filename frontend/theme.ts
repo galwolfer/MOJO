@@ -71,9 +71,10 @@ export const FONT_SIZES = {
 };
 
 // Icon size tokens used across the app
-export type IconSizeKey = "sm" | "md" | "big";
+export type IconSizeKey = "xs" | "sm" | "md" | "big";
 
 export const ICON_SIZES: Record<IconSizeKey, number> = {
+  xs: moderateScale(12),
   sm: moderateScale(18),
   md: moderateScale(24),
   big: moderateScale(35),

@@ -1,8 +1,8 @@
 import React, { useMemo } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
-import AppText from "../common/AppText";
-import { ICONS } from "../icons/icons";
-import { COLORS, FONT_SIZES, ICON_SIZES, SPACING } from "../../theme";
+import AppText from "../../common/AppText";
+import { ICONS } from "../../icons/icons";
+import { COLORS, FONT_SIZES, ICON_SIZES, SPACING } from "../../../theme";
 
 const DEFAULT_ICON_OPTIONS = [
   "work",
@@ -51,10 +51,7 @@ export default function SubcategoryIconPicker({
       {label ? <AppText style={styles.label}>{label}</AppText> : null}
       <View style={styles.grid}>
         {allowNone && (
-          <TouchableOpacity
-            style={[styles.iconOption, !value && styles.iconSelected]}
-            onPress={() => onChange(null)}
-          >
+          <TouchableOpacity style={[styles.iconOption, !value && styles.iconSelected]} onPress={() => onChange(null)}>
             <AppText style={styles.iconNoneText}>None</AppText>
           </TouchableOpacity>
         )}

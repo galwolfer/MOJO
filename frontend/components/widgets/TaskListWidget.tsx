@@ -242,7 +242,7 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({
               categoryDisplay={getCategoryDisplay(task.category, task.categoryDisplay)}
               subcategory={task.subcategory}
               subcategoryDisplay={task.subcategoryDisplay}
-              subCategory={task.subCategory}
+              subCategory={(task as any).subCategory || null}
               importance={task.importance}
               effort={task.effort}
             />

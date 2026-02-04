@@ -6,10 +6,12 @@ import Input from "../../components/inputs/Input";
 import Box from "../../components/layout/Box";
 import ScrollableContent from "../../components/layout/ScrollableContent";
 import ErrorText from "../../components/common/ErrorText";
-import SubcategoryIconPicker from "../../components/subcategories/SubcategoryIconPicker";
-import SubcategoryColorPicker from "../../components/subcategories/SubcategoryColorPicker";
+import SubcategoryIconPicker from "../../components/special/subcategories/SubcategoryIconPicker";
+import SubcategoryColorPicker from "../../components/special/subcategories/SubcategoryColorPicker";
 import { ICONS } from "../../components/icons/icons";
 import { COLORS, SPACING, SHADOWS, ICON_SIZES, FONT_SIZES } from "../../theme";
+import AddSubcategoryPopup from "../../components/special/subcategories/AddSubcategoryPopup";
+import FloatingButton from "../../components/common/FloatingButton";
 import { CATEGORY_KEYS, getCategoryMeta, type CategoryKey } from "../../config/categoryMeta";
 import { useNavigation } from "../../context/NavigationContext";
 import { useAuth } from "../../context/AuthContext";
@@ -86,11 +88,6 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
     Array<{ name: string; category: CategoryKey; icon?: string | null; color?: string | null }>
   >([]);
 
-  const [newName, setNewName] = useState("");
-  const [newParent, setNewParent] = useState<CategoryKey>(CATEGORY_KEYS[0] || "uncategorized");
-  const [newIcon, setNewIcon] = useState<string | null>(null);
-  const [newColor, setNewColor] = useState<string | null>(null);
-
   const [editingSubcategory, setEditingSubcategory] = useState<Subcategory | null>(null);
   const [editName, setEditName] = useState("");
   const [editIcon, setEditIcon] = useState<string | null>(null);
@@ -140,6 +137,53 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
     });
   }, [setHeaderConfig, ListIcon, LeftIcon]);
 
+  // Add Subcategory popup state
+  const [showAddPopup, setShowAddPopup] = useState(false);
+
+  const openAddPopup = () => setShowAddPopup(true);
+  const closeAddPopup = () => setShowAddPopup(false);
+
+  // Category options used by the popup
+  const simpleCategoryOptions = useMemo(
+    () =>
+      CATEGORY_KEYS.map((key) => {
+        const m = getCategoryMeta(key);
+        return { value: key as CategoryKey, label: m.displayName || key };
+      }),
+    [],
+  );
+
+  // Handler to create a staged subcategory from the popup
+  const createFromPopup = (payload: {
+    name: string;
+    category: CategoryKey;
+    icon?: string | null;
+    color?: string | null;
+  }) => {
+    const trimmed = payload.name.trim();
+    if (!trimmed) return;
+    const resolvedColor = payload.color || getAutoColor(trimmed);
+
+    setPendingCreates((prev) => [
+      ...prev,
+      { name: trimmed, category: payload.category, icon: payload.icon, color: resolvedColor },
+    ]);
+
+    const tempId = `temp_${Date.now()}_${Math.random()}`;
+    const tempSubcategory: Subcategory = {
+      id: tempId,
+      name: trimmed,
+      parent: payload.category,
+      icon: payload.icon || undefined,
+      color: resolvedColor,
+    };
+
+    setSubcategoriesByCategory((prev) => {
+      const existing = prev[payload.category] || [];
+      return updateCategoryMap(prev, payload.category, [...existing, tempSubcategory]);
+    });
+  };
+
   const loadSubcategories = async () => {
     try {
       setLoading(true);
@@ -164,56 +208,6 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
     }
     loadSubcategories();
   }, [authLoading, token]);
-
-  const handleDiscardNew = () => {
-    setNewName("");
-    setNewIcon(null);
-    setNewColor(null);
-  };
-
-  const handleStageCreate = () => {
-    const trimmed = normalizeName(newName);
-    if (!trimmed) {
-      Alert.alert("Validation Error", "Please enter a subcategory name.");
-      return;
-    }
-
-    // Disallow creating reserved 'General' subcategory
-    if (trimmed.toLowerCase() === "general") {
-      Alert.alert("Validation Error", "'General' is reserved and cannot be created.");
-      return;
-    }
-
-    const resolvedColor = newColor || getAutoColor(trimmed);
-    setPendingCreates((prev) => [
-      ...prev,
-      {
-        name: trimmed,
-        category: newParent,
-        icon: newIcon,
-        color: resolvedColor,
-      },
-    ]);
-
-    // Add temporary subcategory to UI
-    const tempId = `temp_${Date.now()}_${Math.random()}`;
-    const tempSubcategory: Subcategory = {
-      id: tempId,
-      name: trimmed,
-      parent: newParent,
-      icon: newIcon || undefined,
-      color: resolvedColor,
-    };
-
-    setSubcategoriesByCategory((prev) => {
-      const existing = prev[newParent] || [];
-      return updateCategoryMap(prev, newParent, [...existing, tempSubcategory]);
-    });
-
-    setNewName("");
-    setNewIcon(null);
-    setNewColor(null);
-  };
 
   const handleEdit = (subcategory: Subcategory) => {
     setEditingSubcategory(subcategory);
@@ -375,160 +369,136 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
   }
 
   return (
-    <ScrollableContent
-      respectHeader={true}
-      respectNavBar={true}
-      extraTopPadding={SPACING.lg}
-      scrollKey="subcategory-manager"
-      contentContainerStyle={styles.contentContainer}
-      extraBottomPadding={SPACING.xlg * 3}
-    >
-      {error && (
-        <View style={styles.errorBlock}>
-          <ErrorText>{error}</ErrorText>
-          <AppButton title="Retry" onPress={loadSubcategories} mode="light" color="lightGray" />
-        </View>
-      )}
-
-      {hasPendingChanges && (
-        <Box title="Pending Changes" titleColor={COLORS.primary6}>
-          <AppText style={styles.pendingText}>You have unsaved changes. Click "Save All" to apply them.</AppText>
-          <View style={styles.buttonRow}>
-            <AppButton title="Discard All" onPress={handleDiscardAll} mode="light" color="lightGray" icon="cancel" />
-            <AppButton
-              title="Save All"
-              onPress={handleSaveAll}
-              mode="filled"
-              color="primary5"
-              icon="check"
-              disabled={saving}
-            />
+    <>
+      <ScrollableContent
+        respectHeader={true}
+        respectNavBar={true}
+        extraTopPadding={SPACING.lg}
+        scrollKey="subcategory-manager"
+        contentContainerStyle={styles.contentContainer}
+        extraBottomPadding={SPACING.xlg * 3}
+      >
+        {error && (
+          <View style={styles.errorBlock}>
+            <ErrorText>{error}</ErrorText>
+            <AppButton title="Retry" onPress={loadSubcategories} mode="light" color="lightGray" />
           </View>
-        </Box>
-      )}
+        )}
 
-      <Box title="Add Subcategory" titleColor={COLORS.primary1}>
-        <View style={styles.formField}>
-          <AppText style={styles.label}>Sub name</AppText>
-          <Input placeholder="Subcategory name" value={newName} onChangeText={setNewName} type="text" />
-        </View>
-
-        <View style={styles.formField}>
-          <AppText style={styles.label}>Parent category</AppText>
-          <Input
-            placeholder="Select parent category"
-            value={newParent}
-            options={categoryOptions}
-            onSelect={(values) => {
-              const next = values[0] as CategoryKey | undefined;
-              if (next) setNewParent(next);
-            }}
-          />
-        </View>
-
-        <View style={styles.formField}>
-          <SubcategoryIconPicker label="Choose an icon" value={newIcon} onChange={setNewIcon} />
-        </View>
-
-        <View style={styles.formField}>
-          <SubcategoryColorPicker label="Choose a color" value={newColor} onChange={setNewColor} />
-        </View>
-
-        <View style={styles.buttonRow}>
-          <AppButton title="Discard" onPress={handleDiscardNew} mode="light" color="lightGray" icon="cancel" />
-          <AppButton
-            title="Add"
-            onPress={handleStageCreate}
-            mode="filled"
-            color="primary5"
-            icon="check"
-            disabled={saving}
-          />
-        </View>
-      </Box>
-
-      {categoriesWithSubs.length === 0 ? (
-        <Box title="Your Subcategories" titleColor={COLORS.primary1}>
-          <AppText style={styles.emptyText}>No subcategories yet.</AppText>
-        </Box>
-      ) : (
-        categoriesWithSubs.map((categoryKey) => {
-          const meta = getCategoryMeta(categoryKey);
-          const subs = filteredSubcategoriesByCategory[categoryKey] || [];
-          return (
-            <Box key={categoryKey} title={meta.displayName || categoryKey} titleColor={COLORS.primary1}>
-              {subs.map((subcategory) => {
-                const isDefault = subcategory.source === "category-default" || subcategory.name === "General";
-                const Icon = isDefault
-                  ? ICONS[meta.icon] || DefaultIcon
-                  : subcategory.icon && ICONS[subcategory.icon]
-                    ? ICONS[subcategory.icon]
-                    : DefaultIcon;
-                const displayColor = subcategory.color || getAutoColor(subcategory.name || "");
-                return (
-                  <View key={subcategory.id} style={styles.subcategoryRow}>
-                    <View style={styles.subcategoryInfo}>
-                      <View style={[styles.subcategoryIcon, { backgroundColor: displayColor }]}>
-                        <Icon size={20} color={COLORS.white} />
-                      </View>
-                      <View style={styles.subcategoryNameContainer}>
-                        <AppText style={styles.subcategoryName}>{subcategory.name}</AppText>
-                        {isDefault && <AppText style={styles.defaultBadge}>Default</AppText>}
-                      </View>
-                    </View>
-                    <View style={styles.subcategoryActions}>
-                      {!isDefault && (
-                        <>
-                          <TouchableOpacity onPress={() => handleEdit(subcategory)} style={styles.actionButton}>
-                            <EditIcon size={18} color={COLORS.primary2} />
-                          </TouchableOpacity>
-                          <TouchableOpacity onPress={() => handleStageDelete(subcategory)} style={styles.actionButton}>
-                            <TrashIcon size={18} color={COLORS.primary6} />
-                          </TouchableOpacity>
-                        </>
-                      )}
-                    </View>
-                  </View>
-                );
-              })}
-            </Box>
-          );
-        })
-      )}
-
-      <Modal visible={isEditModalVisible} transparent animationType="fade" onRequestClose={handleDiscardEdit}>
-        <Pressable style={styles.modalOverlay} onPress={handleDiscardEdit}>
-          <Pressable onPress={(e) => e.stopPropagation()}>
-            <View style={styles.modalContent}>
-              <AppText variant="title3" style={styles.modalTitle}>
-                Edit Subcategory
-              </AppText>
-              <View style={styles.formField}>
-                <AppText style={styles.label}>Sub name</AppText>
-                <Input placeholder="Subcategory name" value={editName} onChangeText={setEditName} type="text" />
-              </View>
-              <View style={styles.formField}>
-                <SubcategoryIconPicker label="Choose an icon" value={editIcon} onChange={setEditIcon} />
-              </View>
-              <View style={styles.formField}>
-                <SubcategoryColorPicker label="Choose a color" value={editColor} onChange={setEditColor} />
-              </View>
-              <View style={styles.buttonRow}>
-                <AppButton title="Discard" onPress={handleDiscardEdit} mode="light" color="lightGray" icon="cancel" />
-                <AppButton
-                  title="Save"
-                  onPress={handleStageEdit}
-                  mode="filled"
-                  color="primary5"
-                  icon="check"
-                  disabled={saving}
-                />
-              </View>
+        {hasPendingChanges && (
+          <Box title="Pending Changes" titleColor={COLORS.primary6}>
+            <AppText style={styles.pendingText}>You have unsaved changes. Click "Save All" to apply them.</AppText>
+            <View style={styles.buttonRow}>
+              <AppButton title="Discard All" onPress={handleDiscardAll} mode="light" color="lightGray" icon="cancel" />
+              <AppButton
+                title="Save All"
+                onPress={handleSaveAll}
+                mode="filled"
+                color="primary5"
+                icon="check"
+                disabled={saving}
+              />
             </View>
+          </Box>
+        )}
+
+        {/* Global add popup (opens from header + can be used elsewhere) */}
+        <AddSubcategoryPopup
+          visible={showAddPopup}
+          onClose={closeAddPopup}
+          onCreate={createFromPopup}
+          categoryOptions={simpleCategoryOptions}
+        />
+
+        {categoriesWithSubs.length === 0 ? (
+          <Box title="Your Subcategories" titleColor={COLORS.primary1}>
+            <AppText style={styles.emptyText}>No subcategories yet.</AppText>
+          </Box>
+        ) : (
+          categoriesWithSubs.map((categoryKey) => {
+            const meta = getCategoryMeta(categoryKey);
+            const subs = filteredSubcategoriesByCategory[categoryKey] || [];
+            return (
+              <Box key={categoryKey} title={meta.displayName || categoryKey} titleColor={COLORS.primary1}>
+                {subs.map((subcategory) => {
+                  const isDefault = subcategory.source === "category-default" || subcategory.name === "General";
+                  const Icon = isDefault
+                    ? ICONS[meta.icon] || DefaultIcon
+                    : subcategory.icon && ICONS[subcategory.icon]
+                      ? ICONS[subcategory.icon]
+                      : DefaultIcon;
+                  const displayColor = subcategory.color || getAutoColor(subcategory.name || "");
+                  return (
+                    <View key={subcategory.id} style={styles.subcategoryRow}>
+                      <View style={styles.subcategoryInfo}>
+                        <View style={[styles.subcategoryIcon, { backgroundColor: displayColor }]}>
+                          <Icon size={20} color={COLORS.white} />
+                        </View>
+                        <View style={styles.subcategoryNameContainer}>
+                          <AppText style={styles.subcategoryName}>{subcategory.name}</AppText>
+                          {isDefault && <AppText style={styles.defaultBadge}>Default</AppText>}
+                        </View>
+                      </View>
+                      <View style={styles.subcategoryActions}>
+                        {!isDefault && (
+                          <>
+                            <TouchableOpacity onPress={() => handleEdit(subcategory)} style={styles.actionButton}>
+                              <EditIcon size={18} color={COLORS.primary2} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={() => handleStageDelete(subcategory)}
+                              style={styles.actionButton}
+                            >
+                              <TrashIcon size={18} color={COLORS.primary6} />
+                            </TouchableOpacity>
+                          </>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })}
+              </Box>
+            );
+          })
+        )}
+
+        <Modal visible={isEditModalVisible} transparent animationType="fade" onRequestClose={handleDiscardEdit}>
+          <Pressable style={styles.modalOverlay} onPress={handleDiscardEdit}>
+            <Pressable onPress={(e) => e.stopPropagation()}>
+              <View style={styles.modalContent}>
+                <AppText variant="title3" style={styles.modalTitle}>
+                  Edit Subcategory
+                </AppText>
+                <View style={styles.formField}>
+                  <AppText style={styles.label}>Sub name</AppText>
+                  <Input placeholder="Subcategory name" value={editName} onChangeText={setEditName} type="text" />
+                </View>
+                <View style={styles.formField}>
+                  <SubcategoryIconPicker label="Choose an icon" value={editIcon} onChange={setEditIcon} />
+                </View>
+                <View style={styles.formField}>
+                  <SubcategoryColorPicker label="Choose a color" value={editColor} onChange={setEditColor} />
+                </View>
+                <View style={styles.buttonRow}>
+                  <AppButton title="Discard" onPress={handleDiscardEdit} mode="light" color="lightGray" icon="cancel" />
+                  <AppButton
+                    title="Save"
+                    onPress={handleStageEdit}
+                    mode="filled"
+                    color="primary5"
+                    icon="check"
+                    disabled={saving}
+                  />
+                </View>
+              </View>
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
-    </ScrollableContent>
+        </Modal>
+      </ScrollableContent>
+
+      {/* Floating Add Subcategory button (replaces header + icon) */}
+      <FloatingButton onPress={openAddPopup} text="Add Subcategory" Icon={ICONS.plus} />
+    </>
   );
 }
 
@@ -584,7 +554,7 @@ const styles = StyleSheet.create({
     color: COLORS.black,
   },
   defaultBadge: {
-    fontSize: FONT_SIZES.xs,
+    fontSize: FONT_SIZES.sm,
     color: COLORS.white,
     backgroundColor: COLORS.primary3,
     paddingHorizontal: 6,
