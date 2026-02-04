@@ -1,20 +1,20 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { View, StyleSheet, TouchableOpacity, Modal, Pressable, Alert, ActivityIndicator } from "react-native";
-import AppText from "../../components/common/AppText";
-import AppButton from "../../components/common/AppButton";
-import Input from "../../components/inputs/Input";
-import Box from "../../components/layout/Box";
-import ScrollableContent from "../../components/layout/ScrollableContent";
-import ErrorText from "../../components/common/ErrorText";
-import SubcategoryIconPicker from "../../components/special/subcategories/SubcategoryIconPicker";
-import SubcategoryColorPicker from "../../components/special/subcategories/SubcategoryColorPicker";
-import { ICONS } from "../../components/icons/icons";
-import { COLORS, SPACING, SHADOWS, ICON_SIZES, FONT_SIZES } from "../../theme";
-import AddSubcategoryPopup from "../../components/special/subcategories/AddSubcategoryPopup";
-import FloatingButton from "../../components/common/FloatingButton";
-import { CATEGORY_KEYS, getCategoryMeta, type CategoryKey } from "../../config/categoryMeta";
-import { useNavigation } from "../../context/NavigationContext";
-import { useAuth } from "../../context/AuthContext";
+import AppText from "../../../components/common/AppText";
+import AppButton from "../../../components/common/AppButton";
+import Input from "../../../components/inputs/Input";
+import Box from "../../../components/layout/Box";
+import ScrollableContent from "../../../components/layout/ScrollableContent";
+import ErrorText from "../../../components/common/ErrorText";
+import SubcategoryIconPicker from "../../../components/special/IconPicker";
+import SubcategoryColorPicker from "../../../components/special/ColorPicker";
+import { ICONS } from "../../../components/icons/icons";
+import { COLORS, SPACING, SHADOWS, ICON_SIZES, FONT_SIZES } from "../../../theme";
+import AddSubcategoryPopup from "./components/AddSubcategoryPopup";
+import FloatingButton from "../../../components/common/FloatingButton";
+import { CATEGORY_KEYS, getCategoryMeta, type CategoryKey } from "../../../config/categoryMeta";
+import { useNavigation } from "../../../context/NavigationContext";
+import { useAuth } from "../../../context/AuthContext";
 import {
   fetchAllSubcategories,
   createSubcategory,
@@ -22,8 +22,8 @@ import {
   deleteSubcategory,
   type Subcategory,
   type SubcategoriesByCategory,
-} from "../../services/subcategoryService";
-import { setAuthToken } from "../../services/httpClient";
+} from "../../../services/subcategoryService";
+import { setAuthToken } from "../../../services/httpClient";
 import { moderateScale } from "react-native-size-matters";
 
 const PRIMARY_COLORS = [

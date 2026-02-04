@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
-import AppText from "../../common/AppText";
-import { COLORS, FONT_SIZES, SPACING } from "../../../theme";
+import AppText from "../common/AppText";
+import { COLORS, FONT_SIZES, SPACING } from "../../theme";
 
 const DEFAULT_PRIMARY_COLORS = [
   COLORS.primary1,

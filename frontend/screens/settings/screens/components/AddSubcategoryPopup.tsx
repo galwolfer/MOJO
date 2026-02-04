@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 import { View, Modal, Pressable, StyleSheet, Alert } from "react-native";
-import AppText from "../../common/AppText";
-import AppButton from "../../common/AppButton";
-import Input from "../../inputs/Input";
-import CategoryPicker from "../CategoryPicker";
-import SubcategoryIconPicker from "./SubcategoryIconPicker";
-import SubcategoryColorPicker from "./SubcategoryColorPicker";
-import { COLORS, SPACING } from "../../../theme";
-import PopupBox from "../../common/PopupBox";
-import { type CategoryKey } from "../../../config/categoryMeta";
+import AppText from "../../../../components/common/AppText";
+import AppButton from "../../../../components/common/AppButton";
+import Input from "../../../../components/inputs/Input";
+import CategoryPicker from "../../../../components/special/CategoryPicker";
+import SubcategoryIconPicker from "../../../../components/special/IconPicker";
+import SubcategoryColorPicker from "../../../../components/special/ColorPicker";
+import { COLORS, SPACING } from "../../../../theme";
+import PopupBox from "../../../../components/common/PopupBox";
+import { type CategoryKey } from "../../../../config/categoryMeta";
 
 interface CategoryOption {
   value: CategoryKey;

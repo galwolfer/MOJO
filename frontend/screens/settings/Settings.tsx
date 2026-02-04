@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { View, StyleSheet, TouchableOpacity, Alert, Platform } from "react-native";
 import AppText from "../../components/common/AppText";
 import AppButton from "../../components/common/AppButton";
-import ProfileSettings from "./ProfileSettings";
+import ProfileSettings from "./screens/ProfileSettings";
 import { COLORS, SPACING, SHADOWS, ICON_SIZES } from "../../theme";
 import { useNavigation } from "../../context/NavigationContext";
 import { ICONS } from "../../components/icons/icons";
