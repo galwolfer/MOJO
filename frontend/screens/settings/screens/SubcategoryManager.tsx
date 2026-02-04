@@ -375,7 +375,6 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
         respectNavBar={true}
         extraTopPadding={SPACING.lg}
         scrollKey="subcategory-manager"
-        contentContainerStyle={styles.contentContainer}
         extraBottomPadding={SPACING.xlg * 3}
       >
         {error && (
@@ -474,7 +473,12 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
                   <Input placeholder="Subcategory name" value={editName} onChangeText={setEditName} type="text" />
                 </View>
                 <View style={styles.formField}>
-                  <SubcategoryIconPicker label="Choose an icon" value={editIcon} onChange={setEditIcon} />
+                  <SubcategoryIconPicker
+                    label="Choose an icon"
+                    value={editIcon}
+                    onChange={setEditIcon}
+                    selectedColor={editColor}
+                  />
                 </View>
                 <View style={styles.formField}>
                   <SubcategoryColorPicker label="Choose a color" value={editColor} onChange={setEditColor} />

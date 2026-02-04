@@ -1,5 +1,5 @@
 import React from "react";
-import { Modal, Pressable, StyleSheet, View } from "react-native";
+import { Modal, Pressable, StyleSheet, View, ScrollView } from "react-native";
 import Box from "../layout/Box";
 import { SPACING, COLORS } from "../../theme";
 
@@ -12,14 +12,20 @@ interface PopupBoxProps {
   contentStyle?: object;
 }
 
-export default function PopupBox({ visible, onClose, title, titleColor, children, contentStyle }: PopupBoxProps) {
+export default function PopupBox({ visible, onClose, title, titleColor, children }: PopupBoxProps) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable onPress={(e) => e.stopPropagation()}>
-          <Box title={title} titleColor={titleColor || COLORS.primary1} style={contentStyle}>
-            <View>{children}</View>
-          </Box>
+        <Pressable onPress={(e) => e.stopPropagation()} style={styles.boxContainer}>
+          <View style={styles.boxWrapper}>
+            <Box title={title} titleColor={titleColor || COLORS.primary1}>
+              <View style={styles.scrollWrapper}>
+                <ScrollView showsVerticalScrollIndicator={true} nestedScrollEnabled={true} style={styles.scrollView}>
+                  {children}
+                </ScrollView>
+              </View>
+            </Box>
+          </View>
         </Pressable>
       </Pressable>
     </Modal>
@@ -33,5 +39,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: SPACING.lg,
+  },
+  boxContainer: {
+    maxHeight: "80%",
+  },
+  boxWrapper: {
+    maxHeight: "100%",
+  },
+  scrollWrapper: {
+    maxHeight: 500,
+  },
+  scrollView: {
+    flexGrow: 0,
   },
 });

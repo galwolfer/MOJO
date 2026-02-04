@@ -9,6 +9,7 @@ import SubcategoryColorPicker from "../../../../components/special/ColorPicker";
 import { COLORS, SPACING } from "../../../../theme";
 import PopupBox from "../../../../components/common/PopupBox";
 import { type CategoryKey } from "../../../../config/categoryMeta";
+import { BoxContainer } from "../../../../components";
 
 interface CategoryOption {
   value: CategoryKey;
@@ -54,9 +55,8 @@ export default function AddSubcategoryPopup({ visible, onClose, onCreate, catego
       <Input label="Subcategory name" placeholder="Subcategory name" value={name} onChangeText={setName} type="text" />
 
       <CategoryPicker value={category} onChange={(v: CategoryKey) => setCategory(v)} />
-
-      <SubcategoryIconPicker label="Choose an icon" value={icon} onChange={setIcon} />
       <SubcategoryColorPicker label="Choose a color" value={color} onChange={setColor} />
+      <SubcategoryIconPicker label="Choose an icon" value={icon} onChange={setIcon} selectedColor={color} />
 
       <View style={styles.buttonRow}>
         <AppButton title="Cancel" onPress={onClose} mode="light" color="lightGray" />
@@ -68,6 +68,8 @@ export default function AddSubcategoryPopup({ visible, onClose, onCreate, catego
 
 const styles = StyleSheet.create({
   buttonRow: {
+    marginTop: SPACING.md,
+    marginBottom: SPACING.xlg,
     flexDirection: "row",
     justifyContent: "center",
     gap: SPACING.md,
