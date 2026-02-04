@@ -1,6 +1,8 @@
 import React, { useMemo, useState, useCallback } from "react";
 import { StyleSheet, TouchableOpacity, View, ScrollView } from "react-native";
 import AppText from "../common/AppText";
+import FilterChips from "../common/FilterChips";
+import { DEMO_FILTERS } from "../../config/iconFilters";
 import { ICONS, ICON_NAMES } from "../icons/icons";
 import { COLORS, FONT_SIZES, ICON_SIZES, SPACING } from "../../theme";
 
@@ -22,66 +24,6 @@ export default function SubcategoryIconPicker({
   selectedColor = null,
 }: SubcategoryIconPickerProps) {
   const [selectedFilter, setSelectedFilter] = useState<string>("All");
-
-  // Compact filters (All + 3 concise categories) covering all available icons
-  const DEMO_FILTERS: Record<string, string[] | undefined> = {
-    All: undefined,
-    Essentials: [
-      "bag",
-      "calendar",
-      "check",
-      "clock",
-      "list",
-      "send",
-      "settings",
-      "shoppingCart",
-      "plus",
-      "edit",
-      "repeat",
-      "trash",
-      "split",
-      "right",
-      "left",
-      "up",
-      "down",
-      "user",
-      "notifications",
-      "other",
-      "prefrences",
-      "study",
-      "goals",
-      "skills",
-      "medal",
-      "trophy",
-      "highEffort",
-      "lowEffort",
-      "highPriority",
-      "mediumPiority",
-      "mediumImportant",
-      "lowImportant",
-      "cancel",
-    ],
-    Wellness: ["health", "mindfulness", "workout", "heart", "flame"],
-    Creative: [
-      "creative",
-      "hobbies",
-      "puzzle",
-      "explore",
-      "burger",
-      "move",
-      "reflection",
-      "mojo",
-      "ojo",
-      "friends",
-      "family",
-      "mentorjo",
-      "bestojo",
-      "brojo",
-      "strictojo",
-      "random",
-      "default",
-    ],
-  };
 
   const availableIcons = useMemo(() => {
     // If options provided, use them; otherwise default to full ICON_NAMES registry
@@ -130,31 +72,18 @@ export default function SubcategoryIconPicker({
         </AppText>
       ) : null}
       {/* Filter chips (demo) */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
+      <FilterChips
+        filters={Object.keys(DEMO_FILTERS)}
+        selected={selectedFilter}
+        onChange={(f) => {
+          setSelectedFilter(f);
+          // if current value is not in new list, clear it so selection stays consistent
+          if (value && f !== "All" && !(DEMO_FILTERS[f] || []).includes(value)) {
+            onChange(null);
+          }
+        }}
         style={styles.filterScroll}
-        contentContainerStyle={{ gap: SPACING.sm }}
-      >
-        {Object.keys(DEMO_FILTERS).map((f) => {
-          const isActive = selectedFilter === f;
-          return (
-            <TouchableOpacity
-              key={f}
-              style={[styles.filterChip, isActive && styles.filterChipActive]}
-              onPress={() => {
-                setSelectedFilter(f);
-                // if current value is not in new list, clear it so selection stays consistent
-                if (value && f !== "All" && !(DEMO_FILTERS[f] || []).includes(value)) {
-                  onChange(null);
-                }
-              }}
-            >
-              <AppText style={{ color: isActive ? COLORS.white : COLORS.darkGray }}>{f}</AppText>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      />
 
       <View style={styles.grid} onLayout={onGridLayout}>
         {allowNone && (
