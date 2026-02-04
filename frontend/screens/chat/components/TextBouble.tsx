@@ -145,8 +145,9 @@ function cloneChildrenWithTyping(node: React.ReactNode, typedChars: number): Rea
 
   if (typeof node === "string" || typeof node === "number") {
     const str = String(node);
-    if (typedChars <= 0) return "";
-    return str.slice(0, Math.min(str.length, typedChars));
+    if (typedChars <= 0) return null;
+    const content = str.slice(0, Math.min(str.length, typedChars));
+    return <Text key={Math.random().toString(36).slice(2, 9)}>{content}</Text>;
   }
 
   if (Array.isArray(node)) {

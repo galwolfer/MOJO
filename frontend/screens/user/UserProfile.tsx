@@ -23,7 +23,13 @@ import { StatBadge, ProgressGraph } from "./components";
 import FriendsList from "./components/FriendsList";
 import { moderateScale } from "react-native-size-matters";
 import { getUserStats } from "../../services/userService";
-import { getTasks, getScheduledTasksByDay, calculateTaskProgress, type Task, type TaskProgress } from "../../services/taskService";
+import {
+  getTasks,
+  getScheduledTasksByDay,
+  calculateTaskProgress,
+  type Task,
+  type TaskProgress,
+} from "../../services/taskService";
 import UserAvatar from "../../components/common/UserAvatar";
 import {
   SettingsScreen,
@@ -168,13 +174,11 @@ export default function UserProfileScreen() {
 
   const fetchAllData = useCallback(async () => {
     if (!mountedRef.current) return null;
-    console.log("[UserProfile] fetchAllData called");
     try {
       // Fetch tasks (stats are now managed by StatsContext)
       const taskList = await getTasks();
-      console.log("[UserProfile] Got tasks:", taskList.length);
       if (!mountedRef.current) return null;
-      
+
       // Only update tasks state if we got valid data
       if (taskList && taskList.length >= 0) {
         setTasksState(taskList);
@@ -183,10 +187,7 @@ export default function UserProfileScreen() {
       // Also fetch scheduled tasks for today (and next days) so progress can prefer scheduled units
       try {
         const sched = await getScheduledTasksByDay(7);
-        console.log("[UserProfile] Got scheduled tasks:", {
-          hasSched: !!sched,
-          todayTaskCount: sched?.today?.tasks?.length || 0,
-        });
+
         if (sched && sched.today && sched.today.tasks) {
           const scheduledTaskIds = new Set<string>();
           const scheduledSubtaskKeys = new Set<string>();
@@ -202,36 +203,29 @@ export default function UserProfileScreen() {
             }
           }
 
-          console.log("[UserProfile] Scheduled info:", { 
-            taskIds: scheduledTaskIds.size, 
-            subtaskKeys: scheduledSubtaskKeys.size 
+          const progress = calculateTaskProgress(taskList, 14, {
+            taskIds: scheduledTaskIds,
+            subtaskKeys: scheduledSubtaskKeys,
           });
-          const progress = calculateTaskProgress(taskList, 14, { taskIds: scheduledTaskIds, subtaskKeys: scheduledSubtaskKeys });
-          console.log("[UserProfile] Progress calculated:", {
-            todayTotal: progress.today.total,
-            todayCompleted: progress.today.completed,
-            dailyProgressSum: progress.dailyProgress.reduce((a, b) => a + b, 0),
-          });
+
           setTaskProgress(progress);
           // Only update progressData if we have meaningful data or if user has tasks
           // This prevents UI from flashing zeros during refresh
-          if (taskList.length > 0 || progress.dailyProgress.some(p => p > 0)) {
+          if (taskList.length > 0 || progress.dailyProgress.some((p) => p > 0)) {
             setProgressData(progress.dailyProgress);
           }
         } else {
-          console.log("[UserProfile] No scheduled tasks for today, using fallback");
           const progress = calculateTaskProgress(taskList, 14);
           setTaskProgress(progress);
-          if (taskList.length > 0 || progress.dailyProgress.some(p => p > 0)) {
+          if (taskList.length > 0 || progress.dailyProgress.some((p) => p > 0)) {
             setProgressData(progress.dailyProgress);
           }
         }
       } catch (err) {
         // If scheduled fetch fails, fallback to normal progress calc
-        console.log("[UserProfile] Scheduled fetch failed, using fallback");
         const progress = calculateTaskProgress(taskList, 14);
         setTaskProgress(progress);
-        if (taskList.length > 0 || progress.dailyProgress.some(p => p > 0)) {
+        if (taskList.length > 0 || progress.dailyProgress.some((p) => p > 0)) {
           setProgressData(progress.dailyProgress);
         }
       }
@@ -269,10 +263,13 @@ export default function UserProfileScreen() {
           }
 
           // Recalculate progress with scheduled info using the freshly fetched task list
-          const progress = calculateTaskProgress(taskList, 14, { taskIds: scheduledTaskIds, subtaskKeys: scheduledSubtaskKeys });
+          const progress = calculateTaskProgress(taskList, 14, {
+            taskIds: scheduledTaskIds,
+            subtaskKeys: scheduledSubtaskKeys,
+          });
           setTaskProgress(progress);
           // Only update if meaningful data
-          if (taskList.length > 0 || progress.dailyProgress.some(p => p > 0)) {
+          if (taskList.length > 0 || progress.dailyProgress.some((p) => p > 0)) {
             setProgressData(progress.dailyProgress);
           }
         }
@@ -347,11 +344,7 @@ export default function UserProfileScreen() {
 
   // If on Notification Settings screen, render NotificationSettingsScreen
   if (currentScreen === "notification-settings") {
-    return (
-      <NotificationSettingsScreen
-        onBack={() => setCurrentScreen("settings")}
-      />
-    );
+    return <NotificationSettingsScreen onBack={() => setCurrentScreen("settings")} />;
   }
 
   if (currentScreen === "subcategory-manager") {

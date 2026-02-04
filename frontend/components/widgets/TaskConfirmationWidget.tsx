@@ -202,7 +202,7 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
                             style={{ color: getCategoryMeta(task.category)?.color || COLORS.primary1 }}
                           >
                             {formatDuration(subtask.duration || subtask.minutes || 0)}
-                          </AppText>{" "}
+                          </AppText>
                           <ICONS.clock
                             size={ICON_SIZES.sm / 2}
                             color={getCategoryMeta(task.category)?.color || COLORS.primary1}
