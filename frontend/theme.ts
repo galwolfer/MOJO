@@ -74,8 +74,8 @@ export const FONT_SIZES = {
 export type IconSizeKey = "xs" | "sm" | "md" | "big";
 
 export const ICON_SIZES: Record<IconSizeKey, number> = {
-  xs: moderateScale(12),
-  sm: moderateScale(18),
+  xs: moderateScale(14),
+  sm: moderateScale(20),
   md: moderateScale(24),
   big: moderateScale(35),
 };
