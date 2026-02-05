@@ -6,6 +6,7 @@ import Input from "../../../components/inputs/Input";
 import Box from "../../../components/layout/Box";
 import ScrollableContent from "../../../components/layout/ScrollableContent";
 import ErrorText from "../../../components/common/ErrorText";
+import PopupBox from "../../../components/common/PopupBox";
 import SubcategoryIconPicker from "../../../components/special/IconPicker";
 import SubcategoryColorPicker from "../../../components/special/ColorPicker";
 import { ICONS } from "../../../components/icons/icons";
@@ -268,6 +269,8 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
     });
   };
 
+  const [saveResult, setSaveResult] = useState<{ title: string; message: string } | null>(null);
+
   const handleSaveAll = async () => {
     try {
       setSaving(true);
@@ -302,10 +305,10 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
       // Reload from server to get fresh data
       await loadSubcategories();
 
-      Alert.alert("Success", "All changes saved successfully!");
+      setSaveResult({ title: "Success", message: "All changes saved successfully!" });
     } catch (err: any) {
       console.error("Failed to save changes:", err);
-      Alert.alert("Error", err?.message || "Failed to save changes");
+      setSaveResult({ title: "Error", message: err?.message || "Failed to save changes" });
     } finally {
       setSaving(false);
     }
@@ -466,6 +469,17 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
             );
           })
         )}
+        <PopupBox
+          visible={!!saveResult}
+          onClose={() => setSaveResult(null)}
+          title={saveResult?.title}
+          titleColor={saveResult?.title === "Success" ? COLORS.primary1 : COLORS.primary6}
+        >
+          <AppText>{saveResult?.message}</AppText>
+          <View style={{ marginTop: SPACING.md }}>
+            <AppButton title="OK" onPress={() => setSaveResult(null)} />
+          </View>
+        </PopupBox>
       </ScrollableContent>
 
       {/* Floating Add Subcategory button (replaces header + icon) */}

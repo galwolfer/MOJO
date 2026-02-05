@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
-import { View, StyleSheet, TouchableOpacity, Alert, Platform } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Platform } from "react-native";
+import PopupBox from "../../components/common/PopupBox";
 import AppText from "../../components/common/AppText";
 import AppButton from "../../components/common/AppButton";
 import ErrorText from "../../components/common/ErrorText";
@@ -139,37 +140,17 @@ export default function SettingsScreen({
     }),
   ];
 
-  const handleDeleteAccount = async () => {
-    // Alert.alert doesn't work on web, use platform-specific approach
-    const confirmDelete =
-      Platform.OS === "web"
-        ? window.confirm(
-            "Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.",
-          )
-        : await new Promise<boolean>((resolve) => {
-            Alert.alert(
-              "Delete Account",
-              "Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.",
-              [
-                {
-                  text: "Cancel",
-                  onPress: () => resolve(false),
-                  style: "cancel",
-                },
-                {
-                  text: "Delete",
-                  onPress: () => resolve(true),
-                  style: "destructive",
-                },
-              ],
-            );
-          });
+  const [showDeletePopup, setShowDeletePopup] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
-    if (!confirmDelete) {
-      console.log("Delete cancelled");
-      return;
-    }
+  const handleDeleteAccount = () => {
+    setShowDeletePopup(true);
+  };
 
+  const confirmDeleteAccount = async () => {
+    setIsDeletingAccount(true);
+    setDeleteError(null);
     try {
       setIsSaving(true);
       setError(null);
@@ -180,8 +161,11 @@ export default function SettingsScreen({
       await signOut();
     } catch (err: any) {
       console.error("Error deleting account:", err);
-      setError(err?.message || "Failed to delete account");
+      setDeleteError(err?.message || "Failed to delete account");
+    } finally {
+      setIsDeletingAccount(false);
       setIsSaving(false);
+      setShowDeletePopup(false);
     }
   };
 
@@ -219,6 +203,30 @@ export default function SettingsScreen({
       </View>
 
       {error && <ErrorText>{error}</ErrorText>}
+
+      <PopupBox visible={showDeletePopup} onClose={() => setShowDeletePopup(false)} title="Delete Account">
+        <AppText>
+          Are you sure you want to delete your account? This action cannot be undone and all your data will be
+          permanently deleted.
+        </AppText>
+        <View style={{ flexDirection: "row", gap: SPACING.md, justifyContent: "center", marginTop: SPACING.md }}>
+          <AppButton title="Cancel" onPress={() => setShowDeletePopup(false)} color="primary6" />
+          <AppButton
+            title={isDeletingAccount ? "Deleting..." : "Delete"}
+            onPress={confirmDeleteAccount}
+            mode="light"
+            color="primary7"
+            disabled={isDeletingAccount}
+          />
+        </View>
+      </PopupBox>
+
+      <PopupBox visible={!!deleteError} onClose={() => setDeleteError(null)} title="Error" titleColor={COLORS.primary6}>
+        <ErrorText>{deleteError}</ErrorText>
+        <View style={{ marginTop: SPACING.md }}>
+          <AppButton title="Close" onPress={() => setDeleteError(null)} />
+        </View>
+      </PopupBox>
     </ScrollableContent>
   );
 }

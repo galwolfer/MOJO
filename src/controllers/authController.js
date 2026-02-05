@@ -409,7 +409,7 @@ export async function deleteAccount(req, res, next) {
     console.log(`📧 Deleting account for user: ${user.username} (${user.email})`);
 
     // Import all models
-    const { Task, Session, Memory, TaskSchedule, SubTask, BusyBlock, EventLog } = await import("../models/index.js");
+    const { Task, Session, Memory, TaskSchedule, SubTask, BusyBlock, EventLog, Subcategory } = await import("../models/index.js");
 
     // Delete all user data from all collections
     const deletionResults = await Promise.allSettled([
@@ -427,10 +427,12 @@ export async function deleteAccount(req, res, next) {
       BusyBlock?.deleteMany({ userId }),
       // Delete all event logs
       EventLog?.deleteMany({ userId }),
+      // Delete all user-created subcategories
+      Subcategory?.deleteMany({ userId }),
     ]);
 
     // Log deletion results
-    const collectionNames = ["Task", "SubTask", "TaskSchedule", "Session", "Memory", "BusyBlock", "EventLog"];
+    const collectionNames = ["Task", "SubTask", "TaskSchedule", "Session", "Memory", "BusyBlock", "EventLog", "Subcategory"];
     deletionResults.forEach((result, index) => {
       if (result.status === "fulfilled" && result.value) {
         console.log(`  ✅ Deleted ${result.value.deletedCount || 0} ${collectionNames[index]}(s)`);
