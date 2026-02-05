@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { View, StyleSheet, TouchableOpacity, Modal, Pressable, Alert, ActivityIndicator } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
 import AppText from "../../../components/common/AppText";
 import AppButton from "../../../components/common/AppButton";
 import Input from "../../../components/inputs/Input";
@@ -89,10 +89,7 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
   >([]);
 
   const [editingSubcategory, setEditingSubcategory] = useState<Subcategory | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editIcon, setEditIcon] = useState<string | null>(null);
-  const [editColor, setEditColor] = useState<string | null>(null);
-  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [showEditPopup, setShowEditPopup] = useState(false);
 
   const ListIcon = ICONS.list;
   const LeftIcon = ICONS.left;
@@ -211,41 +208,30 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
 
   const handleEdit = (subcategory: Subcategory) => {
     setEditingSubcategory(subcategory);
-    setEditName(subcategory.name || "");
-    setEditIcon(subcategory.icon || null);
-    setEditColor(subcategory.color || null);
-    setIsEditModalVisible(true);
+    setShowEditPopup(true);
   };
 
-  const handleDiscardEdit = () => {
+  const handleCloseEditPopup = () => {
     setEditingSubcategory(null);
-    setEditName("");
-    setEditIcon(null);
-    setEditColor(null);
-    setIsEditModalVisible(false);
+    setShowEditPopup(false);
   };
 
-  const handleStageEdit = () => {
+  const handleStageEdit = (payload: {
+    name: string;
+    category: CategoryKey;
+    icon?: string | null;
+    color?: string | null;
+  }) => {
     if (!editingSubcategory) return;
-    const trimmed = normalizeName(editName);
-    if (!trimmed) {
-      Alert.alert("Validation Error", "Please enter a subcategory name.");
-      return;
-    }
 
-    // Disallow renaming to the reserved 'General' subcategory
-    if (trimmed.toLowerCase() === "general") {
-      Alert.alert("Validation Error", "'General' is reserved and cannot be used.");
-      return;
-    }
-
-    const resolvedColor = editColor || getAutoColor(trimmed);
+    const trimmed = payload.name.trim();
+    const resolvedColor = payload.color || getAutoColor(trimmed);
 
     setPendingUpdates((prev) => {
       const next = new Map(prev);
       next.set(editingSubcategory.id, {
         name: trimmed,
-        icon: editIcon,
+        icon: payload.icon,
         color: resolvedColor,
       });
       return next;
@@ -256,12 +242,12 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
       const parent = editingSubcategory.parent;
       const list = prev[parent] || [];
       const next = list.map((item) =>
-        item.id === editingSubcategory.id ? { ...item, name: trimmed, icon: editIcon, color: resolvedColor } : item,
+        item.id === editingSubcategory.id ? { ...item, name: trimmed, icon: payload.icon, color: resolvedColor } : item,
       );
       return updateCategoryMap(prev, parent, next);
     });
 
-    handleDiscardEdit();
+    handleCloseEditPopup();
   };
 
   const handleStageDelete = (subcategory: Subcategory) => {
@@ -409,6 +395,25 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
           categoryOptions={simpleCategoryOptions}
         />
 
+        {/* Edit popup using the same component */}
+        <AddSubcategoryPopup
+          visible={showEditPopup}
+          onClose={handleCloseEditPopup}
+          onCreate={handleStageEdit}
+          categoryOptions={simpleCategoryOptions}
+          mode="edit"
+          initialData={
+            editingSubcategory
+              ? {
+                  name: editingSubcategory.name || "",
+                  category: editingSubcategory.parent,
+                  icon: editingSubcategory.icon || null,
+                  color: editingSubcategory.color || null,
+                }
+              : undefined
+          }
+        />
+
         {categoriesWithSubs.length === 0 ? (
           <Box title="Your Subcategories" titleColor={COLORS.primary1}>
             <AppText style={styles.emptyText}>No subcategories yet.</AppText>
@@ -460,44 +465,6 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
             );
           })
         )}
-
-        <Modal visible={isEditModalVisible} transparent animationType="fade" onRequestClose={handleDiscardEdit}>
-          <Pressable style={styles.modalOverlay} onPress={handleDiscardEdit}>
-            <Pressable onPress={(e) => e.stopPropagation()}>
-              <View style={styles.modalContent}>
-                <AppText variant="title3" style={styles.modalTitle}>
-                  Edit Subcategory
-                </AppText>
-                <View style={styles.formField}>
-                  <AppText style={styles.label}>Sub name</AppText>
-                  <Input placeholder="Subcategory name" value={editName} onChangeText={setEditName} type="text" />
-                </View>
-                <View style={styles.formField}>
-                  <SubcategoryIconPicker
-                    label="Choose an icon"
-                    value={editIcon}
-                    onChange={setEditIcon}
-                    selectedColor={editColor}
-                  />
-                </View>
-                <View style={styles.formField}>
-                  <SubcategoryColorPicker label="Choose a color" value={editColor} onChange={setEditColor} />
-                </View>
-                <View style={styles.buttonRow}>
-                  <AppButton title="Discard" onPress={handleDiscardEdit} mode="light" color="lightGray" icon="cancel" />
-                  <AppButton
-                    title="Save"
-                    onPress={handleStageEdit}
-                    mode="filled"
-                    color="primary5"
-                    icon="check"
-                    disabled={saving}
-                  />
-                </View>
-              </View>
-            </Pressable>
-          </Pressable>
-        </Modal>
       </ScrollableContent>
 
       {/* Floating Add Subcategory button (replaces header + icon) */}
@@ -613,26 +580,5 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContent: {
-    backgroundColor: COLORS.white,
-    borderRadius: 20,
-    width: "85%",
-    maxHeight: "80%",
-    paddingVertical: SPACING.lg,
-    paddingHorizontal: SPACING.lg,
-    ...SHADOWS.card,
-  },
-  modalTitle: {
-    textAlign: "center",
-    color: COLORS.primary1,
-    fontWeight: "400",
-    paddingBottom: SPACING.md,
   },
 });

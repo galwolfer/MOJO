@@ -51,6 +51,8 @@ interface InputProps<T = any> extends Omit<TextInputProps, "style"> {
   multiSelect?: boolean;
   // optional icon size control (sm | md | big)
   iconSize?: IconSizeKey;
+  // explicit disabled prop for clarity
+  disabled?: boolean;
 }
 
 /**
@@ -125,6 +127,7 @@ function Input<T = any>({
   onSelect,
   multiSelect = false,
   iconSize = "md",
+  disabled = false,
   ...rest
 }: InputProps<T>) {
   const borderColorAnim = useRef(new Animated.Value(0)).current;
@@ -318,6 +321,9 @@ function Input<T = any>({
 
       <Pressable
         onPress={() => {
+          // Don't allow interaction if disabled
+          if (disabled) return;
+
           // Always focus the input when the wrapper is tapped to improve tap responsiveness
           inputRef.current?.focus();
 
@@ -353,7 +359,7 @@ function Input<T = any>({
         <Animated.View
           ref={wrapperRef}
           collapsable={false}
-          style={[styles.inputWrapper, { borderColor: animatedBorderColor }]}
+          style={[styles.inputWrapper, { borderColor: animatedBorderColor }, disabled && styles.inputWrapperDisabled]}
         >
           {/* Display selected option's icon for single-select dropdowns */}
           {selectedOption?.icon && (
@@ -378,7 +384,7 @@ function Input<T = any>({
             placeholderTextColor={COLORS.lightGray}
             keyboardType={getKeyboardType()}
             secureTextEntry={getSecureTextEntry()}
-            editable={!options}
+            editable={!options && !disabled}
             multiline={isMultiline}
             numberOfLines={type === "longtext" ? 5 : undefined}
             blurOnSubmit={enterToSubmit && isMultiline}
@@ -608,6 +614,10 @@ const styles = StyleSheet.create({
     marginLeft: SPACING.md,
     alignItems: "center",
     justifyContent: "center",
+  },
+  inputWrapperDisabled: {
+    backgroundColor: COLORS.white2,
+    opacity: 0.7,
   },
 });
 
