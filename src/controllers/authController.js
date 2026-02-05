@@ -393,40 +393,62 @@ export async function updateProfile(req, res, next) {
 export async function deleteAccount(req, res, next) {
   try {
     const userId = req.user.userId;
+    console.log(`🗑️  Delete account request for userId: ${userId}`);
 
-    // Delete user and all associated data
-    const user = await User.findByIdAndDelete(userId);
+    // First verify user exists before deleting data
+    const user = await User.findById(userId);
 
     if (!user) {
+      console.log(`❌ User not found: ${userId}`);
       return res.status(404).json({
         success: false,
         error: "User not found",
       });
     }
 
-    // Delete all tasks associated with the user
-    const Task = (await import("../models/index.js")).Task;
-    if (Task) {
-      await Task.deleteMany({ userId });
-    }
+    console.log(`📧 Deleting account for user: ${user.username} (${user.email})`);
 
-    // Delete all chat sessions associated with the user
-    const ChatSession = (await import("../models/index.js")).ChatSession;
-    if (ChatSession) {
-      await ChatSession.deleteMany({ userId });
-    }
+    // Import all models
+    const { Task, Session, Memory, TaskSchedule, SubTask, BusyBlock, EventLog } = await import("../models/index.js");
 
-    // Delete all chat messages associated with the user
-    const ChatMessage = (await import("../models/index.js")).ChatMessage;
-    if (ChatMessage) {
-      await ChatMessage.deleteMany({ userId });
-    }
+    // Delete all user data from all collections
+    const deletionResults = await Promise.allSettled([
+      // Delete all tasks
+      Task?.deleteMany({ userId }),
+      // Delete all subtasks
+      SubTask?.deleteMany({ userId }),
+      // Delete all task schedules
+      TaskSchedule?.deleteMany({ userId }),
+      // Delete all sessions (chat history)
+      Session?.deleteMany({ userId }),
+      // Delete all memories (deprecated but may still have data)
+      Memory?.deleteMany({ userId }),
+      // Delete all busy blocks
+      BusyBlock?.deleteMany({ userId }),
+      // Delete all event logs
+      EventLog?.deleteMany({ userId }),
+    ]);
+
+    // Log deletion results
+    const collectionNames = ["Task", "SubTask", "TaskSchedule", "Session", "Memory", "BusyBlock", "EventLog"];
+    deletionResults.forEach((result, index) => {
+      if (result.status === "fulfilled" && result.value) {
+        console.log(`  ✅ Deleted ${result.value.deletedCount || 0} ${collectionNames[index]}(s)`);
+      } else if (result.status === "rejected") {
+        console.error(`  ❌ Failed to delete ${collectionNames[index]}:`, result.reason);
+      }
+    });
+
+    // Finally delete the user
+    await User.findByIdAndDelete(userId);
+    console.log(`✅ Account deleted successfully for user: ${user.username}`);
 
     res.json({
       success: true,
       message: "Account and all associated data deleted successfully",
     });
   } catch (error) {
+    console.error(`❌ Error deleting account:`, error);
     next(error);
   }
 }

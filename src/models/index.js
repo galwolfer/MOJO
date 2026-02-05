@@ -10,4 +10,7 @@ export { Session } from "./Session.js";
 export { Memory } from "./Memory.js";
 export { Task } from "./Task.js";
 export { default as OjoType } from "./OjoType.js";
-export { Subcategory } from "./Subcategory.js";
+export { TaskSchedule } from "./TaskSchedule.js";
+export { SubTask } from "./SubTask.js";
+export { BusyBlock } from "./BusyBlock.js";
+export { default as EventLog } from "./EventLog.js";

@@ -1448,12 +1448,47 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
         updatePayload.earnedPoints = 0;
         updatePayload.completedAt = null;
       }
-      // If task is being completed, set completedAt
+      // If task is being completed, set completedAt and calculate actualCompletionMinutes
       if (parentTaskCompleted && !parentTaskWasCompleted) {
         updatePayload.completedAt = new Date();
+        
+        // Calculate actual completion time from all completed sessions
+        const completedSessions = await TaskSchedule.find({
+          taskId: updated.taskId,
+          status: "completed",
+        }).lean();
+        const actualCompletionMinutes = completedSessions.reduce(
+          (total, session) => total + (session.minutes || 0),
+          0
+        );
+        updatePayload.actualCompletionMinutes = actualCompletionMinutes;
       }
 
       await Task.updateOne({ _id: updated.taskId }, { $set: updatePayload });
+      
+      // ========================================================================
+      // ML TRAINING: Train when parent task is auto-completed via subtasks
+      // ========================================================================
+      if (parentTaskCompleted && !parentTaskWasCompleted) {
+        try {
+          // Re-fetch the updated parent task with all fields for ML training
+          const updatedParentTask = await Task.findById(updated.taskId).lean();
+          
+          if (updatedParentTask) {
+            console.log(`🤖 [ML Training] Parent task auto-completed via subtasks, training model...`);
+            const trainingResult = await trainTask(updatedParentTask);
+            
+            if (trainingResult.success) {
+              console.log(`✅ [ML Training] Model trained successfully (reward: ${trainingResult.reward?.toFixed(3)})`);
+            } else {
+              console.error(`❌ [ML Training] Training failed:`, trainingResult.error);
+            }
+          }
+        } catch (mlError) {
+          // Don't fail subtask update if ML training fails
+          console.error(`❌ [ML Training] Error (subtask still updated):`, mlError.message);
+        }
+      }
     }
   } catch (err) {
     // Non-fatal
