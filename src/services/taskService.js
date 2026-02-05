@@ -161,7 +161,7 @@ export async function createTask({
         parent: category,
         icon: typeof subCategory === "object" ? subCategory.icon : null,
         source: typeof subCategory === "object" ? subCategory.source || "user" : "user",
-        confidence: typeof subCategory === "object" ? subCategory.confidence ?? 1 : 1,
+        confidence: typeof subCategory === "object" ? (subCategory.confidence ?? 1) : 1,
       })
     : null;
 
@@ -261,7 +261,9 @@ export async function checkSuggestionFollowed({ userId, task, lastSuggestion, wi
  * Fetch all tasks for a user.
  */
 export async function getTasksForUser(userId, filter = {}) {
-  const tasks = await Task.find({ userId, ...filter }).populate("subCategory").lean();
+  const tasks = await Task.find({ userId, ...filter })
+    .populate("subCategory")
+    .lean();
   tasks.forEach(attachSubcategoryLabel);
   return tasks;
 }
@@ -287,53 +289,53 @@ export async function getTasks(userId, filters = {}) {
   if (filters.dueBefore) q.dueDate = { ...q.dueDate, $lte: new Date(filters.dueBefore) };
   if (filters.dueAfter) q.dueDate = { ...q.dueDate, $gte: new Date(filters.dueAfter) };
   if (filters.search) q.taskname = { $regex: filters.search, $options: "i" };
-  
+
   const tasks = await Task.find(q).populate("subCategory").lean();
   tasks.forEach(attachSubcategoryLabel);
   console.log(`[getTasks] Query: ${JSON.stringify(q)}`);
   console.log(`[getTasks] Found ${tasks.length} tasks matching filters`);
-  tasks.forEach(t => {
+  tasks.forEach((t) => {
     console.log(`  - ${t._id} (${t.taskname}) taskType: ${t.taskType}`);
   });
-  
+
   // For ALL tasks, fetch their subtasks (not just split tasks)
   // This ensures we always have subtask data when needed
-  const taskIds = tasks.map(task => task._id);
+  const taskIds = tasks.map((task) => task._id);
   if (taskIds.length > 0) {
     const subtasks = await SubTask.find({ userId, taskId: { $in: taskIds } }).lean();
     console.log(`[getTasks] Query subtasks: { userId: ${userId}, taskId: { $in: [${taskIds.length} ids] } }`);
     console.log(`[getTasks] Found ${subtasks.length} subtasks for ${taskIds.length} tasks`);
     if (subtasks.length > 0) {
-      subtasks.forEach(st => {
+      subtasks.forEach((st) => {
         console.log(`  - SubTask ${st._id} for Task ${st.taskId} (title: ${st.title}) status: ${st.status}`);
       });
     }
-    
+
     // Fetch scheduled sessions for all tasks (last 14 days + future)
     const fourteenDaysAgo = new Date();
     fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
     fourteenDaysAgo.setHours(0, 0, 0, 0);
-    
+
     const schedules = await TaskSchedule.find({
       userId,
       taskId: { $in: taskIds },
-      start: { $gte: fourteenDaysAgo }
+      start: { $gte: fourteenDaysAgo },
     }).lean();
     console.log(`[getTasks] Found ${schedules.length} scheduled sessions for tasks`);
-    
+
     // Group subtasks by taskId
     const subtasksByTaskId = {};
-    subtasks.forEach(subtask => {
+    subtasks.forEach((subtask) => {
       if (!subtasksByTaskId[subtask.taskId]) {
         subtasksByTaskId[subtask.taskId] = [];
       }
       subtasksByTaskId[subtask.taskId].push(subtask);
     });
-    
+
     // Group schedules by taskId (and also track subtask schedules)
     const schedulesByTaskId = {};
     const schedulesBySubtaskKey = {}; // key: "taskId:subtaskIndex"
-    schedules.forEach(sched => {
+    schedules.forEach((sched) => {
       const taskIdStr = sched.taskId.toString();
       if (!schedulesByTaskId[taskIdStr]) {
         schedulesByTaskId[taskIdStr] = [];
@@ -347,7 +349,7 @@ export async function getTasks(userId, filters = {}) {
         subtaskIndex: sched.subtaskIndex,
         subtaskTitle: sched.subtaskTitle,
       });
-      
+
       // Also track by subtask key for attaching to subtasks
       if (sched.subtaskIndex !== undefined && sched.subtaskIndex !== null) {
         const key = `${taskIdStr}:${sched.subtaskIndex}`;
@@ -363,29 +365,29 @@ export async function getTasks(userId, filters = {}) {
         });
       }
     });
-    
+
     // Attach subtasks and schedules to tasks
-    tasks.forEach(task => {
+    tasks.forEach((task) => {
       const taskIdStr = task._id.toString();
-      
+
       // Attach subtasks
       if (subtasksByTaskId[task._id]) {
-        task.subTasks = subtasksByTaskId[task._id].map(st => ({
+        task.subTasks = subtasksByTaskId[task._id].map((st) => ({
           ...st,
           // Attach scheduled sessions to each subtask
-          scheduledSessions: schedulesBySubtaskKey[`${taskIdStr}:${st.index}`] || []
+          scheduledSessions: schedulesBySubtaskKey[`${taskIdStr}:${st.index}`] || [],
         }));
         console.log(`[getTasks] Task ${task._id} (${task.taskname}) has ${task.subTasks.length} subtasks`);
       } else {
         task.subTasks = []; // Ensure empty array if no subtasks
         console.log(`[getTasks] Task ${task._id} (${task.taskname}) has NO subtasks`);
       }
-      
+
       // Attach scheduled sessions to task (for tasks without subtasks or for task-level view)
       task.scheduledSessions = schedulesByTaskId[taskIdStr] || [];
     });
   }
-  
+
   return tasks;
 }
 
@@ -438,7 +440,9 @@ export async function getScheduledTasksByDay(userId, days = 7) {
   }
 
   const taskIds = Array.from(new Set(sessions.map((s) => toId(s.taskId)).filter(Boolean)));
-  const tasks = await Task.find({ userId, _id: { $in: taskIds } }).populate("subCategory").lean();
+  const tasks = await Task.find({ userId, _id: { $in: taskIds } })
+    .populate("subCategory")
+    .lean();
   tasks.forEach(attachSubcategoryLabel);
   const taskMap = new Map(tasks.map((t) => [toId(t._id), t]));
 
@@ -729,7 +733,7 @@ export async function updateTask({ userId, taskId, updates }) {
       parent: cat,
       icon: typeof rawSub === "object" ? rawSub.icon : null,
       source: typeof rawSub === "object" ? rawSub.source || "user" : "user",
-      confidence: typeof rawSub === "object" ? rawSub.confidence ?? 1 : 1,
+      confidence: typeof rawSub === "object" ? (rawSub.confidence ?? 1) : 1,
     });
 
     if (!resolvedSubCategoryId) {
@@ -784,6 +788,49 @@ export async function updateTask({ userId, taskId, updates }) {
   }
 
   const updated = await Task.findByIdAndUpdate(taskId, { $set: sanitizedUpdates }, { new: true }).lean();
+
+  // If subtasks were provided as part of the update, apply them to SubTask documents
+  if (sanitizedUpdates.subtasks !== undefined) {
+    try {
+      for (const s of sanitizedUpdates.subtasks) {
+        // If an id was provided, update the existing subtask
+        if (s.id) {
+          const updateFields = {};
+          if (s.title !== undefined) updateFields.title = String(s.title).trim();
+          if (s.description !== undefined) updateFields.description = String(s.description);
+          if (s.minutes !== undefined) updateFields.minutes = Number(s.minutes);
+          if (s.index !== undefined) updateFields.index = Number(s.index);
+
+          if (Object.keys(updateFields).length > 0) {
+            await SubTask.findOneAndUpdate({ _id: s.id, userId, taskId }, { $set: updateFields }, { new: true }).lean();
+          }
+        } else if (s.title && s.title.trim().length > 0) {
+          // Create a new subtask if no id provided
+          const count = await SubTask.countDocuments({ taskId });
+          const idx = s.index !== undefined ? Number(s.index) : count + 1;
+          await SubTask.create({
+            taskId,
+            userId,
+            index: idx,
+            title: s.title.trim(),
+            description: s.description || "",
+            minutes: s.minutes ? Number(s.minutes) : 0,
+          });
+        }
+      }
+
+      // Recompute progress percentage after modifying subtasks (avoid relying on local helper scope)
+      const updatedSubtasks = await SubTask.find({ taskId }).lean();
+      let progressPercentage = 0;
+      if (updatedSubtasks.length > 0) {
+        const completedCount = updatedSubtasks.filter((st) => st.status === "done").length;
+        progressPercentage = Math.round((completedCount / updatedSubtasks.length) * 100);
+      }
+      await Task.updateOne({ _id: taskId }, { $set: { progressPercentage } });
+    } catch (err) {
+      logger.warn("Failed to apply subtask updates:", err && err.message);
+    }
+  }
 
   await logEvent({
     type: "task_updated",
@@ -1074,10 +1121,7 @@ export async function completeTask({ taskId, userId }) {
 
     // Mark all planned TaskSchedule sessions for this task as completed
     try {
-      await TaskSchedule.updateMany(
-        { taskId, status: "planned" },
-        { $set: { status: "completed" } }
-      );
+      await TaskSchedule.updateMany({ taskId, status: "planned" }, { $set: { status: "completed" } });
       console.log(`[completeTask] Marked TaskSchedule sessions as completed for task ${taskId}`);
     } catch (schedErr) {
       console.warn(`[completeTask] Failed to update TaskSchedule status:`, schedErr && schedErr.message);
@@ -1100,17 +1144,25 @@ export async function completeTask({ taskId, userId }) {
     try {
       // Structured log before training
       try {
-        console.log(JSON.stringify({
-          event: 'task_completed_training_start',
-          taskId: taskId.toString(),
-          userId,
-          taskname: task.taskname,
-          estimatedDuration: task.estimatedDuration,
-          actualCompletionMinutes,
-          sessionCount: completedSessions.length,
-        }));
+        console.log(
+          JSON.stringify({
+            event: "task_completed_training_start",
+            taskId: taskId.toString(),
+            userId,
+            taskname: task.taskname,
+            estimatedDuration: task.estimatedDuration,
+            actualCompletionMinutes,
+            sessionCount: completedSessions.length,
+          }),
+        );
       } catch (err) {
-        console.log('[task_completed_training_start] taskId=%s userId=%s estimated=%s actual=%s', taskId.toString(), userId, task.estimatedDuration, actualCompletionMinutes);
+        console.log(
+          "[task_completed_training_start] taskId=%s userId=%s estimated=%s actual=%s",
+          taskId.toString(),
+          userId,
+          task.estimatedDuration,
+          actualCompletionMinutes,
+        );
       }
 
       const trainingResult = await trainTask(updated);
@@ -1162,7 +1214,7 @@ export async function toggleTaskCompletion(taskId, userId) {
   const nextStatus = task.status === "done" ? "todo" : "done";
 
   const updatePayload = { status: nextStatus };
-  if (nextStatus === 'done') {
+  if (nextStatus === "done") {
     updatePayload.completedAt = new Date();
   } else {
     updatePayload.completedAt = null;
@@ -1190,17 +1242,11 @@ export async function toggleTaskCompletion(taskId, userId) {
   try {
     if (nextStatus === "done") {
       // Mark all planned sessions for this task as completed
-      await TaskSchedule.updateMany(
-        { taskId, status: "planned" },
-        { $set: { status: "completed" } }
-      );
+      await TaskSchedule.updateMany({ taskId, status: "planned" }, { $set: { status: "completed" } });
       console.log(`[toggleTaskCompletion] Marked TaskSchedule sessions as completed for task ${taskId}`);
     } else {
       // Mark all completed sessions for this task as planned (reverting)
-      await TaskSchedule.updateMany(
-        { taskId, status: "completed" },
-        { $set: { status: "planned" } }
-      );
+      await TaskSchedule.updateMany({ taskId, status: "completed" }, { $set: { status: "planned" } });
       console.log(`[toggleTaskCompletion] Reverted TaskSchedule sessions to planned for task ${taskId}`);
     }
   } catch (schedErr) {
@@ -1218,8 +1264,8 @@ export async function toggleTaskCompletion(taskId, userId) {
   });
 
   // Return both the task and completion state flags
-  return { 
-    task: updated, 
+  return {
+    task: updated,
     wasNewCompletion: wasIncomplete && nextStatus === "done",
     wasNewUncompletion: wasCompleted && nextStatus === "todo",
   };
@@ -1289,14 +1335,20 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
   // Use find + save instead of findOneAndUpdate to trigger Mongoose hooks
   console.log(`[updateSubTask] Querying SubTask with:`, { _id: subTaskId, userId });
   const subtask = await SubTask.findOne({ _id: subTaskId, userId });
-  console.log(`[updateSubTask] Query result:`, { found: !!subtask, subtaskId: subtask?._id, subtaskUserId: subtask?.userId });
+  console.log(`[updateSubTask] Query result:`, {
+    found: !!subtask,
+    subtaskId: subtask?._id,
+    subtaskUserId: subtask?.userId,
+  });
 
   if (!subtask) {
     console.error(`[updateSubTask] SubTask not found! Queried with _id=${subTaskId}, userId=${userId}`);
     // Debug: try to find without userId to see if it exists for other users
     const anySubtask = await SubTask.findOne({ _id: subTaskId });
     if (anySubtask) {
-      console.error(`[updateSubTask] SubTask exists with different userId! Expected userId=${userId}, actual userId=${anySubtask.userId}`);
+      console.error(
+        `[updateSubTask] SubTask exists with different userId! Expected userId=${userId}, actual userId=${anySubtask.userId}`,
+      );
     } else {
       console.error(`[updateSubTask] SubTask with _id=${subTaskId} doesn't exist in database at all`);
     }
@@ -1329,16 +1381,20 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
       // Mark scheduled sessions for this subtask as completed
       await TaskSchedule.updateMany(
         { taskId: subtask.taskId, subtaskIndex: subtask.index, status: "planned" },
-        { $set: { status: "completed" } }
+        { $set: { status: "completed" } },
       );
-      console.log(`[updateSubTask] Marked TaskSchedule sessions as completed for subtask index ${subtask.index} of task ${subtask.taskId}`);
+      console.log(
+        `[updateSubTask] Marked TaskSchedule sessions as completed for subtask index ${subtask.index} of task ${subtask.taskId}`,
+      );
     } else if (isNewUncompletion) {
       // Mark scheduled sessions for this subtask as planned (reverting)
       await TaskSchedule.updateMany(
         { taskId: subtask.taskId, subtaskIndex: subtask.index, status: "completed" },
-        { $set: { status: "planned" } }
+        { $set: { status: "planned" } },
       );
-      console.log(`[updateSubTask] Reverted TaskSchedule sessions to planned for subtask index ${subtask.index} of task ${subtask.taskId}`);
+      console.log(
+        `[updateSubTask] Reverted TaskSchedule sessions to planned for subtask index ${subtask.index} of task ${subtask.taskId}`,
+      );
     }
   } catch (schedErr) {
     console.warn(`[updateSubTask] Failed to update TaskSchedule status:`, schedErr && schedErr.message);
@@ -1349,7 +1405,7 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
 
   // Save to trigger post-save hooks (which sync parent Task progress)
   await subtask.save();
-  
+
   const updated = subtask.toObject();
   // Attach previousEarnedPoints for reversal calculation
   updated.previousEarnedPoints = previousEarnedPoints;
@@ -1385,7 +1441,7 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
           parentTaskUncompleted = true;
         }
       }
-      
+
       const updatePayload = { status: newStatus };
       // If task is being uncompleted, reset its earnedPoints
       if (parentTaskUncompleted) {
@@ -1396,7 +1452,7 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
       if (parentTaskCompleted && !parentTaskWasCompleted) {
         updatePayload.completedAt = new Date();
       }
-      
+
       await Task.updateOne({ _id: updated.taskId }, { $set: updatePayload });
     }
   } catch (err) {
@@ -1596,4 +1652,3 @@ export function stopExpiredTaskChecker() {
 export async function triggerExpiredTaskCheck() {
   return runExpiredTaskCheck();
 }
-
