@@ -306,3 +306,48 @@ export function paletteIndexFromKey(key?: string): number {
   const idx = Math.abs(hash) % COLORS_NUM;
   return idx + 1;
 }
+
+/**
+ * Translate a color token or string into a palette index (1..8).
+ * - If token looks like a palette token containing a digit (e.g., 'p1','primary2','brightP3'), return that digit.
+ * - Otherwise, deterministically map arbitrary strings to an index via `paletteIndexFromKey`.
+ * - If token appears to be a hex or rgba(...) color and `fallback` is provided, return `fallback` (usually category's colorIndex).
+ * - Returns a number between 1 and 8.
+ */
+export function paletteIndexFromColorToken(token?: string, fallback?: number): number {
+  if (!token) return fallback ?? paletteIndexFromKey(token);
+  const s = String(token).trim();
+
+  // If token is a hex color (#RGB or #RRGGBB), try to find an exact match in our palette
+  if (/^#/.test(s)) {
+    const hex = s.toLowerCase();
+    for (const key in COLORS) {
+      const val = (COLORS as any)[key];
+      if (typeof val === "string" && val.toLowerCase() === hex) {
+        const mKey = key.match(/([1-8])\b/);
+        if (mKey) return Number(mKey[1]);
+      }
+    }
+    // Not found in palette: fall back to provided fallback or deterministic mapping
+    return fallback ?? paletteIndexFromKey(s);
+  }
+
+  // If token is rgba(...), try to exact-match a palette entry (rare) then fallback
+  if (/^rgba?\(/i.test(s)) {
+    for (const key in COLORS) {
+      const val = (COLORS as any)[key];
+      if (typeof val === "string" && val.toLowerCase() === s.toLowerCase()) {
+        const mKey = key.match(/([1-8])\b/);
+        if (mKey) return Number(mKey[1]);
+      }
+    }
+    return fallback ?? paletteIndexFromKey(s);
+  }
+
+  // Look for a palette digit 1..8 in the token (e.g., 'primary1', 'brightP2')
+  const m = s.toLowerCase().match(/([1-8])\b/);
+  if (m) return Number(m[1]);
+
+  // Fall back to deterministic mapping
+  return paletteIndexFromKey(s);
+}

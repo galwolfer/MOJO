@@ -3,7 +3,7 @@ import { View } from "react-native";
 import Tag from "../../inputs/tag";
 import { getCategoryMeta } from "../../../config/categoryMeta";
 import { StyleSheet } from "react-native";
-import { SPACING } from "../../../theme";
+import { SPACING, paletteIndexFromColorToken } from "../../../theme";
 import { getImportanceLabel, getEffortLabel } from "../../widgets/taskHelpers";
 
 export const TaskTagsRow: React.FC<{
@@ -71,14 +71,14 @@ export const TaskTagsRow: React.FC<{
               );
             }
 
-            // If subcategory has its own color, use explicit bgColor
+            // If subcategory has its own color token (e.g., p1, p2), translate to color index
             if (subCategory && subCategory.color) {
+              const colorIdx = paletteIndexFromColorToken(subCategory.color, categoryMeta.colorIndex);
               return (
                 <Tag
                   label={subLabel}
                   leftIcon={subCategory.icon || undefined}
-                  bgColor={subCategory.color}
-                  textColor="#FFFFFF"
+                  colorIndex={colorIdx}
                   style={styles.tagItem}
                 />
               );
