@@ -318,7 +318,7 @@ export function paletteIndexFromColorToken(token?: string, fallback?: number): n
   if (!token) return fallback ?? paletteIndexFromKey(token);
   const s = String(token).trim();
 
-  // If token is a hex color (#RGB or #RRGGBB), try to find an exact match in our palette
+  // If token is a hex color, try to find an exact match in our palette
   if (/^#/.test(s)) {
     const hex = s.toLowerCase();
     for (const key in COLORS) {

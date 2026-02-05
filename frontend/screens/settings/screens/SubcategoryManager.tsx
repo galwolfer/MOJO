@@ -362,6 +362,7 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
         extraTopPadding={SPACING.lg}
         scrollKey="subcategory-manager"
         extraBottomPadding={SPACING.xlg * 3}
+        contentContainerStyle={styles.contentContainer}
       >
         {error && (
           <View style={styles.errorBlock}>
@@ -371,7 +372,7 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
         )}
 
         {hasPendingChanges && (
-          <Box title="Pending Changes" titleColor={COLORS.primary6}>
+          <Box title="Pending Changes">
             <AppText style={styles.pendingText}>You have unsaved changes. Click "Save All" to apply them.</AppText>
             <View style={styles.buttonRow}>
               <AppButton title="Discard All" onPress={handleDiscardAll} mode="light" color="lightGray" icon="cancel" />
@@ -379,7 +380,7 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
                 title="Save All"
                 onPress={handleSaveAll}
                 mode="filled"
-                color="primary5"
+                color="primary6"
                 icon="check"
                 disabled={saving}
               />
@@ -436,7 +437,7 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
                     <View key={subcategory.id} style={styles.subcategoryRow}>
                       <View style={styles.subcategoryInfo}>
                         <View style={[styles.subcategoryIcon, { backgroundColor: displayColor }]}>
-                          <Icon size={20} color={COLORS.white} />
+                          <Icon size={ICON_SIZES.xs} color={COLORS.white} />
                         </View>
                         <View style={styles.subcategoryNameContainer}>
                           <AppText style={styles.subcategoryName}>{subcategory.name}</AppText>
@@ -447,13 +448,13 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
                         {!isDefault && (
                           <>
                             <TouchableOpacity onPress={() => handleEdit(subcategory)} style={styles.actionButton}>
-                              <EditIcon size={18} color={COLORS.primary2} />
+                              <EditIcon size={ICON_SIZES.xs} color={COLORS.primary2} />
                             </TouchableOpacity>
                             <TouchableOpacity
                               onPress={() => handleStageDelete(subcategory)}
                               style={styles.actionButton}
                             >
-                              <TrashIcon size={18} color={COLORS.primary6} />
+                              <TrashIcon size={ICON_SIZES.xs} color={COLORS.primary6} />
                             </TouchableOpacity>
                           </>
                         )}
@@ -477,7 +478,6 @@ const styles = StyleSheet.create({
   contentContainer: {
     alignItems: "center",
     gap: SPACING.lg,
-    paddingBottom: SPACING.xlg * 4,
   },
   formField: {
     marginBottom: SPACING.md,
@@ -490,7 +490,7 @@ const styles = StyleSheet.create({
   buttonRow: {
     flexDirection: "row",
     gap: SPACING.md,
-    justifyContent: "flex-end",
+    justifyContent: "center",
   },
   subcategoryRow: {
     flexDirection: "row",
@@ -551,7 +551,6 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
   },
   pendingText: {
-    color: COLORS.primary6,
     textAlign: "center",
     paddingVertical: SPACING.md,
     fontWeight: "500",
