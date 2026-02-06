@@ -73,7 +73,7 @@ const memorySchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 const subCategorySchema = new mongoose.Schema(
@@ -81,7 +81,7 @@ const subCategorySchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     category: { type: Number, required: true }, // Index from CATEGORIES config (0-17)
   },
-  { _id: false }
+  { _id: false },
 );
 
 /**
@@ -133,7 +133,8 @@ const userSchema = new mongoose.Schema(
       settings: {
         type: Map,
         of: mongoose.Schema.Types.Mixed,
-        default: {},
+        // Default settings includes accessibility preferences so new users have a defined value
+        default: { accessibility: { timeFormat: "12h" } },
       },
       priorities: {
         study_and_education: { type: Number, min: 1, max: 5, default: 3 },
@@ -184,7 +185,7 @@ const userSchema = new mongoose.Schema(
             messageCount: { type: Number, default: 0 },
             preview: { type: String, default: "" },
           },
-          { _id: false }
+          { _id: false },
         ),
       ],
       default: [],
@@ -224,7 +225,7 @@ const userSchema = new mongoose.Schema(
           lastActiveDate: { type: Date, default: null },
           completedTasks: { type: Number, default: 0 },
         },
-        { _id: false }
+        { _id: false },
       ),
       default: {
         points: 0,
@@ -265,7 +266,7 @@ const userSchema = new mongoose.Schema(
           lastMorningDigest: { type: Date, default: null },
           lastTaskReminder: { type: Date, default: null },
         },
-        { _id: false }
+        { _id: false },
       ),
       default: {
         expoPushToken: null,
@@ -279,7 +280,7 @@ const userSchema = new mongoose.Schema(
       },
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Indexes for performance

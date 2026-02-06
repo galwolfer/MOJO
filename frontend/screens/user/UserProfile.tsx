@@ -23,9 +23,21 @@ import { StatBadge, ProgressGraph } from "./components";
 import FriendsList from "./components/FriendsList";
 import { moderateScale } from "react-native-size-matters";
 import { getUserStats } from "../../services/userService";
-import { getTasks, getScheduledTasksByDay, calculateTaskProgress, type Task, type TaskProgress } from "../../services/taskService";
+import {
+  getTasks,
+  getScheduledTasksByDay,
+  calculateTaskProgress,
+  type Task,
+  type TaskProgress,
+} from "../../services/taskService";
 import UserAvatar from "../../components/common/UserAvatar";
-import { SettingsScreen, EditPreferencesScreen, ChatSettingsScreen, NotificationSettingsScreen } from "../settings";
+import {
+  SettingsScreen,
+  EditPreferencesScreen,
+  ChatSettingsScreen,
+  NotificationSettingsScreen,
+  AccessibilitySettingsScreen,
+} from "../settings";
 import { useStatsContext } from "../../context/StatsContext";
 
 /**
@@ -81,9 +93,9 @@ export default function UserProfileScreen() {
   const { stats, isLoading: statsLoading, refreshStats } = useStatsContext();
 
   // Screen navigation state
-  const [currentScreen, setCurrentScreen] = useState<"profile" | "settings" | "edit-preferences" | "chat-settings" | "notification-settings">(
-    "profile",
-  );
+  const [currentScreen, setCurrentScreen] = useState<
+    "profile" | "settings" | "edit-preferences" | "chat-settings" | "notification-settings" | "accessibility-settings"
+  >("profile");
 
   const [loading, setLoading] = useState(true);
   const [progressData, setProgressData] = useState<number[]>(DEFAULT_PROGRESS);
@@ -168,7 +180,7 @@ export default function UserProfileScreen() {
       const taskList = await getTasks();
       console.log("[UserProfile] Got tasks:", taskList.length);
       if (!mountedRef.current) return null;
-      
+
       // Only update tasks state if we got valid data
       if (taskList && taskList.length >= 0) {
         setTasksState(taskList);
@@ -196,11 +208,14 @@ export default function UserProfileScreen() {
             }
           }
 
-          console.log("[UserProfile] Scheduled info:", { 
-            taskIds: scheduledTaskIds.size, 
-            subtaskKeys: scheduledSubtaskKeys.size 
+          console.log("[UserProfile] Scheduled info:", {
+            taskIds: scheduledTaskIds.size,
+            subtaskKeys: scheduledSubtaskKeys.size,
           });
-          const progress = calculateTaskProgress(taskList, 14, { taskIds: scheduledTaskIds, subtaskKeys: scheduledSubtaskKeys });
+          const progress = calculateTaskProgress(taskList, 14, {
+            taskIds: scheduledTaskIds,
+            subtaskKeys: scheduledSubtaskKeys,
+          });
           console.log("[UserProfile] Progress calculated:", {
             todayTotal: progress.today.total,
             todayCompleted: progress.today.completed,
@@ -209,14 +224,14 @@ export default function UserProfileScreen() {
           setTaskProgress(progress);
           // Only update progressData if we have meaningful data or if user has tasks
           // This prevents UI from flashing zeros during refresh
-          if (taskList.length > 0 || progress.dailyProgress.some(p => p > 0)) {
+          if (taskList.length > 0 || progress.dailyProgress.some((p) => p > 0)) {
             setProgressData(progress.dailyProgress);
           }
         } else {
           console.log("[UserProfile] No scheduled tasks for today, using fallback");
           const progress = calculateTaskProgress(taskList, 14);
           setTaskProgress(progress);
-          if (taskList.length > 0 || progress.dailyProgress.some(p => p > 0)) {
+          if (taskList.length > 0 || progress.dailyProgress.some((p) => p > 0)) {
             setProgressData(progress.dailyProgress);
           }
         }
@@ -225,7 +240,7 @@ export default function UserProfileScreen() {
         console.log("[UserProfile] Scheduled fetch failed, using fallback");
         const progress = calculateTaskProgress(taskList, 14);
         setTaskProgress(progress);
-        if (taskList.length > 0 || progress.dailyProgress.some(p => p > 0)) {
+        if (taskList.length > 0 || progress.dailyProgress.some((p) => p > 0)) {
           setProgressData(progress.dailyProgress);
         }
       }
@@ -263,10 +278,13 @@ export default function UserProfileScreen() {
           }
 
           // Recalculate progress with scheduled info using the freshly fetched task list
-          const progress = calculateTaskProgress(taskList, 14, { taskIds: scheduledTaskIds, subtaskKeys: scheduledSubtaskKeys });
+          const progress = calculateTaskProgress(taskList, 14, {
+            taskIds: scheduledTaskIds,
+            subtaskKeys: scheduledSubtaskKeys,
+          });
           setTaskProgress(progress);
           // Only update if meaningful data
-          if (taskList.length > 0 || progress.dailyProgress.some(p => p > 0)) {
+          if (taskList.length > 0 || progress.dailyProgress.some((p) => p > 0)) {
             setProgressData(progress.dailyProgress);
           }
         }
@@ -308,6 +326,7 @@ export default function UserProfileScreen() {
         onEditPreferences={() => setCurrentScreen("edit-preferences")}
         onChatSettings={() => setCurrentScreen("chat-settings")}
         onNotificationSettings={() => setCurrentScreen("notification-settings")}
+        onAccessibilitySettings={() => setCurrentScreen("accessibility-settings")}
       />
     );
   }
@@ -340,11 +359,12 @@ export default function UserProfileScreen() {
 
   // If on Notification Settings screen, render NotificationSettingsScreen
   if (currentScreen === "notification-settings") {
-    return (
-      <NotificationSettingsScreen
-        onBack={() => setCurrentScreen("settings")}
-      />
-    );
+    return <NotificationSettingsScreen onBack={() => setCurrentScreen("settings")} />;
+  }
+
+  // If on Accessibility Settings screen, render AccessibilitySettingsScreen
+  if (currentScreen === "accessibility-settings") {
+    return <AccessibilitySettingsScreen onBack={() => setCurrentScreen("settings")} />;
   }
 
   return (

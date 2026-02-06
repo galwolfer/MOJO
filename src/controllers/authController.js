@@ -107,7 +107,8 @@ export async function register(req, res, next) {
         profileImage: profileImage || null,
         ojoTypeId: defaultOjoType ? defaultOjoType._id : null,
         gender: gender ? String(gender) : "unspecified",
-        settings: {},
+        // Initialize settings with accessibility defaults so preference exists on new accounts
+        settings: { accessibility: { timeFormat: "12h" } },
       },
     });
 
@@ -356,7 +357,13 @@ export async function updateProfile(req, res, next) {
       user.profile.gender = canonical;
     }
     if (settings) {
-      user.profile.settings = new Map(Object.entries(settings));
+      // Merge incoming settings with existing settings instead of replacing entirely, to preserve other keys
+      const currentSettings =
+        user.profile.settings && typeof user.profile.settings.toObject === "function"
+          ? user.profile.settings.toObject()
+          : JSON.parse(JSON.stringify(user.profile.settings || {}));
+      const merged = { ...currentSettings, ...settings };
+      user.profile.settings = new Map(Object.entries(merged));
     }
 
     await user.save();
@@ -502,9 +509,10 @@ export async function updateCategoryPriorities(req, res, next) {
     await user.save();
 
     // Convert priorities to a plain JavaScript object for response
-    const savedPriorities = user.profile.priorities && typeof user.profile.priorities.toObject === "function"
-      ? user.profile.priorities.toObject()
-      : JSON.parse(JSON.stringify(user.profile.priorities || {}));
+    const savedPriorities =
+      user.profile.priorities && typeof user.profile.priorities.toObject === "function"
+        ? user.profile.priorities.toObject()
+        : JSON.parse(JSON.stringify(user.profile.priorities || {}));
 
     res.json({
       success: true,
@@ -538,10 +546,11 @@ export async function getPreferences(req, res, next) {
 
     // Convert priorities to a plain JavaScript object (Mongoose subdocument -> plain object)
     const prioritiesDoc = user.profile.priorities;
-    const priorities = prioritiesDoc && typeof prioritiesDoc.toObject === "function"
-      ? prioritiesDoc.toObject()
-      : JSON.parse(JSON.stringify(prioritiesDoc || {}));
-    
+    const priorities =
+      prioritiesDoc && typeof prioritiesDoc.toObject === "function"
+        ? prioritiesDoc.toObject()
+        : JSON.parse(JSON.stringify(prioritiesDoc || {}));
+
     const ojoType = user.profile.ojoTypeId
       ? {
           name: user.profile.ojoTypeId.name,
@@ -551,10 +560,21 @@ export async function getPreferences(req, res, next) {
         }
       : null;
 
+    // Convert settings Map to plain object
+    const settingsMap = user.profile.settings;
+    const settings =
+      settingsMap && typeof settingsMap.toObject === "function"
+        ? settingsMap.toObject()
+        : JSON.parse(JSON.stringify(settingsMap || {}));
+
+    // Ensure accessibility defaults exist server-side for consistency
+    settings.accessibility = settings.accessibility || { timeFormat: "12h" };
+
     res.json({
       success: true,
       priorities,
       ojoType,
+      appSettings: settings,
     });
   } catch (error) {
     next(error);

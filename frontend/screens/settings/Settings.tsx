@@ -29,9 +29,16 @@ type SettingsScreenProps = {
   onEditPreferences?: () => void;
   onChatSettings?: () => void;
   onNotificationSettings?: () => void;
+  onAccessibilitySettings?: () => void;
 };
 
-export default function SettingsScreen({ onBack, onEditPreferences, onChatSettings, onNotificationSettings }: SettingsScreenProps) {
+export default function SettingsScreen({
+  onBack,
+  onEditPreferences,
+  onChatSettings,
+  onNotificationSettings,
+  onAccessibilitySettings,
+}: SettingsScreenProps) {
   const { user, signOut, signIn, token } = useAuth();
   const { setHeaderConfig } = useNavigation();
 
@@ -50,6 +57,7 @@ export default function SettingsScreen({ onBack, onEditPreferences, onChatSettin
   const EditIcon = ICONS.prefrences;
   const ChatIcon = ICONS.ojo;
   const NotificationIcon = ICONS.notifications;
+  const AccessibilityIcon = ICONS.settings;
   const PencilIcon = ICONS.edit;
 
   useEffect(() => {
@@ -96,6 +104,14 @@ export default function SettingsScreen({ onBack, onEditPreferences, onChatSettin
     }
   };
 
+  const handleAccessibility = () => {
+    if (onAccessibilitySettings) {
+      onAccessibilitySettings();
+    } else {
+      console.log("Accessibility pressed - no handler provided");
+    }
+  };
+
   const preferenceItems: ListCellProps[] = [
     makeListCell("edit-preferences", {
       title: "Edit my prefrences",
@@ -113,32 +129,41 @@ export default function SettingsScreen({ onBack, onEditPreferences, onChatSettin
       title: "Notifications",
       logo: <NotificationIcon size={24} color={COLORS.primary5} />,
       onPress: handleNotifications,
+      divider: true,
+    }),
+    makeListCell("accessibility", {
+      title: "Accessibility",
+      logo: <AccessibilityIcon size={24} color={COLORS.primary3} />,
+      onPress: handleAccessibility,
       divider: false,
     }),
   ];
 
   const handleDeleteAccount = async () => {
     // Alert.alert doesn't work on web, use platform-specific approach
-    const confirmDelete = Platform.OS === "web"
-      ? window.confirm("Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.")
-      : await new Promise<boolean>((resolve) => {
-          Alert.alert(
-            "Delete Account",
+    const confirmDelete =
+      Platform.OS === "web"
+        ? window.confirm(
             "Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.",
-            [
-              {
-                text: "Cancel",
-                onPress: () => resolve(false),
-                style: "cancel",
-              },
-              {
-                text: "Delete",
-                onPress: () => resolve(true),
-                style: "destructive",
-              },
-            ],
-          );
-        });
+          )
+        : await new Promise<boolean>((resolve) => {
+            Alert.alert(
+              "Delete Account",
+              "Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.",
+              [
+                {
+                  text: "Cancel",
+                  onPress: () => resolve(false),
+                  style: "cancel",
+                },
+                {
+                  text: "Delete",
+                  onPress: () => resolve(true),
+                  style: "destructive",
+                },
+              ],
+            );
+          });
 
     if (!confirmDelete) {
       console.log("Delete cancelled");
@@ -192,7 +217,7 @@ export default function SettingsScreen({ onBack, onEditPreferences, onChatSettin
           disabled={isSaving}
         />
       </View>
-      
+
       {error && <ErrorText>{error}</ErrorText>}
     </ScrollableContent>
   );

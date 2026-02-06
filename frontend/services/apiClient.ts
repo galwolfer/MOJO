@@ -94,17 +94,19 @@ export async function updateCategoryPriorities(payload: CategoryPrioritiesReques
 }
 
 /**
- * Get user preferences (priorities and ojoType)
+ * Get user preferences (priorities, ojoType, and appSettings)
  * GET /api/auth/preferences
  */
 export async function getUserPreferences(): Promise<{
   priorities: Record<string, number>;
   ojoType: { name: string; displayName: string } | null;
+  appSettings: Record<string, any>;
 }> {
   const { get } = await import("./httpClient");
   return get<{
     priorities: Record<string, number>;
     ojoType: { name: string; displayName: string } | null;
+    appSettings: Record<string, any>;
   }>("/auth/preferences");
 }
 
@@ -112,9 +114,24 @@ export async function getUserPreferences(): Promise<{
  * Update user profile
  * PATCH /api/auth/profile
  */
-export async function updateProfile(payload: { name?: string; profileImage?: string; email?: string; username?: string }): Promise<any> {
+export async function updateProfile(payload: {
+  name?: string;
+  profileImage?: string;
+  email?: string;
+  username?: string;
+  settings?: Record<string, any>;
+}): Promise<any> {
   const { patch } = await import("./httpClient");
   return patch<any>("/auth/profile", payload);
+}
+
+/**
+ * Update user app settings
+ * PATCH /api/auth/profile
+ */
+export async function updateAppSettings(settings: Record<string, any>): Promise<any> {
+  const { patch } = await import("./httpClient");
+  return patch<any>("/auth/profile", { settings });
 }
 
 /**
@@ -169,4 +186,15 @@ export async function deleteAccount(): Promise<any> {
   return del<any>("/auth/account");
 }
 
-export default { setApiBase, setAuthToken, login, register, updateCategoryPriorities, getUserPreferences, uploadProfileImage, updateProfile, deleteAccount };
+export default {
+  setApiBase,
+  setAuthToken,
+  login,
+  register,
+  updateCategoryPriorities,
+  getUserPreferences,
+  uploadProfileImage,
+  updateProfile,
+  updateAppSettings,
+  deleteAccount,
+};

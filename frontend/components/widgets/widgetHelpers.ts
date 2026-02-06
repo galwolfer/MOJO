@@ -279,19 +279,34 @@ export const getSessionKey = (
 /**
  * getTimeParts
  * Extract hour:minute and AM/PM parts from an ISO date string.
- * Used for displaying time in 12-hour format with separate components.
+ * Supports both 12-hour and 24-hour format based on the format parameter.
  * @param dateStr - ISO date string
- * @returns Object with time (HH:MM), ampm (AM/PM), and date strings
+ * @param format - Time format: "12h" (default) or "24h"
+ * @returns Object with time (HH:MM), ampm (AM/PM or empty for 24h), and date strings
  */
-export const getTimeParts = (dateStr?: string): { time: string; ampm: string; date: string } => {
+export const getTimeParts = (
+  dateStr?: string,
+  format: "12h" | "24h" = "12h",
+): { time: string; ampm: string; date: string } => {
   if (!dateStr) return { time: "", ampm: "", date: "" };
   try {
     const date = new Date(dateStr);
     const minutes = date.getMinutes();
     const rawHours = date.getHours();
-    const ampm = rawHours >= 12 ? "PM" : "AM";
-    const hours12 = rawHours % 12 === 0 ? 12 : rawHours % 12;
-    const time = `${hours12}:${minutes.toString().padStart(2, "0")}`;
+
+    let time: string;
+    let ampm: string;
+
+    if (format === "24h") {
+      // 24-hour format: HH:MM (e.g., "14:30")
+      time = `${rawHours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+      ampm = "";
+    } else {
+      // 12-hour format: H:MM AM/PM (e.g., "2:30 PM")
+      ampm = rawHours >= 12 ? "PM" : "AM";
+      const hours12 = rawHours % 12 === 0 ? 12 : rawHours % 12;
+      time = `${hours12}:${minutes.toString().padStart(2, "0")}`;
+    }
 
     // Format date as "Mon, Jan 27"
     const dateFormatted = date.toLocaleDateString("en-US", {
@@ -567,13 +582,13 @@ export const toggleSubtask = async ({
     notifyTaskUpdate({ taskId }, 300);
 
     // If gamification data was returned, notify stats context
-    console.log("[toggleSubtask] Result from API:", { 
-      success: result.success, 
+    console.log("[toggleSubtask] Result from API:", {
+      success: result.success,
       hasGamification: !!result.gamification,
       gamification: result.gamification,
-      notifyStatsChangeExists: !!notifyStatsChange 
+      notifyStatsChangeExists: !!notifyStatsChange,
     });
-    
+
     if (result.gamification && notifyStatsChange) {
       console.log("[toggleSubtask] Calling notifyStatsChange with:", result.gamification);
       notifyStatsChange(result.gamification);
@@ -680,7 +695,7 @@ export const toggleSession = async ({
         gamification: result.gamification,
         notifyStatsChangeExists: !!notifyStatsChange,
       });
-      
+
       if (result.gamification && notifyStatsChange) {
         console.log("[toggleSession] Calling notifyStatsChange with:", result.gamification);
         notifyStatsChange(result.gamification);

@@ -3,6 +3,7 @@ import { View, Pressable } from "react-native";
 import AppText from "../../common/AppText";
 import { Checkbox } from "../../icons/Checkbox";
 import { getTimeParts, getSubtaskIdFromSession, ScheduledSession, Subtask } from "../../widgets/taskHelpers";
+import { useAccessibilityPreferences } from "../../../hooks/useAccessibilityPreferences";
 import { StyleSheet } from "react-native";
 import { ICON_SIZES, SPACING, COLORS } from "../../../theme";
 
@@ -37,6 +38,7 @@ export const SessionRow: React.FC<{
   hideTaskTitle = false,
   showTaskDate = false,
 }) => {
+  const { preferences } = useAccessibilityPreferences();
   const checkboxHandler = checkboxOnToggle ?? rowOnPress ?? undefined;
   const rowPressHandler = rowOnPress ?? (canToggle ? (checkboxOnToggle ?? undefined) : undefined);
 
@@ -48,8 +50,8 @@ export const SessionRow: React.FC<{
     await checkboxHandler?.();
   };
 
-  const startParts = getTimeParts(session.start);
-  const endParts = getTimeParts(session.end);
+  const startParts = getTimeParts(session.start, preferences.timeFormat);
+  const endParts = getTimeParts(session.end, preferences.timeFormat);
   const subtaskTitle = session.subtaskTitle || `Part ${session.subtaskIndex ?? sessionIndex + 1}`;
 
   const Container: any = rowPressHandler ? Pressable : View;
