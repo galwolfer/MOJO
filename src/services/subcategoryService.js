@@ -91,7 +91,7 @@ export async function resolveSubcategoryId({
 } = {}) {
   let candidateId = subcategoryId || (subcategory && (subcategory._id || subcategory.id || subcategory.subcategoryId));
 
-  if (!candidateId && typeof subcategory === "string" && /^[a-fA-F0-9]{24}$/.test(subcategory)) {
+  if (!candidateId && typeof subcategory === "string" && /^[a-fA-F0-9]{ICON_SIZES.sm}$/.test(subcategory)) {
     candidateId = subcategory;
   }
 

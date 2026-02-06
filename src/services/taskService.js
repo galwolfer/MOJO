@@ -55,7 +55,7 @@ import {
 async function _saveUserSubCategory(userId, categoryName, subCategory) {
   if (!userId || !categoryName || !subCategory) return;
 
-  if (typeof subCategory === "string" && /^[a-fA-F0-9]{24}$/.test(subCategory)) {
+  if (typeof subCategory === "string" && /^[a-fA-F0-9]{ICON_SIZES.sm}$/.test(subCategory)) {
     return;
   }
 
@@ -152,7 +152,7 @@ export async function createTask({
     throw new Error(buildIllegalCharsError(illegalFields));
   }
 
-  const isSubcategoryIdString = typeof subCategory === "string" && /^[a-fA-F0-9]{24}$/.test(subCategory);
+  const isSubcategoryIdString = typeof subCategory === "string" && /^[a-fA-F0-9]{ICON_SIZES.sm}$/.test(subCategory);
   const resolvedSubCategoryId = subCategory
     ? await resolveSubcategoryId({
         userId,
@@ -724,7 +724,7 @@ export async function updateTask({ userId, taskId, updates }) {
   // If user provided a subCategory, resolve to ID and record telemetry
   if (sanitizedUpdates.subCategory) {
     const rawSub = sanitizedUpdates.subCategory;
-    const isSubIdString = typeof rawSub === "string" && /^[a-fA-F0-9]{24}$/.test(rawSub);
+    const isSubIdString = typeof rawSub === "string" && /^[a-fA-F0-9]{ICON_SIZES.sm}$/.test(rawSub);
 
     const resolvedSubCategoryId = await resolveSubcategoryId({
       userId,
@@ -1451,21 +1451,18 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
       // If task is being completed, set completedAt and calculate actualCompletionMinutes
       if (parentTaskCompleted && !parentTaskWasCompleted) {
         updatePayload.completedAt = new Date();
-        
+
         // Calculate actual completion time from all completed sessions
         const completedSessions = await TaskSchedule.find({
           taskId: updated.taskId,
           status: "completed",
         }).lean();
-        const actualCompletionMinutes = completedSessions.reduce(
-          (total, session) => total + (session.minutes || 0),
-          0
-        );
+        const actualCompletionMinutes = completedSessions.reduce((total, session) => total + (session.minutes || 0), 0);
         updatePayload.actualCompletionMinutes = actualCompletionMinutes;
       }
 
       await Task.updateOne({ _id: updated.taskId }, { $set: updatePayload });
-      
+
       // ========================================================================
       // ML TRAINING: Train when parent task is auto-completed via subtasks
       // ========================================================================
@@ -1473,11 +1470,11 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
         try {
           // Re-fetch the updated parent task with all fields for ML training
           const updatedParentTask = await Task.findById(updated.taskId).lean();
-          
+
           if (updatedParentTask) {
             console.log(`🤖 [ML Training] Parent task auto-completed via subtasks, training model...`);
             const trainingResult = await trainTask(updatedParentTask);
-            
+
             if (trainingResult.success) {
               console.log(`✅ [ML Training] Model trained successfully (reward: ${trainingResult.reward?.toFixed(3)})`);
             } else {

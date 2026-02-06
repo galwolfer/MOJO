@@ -325,7 +325,7 @@ router.delete("/subcategories/:id", async (req, res, next) => {
       return res.status(400).json({ success: false, error: "Subcategory id is required" });
     }
 
-    const isId = /^[a-fA-F0-9]{24}$/.test(id);
+    const isId = /^[a-fA-F0-9]{ICON_SIZES.sm}$/.test(id);
     let subcategoryDoc = null;
 
     if (isId) {
@@ -399,7 +399,7 @@ router.patch("/subcategories/:id", async (req, res, next) => {
     const { name, icon, color } = req.body;
     const userId = req.user.userId;
 
-    if (!id || !/^[a-fA-F0-9]{24}$/.test(id)) {
+    if (!id || !/^[a-fA-F0-9]{ICON_SIZES.sm}$/.test(id)) {
       return res.status(400).json({ success: false, error: "Valid subcategory id is required" });
     }
 

@@ -3,7 +3,7 @@
  *
  * Animated checkbox control for web builds. Uses `motion/react` to animate
  * the border and checkmark. Exposes a simple API:
- *   <Checkbox checked={value} onChange={setValue} size={24} />
+ *   <Checkbox checked={value} onChange={setValue} size={ICON_SIZES.sm} />
  *
  * Keep the visual behavior consistent with the native implementation
  * (see `Checkbox.native.tsx`).

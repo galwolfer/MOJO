@@ -254,7 +254,7 @@ export async function createTask(req, res) {
     }
 
     const rawSubcategory = subcategoryId || subCategoryId || subcategory;
-    const isSubcategoryId = typeof rawSubcategory === "string" && /^[a-fA-F0-9]{24}$/.test(rawSubcategory);
+    const isSubcategoryId = typeof rawSubcategory === "string" && /^[a-fA-F0-9]{ICON_SIZES.sm}$/.test(rawSubcategory);
 
     if (typeof rawSubcategory === "string" && !isSubcategoryId && hasIllegalDisplayChars(rawSubcategory)) {
       return res.status(400).json({ success: false, error: "Subcategory cannot include angle brackets." });
@@ -518,7 +518,7 @@ export async function updateTask(req, res) {
     // Subcategory
     const rawSubcategory = raw.subcategoryId || raw.subCategoryId || raw.subcategory;
     if (rawSubcategory !== undefined) {
-      const isSubcategoryId = typeof rawSubcategory === "string" && /^[a-fA-F0-9]{24}$/.test(rawSubcategory);
+      const isSubcategoryId = typeof rawSubcategory === "string" && /^[a-fA-F0-9]{ICON_SIZES.sm}$/.test(rawSubcategory);
       if (typeof rawSubcategory === "string" && !isSubcategoryId && hasIllegalDisplayChars(rawSubcategory)) {
         return res.status(400).json({ success: false, error: "Subcategory cannot include angle brackets." });
       }
