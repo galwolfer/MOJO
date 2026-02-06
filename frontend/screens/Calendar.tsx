@@ -12,6 +12,7 @@ import { useNavigation } from "../context/NavigationContext";
 import { ICONS } from "../components/icons/icons";
 import ScrollableContent from "../components/layout/ScrollableContent";
 import useContentInsets from "../hooks/useContentInsets";
+import FloatingButton from "../components/common/FloatingButton";
 
 export default function CalendarScreen() {
   const { setHeaderConfig, setActiveTab } = useNavigation();
@@ -50,20 +51,8 @@ export default function CalendarScreen() {
         <AppText variant="notes">Task list and calendar view...</AppText>
       </ScrollableContent>
 
-      {/* Floating ADD TASK Button */}
-      <TouchableOpacity
-        style={[
-          styles.floatingButton,
-          { bottom: Math.max(100, insets.bottom + SPACING.lg) },
-        ]}
-        activeOpacity={0.8}
-        onPress={handleAddTask}
-      >
-        <AppText variant="bodyText" style={styles.buttonText}>
-          ADD TASK
-        </AppText>
-        <ICONS.plus size={20} color={COLORS.white} style={styles.plusIcon} />
-      </TouchableOpacity>
+      {/* Floating ADD TASK Button (now modular) */}
+      <FloatingButton onPress={handleAddTask} text="ADD TASK" Icon={ICONS.plus} />
     </>
   );
 }

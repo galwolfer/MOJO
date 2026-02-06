@@ -1,7 +1,7 @@
 import { COLORS } from "../../theme";
 import { SVG_DATA_URIS } from "../icons/svg-data-uris";
 import { getCategoryMeta } from "../../config/categoryMeta";
-import { updateSubTask } from "../../services/taskService";
+import { updateSubTask, GamificationResult } from "../../services/taskService";
 
 export interface Subtask {
   id?: string;
@@ -475,6 +475,7 @@ export const toggleSubtask = async ({
   loadingParts,
   setLoadingParts,
   notifyTaskUpdate,
+  notifyStatsChange,
   onAction,
 }: {
   taskId: string;
@@ -484,6 +485,7 @@ export const toggleSubtask = async ({
   loadingParts: Set<string>;
   setLoadingParts: React.Dispatch<React.SetStateAction<Set<string>>>;
   notifyTaskUpdate: (params: { taskId: string }, delayMs?: number) => void;
+  notifyStatsChange?: (gamification?: GamificationResult) => void;
   onAction?: (action: string, data: any) => void;
 }) => {
   const isCompleted = completedParts.has(subtaskId);
@@ -502,16 +504,21 @@ export const toggleSubtask = async ({
 
   try {
     // Persist change to server
-    const success = await updateSubTask(taskId, subtaskId, { status: nextCompleted ? "done" : "todo" });
-    if (!success) throw new Error("Update failed");
+    const result = await updateSubTask(taskId, subtaskId, { status: nextCompleted ? "done" : "todo" });
+    if (!result.success) throw new Error("Update failed");
 
-    // Debug: log toggle
     // Notify other components of task update
     notifyTaskUpdate({ taskId });
     // Also schedule a delayed notify to give backend time to settle and ensure list widgets refresh
     notifyTaskUpdate({ taskId }, 300);
+
+    // If gamification data was returned, notify stats context
+    if (result.gamification && notifyStatsChange) {
+      notifyStatsChange(result.gamification);
+    }
+
     // Trigger action callback for widget interactions
-    onAction?.("subtask_toggled", { taskId, subtaskId, completed: nextCompleted });
+    onAction?.("subtask_toggled", { taskId, subtaskId, completed: nextCompleted, gamification: result.gamification });
   } catch (error) {
     // Revert optimistic update on failure
     setCompletedParts((prev) => {
@@ -547,6 +554,7 @@ export const toggleSession = async ({
   loadingParts,
   setLoadingParts,
   notifyTaskUpdate,
+  notifyStatsChange,
   onAction,
 }: {
   taskId: string;
@@ -558,6 +566,7 @@ export const toggleSession = async ({
   loadingParts: Set<string>;
   setLoadingParts: React.Dispatch<React.SetStateAction<Set<string>>>;
   notifyTaskUpdate: (params: { taskId: string }, delayMs?: number) => void;
+  notifyStatsChange?: (gamification?: GamificationResult) => void;
   onAction?: (action: string, data: any) => void;
 }) => {
   // Find the subtask ID associated with this session

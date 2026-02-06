@@ -7,22 +7,22 @@
  */
 import React, { useState, useEffect, useRef } from "react";
 import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
-import AppText from "../../components/common/AppText";
-import AppButton from "../../components/common/AppButton";
-import Box from "../../components/layout/Box";
-import CategoryGrid from "../auth/components/CategoryGrid";
-import { ICONS } from "../../components/icons/icons";
-import { COLORS, SPACING, FONT_SIZES, SHADOWS, ICON_SIZES } from "../../theme";
+import AppText from "../../../components/common/AppText";
+import AppButton from "../../../components/common/AppButton";
+import Box from "../../../components/layout/Box";
+import CategoryGrid from "../../auth/components/CategoryGrid";
+import { ICONS } from "../../../components/icons/icons";
+import { COLORS, SPACING, FONT_SIZES, SHADOWS, ICON_SIZES } from "../../../theme";
 import { moderateScale } from "react-native-size-matters";
-import { CATEGORY_KEYS, type CategoryKey } from "../../config/categoryMeta";
-import { useNavigation } from "../../context/NavigationContext";
-import { useLayout } from "../../context/LayoutContext";
-import { useKeyboard } from "../../hooks";
-import { getUserPreferences, updateCategoryPriorities } from "../../services/apiClient";
-import { setAuthToken } from "../../services/httpClient";
-import { useAuth } from "../../context/AuthContext";
-import { ScrollableContent } from "../../components";
-import ErrorText from "../../components/common/ErrorText";
+import { CATEGORY_KEYS, type CategoryKey } from "../../../config/categoryMeta";
+import { useNavigation } from "../../../context/NavigationContext";
+import { useLayout } from "../../../context/LayoutContext";
+import { useKeyboard } from "../../../hooks";
+import { getUserPreferences, updateCategoryPriorities } from "../../../services/apiClient";
+import { setAuthToken } from "../../../services/httpClient";
+import { useAuth } from "../../../context/AuthContext";
+import { ScrollableContent } from "../../../components";
+import ErrorText from "../../../components/common/ErrorText";
 
 type EditPreferencesScreenProps = {
   onBack: () => void;

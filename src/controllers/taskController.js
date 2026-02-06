@@ -5,12 +5,12 @@
 
 import * as taskService from "../services/taskService.js";
 import { logger } from "../utils/logger.js";
-import { User } from "../models/User.js";
 import { Task } from "../models/Task.js";
 import { SubTask } from "../models/SubTask.js";
-import { getCategoryIndex, isValidCategory } from "../config/categories.js";
+import { isValidCategory } from "../config/categories.js";
 import { hasIllegalDisplayChars } from "../utils/illegalChars.js";
 import { triggerSchedulerUpdate } from "../services/schedulingService.js";
+import { findOrCreateSubcategory } from "../services/subcategoryService.js";
 
 /**
  * Task Controller
@@ -117,32 +117,13 @@ export async function autoSaveSubcategory(userId, subcategoryName, categoryKey) 
     }
 
     const trimmedName = subcategoryName.trim();
-
-    // Get category index (0-17)
-    const categoryIndex = getCategoryIndex(categoryKey);
-
-    // Find user and check if subcategory already exists
-    const user = await User.findById(userId);
-    if (!user) {
-      return; // User not found, skip silently
-    }
-
-    // Check if this subcategory already exists for this category (case-insensitive)
-    const exists = user.subCategories.some(
-      (sub) => sub.category === categoryIndex && sub.name.toLowerCase() === trimmedName.toLowerCase(),
-    );
-
-    if (exists) {
-      return; // Already exists, nothing to do
-    }
-
-    // Add new subcategory to user profile
-    user.subCategories.push({
+    await findOrCreateSubcategory({
+      userId,
       name: trimmedName,
-      category: categoryIndex,
+      parent: categoryKey,
+      source: "user",
+      confidence: 1,
     });
-
-    await user.save();
     logger.info(`Auto-saved subcategory "${trimmedName}" to category ${categoryKey} for user ${userId}`);
   } catch (error) {
     // Log error but don't fail the task operation
@@ -219,6 +200,8 @@ export async function createTask(req, res) {
       taskname,
       category,
       subcategory,
+      subcategoryId,
+      subCategoryId,
       deadline,
       recurrence,
       importance,
@@ -270,7 +253,10 @@ export async function createTask(req, res) {
       return res.status(400).json({ success: false, error: "Deadline is required" });
     }
 
-    if (subcategory && hasIllegalDisplayChars(subcategory)) {
+    const rawSubcategory = subcategoryId || subCategoryId || subcategory;
+    const isSubcategoryId = typeof rawSubcategory === "string" && /^[a-fA-F0-9]{24}$/.test(rawSubcategory);
+
+    if (typeof rawSubcategory === "string" && !isSubcategoryId && hasIllegalDisplayChars(rawSubcategory)) {
       return res.status(400).json({ success: false, error: "Subcategory cannot include angle brackets." });
     }
 
@@ -299,9 +285,20 @@ export async function createTask(req, res) {
     }
 
     // Auto-save subcategory to user profile if provided
-    if (subcategory && category) {
-      console.log("[taskController.createTask] Auto-saving subcategory:", { subcategory, category, userId });
-      await autoSaveSubcategory(userId, subcategory, category);
+    const subcategoryName =
+      typeof rawSubcategory === "string" && !isSubcategoryId
+        ? rawSubcategory
+        : typeof rawSubcategory === "object"
+          ? rawSubcategory.label || rawSubcategory.name
+          : null;
+
+    if (subcategoryName && category) {
+      console.log("[taskController.createTask] Auto-saving subcategory:", {
+        subcategory: subcategoryName,
+        category,
+        userId,
+      });
+      await autoSaveSubcategory(userId, subcategoryName, category);
     }
 
     // Use estimatedDuration (from agent) OR estimatedMinutes (from frontend)
@@ -310,8 +307,13 @@ export async function createTask(req, res) {
     console.log("[taskController.createTask] Creating task with:", {
       taskname: title,
       category,
-      subcategory,
-      subCategoryObject: subcategory ? { label: subcategory, source: "user", confidence: 1 } : null,
+      subcategory: rawSubcategory,
+      subCategoryObject:
+        rawSubcategory && !isSubcategoryId
+          ? typeof rawSubcategory === "string"
+            ? { label: rawSubcategory, source: "user", confidence: 1 }
+            : rawSubcategory
+          : null,
     });
 
     // Preserve explicit nulls for minChunk (to allow clearing); only use default when undefined
@@ -322,7 +324,11 @@ export async function createTask(req, res) {
       taskname: title,
       description: descriptionValue,
       category: category || "",
-      subCategory: subcategory ? { label: subcategory, source: "user", confidence: 1, updatedAt: new Date() } : null,
+      subCategory: rawSubcategory
+        ? typeof rawSubcategory === "string" && !isSubcategoryId
+          ? { label: rawSubcategory, source: "user", confidence: 1, updatedAt: new Date() }
+          : rawSubcategory
+        : null,
       dueDate: deadline ? new Date(deadline) : null,
       importance: importance !== undefined ? importance : 3,
       effort: effort !== undefined ? effort : 3,
@@ -510,16 +516,30 @@ export async function updateTask(req, res) {
     if (raw.category !== undefined) updates.category = raw.category;
 
     // Subcategory
-    if (raw.subcategory !== undefined) {
-      if (typeof raw.subcategory === "string" && hasIllegalDisplayChars(raw.subcategory)) {
+    const rawSubcategory = raw.subcategoryId || raw.subCategoryId || raw.subcategory;
+    if (rawSubcategory !== undefined) {
+      const isSubcategoryId = typeof rawSubcategory === "string" && /^[a-fA-F0-9]{24}$/.test(rawSubcategory);
+      if (typeof rawSubcategory === "string" && !isSubcategoryId && hasIllegalDisplayChars(rawSubcategory)) {
         return res.status(400).json({ success: false, error: "Subcategory cannot include angle brackets." });
       }
-      updates.subCategory = { label: raw.subcategory, source: "user", confidence: 1, updatedAt: new Date() };
+
+      updates.subCategory =
+        rawSubcategory && !isSubcategoryId
+          ? typeof rawSubcategory === "string"
+            ? { label: rawSubcategory, source: "user", confidence: 1, updatedAt: new Date() }
+            : rawSubcategory
+          : rawSubcategory || null;
 
       // Auto-save subcategory to user profile
       const taskCategory = raw.category || updates.category;
-      if (taskCategory && raw.subcategory) {
-        await autoSaveSubcategory(userId, raw.subcategory, taskCategory);
+      const subcategoryName =
+        typeof rawSubcategory === "string" && !isSubcategoryId
+          ? rawSubcategory
+          : typeof rawSubcategory === "object"
+            ? rawSubcategory.label || rawSubcategory.name
+            : null;
+      if (taskCategory && subcategoryName) {
+        await autoSaveSubcategory(userId, subcategoryName, taskCategory);
       }
     }
 
@@ -660,6 +680,41 @@ export async function updateTask(req, res) {
         }
         updates.dueDate = d;
       }
+    }
+
+    // Recurrence (allow updating recurrence via PATCH)
+    if (raw.recurrence !== undefined) {
+      if (!raw.recurrence || typeof raw.recurrence !== "object") {
+        return res.status(400).json({ success: false, error: "Invalid recurrence format" });
+      }
+
+      const rec = {
+        type: raw.recurrence.type,
+        interval: raw.recurrence.interval || 1,
+        endDate: raw.recurrence.endDate ? new Date(raw.recurrence.endDate) : null,
+        count: raw.recurrence.count || null,
+        completedDates: [],
+      };
+
+      if (!rec.type || !["daily", "weekly", "monthly", "yearly"].includes(rec.type)) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Invalid recurrence type. Must be: daily, weekly, monthly, or yearly" });
+      }
+
+      if (rec.interval && rec.interval < 1) {
+        return res.status(400).json({ success: false, error: "Recurrence interval must be at least 1" });
+      }
+
+      if (rec.count && rec.count < 1) {
+        return res.status(400).json({ success: false, error: "Recurrence count must be at least 1" });
+      }
+
+      if (rec.endDate && isNaN(rec.endDate.getTime())) {
+        return res.status(400).json({ success: false, error: "Invalid recurrence endDate. Use ISO 8601 date." });
+      }
+
+      updates.recurrence = rec;
     }
 
     // Tags
@@ -909,7 +964,7 @@ export async function toggleTaskCompletion(req, res) {
     let gamification = null;
     let pointsAwarded = 0;
     let pointsSubtracted = 0;
-    
+
     if (wasNewCompletion) {
       try {
         if (allSubtasksAlreadyDone) {
@@ -919,10 +974,10 @@ export async function toggleTaskCompletion(req, res) {
           const reward = await awardTaskCompletionBonus(userId, task);
           pointsAwarded = reward.points;
           gamification = reward.gamification;
-          
+
           // Save earnedPoints to the task
           await taskService.updateTaskEarnedPoints(id, pointsAwarded);
-          
+
           logger.info(
             `[toggleTaskCompletion] All subtasks done, awarded ${reward.points} bonus points to user ${userId} for completing task ${id}`,
           );
@@ -932,10 +987,10 @@ export async function toggleTaskCompletion(req, res) {
           const reward = await awardTaskCompletionPoints(userId, task, uncompletedSubtasks);
           pointsAwarded = reward.points;
           gamification = reward.gamification;
-          
+
           // Save earnedPoints to the task
           await taskService.updateTaskEarnedPoints(id, pointsAwarded);
-          
+
           logger.info(
             `[toggleTaskCompletion] Awarded ${reward.points} points to user ${userId} for completing task ${id} via toggle`,
           );
@@ -944,7 +999,7 @@ export async function toggleTaskCompletion(req, res) {
         logger.warn("Failed to award points on toggle completion:", pointsError.message);
       }
     }
-    
+
     // If toggled to incomplete (and was previously complete), reverse points and decrement task count
     if (wasNewUncompletion) {
       try {
@@ -966,11 +1021,13 @@ export async function toggleTaskCompletion(req, res) {
     logger.info(`[toggleTaskCompletion] Sending response:`, {
       taskId: task._id,
       status: task.status,
-      gamification: gamification ? { 
-        points: gamification.points, 
-        currentStreak: gamification.currentStreak,
-        completedTasks: gamification.completedTasks 
-      } : null,
+      gamification: gamification
+        ? {
+            points: gamification.points,
+            currentStreak: gamification.currentStreak,
+            completedTasks: gamification.completedTasks,
+          }
+        : null,
       wasCompletion: wasNewCompletion,
       wasUncompletion: wasNewUncompletion,
     });
@@ -1138,17 +1195,17 @@ export async function updateSubTask(req, res) {
     let completionBonus = 0;
     let pointsSubtracted = 0;
     let taskBonusSubtracted = 0;
-    
+
     if (result.isNewCompletion) {
       try {
         const { awardSubtaskCompletionPoints, awardTaskCompletionBonus } = await import("./userController.js");
         const reward = await awardSubtaskCompletionPoints(userId, result.subtask, result.parentTask);
         pointsAwarded = reward.points;
         gamification = reward.gamification;
-        
+
         // Save earnedPoints to the subtask
         await taskService.updateSubTaskEarnedPoints(subId, pointsAwarded);
-        
+
         logger.info(
           `[updateSubTask] Awarded ${pointsAwarded} points to user ${userId} for completing subtask ${subId}`,
         );
@@ -1160,41 +1217,43 @@ export async function updateSubTask(req, res) {
           completionBonus = bonusReward.points;
           pointsAwarded += completionBonus;
           gamification = bonusReward.gamification; // Use latest gamification state
-          
+
           // Save earnedPoints to the parent task
           await taskService.updateTaskEarnedPoints(result.parentTask._id, completionBonus);
-          
+
           logger.info(`[updateSubTask] Parent task completed! Awarded ${completionBonus} bonus points`);
         }
       } catch (pointsError) {
         logger.warn("[updateSubTask] Failed to award points for subtask completion:", pointsError.message);
       }
     }
-    
+
     // Reverse points for subtask uncompletion (only if this was a NEW uncompletion)
     if (result.isNewUncompletion) {
       try {
         const { reverseSubtaskCompletion } = await import("./userController.js");
         // Use previousEarnedPoints attached by taskService
-        const subtaskWithPoints = { 
-          ...result.subtask, 
-          earnedPoints: result.subtask.previousEarnedPoints || 0 
+        const subtaskWithPoints = {
+          ...result.subtask,
+          earnedPoints: result.subtask.previousEarnedPoints || 0,
         };
-        const parentTaskWithPoints = result.parentTask ? {
-          ...result.parentTask,
-          earnedPoints: result.parentTask.previousEarnedPoints || 0
-        } : null;
-        
+        const parentTaskWithPoints = result.parentTask
+          ? {
+              ...result.parentTask,
+              earnedPoints: result.parentTask.previousEarnedPoints || 0,
+            }
+          : null;
+
         const reversal = await reverseSubtaskCompletion(
-          userId, 
-          subtaskWithPoints, 
-          parentTaskWithPoints, 
-          result.parentTaskUncompleted
+          userId,
+          subtaskWithPoints,
+          parentTaskWithPoints,
+          result.parentTaskUncompleted,
         );
         pointsSubtracted = reversal.pointsSubtracted;
         taskBonusSubtracted = reversal.taskBonusSubtracted;
         gamification = reversal.gamification;
-        
+
         logger.info(
           `[updateSubTask] Reversed subtask completion, subtracted ${pointsSubtracted} points (+ ${taskBonusSubtracted} task bonus) from user ${userId}`,
         );
@@ -1207,11 +1266,13 @@ export async function updateSubTask(req, res) {
     logger.info(`[updateSubTask] Sending response:`, {
       subtaskId: result.subtask?._id,
       status: result.subtask?.status,
-      gamification: gamification ? { 
-        points: gamification.points, 
-        currentStreak: gamification.currentStreak,
-        completedTasks: gamification.completedTasks 
-      } : null,
+      gamification: gamification
+        ? {
+            points: gamification.points,
+            currentStreak: gamification.currentStreak,
+            completedTasks: gamification.completedTasks,
+          }
+        : null,
       wasCompletion: result.isNewCompletion || false,
       wasUncompletion: result.isNewUncompletion || false,
       parentTaskCompleted: result.parentTaskCompleted || false,
@@ -1281,10 +1342,10 @@ export async function markSubTaskComplete(req, res) {
         const reward = await awardSubtaskCompletionPoints(userId, result.subtask, result.parentTask);
         pointsAwarded = reward.points;
         gamification = reward.gamification;
-        
+
         // Save earnedPoints to the subtask
         await taskService.updateSubTaskEarnedPoints(subId, pointsAwarded);
-        
+
         logger.info(
           `[markSubTaskComplete] Awarded ${pointsAwarded} points to user ${userId} for completing subtask ${subId}`,
         );
@@ -1295,10 +1356,10 @@ export async function markSubTaskComplete(req, res) {
           completionBonus = bonusReward.points;
           pointsAwarded += completionBonus;
           gamification = bonusReward.gamification;
-          
+
           // Save earnedPoints to the parent task
           await taskService.updateTaskEarnedPoints(result.parentTask._id, completionBonus);
-          
+
           logger.info(`[markSubTaskComplete] Parent task completed! Awarded ${completionBonus} bonus points`);
         }
       } catch (pointsError) {
@@ -1340,7 +1401,7 @@ export async function markSubTaskTodo(req, res) {
     if (!result || result.success === false) {
       return res.status(404).json({ success: false, error: result ? result.error : "Subtask not found" });
     }
-    
+
     // Reverse points for subtask uncompletion
     let gamification = null;
     let pointsSubtracted = 0;
@@ -1348,25 +1409,27 @@ export async function markSubTaskTodo(req, res) {
     if (result.isNewUncompletion) {
       try {
         const { reverseSubtaskCompletion } = await import("./userController.js");
-        const subtaskWithPoints = { 
-          ...result.subtask, 
-          earnedPoints: result.subtask.previousEarnedPoints || 0 
+        const subtaskWithPoints = {
+          ...result.subtask,
+          earnedPoints: result.subtask.previousEarnedPoints || 0,
         };
-        const parentTaskWithPoints = result.parentTask ? {
-          ...result.parentTask,
-          earnedPoints: result.parentTask.previousEarnedPoints || 0
-        } : null;
-        
+        const parentTaskWithPoints = result.parentTask
+          ? {
+              ...result.parentTask,
+              earnedPoints: result.parentTask.previousEarnedPoints || 0,
+            }
+          : null;
+
         const reversal = await reverseSubtaskCompletion(
-          userId, 
-          subtaskWithPoints, 
-          parentTaskWithPoints, 
-          result.parentTaskUncompleted
+          userId,
+          subtaskWithPoints,
+          parentTaskWithPoints,
+          result.parentTaskUncompleted,
         );
         pointsSubtracted = reversal.pointsSubtracted;
         taskBonusSubtracted = reversal.taskBonusSubtracted;
         gamification = reversal.gamification;
-        
+
         logger.info(
           `[markSubTaskTodo] Reversed subtask completion, subtracted ${pointsSubtracted} points from user ${userId}`,
         );

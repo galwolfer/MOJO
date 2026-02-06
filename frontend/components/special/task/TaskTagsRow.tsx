@@ -3,7 +3,7 @@ import { View } from "react-native";
 import Tag from "../../inputs/tag";
 import { getCategoryMeta } from "../../../config/categoryMeta";
 import { StyleSheet } from "react-native";
-import { SPACING } from "../../../theme";
+import { SPACING, paletteIndexFromColorToken } from "../../../theme";
 import { getImportanceLabel, getEffortLabel } from "../../widgets/taskHelpers";
 
 export const TaskTagsRow: React.FC<{
@@ -11,9 +11,10 @@ export const TaskTagsRow: React.FC<{
   categoryDisplay?: string;
   subcategory?: string;
   subcategoryDisplay?: string;
+  subCategory?: { icon?: string | null; color?: string | null; source?: string | null; parent?: string | null } | null;
   importance?: number | null;
   effort?: number | null;
-}> = ({ category, categoryDisplay, subcategory, subcategoryDisplay, importance, effort }) => {
+}> = ({ category, categoryDisplay, subcategory, subcategoryDisplay, subCategory, importance, effort }) => {
   const categoryMeta = getCategoryMeta(category);
   const subLabel = subcategoryDisplay || subcategory || "";
 
@@ -56,9 +57,43 @@ export const TaskTagsRow: React.FC<{
         />
       )}
 
-      {subLabel ? (
-        <Tag label={subLabel} colorIndex={Math.max(0, Math.min(17, subLabel.length % 9))} style={styles.tagItem} />
-      ) : null}
+      {subLabel
+        ? (() => {
+            // If subcategory is a system 'General' subcategory, use category icon and color
+            if (subCategory && subCategory.source === "category-default") {
+              return (
+                <Tag
+                  label={subLabel}
+                  leftIcon={categoryMeta.icon}
+                  colorIndex={categoryMeta.colorIndex}
+                  style={styles.tagItem}
+                />
+              );
+            }
+
+            // If subcategory has its own color token (e.g., p1, p2), translate to color index
+            if (subCategory && subCategory.color) {
+              const colorIdx = paletteIndexFromColorToken(subCategory.color, categoryMeta.colorIndex);
+              return (
+                <Tag
+                  label={subLabel}
+                  leftIcon={subCategory.icon || undefined}
+                  colorIndex={colorIdx}
+                  style={styles.tagItem}
+                />
+              );
+            }
+
+            // Fallback: use generated color index
+            return (
+              <Tag
+                label={subLabel}
+                colorIndex={Math.max(0, Math.min(17, subLabel.length % 9))}
+                style={styles.tagItem}
+              />
+            );
+          })()
+        : null}
 
       {importance ? (
         <Tag

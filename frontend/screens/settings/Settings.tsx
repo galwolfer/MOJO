@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useRef } from "react";
-import { View, StyleSheet, TouchableOpacity, Alert, Platform } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Platform, Alert } from "react-native";
+import PopupBox from "../../components/common/PopupBox";
 import AppText from "../../components/common/AppText";
 import AppButton from "../../components/common/AppButton";
 import ErrorText from "../../components/common/ErrorText";
-import ProfileSettings from "./ProfileSettings";
+import ProfileSettings from "./screens/ProfileSettings";
 import { COLORS, SPACING, SHADOWS, ICON_SIZES } from "../../theme";
 import { useNavigation } from "../../context/NavigationContext";
 import { ICONS } from "../../components/icons/icons";
@@ -30,6 +31,7 @@ type SettingsScreenProps = {
   onChatSettings?: () => void;
   onNotificationSettings?: () => void;
   onAccessibilitySettings?: () => void;
+  onSubcategoryManager?: () => void;
 };
 
 export default function SettingsScreen({
@@ -38,12 +40,16 @@ export default function SettingsScreen({
   onChatSettings,
   onNotificationSettings,
   onAccessibilitySettings,
+  onSubcategoryManager,
 }: SettingsScreenProps) {
   const { user, signOut, signIn, token } = useAuth();
   const { setHeaderConfig } = useNavigation();
 
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showDeletePopup, setShowDeletePopup] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Store onBack in a ref to avoid recreating header config
   const onBackRef = useRef(onBack);
@@ -59,6 +65,7 @@ export default function SettingsScreen({
   const NotificationIcon = ICONS.notifications;
   const AccessibilityIcon = ICONS.settings;
   const PencilIcon = ICONS.edit;
+  const ListIcon = ICONS.list;
 
   useEffect(() => {
     const handleBackPress = () => onBackRef.current();
@@ -112,11 +119,25 @@ export default function SettingsScreen({
     }
   };
 
+  const handleSubcategoryManager = () => {
+    if (onSubcategoryManager) {
+      onSubcategoryManager();
+    } else {
+      console.log("Subcategory manager pressed - no handler provided");
+    }
+  };
+
   const preferenceItems: ListCellProps[] = [
     makeListCell("edit-preferences", {
       title: "Edit my prefrences",
       logo: <EditIcon size={24} color={COLORS.primary2} />,
       onPress: handleEditPreferences,
+      divider: true,
+    }),
+    makeListCell("subcategories", {
+      title: "Subcategories",
+      logo: <ListIcon size={24} color={COLORS.primary4} />,
+      onPress: handleSubcategoryManager,
       divider: true,
     }),
     makeListCell("chat-settings", {
@@ -139,37 +160,13 @@ export default function SettingsScreen({
     }),
   ];
 
-  const handleDeleteAccount = async () => {
-    // Alert.alert doesn't work on web, use platform-specific approach
-    const confirmDelete =
-      Platform.OS === "web"
-        ? window.confirm(
-            "Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.",
-          )
-        : await new Promise<boolean>((resolve) => {
-            Alert.alert(
-              "Delete Account",
-              "Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.",
-              [
-                {
-                  text: "Cancel",
-                  onPress: () => resolve(false),
-                  style: "cancel",
-                },
-                {
-                  text: "Delete",
-                  onPress: () => resolve(true),
-                  style: "destructive",
-                },
-              ],
-            );
-          });
+  const handleDeleteAccount = () => {
+    setShowDeletePopup(true);
+  };
 
-    if (!confirmDelete) {
-      console.log("Delete cancelled");
-      return;
-    }
-
+  const confirmDeleteAccount = async () => {
+    setIsDeletingAccount(true);
+    setDeleteError(null);
     try {
       setIsSaving(true);
       setError(null);
@@ -180,8 +177,11 @@ export default function SettingsScreen({
       await signOut();
     } catch (err: any) {
       console.error("Error deleting account:", err);
-      setError(err?.message || "Failed to delete account");
+      setDeleteError(err?.message || "Failed to delete account");
+    } finally {
+      setIsDeletingAccount(false);
       setIsSaving(false);
+      setShowDeletePopup(false);
     }
   };
 
@@ -219,6 +219,30 @@ export default function SettingsScreen({
       </View>
 
       {error && <ErrorText>{error}</ErrorText>}
+
+      <PopupBox visible={showDeletePopup} onClose={() => setShowDeletePopup(false)} title="Delete Account">
+        <AppText>
+          Are you sure you want to delete your account? This action cannot be undone and all your data will be
+          permanently deleted.
+        </AppText>
+        <View style={{ flexDirection: "row", gap: SPACING.md, justifyContent: "center", marginTop: SPACING.md }}>
+          <AppButton title="Cancel" onPress={() => setShowDeletePopup(false)} color="primary6" />
+          <AppButton
+            title={isDeletingAccount ? "Deleting..." : "Delete"}
+            onPress={confirmDeleteAccount}
+            mode="light"
+            color="primary7"
+            disabled={isDeletingAccount}
+          />
+        </View>
+      </PopupBox>
+
+      <PopupBox visible={!!deleteError} onClose={() => setDeleteError(null)} title="Error" titleColor={COLORS.primary6}>
+        <ErrorText>{deleteError}</ErrorText>
+        <View style={{ marginTop: SPACING.md }}>
+          <AppButton title="Close" onPress={() => setDeleteError(null)} />
+        </View>
+      </PopupBox>
     </ScrollableContent>
   );
 }

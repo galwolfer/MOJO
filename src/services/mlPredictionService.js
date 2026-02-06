@@ -9,9 +9,8 @@ import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { taskToMLInput, calculateReward } from '../utils/mlInputConverter.js';
-import { User } from '../models/User.js';
+import { Subcategory } from '../models/Subcategory.js';
 import { TaskSchedule } from '../models/TaskSchedule.js';
-import { CATEGORY_INDEX_TO_KEY } from '../config/categories.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,10 +21,28 @@ const PYTHON_SERVICE_PATH = path.join(__dirname, '../predict_model/model_service
 // Timeout for Python subprocess (ms)
 const SUBPROCESS_TIMEOUT = 5000;
 
+async function hydrateTaskSubcategory(task) {
+  if (!task || !task.subCategory) return task;
+  if (typeof task.subCategory === "object" && (task.subCategory.name || task.subCategory.label)) {
+    task.subCategoryLabel = task.subCategory.name || task.subCategory.label;
+    return task;
+  }
+  try {
+    const sub = await Subcategory.findById(task.subCategory).lean();
+    if (sub) {
+      task.subCategory = sub;
+      task.subCategoryLabel = sub.name;
+    }
+  } catch (err) {
+    // Non-fatal: leave task as-is
+  }
+  return task;
+}
+
 /**
  * Build subcategory map from user's custom subcategories
  * 
- * Converts User.subCategories array to the format expected by Python:
+ * Converts Subcategory collection entries to the format expected by Python:
  * { "work_and_career": ["Deep Work", "Meetings"], "workout": ["HIIT", "Cardio"], ... }
  * 
  * The Python model will use model.add_subcategory() to sync these with its internal
@@ -36,25 +53,32 @@ const SUBPROCESS_TIMEOUT = 5000;
  */
 async function buildSubcategoryMap(userId) {
   try {
-    const user = await User.findById(userId).lean();
-    if (!user || !user.subCategories || user.subCategories.length === 0) {
+    const subs = await Subcategory.find({ userId }).lean();
+    if (!subs || subs.length === 0) {
       return {}; // No custom subcategories
     }
 
     const subcategoryMap = {};
-    
-    for (const sub of user.subCategories) {
-      const categoryKey = CATEGORY_INDEX_TO_KEY[sub.category]; // Convert index to string key
-      if (!categoryKey) continue; // Skip invalid categories
-      
+
+    for (const sub of subs) {
+      const categoryKey = sub.parent;
+      if (!categoryKey) continue;
+
       if (!subcategoryMap[categoryKey]) {
-        subcategoryMap[categoryKey] = [];
+        subcategoryMap[categoryKey] = new Set();
       }
-      
-      subcategoryMap[categoryKey].push(sub.name);
+
+      if (sub.name) {
+        subcategoryMap[categoryKey].add(sub.name);
+      }
     }
-    
-    return subcategoryMap;
+
+    const normalizedMap = {};
+    for (const [key, value] of Object.entries(subcategoryMap)) {
+      normalizedMap[key] = Array.from(value);
+    }
+
+    return normalizedMap;
   } catch (error) {
     console.error('❌ Error building subcategory map:', error.message);
     return {}; // Return empty map on error, don't fail prediction
@@ -145,6 +169,7 @@ export async function predictTask(task) {
       throw new Error('Task must have userId for per-user ML predictions');
     }
 
+    await hydrateTaskSubcategory(task);
     // Convert Task to ML input format
     const mlInput = taskToMLInput(task);
 
@@ -207,6 +232,7 @@ export async function trainTask(task) {
     // Get userId early - needed for both deadline reward and training
     const userId = task.userId.toString();
 
+    await hydrateTaskSubcategory(task);
     // Convert Task to ML input format
     const mlInput = taskToMLInput(task);
 

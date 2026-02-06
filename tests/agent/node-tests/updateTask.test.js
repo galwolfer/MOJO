@@ -77,4 +77,74 @@ test("update_task confirmation, validation and persistence", async () => {
   const t5 = await Task.findById(id).lean();
   assert.strictEqual(t5.canSplit, false);
   assert.strictEqual(t5.taskType, "in_parts");
+
+  // --- New tests: Subcategory and Subtask updates via mission/controller ---
+  // Test subcategory update via mission (mission sets `subCategory`, helper should normalize it)
+  await updateMission.execute({
+    userId: user._id.toString(),
+    args: { taskId: id, subcategory: "Updated Subcategory", confirm: true },
+  });
+  const t6 = await Task.findById(id).lean();
+  // Resolve stored subCategory ID to name for assertion (handles object or id)
+  const { Subcategory } = await import("../../../src/models/Subcategory.js");
+  if (t6.subCategory) {
+    const stored = await Subcategory.findById(t6.subCategory).lean();
+    assert.ok(
+      stored && (stored.name === "Updated Subcategory" || stored.label === "Updated Subcategory"),
+      "Expected stored subcategory to be Updated Subcategory",
+    );
+  } else {
+    assert.fail("Expected subCategory to be set on the task");
+  }
+
+  // Test subcategory update via mission without explicit confirm (implicit confirmation should apply)
+  await updateMission.execute({
+    userId: user._id.toString(),
+    args: { taskId: id, subcategory: "Implicit Subcategory" },
+  });
+  const t6b = await Task.findById(id).lean();
+  if (t6b.subCategory) {
+    const stored2 = await Subcategory.findById(t6b.subCategory).lean();
+    assert.ok(
+      stored2 && (stored2.name === "Implicit Subcategory" || stored2.label === "Implicit Subcategory"),
+      "Expected stored subcategory to be Implicit Subcategory",
+    );
+  } else {
+    assert.fail("Expected subCategory to be set on the task for implicit confirm");
+  }
+
+  // Test subtasks update via controller helper normalization
+  // Create a task with subtasks
+  const resAdd2 = await addMission.execute({
+    userId: user._id.toString(),
+    args: {
+      taskname: "Task With Subs",
+      deadline: "2026-02-20",
+      duration: 60,
+      category: "study_and_education",
+      taskType: "in_parts",
+      chunkCount: 2,
+      effort: 2,
+      confirm: true,
+    },
+  });
+  console.log("[TEST] resAdd2:", resAdd2);
+  assert.ok(resAdd2.startsWith("ok=true"));
+  const id2 = parseResponseId(resAdd2);
+
+  // Find one subtask and update it using updateTaskViaController with `_id` field
+  const { SubTask } = await import("../../../src/models/SubTask.js");
+  const subs = await SubTask.find({ taskId: id2, userId: user._id.toString() }).lean();
+  assert.ok(subs.length >= 1, "Expected subtasks to be created for in_parts task");
+  const subToUpdate = subs[0];
+
+  // Call mission helper directly to perform an update that includes subtasks with `_id` property
+  const { updateTaskViaController } = await import("../../../src/agent/missionControllerHelpers.js");
+  const updatedTask = await updateTaskViaController(user._id.toString(), id2, {
+    subtasks: [{ _id: subToUpdate._id, title: "Renamed Subtask" }],
+  });
+  assert.ok(updatedTask, "Expected updateTaskViaController to return updated task");
+
+  const updatedSub = await SubTask.findById(subToUpdate._id).lean();
+  assert.strictEqual(updatedSub.title, "Renamed Subtask");
 });

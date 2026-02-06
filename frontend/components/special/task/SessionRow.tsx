@@ -54,7 +54,8 @@ export const SessionRow: React.FC<{
   const endParts = getTimeParts(session.end, preferences.timeFormat);
   const subtaskTitle = session.subtaskTitle || `Part ${session.subtaskIndex ?? sessionIndex + 1}`;
 
-  const Container: any = rowPressHandler ? Pressable : View;
+  // Avoid making the row a Pressable when it contains interactive children (checkbox)
+  const Container: any = rowPressHandler && !canToggle ? Pressable : View;
   return (
     <View style={styles.sessionRoot}>
       {showTaskDate && (

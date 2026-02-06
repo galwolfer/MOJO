@@ -1,17 +1,17 @@
 import React, { useEffect, useState, useRef } from "react";
 import { View, StyleSheet, Image, Alert, Platform } from "react-native";
 import { moderateScale } from "react-native-size-matters";
-import AppText from "../../components/common/AppText";
-import Input from "../../components/inputs/Input";
-import AppButton from "../../components/common/AppButton";
-import ProfilePhotoWidget from "../../components/special/ProfilePhotoWidget";
-import ErrorText from "../../components/common/ErrorText";
-import { COLORS, SPACING, SHADOWS } from "../../theme";
-import { useAuth } from "../../context/AuthContext";
-import { ICONS } from "../../components/icons/icons";
-import { updateProfile } from "../../services/apiClient";
-import { Box } from "../../components";
-import UserAvatar from "../../components/common/UserAvatar";
+import AppText from "../../../components/common/AppText";
+import Input from "../../../components/inputs/Input";
+import AppButton from "../../../components/common/AppButton";
+import ProfilePhotoWidget from "../../../components/special/ProfilePhotoWidget";
+import ErrorText from "../../../components/common/ErrorText";
+import { COLORS, SPACING, SHADOWS } from "../../../theme";
+import { useAuth } from "../../../context/AuthContext";
+import { ICONS } from "../../../components/icons/icons";
+import { updateProfile } from "../../../services/apiClient";
+import { Box } from "../../../components";
+import UserAvatar from "../../../components/common/UserAvatar";
 
 export default function ProfileSettings() {
   const { user, signIn, token } = useAuth();
@@ -126,7 +126,7 @@ export default function ProfileSettings() {
 
           try {
             const uploadResp = await (
-              await import("../../services/apiClient")
+              await import("../../../services/apiClient")
             ).uploadProfileImage(newProfileImage as File);
             if (uploadResp && uploadResp.url) updateData.profileImage = uploadResp.url;
             else {
@@ -157,7 +157,7 @@ export default function ProfileSettings() {
             }
 
             const uploadResp = await (
-              await import("../../services/apiClient")
+              await import("../../../services/apiClient")
             ).uploadProfileImage(newProfileImage as string);
             if (uploadResp && uploadResp.url) updateData.profileImage = uploadResp.url;
             else {

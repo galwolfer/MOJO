@@ -169,9 +169,9 @@ const userSchema = new mongoose.Schema(
       type: [memorySchema],
       default: [],
     },
-    // User specific subcategories
+    // User specific subcategories (IDs)
     subCategories: {
-      type: [subCategorySchema],
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Subcategory" }],
       default: [],
     },
     // Lightweight recent sessions summary for quick UI access (keeps last N sessions)

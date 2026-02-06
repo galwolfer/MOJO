@@ -4,6 +4,8 @@ import { detectCategory } from "../algorithms/priority/categorizing.js";
 import { generateSubCategory } from "../services/ml/subcategoryGenerator.js";
 import { predictTask } from "../services/mlPredictionService.js";
 import { CATEGORY_STRING_VALUES, isValidCategory } from "../config/categories.js";
+import { Subcategory } from "./Subcategory.js";
+import { findOrCreateSubcategory } from "../services/subcategoryService.js";
 
 const taskSchema = new mongoose.Schema(
   {
@@ -58,12 +60,7 @@ const taskSchema = new mongoose.Schema(
     actualCompletionMinutes: { type: Number }, // minutes taken when task completes (for reward calculation)
     completedAt: { type: Date }, // timestamp when task was marked complete
     earnedPoints: { type: Number, default: 0 }, // points awarded when task was completed (reset to 0 if undone)
-    subCategory: {
-      label: { type: String, default: "", trim: true },
-      source: { type: String, default: "heuristic", trim: true },
-      confidence: { type: Number, min: 0, max: 1, default: 0 },
-      updatedAt: { type: Date },
-    },
+    subCategory: { type: mongoose.Schema.Types.ObjectId, ref: "Subcategory", default: null },
     // Task progress tracking (for split tasks)
     progressPercentage: { type: Number, min: 0, max: 100, default: 0 }, // 0-100, synced from subtasks
     // User-defined tags for categorization and filtering
@@ -244,32 +241,68 @@ taskSchema.pre("save", async function () {
     this.category = autoCategory;
   }
 
-  const hasManualSubCategory = this.subCategory?.label && this.subCategory?.source === "user";
-  const shouldRefreshSubCategory = (shouldRefreshCategory || !this.subCategory?.label) && !hasManualSubCategory;
+  let currentSubcategory = null;
+  if (this.subCategory) {
+    try {
+      currentSubcategory = await Subcategory.findById(this.subCategory).lean();
+    } catch (err) {
+      currentSubcategory = null;
+    }
+  }
+
+  const hasManualSubCategory =
+    currentSubcategory?.name && (currentSubcategory?.source === "user" || currentSubcategory?.source === "imported");
+  const shouldRefreshSubCategory = (shouldRefreshCategory || !currentSubcategory?.name) && !hasManualSubCategory;
 
   console.log("[Task.pre-save] Subcategory check:", {
     isNew: this.isNew,
     taskname: this.taskname,
-    hasSubCategory: !!this.subCategory?.label,
-    subCategoryLabel: this.subCategory?.label,
-    subCategorySource: this.subCategory?.source,
+    hasSubCategory: !!currentSubcategory?.name,
+    subCategoryLabel: currentSubcategory?.name,
+    subCategorySource: currentSubcategory?.source,
     hasManualSubCategory,
     shouldRefreshSubCategory,
   });
 
   if (shouldRefreshSubCategory) {
     console.log("[Task.pre-save] Generating subcategory for:", this.taskname);
-    this.subCategory = await generateSubCategory({
+    const generated = await generateSubCategory({
       userId: this.userId,
       title: this.taskname,
       description: this.description,
       category: this.category,
-      current: this.subCategory,
+      current: currentSubcategory
+        ? {
+            label: currentSubcategory.name,
+            source: currentSubcategory.source,
+            confidence: currentSubcategory.confidence,
+            updatedAt: currentSubcategory.updatedAt,
+          }
+        : null,
       TaskModel: this.constructor,
     });
-    console.log("[Task.pre-save] Generated subcategory:", this.subCategory?.label, "source:", this.subCategory?.source);
+
+    if (generated?.label) {
+      const created = await findOrCreateSubcategory({
+        userId: this.userId,
+        name: generated.label,
+        parent: this.category,
+        source: generated.source || "keyword-match",
+        confidence: typeof generated.confidence === "number" ? generated.confidence : 0.5,
+      });
+      this.subCategory = created ? created._id : null;
+    } else {
+      this.subCategory = null;
+    }
+
+    console.log(
+      "[Task.pre-save] Generated subcategory:",
+      generated?.label,
+      "source:",
+      generated?.source,
+    );
   } else {
-    console.log("[Task.pre-save] Keeping existing subcategory:", this.subCategory?.label);
+    console.log("[Task.pre-save] Keeping existing subcategory:", currentSubcategory?.name);
   }
 
   // ========================================================================

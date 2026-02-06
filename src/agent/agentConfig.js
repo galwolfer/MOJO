@@ -189,9 +189,13 @@ export function buildSystemPromptWithUserContext(
       // Group by category for cleaner prompting
       userProfile.subCategories.forEach((sub) => {
         try {
-          const catKey = getCategoryKey(sub.category);
+          const catKey =
+            sub.parent ||
+            (typeof sub.category === "number" ? getCategoryKey(sub.category) : typeof sub.category === "string" ? sub.category : null);
+          const name = sub.name || sub.label || "";
+          if (!catKey || !name) return;
           if (!grouped[catKey]) grouped[catKey] = [];
-          grouped[catKey].push(sub.name);
+          grouped[catKey].push(name);
         } catch (e) {
           // ignore invalid categories
         }

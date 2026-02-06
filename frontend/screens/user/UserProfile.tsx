@@ -78,7 +78,7 @@ const MOCK_FRIENDS = [
   },
   {
     id: "4",
-    name: "Gal Wolter",
+    name: "Gal Wolfer",
     avatar: null,
     isOnline: true,
     stats: { tasks: 28, streak: 456, points: 321 },
