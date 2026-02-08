@@ -31,17 +31,62 @@ export const COLORS = {
   darkP7: "#DA2727",
   darkGray: "#30364b",
 
-  // Neutrals
-  white: "#F2F5FF",
+  // Light theme colors
+  white1: "#F2F5FF",
   white2: "#E6E9F7",
   white3: "#D8DEF7",
-  colorWhite: "#FFFFFF",
+
+  // Dark theme colors
+  black1: "#1A1D23",
+  black2: "#24272E",
+  black3: "#2E3139",
+
+  // Legacy neutrals (kept for backward compatibility)
+  white: "#F2F5FF",
+  colorWhite: "#F2F5FF",
   black: "#141519",
 
   // Misc / special
   shadow15277c14: "rgba(21, 39, 124, 0.14)",
   transparentWhite: "rgba(255, 255, 255, 0)",
 };
+
+/**
+ * Dynamic theme colors based on light/dark mode
+ * Returns background and text colors that adapt to the current theme
+ */
+export type ThemeMode = "light" | "dark";
+
+export interface ThemeColors {
+  bg1: string;
+  bg2: string;
+  bg3: string;
+  text1: string;
+  text2: string;
+  text3: string;
+}
+
+export function getThemeColors(mode: ThemeMode = "light"): ThemeColors {
+  if (mode === "dark") {
+    return {
+      bg1: COLORS.black1,
+      bg2: COLORS.black2,
+      bg3: COLORS.black3,
+      text1: COLORS.white1,
+      text2: COLORS.white2,
+      text3: COLORS.white3,
+    };
+  }
+  // Light mode (default)
+  return {
+    bg1: COLORS.white1,
+    bg2: COLORS.white2,
+    bg3: COLORS.white3,
+    text1: COLORS.black,
+    text2: COLORS.darkGray,
+    text3: COLORS.lightGray,
+  };
+}
 
 export const SPACING = {
   xs: moderateScale(3),

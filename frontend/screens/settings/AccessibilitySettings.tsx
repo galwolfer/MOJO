@@ -17,13 +17,14 @@ import Box from "../../components/layout/Box";
 import List, { ListCellProps } from "../../components/layout/List";
 import { makeListCell } from "../../components/layout/ListItem";
 import TimeFormatScreen from "./screens/TimeFormat";
+import ThemeModeScreen from "./screens/ThemeMode";
 import ErrorText from "../../components/common/ErrorText";
 
 type AccessibilitySettingsScreenProps = {
   onBack: () => void;
 };
 
-type CurrentScreen = "main" | "time-format";
+type CurrentScreen = "main" | "time-format" | "theme-mode";
 
 export default function AccessibilitySettingsScreen({ onBack }: AccessibilitySettingsScreenProps) {
   const [currentScreen, setCurrentScreen] = useState<CurrentScreen>("main");
@@ -61,9 +62,22 @@ export default function AccessibilitySettingsScreen({ onBack }: AccessibilitySet
     return <TimeFormatScreen onBack={() => setCurrentScreen("main")} />;
   }
 
+  // Render theme mode settings screen
+  if (currentScreen === "theme-mode") {
+    return <ThemeModeScreen onBack={() => setCurrentScreen("main")} />;
+  }
+
   const ClockIcon = ICONS.clock;
+  const PaletteIcon = ICONS.settings; // Replace with actual palette/theme icon
 
   const accessibilityItems: ListCellProps[] = [
+    makeListCell("theme-mode", {
+      title: "Theme Mode",
+      subtitle: preferences.theme === "dark" ? "Dark Mode" : "Light Mode",
+      logo: <PaletteIcon size={ICON_SIZES.sm} color={COLORS.primary3} />,
+      onPress: () => setCurrentScreen("theme-mode"),
+      divider: true,
+    }),
     makeListCell("time-format", {
       title: "Time Format",
       subtitle: preferences.timeFormat === "12h" ? "12-Hour (2:30 PM)" : "24-Hour (14:30)",

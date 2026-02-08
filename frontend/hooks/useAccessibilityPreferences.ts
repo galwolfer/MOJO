@@ -14,13 +14,16 @@ import { useAuth } from "../context/AuthContext";
 const ACCESSIBILITY_PREFS_KEY = "@mojo/accessibility-preferences";
 
 export type TimeFormat = "12h" | "24h";
+export type ThemeMode = "light" | "dark";
 
 export interface AccessibilityPreferences {
   timeFormat: TimeFormat;
+  theme: ThemeMode;
 }
 
 const DEFAULT_PREFERENCES: AccessibilityPreferences = {
   timeFormat: "12h",
+  theme: "light",
 };
 
 export function useAccessibilityPreferences() {

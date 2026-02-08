@@ -8,6 +8,7 @@ import * as SplashScreen from "expo-splash-screen";
 import AuthScreen from "./screens/auth/Auth";
 import { COLORS } from "./theme";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import { NavigationProvider } from "./context/NavigationContext";
 import { LayoutProvider } from "./context/LayoutContext";
 import { TaskProvider } from "./context/TaskContext";
@@ -95,19 +96,21 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <NotificationProvider>
-        <NavigationProvider>
-          <LayoutProvider>
-            <OjoProvider>
-              <TaskProvider>
-                <StatsProvider>
-                  <AppContent />
-                </StatsProvider>
-              </TaskProvider>
-            </OjoProvider>
-          </LayoutProvider>
-        </NavigationProvider>
-      </NotificationProvider>
+      <ThemeProvider>
+        <NotificationProvider>
+          <NavigationProvider>
+            <LayoutProvider>
+              <OjoProvider>
+                <TaskProvider>
+                  <StatsProvider>
+                    <AppContent />
+                  </StatsProvider>
+                </TaskProvider>
+              </OjoProvider>
+            </LayoutProvider>
+          </NavigationProvider>
+        </NotificationProvider>
+      </ThemeProvider>
     </AuthProvider>
   );
 }
