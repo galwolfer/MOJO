@@ -6,11 +6,11 @@
 
 import React, { useEffect } from "react";
 import { View, StyleSheet, TouchableOpacity } from "react-native";
-import { COLORS, SPACING, ICON_SIZES } from "../../theme";
-import { useNavigation } from "../../context/NavigationContext";
-import { ICONS } from "../../components/icons/icons";
-import ScrollableContent from "../../components/layout/ScrollableContent";
-import NotificationSettings from "../../components/special/NotificationSettings";
+import { COLORS, SPACING, ICON_SIZES } from "../../../theme";
+import { useNavigation } from "../../../context/NavigationContext";
+import { ICONS } from "../../../components/icons/icons";
+import ScrollableContent from "../../../components/layout/ScrollableContent";
+import NotificationSettings from "../../../components/special/NotificationSettings";
 
 type NotificationSettingsScreenProps = {
   onBack: () => void;

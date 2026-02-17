@@ -44,7 +44,12 @@ export async function createTaskViaController(userId, taskData) {
         taskname: taskData.taskname,
         name: taskData.taskname,
         category: taskData.category,
-        subcategory: taskData.subcategory || taskData.subCategory?.label,
+        subcategory:
+          taskData.subcategory ||
+          taskData.subCategory?.label ||
+          taskData.subCategory?.name ||
+          (typeof taskData.subCategory === "string" ? taskData.subCategory : undefined),
+        subcategoryId: taskData.subCategoryId || taskData.subcategoryId,
         deadline: taskData.dueDate || taskData.deadline,
         recurrence: taskData.recurrence,
         description: taskData.description,
@@ -110,10 +115,36 @@ export async function createTaskViaController(userId, taskData) {
  */
 export async function updateTaskViaController(userId, taskId, updates) {
   try {
+    // Normalize updates so controller's field expectations are met
+    const normalizedBody = { ...updates };
+
+    // Accept either `subCategory` (object) or `subcategory` (string/object) provided by missions
+    if (normalizedBody.subCategory !== undefined) {
+      // Map `subCategory` -> `subcategory` to match controller's lookup
+      normalizedBody.subcategory = normalizedBody.subCategory;
+      delete normalizedBody.subCategory;
+    }
+
+    // Ensure subcategory id aliases are preserved
+    if (normalizedBody.subCategoryId !== undefined && normalizedBody.subcategoryId === undefined) {
+      normalizedBody.subcategoryId = normalizedBody.subCategoryId;
+    }
+
+    // Normalize subtasks: map `_id` -> `id` so controller picks them up
+    if (Array.isArray(normalizedBody.subtasks)) {
+      normalizedBody.subtasks = normalizedBody.subtasks.map((s) => ({
+        id: s.id || s._id || undefined,
+        title: s.title,
+        description: s.description,
+        minutes: s.minutes,
+        index: s.index,
+      }));
+    }
+
     const mockReq = {
       user: { userId },
       params: { id: taskId },
-      body: updates,
+      body: normalizedBody,
     };
 
     let responseBody = null;

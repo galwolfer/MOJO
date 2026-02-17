@@ -42,6 +42,9 @@ interface TaskData {
   subcategoryDisplay?: string;
   subCategory?: {
     label?: string;
+    name?: string;
+    icon?: string | null;
+    parent?: string;
     source?: string;
     confidence?: number;
     updatedAt?: string;
@@ -131,7 +134,8 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
           category={task.category}
           categoryDisplay={categoryDisplayNormalized}
           subcategory={task.subcategory}
-          subcategoryDisplay={task.subcategoryDisplay || task.subCategory?.label}
+          subcategoryDisplay={task.subcategoryDisplay || task.subCategory?.label || task.subCategory?.name}
+          subCategory={task.subCategory}
           importance={task.importance}
           effort={task.effort}
         />
@@ -198,7 +202,7 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
                             style={{ color: getCategoryMeta(task.category)?.color || COLORS.primary1 }}
                           >
                             {formatDuration(subtask.duration || subtask.minutes || 0)}
-                          </AppText>{" "}
+                          </AppText>
                           <ICONS.clock
                             size={ICON_SIZES.sm / 2}
                             color={getCategoryMeta(task.category)?.color || COLORS.primary1}

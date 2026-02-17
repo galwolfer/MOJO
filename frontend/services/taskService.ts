@@ -37,19 +37,26 @@ export type SubTask = {
   completedAt?: string | null;
 };
 
+export type SubcategoryRef = {
+  _id?: string;
+  id?: string;
+  name?: string;
+  label?: string;
+  parent?: string;
+  icon?: string | null;
+  color?: string | null;
+  source?: string;
+  confidence?: number;
+  updatedAt?: string;
+};
+
 export type Task = {
   _id: string;
   userId: string;
   taskname: string;
   description?: string;
   category?: string;
-  tags?: string[] | null;
-  subCategory?: {
-    label: string;
-    source: string;
-    confidence: number;
-    updatedAt?: string;
-  };
+  subCategory?: SubcategoryRef | null;
   status: TaskStatus;
   completed?: boolean;
   completedAt?: string | null;
@@ -67,6 +74,7 @@ export type Task = {
   earliestStart?: string | null;
   priorityScore?: number;
   progressPercentage?: number;
+  tags?: string[] | null;
   subtasks?: SubTask[];
   scheduledSessions?: ScheduledSession[];
   createdAt: string;
@@ -121,6 +129,7 @@ export type ScheduledDayGroup = {
     progressPercentage?: number;
     taskType?: string | null;
     category?: string | null;
+    subCategory?: SubcategoryRef | null;
     subcategory?: string | null;
     description?: string;
     estimatedDuration?: number;
@@ -162,18 +171,12 @@ export async function getTasks(filters?: {
     const response = await get<TasksResponse>(endpoint);
     console.log("[getTasks] Raw response:", JSON.stringify(response, null, 2));
     const tasks = response.tasks || [];
-    console.log("[getTasks] Tasks count:", tasks.length);
-    tasks.forEach((task: any) => {
-      console.log(`\n[getTasks] Task:`, {
-        id: task._id,
-        name: task.taskname,
-        taskType: task.taskType,
-        hasSubTasks: !!task.subTasks,
-        subTasksCount: task.subTasks?.length || 0,
-        subTasksArray: task.subTasks,
-      });
-    });
-    return tasks;
+
+    // Map subTasks to subtasks for consistent naming across frontend
+    return tasks.map((task: any) => ({
+      ...task,
+      subtasks: task.subTasks || task.subtasks || [],
+    }));
   } catch (error) {
     console.warn("Failed to fetch tasks:", error);
     return [];
@@ -209,7 +212,7 @@ export async function getOverdueTasks(): Promise<Task[]> {
   try {
     const response = await get<{ success: boolean; tasks: Task[] }>(`/tasks/overdue`);
     const tasks = response.tasks || [];
-    
+
     // Map subTasks to subtasks for consistent naming across frontend
     return tasks.map((task: any) => ({
       ...task,
@@ -273,24 +276,11 @@ export async function getScheduledTasksByDay(days: number = 7): Promise<Schedule
  * If `scheduledTodayIds` is provided, today's task counts are taken from the scheduled tasks
  * (i.e., tasks that have scheduled sessions for today) instead of checking `dueDate`.
  */
-export function calculateTaskProgress(tasks: Task[], days: number = 14, scheduledInfo?: { taskIds?: Set<string>; subtaskKeys?: Set<string> }): TaskProgress {
-  console.log("[calculateTaskProgress] Called with:", {
-    taskCount: tasks.length,
-    days,
-    hasScheduledInfo: !!scheduledInfo,
-    scheduledTaskIds: scheduledInfo?.taskIds?.size || 0,
-    scheduledSubtaskKeys: scheduledInfo?.subtaskKeys?.size || 0,
-    tasksSample: tasks.slice(0, 2).map(t => ({
-      id: t._id || (t as any).id,
-      name: (t as any).taskname,
-      status: t.status,
-      completedAt: t.completedAt,
-      subtaskCount: ((t as any).subTasks || []).length,
-      scheduledSessionCount: ((t as any).scheduledSessions || []).length,
-      dueDate: (t as any).dueDate,
-    })),
-  });
-  
+export function calculateTaskProgress(
+  tasks: Task[],
+  days: number = 14,
+  scheduledInfo?: { taskIds?: Set<string>; subtaskKeys?: Set<string> },
+): TaskProgress {
   const now = new Date();
   const dailyProgress: number[] = [];
   const labels: string[] = [];
@@ -311,7 +301,7 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
   // Helper to check if a task/subtask has a scheduled session on a specific day
   const hasScheduledSessionOnDay = (sessions: any[] | undefined, dayStart: Date, dayEnd: Date): boolean => {
     if (!sessions || !Array.isArray(sessions)) return false;
-    return sessions.some(session => {
+    return sessions.some((session) => {
       if (!session?.start) return false;
       const sessionStart = new Date(session.start);
       return sessionStart >= dayStart && sessionStart < dayEnd;
@@ -355,13 +345,13 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
           const stIsDone = st?.status === "done";
           const wasCompletedOnThisDay = isWithinDay(stCompletedAt, dayStart, dayEnd);
           const assumeCompletedToday = isToday && stIsDone && !stCompletedAt;
-          
+
           // Check if subtask has a scheduled session on this day
           const isSubtaskScheduledForDay = hasScheduledSessionOnDay(st?.scheduledSessions, dayStart, dayEnd);
-          
+
           // Fallback: if task is due on this day, count subtasks as planned work
           const isTaskDueThisDay = hasDueDateOnDay(taskDueDate, dayStart, dayEnd);
-          
+
           // Count in total if:
           // 1. Scheduled for this day AND not completed before this day started, OR
           // 2. Was completed on this day (so it shows as work done on this day), OR
@@ -375,7 +365,12 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
             // Completed on this day but wasn't scheduled for it - count as both total and completed
             totalUnits += 1;
             completedUnits += 1;
-          } else if (isToday && isTaskDueThisDay && !isCompletedBefore(stCompletedAt, dayStart) && !isSubtaskScheduledForDay) {
+          } else if (
+            isToday &&
+            isTaskDueThisDay &&
+            !isCompletedBefore(stCompletedAt, dayStart) &&
+            !isSubtaskScheduledForDay
+          ) {
             // Today only: task due today with no scheduled session - count as pending work
             totalUnits += 1;
             if (stIsDone) {
@@ -389,10 +384,10 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
         const taskIsDone = task.status === "done" || task.completed === true;
         const wasCompletedOnThisDay = isWithinDay(taskCompletedAt, dayStart, dayEnd);
         const assumeCompletedToday = isToday && taskIsDone && !taskCompletedAt;
-        
+
         // Check if task has a scheduled session on this day
         const isTaskScheduledForDay = hasScheduledSessionOnDay((task as any).scheduledSessions, dayStart, dayEnd);
-        
+
         // Fallback: check if task is due on this day
         const isTaskDueThisDay = hasDueDateOnDay(taskDueDate, dayStart, dayEnd);
 
@@ -409,7 +404,12 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
           // Completed on this day but wasn't scheduled for it - count as both total and completed
           totalUnits += 1;
           completedUnits += 1;
-        } else if (isToday && isTaskDueThisDay && !isCompletedBefore(taskCompletedAt, dayStart) && !isTaskScheduledForDay) {
+        } else if (
+          isToday &&
+          isTaskDueThisDay &&
+          !isCompletedBefore(taskCompletedAt, dayStart) &&
+          !isTaskScheduledForDay
+        ) {
           // Today only: task due today with no scheduled session - count as pending work
           totalUnits += 1;
           if (taskIsDone) {
@@ -602,7 +602,7 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
   // Helper to check if any scheduled session falls within the week
   const hasScheduledSessionInWeek = (sessions: any[] | undefined): boolean => {
     if (!sessions || !Array.isArray(sessions)) return false;
-    return sessions.some(session => {
+    return sessions.some((session) => {
       if (!session?.start) return false;
       const sessionStart = new Date(session.start);
       return sessionStart >= sundayStart && sessionStart < weekEndExclusive;
@@ -617,7 +617,7 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
       for (const st of subs) {
         const isScheduledThisWeek = hasScheduledSessionInWeek(st?.scheduledSessions);
         const wasCompletedThisWeek = st?.completedAt && isWithinDay(st.completedAt, sundayStart, weekEndExclusive);
-        
+
         if (isScheduledThisWeek || wasCompletedThisWeek) {
           weekTotal += 1;
           if (st?.status === "done") {
@@ -628,7 +628,7 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
     } else {
       const isScheduledThisWeek = hasScheduledSessionInWeek((task as any).scheduledSessions);
       const wasCompletedThisWeek = task.completedAt && isWithinDay(task.completedAt, sundayStart, weekEndExclusive);
-      
+
       if (isScheduledThisWeek || wasCompletedThisWeek) {
         weekTotal += 1;
         if (task.status === "done" || task.completed === true) {
@@ -652,16 +652,7 @@ export function calculateTaskProgress(tasks: Task[], days: number = 14, schedule
     dailyProgress,
     labels,
   };
-  
-  console.log("[calculateTaskProgress] Result:", {
-    todayTotal,
-    todayCompleted,
-    todayPercentage,
-    weekTotal,
-    weekCompleted,
-    dailyProgressSample: dailyProgress.slice(-3), // Last 3 days
-  });
-  
+
   return result;
 }
 
@@ -770,7 +761,7 @@ export async function toggleTaskCompletion(id: string): Promise<ToggleTaskResult
       wasCompletion?: boolean;
       wasUncompletion?: boolean;
     }>(`/tasks/${id}/toggle`, {});
-    
+
     console.log("[taskService] toggleTaskCompletion response:", {
       success: response.success,
       hasGamification: !!response.gamification,
@@ -778,7 +769,7 @@ export async function toggleTaskCompletion(id: string): Promise<ToggleTaskResult
       wasCompletion: response.wasCompletion,
       wasUncompletion: response.wasUncompletion,
     });
-    
+
     return {
       success: response.success,
       task: response.task || null,

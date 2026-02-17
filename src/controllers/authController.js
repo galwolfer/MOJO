@@ -409,7 +409,8 @@ export async function deleteAccount(req, res, next) {
     console.log(`📧 Deleting account for user: ${user.username} (${user.email})`);
 
     // Import all models
-    const { Task, Session, Memory, TaskSchedule, SubTask, BusyBlock, EventLog } = await import("../models/index.js");
+    const { Task, Session, Memory, TaskSchedule, SubTask, BusyBlock, EventLog, Subcategory } =
+      await import("../models/index.js");
 
     // Delete all user data from all collections
     const deletionResults = await Promise.allSettled([
@@ -427,10 +428,21 @@ export async function deleteAccount(req, res, next) {
       BusyBlock?.deleteMany({ userId }),
       // Delete all event logs
       EventLog?.deleteMany({ userId }),
+      // Delete all user-created subcategories
+      Subcategory?.deleteMany({ userId }),
     ]);
 
     // Log deletion results
-    const collectionNames = ["Task", "SubTask", "TaskSchedule", "Session", "Memory", "BusyBlock", "EventLog"];
+    const collectionNames = [
+      "Task",
+      "SubTask",
+      "TaskSchedule",
+      "Session",
+      "Memory",
+      "BusyBlock",
+      "EventLog",
+      "Subcategory",
+    ];
     deletionResults.forEach((result, index) => {
       if (result.status === "fulfilled" && result.value) {
         console.log(`  ✅ Deleted ${result.value.deletedCount || 0} ${collectionNames[index]}(s)`);
@@ -502,9 +514,10 @@ export async function updateCategoryPriorities(req, res, next) {
     await user.save();
 
     // Convert priorities to a plain JavaScript object for response
-    const savedPriorities = user.profile.priorities && typeof user.profile.priorities.toObject === "function"
-      ? user.profile.priorities.toObject()
-      : JSON.parse(JSON.stringify(user.profile.priorities || {}));
+    const savedPriorities =
+      user.profile.priorities && typeof user.profile.priorities.toObject === "function"
+        ? user.profile.priorities.toObject()
+        : JSON.parse(JSON.stringify(user.profile.priorities || {}));
 
     res.json({
       success: true,
@@ -538,10 +551,11 @@ export async function getPreferences(req, res, next) {
 
     // Convert priorities to a plain JavaScript object (Mongoose subdocument -> plain object)
     const prioritiesDoc = user.profile.priorities;
-    const priorities = prioritiesDoc && typeof prioritiesDoc.toObject === "function"
-      ? prioritiesDoc.toObject()
-      : JSON.parse(JSON.stringify(prioritiesDoc || {}));
-    
+    const priorities =
+      prioritiesDoc && typeof prioritiesDoc.toObject === "function"
+        ? prioritiesDoc.toObject()
+        : JSON.parse(JSON.stringify(prioritiesDoc || {}));
+
     const ojoType = user.profile.ojoTypeId
       ? {
           name: user.profile.ojoTypeId.name,

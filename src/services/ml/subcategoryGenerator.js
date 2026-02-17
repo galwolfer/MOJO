@@ -370,7 +370,7 @@ const tokenize = (text = "") =>
  */
 const shouldRespectManual = (subCategory = {}) => {
   if (!subCategory || typeof subCategory !== "object") return false;
-  if (!subCategory.label) return false;
+  if (!subCategory.label && !subCategory.name) return false;
   return subCategory.source === "user" || subCategory.source === "imported";
 };
 

@@ -6,21 +6,21 @@
  */
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
-import AppText from "../../components/common/AppText";
-import AppButton from "../../components/common/AppButton";
-import Box from "../../components/layout/Box";
-import GridEntranceItem from "../../components/common/animations/GridEntranceItem";
-import { ICONS } from "../../components/icons/icons";
-import { COLORS, SPACING, FONT_SIZES, SHADOWS, ICON_SIZES } from "../../theme";
+import AppText from "../../../components/common/AppText";
+import AppButton from "../../../components/common/AppButton";
+import Box from "../../../components/layout/Box";
+import GridEntranceItem from "../../../components/common/animations/GridEntranceItem";
+import { ICONS } from "../../../components/icons/icons";
+import { COLORS, SPACING, FONT_SIZES, SHADOWS, ICON_SIZES } from "../../../theme";
 import { moderateScale } from "react-native-size-matters";
-import { getAllOjoTypes, type OjoTypeName } from "../../config/ojoTypeConfig";
-import { useNavigation } from "../../context/NavigationContext";
-import { useLayout } from "../../context/LayoutContext";
-import { useKeyboard } from "../../hooks";
-import { getUserPreferences } from "../../services/apiClient";
-import { patch, setAuthToken } from "../../services/httpClient";
-import { useAuth } from "../../context/AuthContext";
-import { useOjo } from "../../context/OjoContext";
+import { getAllOjoTypes, type OjoTypeName } from "../../../config/ojoTypeConfig";
+import { useNavigation } from "../../../context/NavigationContext";
+import { useLayout } from "../../../context/LayoutContext";
+import { useKeyboard } from "../../../hooks";
+import { getUserPreferences } from "../../../services/apiClient";
+import { patch, setAuthToken } from "../../../services/httpClient";
+import { useAuth } from "../../../context/AuthContext";
+import { useOjo } from "../../../context/OjoContext";
 
 type ChatSettingsScreenProps = {
   onBack: () => void;
