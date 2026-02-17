@@ -5,7 +5,8 @@ import sys
 
 
 def log_debug(message):
-    print(message, file=sys.stderr, flush=True)
+    # Debug logging disabled - retained as a no-op to avoid side effects
+    return None
 
 
 # Return True when two time slots do not overlap

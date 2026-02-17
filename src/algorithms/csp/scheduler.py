@@ -19,8 +19,8 @@ SLOT_GRANULARITY_MINUTES = 10
 MAX_BACKTRACK_ITERATIONS = 10000
 
 def log_debug(msg: str):
-    """Write debug messages to stderr without breaking JSON output on stdout"""
-    print(f"[CSP-DEBUG] {msg}", file=sys.stderr, flush=True)
+    # Debug logging disabled in production - kept as no-op so calls remain safe
+    return None
 
 
 def start_of_day(dt: datetime) -> datetime:
