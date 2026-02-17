@@ -33,6 +33,7 @@ import { COLORS, FONT_SIZES, SHADOWS, SPACING } from "../theme";
 import { useNavigation } from "../context/NavigationContext";
 import { useAuth } from "../context/AuthContext";
 import { useTaskContext } from "../context/TaskContext";
+import { useOptionalStatsContext } from "../context/StatsContext";
 import { ICONS } from "../components/icons/icons";
 import { setChatAuthToken } from "../services/chatService";
 import { useKeyboard, useContentInsets } from "../hooks";
@@ -47,6 +48,7 @@ export default function ChatScreen() {
   const { setHeaderConfig, setNavBarConfig, scrollPositions, setScrollPosition } = useNavigation();
   const { token } = useAuth();
   const { notifyTaskUpdate } = useTaskContext();
+  const { notifyStatsChange } = useOptionalStatsContext();
   const sessionsRef = useRef<ChatSessionSummary[]>([]);
   const listRef = useRef<FlatList<TimelineItem>>(null);
   const scrollOffsetRef = useRef(0);
@@ -64,8 +66,10 @@ export default function ChatScreen() {
     useChatSessions();
 
   // Pass task change callback to update progress when tasks are created/modified via chat
+  // Pass stats change callback to update points/streak when tasks are completed/uncompleted via chat
   const { isLoading, sessionId, setSessionId, sendText, handleRetry } = useChatMessages(updateSession, {
     onTaskChange: notifyTaskUpdate,
+    onStatsChange: notifyStatsChange,
   });
 
   // Set auth token for chat service

@@ -16,16 +16,24 @@ function parseRelativeDate(dateString) {
 
   const lowerStr = dateString.toLowerCase().trim();
 
+  // Helper to format date as YYYY-MM-DD in local timezone
+  const toLocalDateString = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Handle: "tomorrow"
   if (lowerStr === "tomorrow") {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split("T")[0];
+    return toLocalDateString(tomorrow);
   }
 
   // Handle: "today"
   if (lowerStr === "today") {
-    return today.toISOString().split("T")[0];
+    return toLocalDateString(today);
   }
 
   // Handle: "next Thursday", "this Thursday", "Thursday", etc.
@@ -49,7 +57,7 @@ function parseRelativeDate(dateString) {
 
       const targetDate = new Date(today);
       targetDate.setDate(targetDate.getDate() + daysToAdd);
-      return targetDate.toISOString().split("T")[0];
+      return toLocalDateString(targetDate);
     }
   }
 
@@ -65,7 +73,7 @@ function parseRelativeDate(dateString) {
     else if (unit.includes("week")) futureDate.setDate(futureDate.getDate() + amount * 7);
     else if (unit.includes("hour")) futureDate.setHours(futureDate.getHours() + amount);
 
-    return futureDate.toISOString().split("T")[0];
+    return toLocalDateString(futureDate);
   }
 
   // If already in ISO format (YYYY-MM-DD), return as-is
@@ -85,7 +93,7 @@ const previewTaskMission = new GuidedMission({
   description:
     "Return a task_confirmation widget for approval. Keep your message brief - the widget shows all details. Required: taskname, deadline, estimatedDuration, category, subcategory.",
   missionInfo:
-    "Draft and show a task_confirmation widget. Use 1 short, natural sentence before the widget and one short sentence after (confirm/edit/cancel). Prefer the user's language when evident, otherwise default to English. Allow the model to pick an appropriate, natural phrasing (vary wording and tone as needed). Do NOT repeat fields already shown in the widget.",
+    "Draft and show a task_confirmation widget AFTER required details are collected. Use 1 short, natural sentence before the widget and one short sentence after (confirm/edit/cancel). Prefer the user's language when evident, otherwise default to English. Allow the model to pick an appropriate, natural phrasing (vary wording and tone as needed). Do NOT repeat fields already shown in the widget.",
   behavior: [
     "Use when user asks to create a task.",
     "STEP 1: Determine category ",
@@ -127,6 +135,16 @@ const previewTaskMission = new GuidedMission({
         count: z.number().optional(),
       })
       .optional(),
+    subtasks: z
+      .array(
+        z.object({
+          title: z.string(),
+          description: z.string().optional(),
+          minutes: z.number().optional(),
+          duration: z.number().optional(),
+        }),
+      )
+      .optional(),
   }),
   execute: async ({ userId, args }) => {
     const {
@@ -147,6 +165,7 @@ const previewTaskMission = new GuidedMission({
       earliestStart,
       taskType,
       recurrence,
+      subtasks,
     } = args;
 
     try {
@@ -177,14 +196,51 @@ const previewTaskMission = new GuidedMission({
         return okFalse(`Invalid deadline date: ${finalDeadline}`);
       }
 
+      // Normalize subtasks (if provided)
+      const normalizedSubtasks = Array.isArray(subtasks)
+        ? subtasks
+            .map((st, index) => {
+              if (!st || typeof st !== "object") return null;
+              const title = typeof st.title === "string" ? st.title.trim() : "";
+              if (!title) return null;
+              const rawMinutes =
+                typeof st.minutes === "number"
+                  ? st.minutes
+                  : typeof st.duration === "number"
+                    ? st.duration
+                    : null;
+              const minutes = typeof rawMinutes === "number" && isFinite(rawMinutes) && rawMinutes > 0
+                ? Math.round(rawMinutes)
+                : null;
+              return {
+                title,
+                description: typeof st.description === "string" ? st.description : "",
+                minutes: minutes ?? undefined,
+                duration: minutes ?? undefined,
+                order: index + 1,
+              };
+            })
+            .filter(Boolean)
+        : [];
+      const hasSubtasks = normalizedSubtasks.length > 0;
+      const derivedDuration = hasSubtasks
+        ? normalizedSubtasks.reduce((sum, st) => sum + (st.minutes || 0), 0)
+        : null;
+
       // Infer properties from task name if not provided
       const inferred = inferTaskProperties(taskname);
 
       // Apply defaults and inference
       let finalImportance = importance !== undefined && importance !== null ? importance : null;
       const finalEffort = effort !== undefined && effort !== null ? effort : (inferred.effort ?? null);
-      const finalDuration = duration !== undefined && duration !== null ? duration : (inferred.duration ?? null);
-      const finalCanSplit = canSplit !== undefined ? canSplit : TASK_CONFIG.defaults.splitable;
+      const finalDuration =
+        duration !== undefined && duration !== null
+          ? duration
+          : derivedDuration !== null && derivedDuration > 0
+            ? derivedDuration
+            : (inferred.duration ?? null);
+      const finalCanSplit =
+        canSplit !== undefined ? canSplit : hasSubtasks ? true : TASK_CONFIG.defaults.splitable;
 
       // If duration isn't provided, request it from the user
       if (!finalDuration || typeof finalDuration !== "number" || isNaN(finalDuration) || finalDuration <= 0) {
@@ -226,6 +282,14 @@ const previewTaskMission = new GuidedMission({
       let finalTaskType;
       if (taskType) {
         finalTaskType = taskType;
+      } else if (hasSubtasks) {
+        const minutes = normalizedSubtasks.map((st) => st.minutes).filter((m) => typeof m === "number" && m > 0);
+        if (minutes.length >= 2) {
+          const allSame = minutes.every((m) => m === minutes[0]);
+          finalTaskType = allSame ? "in_parts" : "leaky";
+        } else {
+          finalTaskType = "in_parts";
+        }
       } else if (minMinutes !== undefined || maxMinutes !== undefined) {
         finalTaskType = "leaky";
       } else if (chunkCount !== undefined || chunkMinutes !== undefined) {
@@ -235,10 +299,32 @@ const previewTaskMission = new GuidedMission({
       }
 
       const previewMinChunk = finalTaskType === "in_parts" ? finalMinChunk : null;
-      const previewChunkCount = finalTaskType === "in_parts" ? finalChunkCount : null;
+      const previewChunkCount =
+        finalTaskType === "in_parts"
+          ? finalChunkCount !== null && finalChunkCount !== undefined
+            ? finalChunkCount
+            : hasSubtasks
+              ? normalizedSubtasks.length
+              : null
+          : null;
       const previewChunkMinutes = finalTaskType === "in_parts" ? finalChunkMinutes : null;
-      const previewMinMinutes = finalTaskType === "leaky" ? finalMinMinutes : null;
-      const previewMaxMinutes = finalTaskType === "leaky" ? finalMaxMinutes : null;
+      const subtaskMinutes = hasSubtasks
+        ? normalizedSubtasks.map((st) => st.minutes || 0).filter((m) => m > 0)
+        : [];
+      const subtaskMin = subtaskMinutes.length > 0 ? Math.min(...subtaskMinutes) : null;
+      const subtaskMax = subtaskMinutes.length > 0 ? Math.max(...subtaskMinutes) : null;
+      const previewMinMinutes =
+        finalTaskType === "leaky"
+          ? finalMinMinutes !== null && finalMinMinutes !== undefined
+            ? finalMinMinutes
+            : subtaskMin
+          : null;
+      const previewMaxMinutes =
+        finalTaskType === "leaky"
+          ? finalMaxMinutes !== null && finalMaxMinutes !== undefined
+            ? finalMaxMinutes
+            : subtaskMax
+          : null;
 
       // Infer splitting params if not explicitly provided for this taskType
       const inferredParams = inferSplittingParams(finalTaskType, finalDuration);
@@ -270,7 +356,7 @@ const previewTaskMission = new GuidedMission({
         taskname: taskname,
         // Include human-consumable deadline and machine ISO dueDate
         deadline: finalDeadline,
-        dueDate: new Date(finalDeadline).toISOString(),
+        dueDate: finalDeadline + "T00:00:00.000Z",
         description: description || "",
         status: "draft",
         // Use internal category key for the 'category' field (for internal operations)
@@ -296,6 +382,7 @@ const previewTaskMission = new GuidedMission({
         recurrence: recurrence || null,
         progressPercentage: 0,
         scheduledSessions: [],
+        subtasks: hasSubtasks ? normalizedSubtasks : [],
         // Small human-readable short description for listing/preview
         shortDescription,
         // Store internal category key for task creation

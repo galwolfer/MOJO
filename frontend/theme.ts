@@ -19,7 +19,7 @@ export const COLORS = {
   brightP5: "#FFD796",
   brightP6: "#A7F7B6",
   brightP7: "#FFADAD",
-  lightGray: "#7b86af",
+  lightGray: "#7d87a7",
 
   // Dark palette
   darkP1: "#1F3BC0",
@@ -29,7 +29,7 @@ export const COLORS = {
   darkP5: "#D38911",
   darkP6: "#118826",
   darkP7: "#DA2727",
-  darkGray: "#3B3E50",
+  darkGray: "#30364b",
 
   // Neutrals
   white: "#F2F5FF",
@@ -282,8 +282,13 @@ export function getPalettePair(index?: number) {
     Number.isInteger(index) && index! >= 1 && index! <= COLORS_NUM
       ? (index as number)
       : Math.floor(Math.random() * COLORS_NUM) + 1;
-  const brightKey = `brightP${idx}` as keyof typeof COLORS as keyof typeof COLORS;
-  const darkKey = `darkP${idx}` as keyof typeof COLORS as keyof typeof COLORS;
+
+  if (idx === 8) {
+    return { bg: COLORS.lightGray, text: COLORS.darkGray, index: 8 };
+  }
+
+  const brightKey = `brightP${idx}` as keyof typeof COLORS;
+  const darkKey = `darkP${idx}` as keyof typeof COLORS;
   return { bg: COLORS[brightKey], text: COLORS[darkKey], index: idx };
 }
 

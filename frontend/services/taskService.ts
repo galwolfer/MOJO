@@ -34,6 +34,7 @@ export type SubTask = {
   status?: SubTaskStatus;
   minutes?: number;
   scheduledSessions?: ScheduledSession[];
+  completedAt?: string | null;
 };
 
 export type Task = {
@@ -51,6 +52,7 @@ export type Task = {
   };
   status: TaskStatus;
   completed?: boolean;
+  completedAt?: string | null;
   importance?: number;
   effort?: number;
   dueDate?: string;
@@ -65,6 +67,8 @@ export type Task = {
   earliestStart?: string | null;
   priorityScore?: number;
   progressPercentage?: number;
+  subtasks?: SubTask[];
+  scheduledSessions?: ScheduledSession[];
   createdAt: string;
   updatedAt: string;
 };
@@ -183,7 +187,14 @@ export async function getTasks(filters?: {
 export async function getTaskById(id: string): Promise<Task | null> {
   try {
     const response = await get<{ success: boolean; task: Task }>(`/tasks/${id}`);
-    return response.task || null;
+    const task = response.task || null;
+    if (task) {
+      return {
+        ...task,
+        subtasks: (task as any).subTasks || task.subtasks || [],
+      };
+    }
+    return null;
   } catch (error) {
     console.warn("Failed to fetch task:", error);
     return null;
@@ -197,7 +208,13 @@ export async function getTaskById(id: string): Promise<Task | null> {
 export async function getOverdueTasks(): Promise<Task[]> {
   try {
     const response = await get<{ success: boolean; tasks: Task[] }>(`/tasks/overdue`);
-    return response.tasks || [];
+    const tasks = response.tasks || [];
+    
+    // Map subTasks to subtasks for consistent naming across frontend
+    return tasks.map((task: any) => ({
+      ...task,
+      subtasks: task.subTasks || task.subtasks || [],
+    }));
   } catch (error) {
     console.warn("Failed to fetch overdue tasks:", error);
     return [];
@@ -252,112 +269,400 @@ export async function getScheduledTasksByDay(days: number = 7): Promise<Schedule
 /**
  * Calculate task progress from tasks
  * Returns daily completion percentages for the progress graph
+ *
+ * If `scheduledTodayIds` is provided, today's task counts are taken from the scheduled tasks
+ * (i.e., tasks that have scheduled sessions for today) instead of checking `dueDate`.
  */
-export function calculateTaskProgress(tasks: Task[], days: number = 14): TaskProgress {
+export function calculateTaskProgress(tasks: Task[], days: number = 14, scheduledInfo?: { taskIds?: Set<string>; subtaskKeys?: Set<string> }): TaskProgress {
+  console.log("[calculateTaskProgress] Called with:", {
+    taskCount: tasks.length,
+    days,
+    hasScheduledInfo: !!scheduledInfo,
+    scheduledTaskIds: scheduledInfo?.taskIds?.size || 0,
+    scheduledSubtaskKeys: scheduledInfo?.subtaskKeys?.size || 0,
+    tasksSample: tasks.slice(0, 2).map(t => ({
+      id: t._id || (t as any).id,
+      name: (t as any).taskname,
+      status: t.status,
+      completedAt: t.completedAt,
+      subtaskCount: ((t as any).subTasks || []).length,
+      scheduledSessionCount: ((t as any).scheduledSessions || []).length,
+      dueDate: (t as any).dueDate,
+    })),
+  });
+  
   const now = new Date();
   const dailyProgress: number[] = [];
   const labels: string[] = [];
 
+  // Helper to check if a date falls within a day range
+  const isWithinDay = (date: Date | string | null | undefined, dayStart: Date, dayEnd: Date): boolean => {
+    if (!date) return false;
+    const d = new Date(date);
+    return d >= dayStart && d < dayEnd;
+  };
+
+  // Helper to check if completed before a day started
+  const isCompletedBefore = (completedAt: Date | string | null | undefined, dayStart: Date): boolean => {
+    if (!completedAt) return false;
+    return new Date(completedAt) < dayStart;
+  };
+
+  // Helper to check if a task/subtask has a scheduled session on a specific day
+  const hasScheduledSessionOnDay = (sessions: any[] | undefined, dayStart: Date, dayEnd: Date): boolean => {
+    if (!sessions || !Array.isArray(sessions)) return false;
+    return sessions.some(session => {
+      if (!session?.start) return false;
+      const sessionStart = new Date(session.start);
+      return sessionStart >= dayStart && sessionStart < dayEnd;
+    });
+  };
+
+  // Helper to check if a task's deadline falls within a day range
+  const hasDueDateOnDay = (dueDate: Date | string | null | undefined, dayStart: Date, dayEnd: Date): boolean => {
+    if (!dueDate) return false;
+    const d = new Date(dueDate);
+    // Normalize to midnight for comparison (deadline date only, ignoring time)
+    d.setHours(0, 0, 0, 0);
+    const dayStartNorm = new Date(dayStart);
+    dayStartNorm.setHours(0, 0, 0, 0);
+    return d.getTime() === dayStartNorm.getTime();
+  };
+
   // Calculate progress for each of the last N days
   for (let i = days - 1; i >= 0; i--) {
-    const date = new Date(now);
-    date.setDate(date.getDate() - i);
-    date.setHours(0, 0, 0, 0);
+    const dayStart = new Date(now);
+    dayStart.setDate(dayStart.getDate() - i);
+    dayStart.setHours(0, 0, 0, 0);
 
-    const nextDate = new Date(date);
-    nextDate.setDate(nextDate.getDate() + 1);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
 
-    // Get tasks that were due on this day (if they have dueDate)
-    const dayTasksWithDue = tasks.filter((task) => {
-      if (!task.dueDate) return false;
-      const dueDate = new Date(task.dueDate);
-      return dueDate >= date && dueDate < nextDate;
-    });
+    const isToday = i === 0;
 
-    // Get tasks created on this specific day (as fallback)
-    const tasksCreatedOnDay = tasks.filter((task) => {
-      const createdAt = new Date(task.createdAt);
-      createdAt.setHours(0, 0, 0, 0);
-      return createdAt >= date && createdAt < nextDate;
-    });
+    let totalUnits = 0;
+    let completedUnits = 0;
 
-    // Use tasks with due dates if available, otherwise use created tasks
-    const dayTasks = dayTasksWithDue.length > 0 ? dayTasksWithDue : tasksCreatedOnDay;
+    for (const task of tasks) {
+      const subTasks: any[] = task.subtasks || [];
+      const hasSubtasks = subTasks.length > 0;
+      const taskDueDate = (task as any).dueDate || (task as any).deadline;
 
-    // Calculate completion rate
-    const total = dayTasks.length;
-    const completed = dayTasks.filter((t) => t.status === "done" || t.completed === true).length;
+      if (hasSubtasks) {
+        // For tasks with subtasks, each subtask is a unit
+        for (const st of subTasks) {
+          const stCompletedAt = st?.completedAt;
+          const stIsDone = st?.status === "done";
+          const wasCompletedOnThisDay = isWithinDay(stCompletedAt, dayStart, dayEnd);
+          const assumeCompletedToday = isToday && stIsDone && !stCompletedAt;
+          
+          // Check if subtask has a scheduled session on this day
+          const isSubtaskScheduledForDay = hasScheduledSessionOnDay(st?.scheduledSessions, dayStart, dayEnd);
+          
+          // Fallback: if task is due on this day, count subtasks as planned work
+          const isTaskDueThisDay = hasDueDateOnDay(taskDueDate, dayStart, dayEnd);
+          
+          // Count in total if:
+          // 1. Scheduled for this day AND not completed before this day started, OR
+          // 2. Was completed on this day (so it shows as work done on this day), OR
+          // 3. Task is due this day AND not completed before this day (fallback for no sessions)
+          if (isSubtaskScheduledForDay && !isCompletedBefore(stCompletedAt, dayStart)) {
+            totalUnits += 1;
+            if (wasCompletedOnThisDay || assumeCompletedToday) {
+              completedUnits += 1;
+            }
+          } else if (wasCompletedOnThisDay || assumeCompletedToday) {
+            // Completed on this day but wasn't scheduled for it - count as both total and completed
+            totalUnits += 1;
+            completedUnits += 1;
+          } else if (isToday && isTaskDueThisDay && !isCompletedBefore(stCompletedAt, dayStart) && !isSubtaskScheduledForDay) {
+            // Today only: task due today with no scheduled session - count as pending work
+            totalUnits += 1;
+            if (stIsDone) {
+              completedUnits += 1;
+            }
+          }
+        }
+      } else {
+        // Task without subtasks - check task-level scheduled sessions
+        const taskCompletedAt = task.completedAt;
+        const taskIsDone = task.status === "done" || task.completed === true;
+        const wasCompletedOnThisDay = isWithinDay(taskCompletedAt, dayStart, dayEnd);
+        const assumeCompletedToday = isToday && taskIsDone && !taskCompletedAt;
+        
+        // Check if task has a scheduled session on this day
+        const isTaskScheduledForDay = hasScheduledSessionOnDay((task as any).scheduledSessions, dayStart, dayEnd);
+        
+        // Fallback: check if task is due on this day
+        const isTaskDueThisDay = hasDueDateOnDay(taskDueDate, dayStart, dayEnd);
 
-    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+        // Count in total if:
+        // 1. Scheduled for this day AND not completed before this day started, OR
+        // 2. Was completed on this day (so it shows as work done on this day), OR
+        // 3. Task is due this day AND not completed before this day (fallback for no sessions)
+        if (isTaskScheduledForDay && !isCompletedBefore(taskCompletedAt, dayStart)) {
+          totalUnits += 1;
+          if (wasCompletedOnThisDay || assumeCompletedToday) {
+            completedUnits += 1;
+          }
+        } else if (wasCompletedOnThisDay || assumeCompletedToday) {
+          // Completed on this day but wasn't scheduled for it - count as both total and completed
+          totalUnits += 1;
+          completedUnits += 1;
+        } else if (isToday && isTaskDueThisDay && !isCompletedBefore(taskCompletedAt, dayStart) && !isTaskScheduledForDay) {
+          // Today only: task due today with no scheduled session - count as pending work
+          totalUnits += 1;
+          if (taskIsDone) {
+            completedUnits += 1;
+          }
+        }
+      }
+    }
+
+    // Calculate percentage - cap at 100% to handle edge cases
+    const percentage = totalUnits > 0 ? Math.min(100, Math.round((completedUnits / totalUnits) * 100)) : 0;
     dailyProgress.push(percentage);
 
     // Format label (e.g., "Mon", "Tue")
-    labels.push(date.toLocaleDateString("en-US", { weekday: "short" }));
+    labels.push(dayStart.toLocaleDateString("en-US", { weekday: "short" }));
   }
 
-  // Calculate today's progress - include ALL tasks (with or without dueDate)
+  // Calculate today's progress using scheduled info if available
   const todayStart = new Date(now);
   todayStart.setHours(0, 0, 0, 0);
   const todayEnd = new Date(todayStart);
   todayEnd.setDate(todayEnd.getDate() + 1);
 
-  // Tasks due today OR tasks without dueDate that were created today
-  const todayTasks = tasks.filter((task) => {
-    // If has dueDate, check if it's today
-    if (task.dueDate) {
-      const dueDate = new Date(task.dueDate);
-      return dueDate >= todayStart && dueDate < todayEnd;
+  let todayTotal = 0;
+  let todayCompleted = 0;
+
+  if (scheduledInfo && (scheduledInfo.taskIds?.size || scheduledInfo.subtaskKeys?.size)) {
+    // Use scheduled info for more accurate today calculations
+    // Also include tasks due today that aren't in the scheduled set
+    const taskIds = scheduledInfo.taskIds || new Set<string>();
+    const subtaskKeys = scheduledInfo.subtaskKeys || new Set<string>();
+
+    for (const task of tasks) {
+      const subs: any[] = task.subtasks || [];
+      const taskId = task._id || (task as any).id;
+      const hasSubtasks = subs.length > 0;
+      const taskDueDate = (task as any).dueDate || (task as any).deadline;
+      const isTaskDueToday = hasDueDateOnDay(taskDueDate, todayStart, todayEnd);
+
+      if (hasSubtasks) {
+        // Check each subtask
+        for (let idx = 0; idx < subs.length; idx++) {
+          const st = subs[idx];
+          const keyWithUnderscore = `${task._id}:${st.index ?? idx}`;
+          const keyWithId = `${(task as any).id}:${st.index ?? idx}`;
+          const isScheduledToday = subtaskKeys.has(keyWithUnderscore) || subtaskKeys.has(keyWithId);
+
+          const stCompletedAt = st?.completedAt;
+          const stIsDone = st?.status === "done";
+
+          if (isScheduledToday) {
+            // Only count in total if NOT completed before today
+            if (!isCompletedBefore(stCompletedAt, todayStart)) {
+              todayTotal += 1;
+
+              // Count as completed only if completed TODAY
+              if (isWithinDay(stCompletedAt, todayStart, todayEnd)) {
+                todayCompleted += 1;
+              } else if (stIsDone && !stCompletedAt) {
+                // Done but no timestamp - assume today
+                todayCompleted += 1;
+              }
+            }
+          } else if (isTaskDueToday && !isCompletedBefore(stCompletedAt, todayStart)) {
+            // Fallback: Task due today but not in scheduled set - count as pending
+            todayTotal += 1;
+            if (isWithinDay(stCompletedAt, todayStart, todayEnd)) {
+              todayCompleted += 1;
+            } else if (stIsDone && !stCompletedAt) {
+              todayCompleted += 1;
+            }
+          }
+        }
+      } else {
+        // Task without subtasks
+        const isScheduledToday = taskIds.has(task._id) || taskIds.has(taskId);
+
+        const taskCompletedAt = task.completedAt;
+        const taskIsDone = task.status === "done" || task.completed === true;
+
+        if (isScheduledToday) {
+          // Only count in total if NOT completed before today
+          if (!isCompletedBefore(taskCompletedAt, todayStart)) {
+            todayTotal += 1;
+
+            // Count as completed only if completed TODAY
+            if (isWithinDay(taskCompletedAt, todayStart, todayEnd)) {
+              todayCompleted += 1;
+            } else if (taskIsDone && !taskCompletedAt) {
+              // Done but no timestamp - assume today
+              todayCompleted += 1;
+            }
+          }
+        } else if (isTaskDueToday && !isCompletedBefore(taskCompletedAt, todayStart)) {
+          // Fallback: Task due today but not in scheduled set - count as pending
+          todayTotal += 1;
+          if (isWithinDay(taskCompletedAt, todayStart, todayEnd)) {
+            todayCompleted += 1;
+          } else if (taskIsDone && !taskCompletedAt) {
+            todayCompleted += 1;
+          }
+        }
+      }
     }
-    // If no dueDate, check if created today (consider it a "today" task)
-    const createdAt = new Date(task.createdAt);
-    return createdAt >= todayStart && createdAt < todayEnd;
-  });
+  } else {
+    // Fallback: use scheduledSessions to determine what's scheduled for today
+    // Also include tasks due today that have no sessions
+    for (const task of tasks) {
+      const subs: any[] = task.subtasks || [];
+      const hasSubtasks = subs.length > 0;
+      const taskDueDate = (task as any).dueDate || (task as any).deadline;
+      const isTaskDueToday = hasDueDateOnDay(taskDueDate, todayStart, todayEnd);
 
-  // Only count tasks that are actually due today (or created today with no due date)
-  const todayTotal = todayTasks.length;
-  const todayCompleted = todayTasks.filter((t) => t.status === "done" || t.completed === true).length;
+      if (hasSubtasks) {
+        for (const st of subs) {
+          const stCompletedAt = st?.completedAt;
+          const stIsDone = st?.status === "done";
+          const isSubtaskScheduledToday = hasScheduledSessionOnDay(st?.scheduledSessions, todayStart, todayEnd);
+          const wasCompletedToday = isWithinDay(stCompletedAt, todayStart, todayEnd);
+          const assumeCompletedToday = stIsDone && !stCompletedAt;
 
-  // Calculate week's progress using Sunday -> Saturday boundaries
-  // Determine the start of the current week (Sunday 00:00)
+          // Count if scheduled today and not completed before today, OR completed today
+          if (isSubtaskScheduledToday && !isCompletedBefore(stCompletedAt, todayStart)) {
+            todayTotal += 1;
+            if (wasCompletedToday || assumeCompletedToday) {
+              todayCompleted += 1;
+            }
+          } else if (wasCompletedToday || assumeCompletedToday) {
+            // Completed today but wasn't scheduled - count as both
+            todayTotal += 1;
+            todayCompleted += 1;
+          } else if (isTaskDueToday && !isCompletedBefore(stCompletedAt, todayStart) && !isSubtaskScheduledToday) {
+            // Task due today with no scheduled session - count as pending work
+            todayTotal += 1;
+            if (stIsDone) {
+              todayCompleted += 1;
+            }
+          }
+        }
+      } else {
+        const taskCompletedAt = task.completedAt;
+        const taskIsDone = task.status === "done" || task.completed === true;
+        const isTaskScheduledToday = hasScheduledSessionOnDay((task as any).scheduledSessions, todayStart, todayEnd);
+        const wasCompletedToday = isWithinDay(taskCompletedAt, todayStart, todayEnd);
+        const assumeCompletedToday = taskIsDone && !taskCompletedAt;
+
+        // Count if scheduled today and not completed before today, OR completed today
+        if (isTaskScheduledToday && !isCompletedBefore(taskCompletedAt, todayStart)) {
+          todayTotal += 1;
+          if (wasCompletedToday || assumeCompletedToday) {
+            todayCompleted += 1;
+          }
+        } else if (wasCompletedToday || assumeCompletedToday) {
+          // Completed today but wasn't scheduled - count as both
+          todayTotal += 1;
+          todayCompleted += 1;
+        } else if (isTaskDueToday && !isCompletedBefore(taskCompletedAt, todayStart) && !isTaskScheduledToday) {
+          // Task due today with no scheduled session - count as pending work
+          todayTotal += 1;
+          if (taskIsDone) {
+            todayCompleted += 1;
+          }
+        }
+      }
+    }
+  }
+
+  // Calculate today's percentage
+  const todayPercentage = todayTotal > 0 ? Math.round((todayCompleted / todayTotal) * 100) : 0;
+
+  // Update the last element of dailyProgress to match today's calculated values
+  if (dailyProgress.length > 0) {
+    dailyProgress[dailyProgress.length - 1] = todayPercentage;
+  }
+
+  // Calculate week's progress
   const today = new Date(now);
-  const dayOfWeek = today.getDay(); // 0 = Sunday, 6 = Saturday
+  const dayOfWeek = today.getDay();
   const sundayStart = new Date(today);
   sundayStart.setDate(today.getDate() - dayOfWeek);
   sundayStart.setHours(0, 0, 0, 0);
 
-  // End of week (exclusive) is next Sunday 00:00 (i.e., Saturday inclusive)
   const weekEndExclusive = new Date(sundayStart);
   weekEndExclusive.setDate(sundayStart.getDate() + 7);
 
-  const weekTasks = tasks.filter((task) => {
-    // If has dueDate, check if it's within [sundayStart, weekEndExclusive)
-    if (task.dueDate) {
-      const dueDate = new Date(task.dueDate);
-      return dueDate >= sundayStart && dueDate < weekEndExclusive;
+  // Count tasks scheduled for this week and their completion status
+  let weekTotal = 0;
+  let weekCompleted = 0;
+
+  // Helper to check if any scheduled session falls within the week
+  const hasScheduledSessionInWeek = (sessions: any[] | undefined): boolean => {
+    if (!sessions || !Array.isArray(sessions)) return false;
+    return sessions.some(session => {
+      if (!session?.start) return false;
+      const sessionStart = new Date(session.start);
+      return sessionStart >= sundayStart && sessionStart < weekEndExclusive;
+    });
+  };
+
+  for (const task of tasks) {
+    const subs: any[] = (task as any).subTasks || [];
+    const hasSubtasks = subs.length > 0;
+
+    if (hasSubtasks) {
+      for (const st of subs) {
+        const isScheduledThisWeek = hasScheduledSessionInWeek(st?.scheduledSessions);
+        const wasCompletedThisWeek = st?.completedAt && isWithinDay(st.completedAt, sundayStart, weekEndExclusive);
+        
+        if (isScheduledThisWeek || wasCompletedThisWeek) {
+          weekTotal += 1;
+          if (st?.status === "done") {
+            weekCompleted += 1;
+          }
+        }
+      }
+    } else {
+      const isScheduledThisWeek = hasScheduledSessionInWeek((task as any).scheduledSessions);
+      const wasCompletedThisWeek = task.completedAt && isWithinDay(task.completedAt, sundayStart, weekEndExclusive);
+      
+      if (isScheduledThisWeek || wasCompletedThisWeek) {
+        weekTotal += 1;
+        if (task.status === "done" || task.completed === true) {
+          weekCompleted += 1;
+        }
+      }
     }
-    // If no dueDate, check if created within the week range
-    const createdAt = new Date(task.createdAt);
-    return createdAt >= sundayStart && createdAt < weekEndExclusive;
-  });
+  }
 
-  // If no tasks in the week range, use all tasks as a fallback
-  const effectiveWeekTasks = weekTasks.length > 0 ? weekTasks : tasks;
-  const weekCompleted = effectiveWeekTasks.filter((t) => t.status === "done" || t.completed === true).length;
-
-  return {
+  const result = {
     today: {
       total: todayTotal,
       completed: todayCompleted,
-      percentage: todayTotal > 0 ? Math.round((todayCompleted / todayTotal) * 100) : 0,
+      percentage: todayPercentage,
     },
     week: {
-      total: effectiveWeekTasks.length,
+      total: weekTotal,
       completed: weekCompleted,
-      percentage: effectiveWeekTasks.length > 0 ? Math.round((weekCompleted / effectiveWeekTasks.length) * 100) : 0,
+      percentage: weekTotal > 0 ? Math.round((weekCompleted / weekTotal) * 100) : 0,
     },
     dailyProgress,
     labels,
   };
+  
+  console.log("[calculateTaskProgress] Result:", {
+    todayTotal,
+    todayCompleted,
+    todayPercentage,
+    weekTotal,
+    weekCompleted,
+    dailyProgressSample: dailyProgress.slice(-3), // Last 3 days
+  });
+  
+  return result;
 }
 
 /**
@@ -436,16 +741,64 @@ export async function completeTask(id: string): Promise<Task | null> {
 }
 
 /**
+ * Result from toggling a task completion
+ */
+export type ToggleTaskResult = {
+  success: boolean;
+  task: Task | null;
+  gamification?: GamificationResult;
+  wasCompletion?: boolean;
+  wasUncompletion?: boolean;
+};
+
+/**
  * Toggle task completion
  * POST /api/tasks/:id/toggle
  */
-export async function toggleTaskCompletion(id: string): Promise<Task | null> {
+export async function toggleTaskCompletion(id: string): Promise<ToggleTaskResult> {
   try {
-    const response = await post<{ success: boolean; task: Task }>(`/tasks/${id}/toggle`, {});
-    return response.task || null;
+    const response = await post<{
+      success: boolean;
+      task: Task;
+      gamification?: {
+        points?: number;
+        currentStreak?: number;
+        completedTasks?: number;
+      };
+      pointsAwarded?: number;
+      pointsSubtracted?: number;
+      wasCompletion?: boolean;
+      wasUncompletion?: boolean;
+    }>(`/tasks/${id}/toggle`, {});
+    
+    console.log("[taskService] toggleTaskCompletion response:", {
+      success: response.success,
+      hasGamification: !!response.gamification,
+      gamification: response.gamification,
+      wasCompletion: response.wasCompletion,
+      wasUncompletion: response.wasUncompletion,
+    });
+    
+    return {
+      success: response.success,
+      task: response.task || null,
+      gamification: response.gamification
+        ? {
+            points: response.gamification.points,
+            currentStreak: response.gamification.currentStreak,
+            completedTasks: response.gamification.completedTasks,
+            pointsAwarded: response.pointsAwarded,
+            pointsSubtracted: response.pointsSubtracted,
+            wasCompletion: response.wasCompletion,
+            wasUncompletion: response.wasUncompletion,
+          }
+        : undefined,
+      wasCompletion: response.wasCompletion,
+      wasUncompletion: response.wasUncompletion,
+    };
   } catch (error) {
     console.warn("Failed to toggle task:", error);
-    return null;
+    return { success: false, task: null };
   }
 }
 
@@ -467,37 +820,87 @@ export async function updateTask(
 }
 
 /**
+ * Gamification result returned from task/subtask completion or reversal
+ */
+export type GamificationResult = {
+  points?: number;
+  currentStreak?: number;
+  completedTasks?: number;
+  pointsAwarded?: number;
+  pointsSubtracted?: number;
+  taskBonusSubtracted?: number;
+  parentTaskCompleted?: boolean;
+  parentTaskUncompleted?: boolean;
+  wasCompletion?: boolean;
+  wasUncompletion?: boolean;
+};
+
+/**
+ * Result from updating a subtask
+ */
+export type UpdateSubTaskResult = {
+  success: boolean;
+  gamification?: GamificationResult;
+};
+
+/**
  * Update a subtask
  * PATCH /api/tasks/:taskId/subtasks/:subId
- * Returns gamification data when subtask is completed
+ * Returns gamification data when subtask is completed or reverted
  */
 export async function updateSubTask(
   taskId: string,
   subtaskId: string,
   updates: Partial<{ status: SubTaskStatus; title?: string; description?: string; minutes?: number }>,
-): Promise<boolean> {
+): Promise<UpdateSubTaskResult> {
   try {
     const response = await patch<{
       success: boolean;
-      gamification?: { points: number; currentStreak: number };
+      gamification?: { points: number; currentStreak: number; completedTasks?: number };
       pointsAwarded?: number;
+      pointsSubtracted?: number;
+      taskBonusSubtracted?: number;
       parentTaskCompleted?: boolean;
+      parentTaskUncompleted?: boolean;
+      wasCompletion?: boolean;
+      wasUncompletion?: boolean;
     }>(`/tasks/${taskId}/subtasks/${subtaskId}`, updates);
 
-    // Log gamification data if subtask was completed
+    // Log gamification data if subtask was completed or reverted
     if (response.gamification) {
-      console.log("[taskService] Subtask completion gamification:", {
+      console.log("[taskService] Subtask gamification:", {
         pointsAwarded: response.pointsAwarded,
+        pointsSubtracted: response.pointsSubtracted,
         totalPoints: response.gamification.points,
+        completedTasks: response.gamification.completedTasks,
         streak: response.gamification.currentStreak,
         parentTaskCompleted: response.parentTaskCompleted,
+        parentTaskUncompleted: response.parentTaskUncompleted,
+        wasCompletion: response.wasCompletion,
+        wasUncompletion: response.wasUncompletion,
       });
     }
 
-    return true;
+    return {
+      success: true,
+      gamification: response.gamification
+        ? {
+            points: response.gamification.points,
+            currentStreak: response.gamification.currentStreak,
+            completedTasks: response.gamification.completedTasks,
+            pointsAwarded: response.pointsAwarded,
+            pointsSubtracted: response.pointsSubtracted,
+            taskBonusSubtracted: response.taskBonusSubtracted,
+            parentTaskCompleted: response.parentTaskCompleted,
+            parentTaskUncompleted: response.parentTaskUncompleted,
+            wasCompletion: response.wasCompletion,
+            wasUncompletion: response.wasUncompletion,
+          }
+        : undefined,
+    };
   } catch (error) {
     console.warn("Failed to update subtask:", error);
-    return false;
+    return { success: false };
   }
 }
 
@@ -1241,20 +1644,4 @@ export async function markSubTaskTodo(taskId: string, subTaskId: string): Promis
   }
 }
 
-/**
- * Update subtask status
- * PATCH /api/tasks/:taskId/subtasks/:subId/status
- */
-export async function updateSubTaskStatus(
-  taskId: string, 
-  subTaskId: string, 
-  status: "todo" | "done"
-): Promise<{ success: boolean; subtask?: ApiSubTask; message?: string }> {
-  try {
-    const response = await patch<{ success: boolean; subtask: ApiSubTask; message: string }>(`/tasks/${taskId}/subtasks/${subTaskId}/status`, { status });
-    return response;
-  } catch (error) {
-    console.error("Failed to update subtask status:", error);
-    return { success: false };
-  }
-}
+

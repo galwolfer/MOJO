@@ -69,8 +69,18 @@ export const TOOL_DESCRIPTIONS = missionRegistry.getToolDescriptions();
 
 export function getBaseIdentity() {
   // Compose identity once per call to allow current timestamp
-  const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const today = `${year}-${month}-${day}`;
+  
+  const tomorrowDate = new Date(now);
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrowYear = tomorrowDate.getFullYear();
+  const tomorrowMonth = String(tomorrowDate.getMonth() + 1).padStart(2, '0');
+  const tomorrowDay = String(tomorrowDate.getDate()).padStart(2, '0');
+  const tomorrow = `${tomorrowYear}-${tomorrowMonth}-${tomorrowDay}`;
 
   return `You are MOJO, a helpful AI assistant for task management.
 
@@ -78,7 +88,10 @@ CURRENT DATE: ${today}
 TOMORROW: ${tomorrow}
 
 CRITICAL:
-- To add: preview_task -> task_confirmation -> add_task on confirm.
+- Task creation flow:
+  1) Gather required details first (ask for anything missing).
+  2) preview_task -> task_confirmation to show the draft.
+  3) add_task ONLY after the user explicitly confirms.
 - To list: call get_tasks/get_upcoming_tasks/get_overdue_tasks first.
 - Use RECENT ENTITIES only for reference resolution, not for lists.
 - ALWAYS use <WIDGET_JSON> tags when showing tasks. NEVER output raw JSON without these tags.

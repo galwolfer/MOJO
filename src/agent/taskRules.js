@@ -25,6 +25,7 @@ export const TASK_CONFIG = {
     "subcategory",
     "recurrence",
     "canSplit", // boolean
+    "subtasks",
   ],
 
   // Default values to use if the LLM/User doesn't provide them
@@ -120,6 +121,11 @@ export function getTaskFieldInstructions() {
 - CATEGORY USAGE: When talking to the user in conversational text, use the display names (e.g., "Study & Education", "Work & Career"). When making tool calls or populating widgets, use the string values (e.g., "study_and_education", "work_and_career").
 - INVALID CATEGORY HANDLING: If the user provides a category name not in the list, DO NOT simply list all available categories. Instead, ask if they meant to use that name as a SUBCATEGORY within a relevant main category (and suggest 1-2 likely candidates using display names).
 
+TASK CREATION FLOW (REQUIRED):
+1. Collect required details (taskname, deadline, estimatedDuration). If anything is missing, ask for it and wait.
+2. Once details are complete, call get_subcategories, then preview_task to show a task_confirmation draft.
+3. Only call add_task after the user explicitly confirms the draft.
+
 SUBCATEGORY WORKFLOW (IMPORTANT):
 1. After the user chooses or you infer a category, ALWAYS call get_subcategories(category=<category_index>) to see what subcategories the user has saved and historical task labels.
 2. AUTO-SELECT: If a matching subcategory exists in the returned list (exact match or very close to the task name), USE IT IMMEDIATELY in the next tool call (preview_task/add_task). DO NOT ASK the user for confirmation.
@@ -140,8 +146,14 @@ SPLITTING & RECURRENCE RULES:
 - Always surface these as fields in the 'task_confirmation' widget and confirm with the user before creating the task.
 - Use splitting info when choosing 'effort' and when suggesting 'taskType' (LLM should consider duration and user's preference).
 
+SUBTASKS:
+- If the user provides a list of subtasks with names and times (e.g., "task1: 3 hours"), interpret each line as a subtask.
+- Convert hours to minutes and include an array 'subtasks' in preview_task/add_task with { title, minutes } (description optional).
+- When subtasks are provided, set canSplit=true and choose taskType based on durations: all same -> in_parts, different -> leaky.
+- If overall duration is not given, set estimatedDuration to the sum of subtask minutes.
+
 DURATION RULE (REQUIRED):
-- If the user does NOT provide 'estimatedDuration', ask them directly: "How many minutes will this take?" and wait for an explicit numeric reply. Do NOT infer or guess the duration; do not proceed without it.
+- If the user does NOT provide 'estimatedDuration' and did NOT provide subtasks with durations, ask them directly: "How many minutes will this take?" and wait for an explicit numeric reply. Do NOT infer or guess the duration; do not proceed without it.
 
 EFFORT RULE:
 - If the user does not provide 'effort', the assistant (LLM) MUST choose and include a value (integer 1-5) based on task length, category, and complexity. The assistant should NOT rely on hardcoded defaults; include the selected effort when calling preview_task or add_task. NEVER leave 'effort' empty or null.`;

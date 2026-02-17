@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { View, StyleSheet, TouchableOpacity, Alert, Platform } from "react-native";
 import AppText from "../../components/common/AppText";
 import AppButton from "../../components/common/AppButton";
+import ErrorText from "../../components/common/ErrorText";
 import ProfileSettings from "./ProfileSettings";
 import { COLORS, SPACING, SHADOWS, ICON_SIZES } from "../../theme";
 import { useNavigation } from "../../context/NavigationContext";
@@ -27,9 +28,10 @@ type SettingsScreenProps = {
   onBack: () => void;
   onEditPreferences?: () => void;
   onChatSettings?: () => void;
+  onNotificationSettings?: () => void;
 };
 
-export default function SettingsScreen({ onBack, onEditPreferences, onChatSettings }: SettingsScreenProps) {
+export default function SettingsScreen({ onBack, onEditPreferences, onChatSettings, onNotificationSettings }: SettingsScreenProps) {
   const { user, signOut, signIn, token } = useAuth();
   const { setHeaderConfig } = useNavigation();
 
@@ -87,8 +89,11 @@ export default function SettingsScreen({ onBack, onEditPreferences, onChatSettin
   };
 
   const handleNotifications = () => {
-    // TODO: Navigate to notifications settings screen
-    console.log("Notifications pressed");
+    if (onNotificationSettings) {
+      onNotificationSettings();
+    } else {
+      console.log("Notifications pressed - no handler provided");
+    }
   };
 
   const preferenceItems: ListCellProps[] = [
@@ -113,35 +118,46 @@ export default function SettingsScreen({ onBack, onEditPreferences, onChatSettin
   ];
 
   const handleDeleteAccount = async () => {
-    Alert.alert(
-      "Delete Account",
-      "Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.",
-      [
-        {
-          text: "Cancel",
-          onPress: () => console.log("Delete cancelled"),
-          style: "cancel",
-        },
-        {
-          text: "Delete",
-          onPress: async () => {
-            try {
-              setIsSaving(true);
-              console.log("Deleting account...");
-              await deleteAccount();
-              console.log("Account deleted successfully");
-              // Sign out after account deletion
-              await signOut();
-            } catch (err: any) {
-              console.error("Error deleting account:", err);
-              setError(err?.message || "Failed to delete account");
-              setIsSaving(false);
-            }
-          },
-          style: "destructive",
-        },
-      ],
-    );
+    // Alert.alert doesn't work on web, use platform-specific approach
+    const confirmDelete = Platform.OS === "web"
+      ? window.confirm("Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.")
+      : await new Promise<boolean>((resolve) => {
+          Alert.alert(
+            "Delete Account",
+            "Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.",
+            [
+              {
+                text: "Cancel",
+                onPress: () => resolve(false),
+                style: "cancel",
+              },
+              {
+                text: "Delete",
+                onPress: () => resolve(true),
+                style: "destructive",
+              },
+            ],
+          );
+        });
+
+    if (!confirmDelete) {
+      console.log("Delete cancelled");
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setError(null);
+      console.log("Deleting account...");
+      await deleteAccount();
+      console.log("Account deleted successfully");
+      // Sign out after account deletion
+      await signOut();
+    } catch (err: any) {
+      console.error("Error deleting account:", err);
+      setError(err?.message || "Failed to delete account");
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -169,13 +185,15 @@ export default function SettingsScreen({ onBack, onEditPreferences, onChatSettin
       <View style={styles.signButtonsRow}>
         <AppButton title="Logout" onPress={signOut} mode="light" color="primary7" />
         <AppButton
-          title="Delete Account"
+          title={isSaving ? "Deleting..." : "Delete Account"}
           onPress={handleDeleteAccount}
           mode="light"
           color="lightGray"
           disabled={isSaving}
         />
       </View>
+      
+      {error && <ErrorText>{error}</ErrorText>}
     </ScrollableContent>
   );
 }

@@ -32,6 +32,50 @@ def add_minutes(dt: datetime, minutes: int) -> datetime:
     return dt + timedelta(minutes=minutes)
 
 
+def parse_datetime(value) -> datetime:
+    """Parse a datetime from string or return as-is if already datetime."""
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        # Try ISO format first
+        try:
+            # Handle ISO strings with Z suffix
+            if value.endswith('Z'):
+                value = value[:-1] + '+00:00'
+            return datetime.fromisoformat(value)
+        except ValueError:
+            pass
+        # Try common formats
+        for fmt in ["%Y-%m-%dT%H:%M:%S.%f%z", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S"]:
+            try:
+                dt = datetime.strptime(value, fmt)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return dt
+            except ValueError:
+                continue
+    raise ValueError(f"Cannot parse datetime from: {value}")
+
+
+def normalize_busy_blocks(busy_blocks_by_date: Dict) -> Dict:
+    """Convert busy block start/end values from strings to datetime objects."""
+    normalized = {}
+    for date_key, blocks in busy_blocks_by_date.items():
+        normalized_blocks = []
+        for block in blocks:
+            try:
+                normalized_block = {
+                    "start": parse_datetime(block["start"]),
+                    "end": parse_datetime(block["end"]),
+                }
+                normalized_blocks.append(normalized_block)
+            except (KeyError, ValueError) as e:
+                # Skip malformed blocks
+                continue
+        normalized[date_key] = normalized_blocks
+    return normalized
+
+
 def build_working_window(day: datetime, working_hours: Dict) -> Dict:
     # Build start/end datetimes for the given day according to working hours
     # Preserve timezone from input day
@@ -43,7 +87,9 @@ def build_working_window(day: datetime, working_hours: Dict) -> Dict:
 
 def schedule_tasks_csp(tasks: List[dict], options: Dict = None) -> Dict:
     options = options or {}
-    busy_blocks_by_date = options.get("busyBlocksByDate", {})
+    busy_blocks_by_date_raw = options.get("busyBlocksByDate", {})
+    # Normalize busy blocks to ensure start/end are datetime objects
+    busy_blocks_by_date = normalize_busy_blocks(busy_blocks_by_date_raw)
     working_hours = options.get("workingHours", DEFAULT_WORKING_HOURS)
     planning_horizon_days = options.get("planningHorizonDays", 14)
     daily_cap_minutes = options.get("dailyCapMinutes", DEFAULT_DAILY_CAP_MINUTES)
@@ -134,14 +180,14 @@ def generate_variables(tasks: List[dict], horizon_end: datetime, rng: Optional[r
                 # normalize to end of day
                 deadline = deadline.replace(hour=23, minute=59, second=59, microsecond=999999)
 
-                # If deadline is timezone-aware, convert it to local timezone and make it naive
-                # so it is comparable to the naive `now` and other naive datetimes used elsewhere.
-                if isinstance(deadline, datetime) and deadline.tzinfo is not None:
-                    try:
-                        deadline = deadline.astimezone().replace(tzinfo=None)
-                    except Exception:
-                        # best-effort fallback to strip tzinfo
-                        deadline = deadline.replace(tzinfo=None)
+                # Normalize deadline to UTC timezone-aware datetime for consistent comparisons
+                if isinstance(deadline, datetime):
+                    if deadline.tzinfo is None:
+                        # assume naive deadlines are in UTC
+                        deadline = deadline.replace(tzinfo=timezone.utc)
+                    else:
+                        # convert any timezone-aware deadline to UTC
+                        deadline = deadline.astimezone(timezone.utc)
             except Exception:
                 deadline = horizon_end
         else:
@@ -302,6 +348,18 @@ def generate_domain(variable: dict, today: datetime, horizon_end: datetime, busy
         date_key = current_day.date().isoformat()
         working_window = build_working_window(current_day, working_hours)
         busy_blocks = busy_blocks_by_date.get(date_key, [])
+        
+        # Parse busy blocks if they contain ISO strings instead of datetime objects
+        parsed_busy_blocks = []
+        for b in busy_blocks:
+            parsed_block = {}
+            for key, val in b.items():
+                if key in ["start", "end"] and isinstance(val, str):
+                    # Parse ISO string to datetime
+                    parsed_block[key] = datetime.fromisoformat(val.replace('Z', '+00:00'))
+                else:
+                    parsed_block[key] = val
+            parsed_busy_blocks.append(parsed_block)
 
         slot_start = working_window["start"]
         while slot_start < working_window["end"]:
@@ -313,7 +371,7 @@ def generate_domain(variable: dict, today: datetime, horizon_end: datetime, busy
                 continue
 
             candidate = {"start": slot_start, "end": slot_end, "minutes": chunk_minutes, "dateKey": date_key}
-            overlaps_with_busy = any(not (candidate["end"] <= b["start"] or candidate["start"] >= b["end"]) for b in busy_blocks)
+            overlaps_with_busy = any(not (candidate["end"] <= b["start"] or candidate["start"] >= b["end"]) for b in parsed_busy_blocks)
             if not overlaps_with_busy:
                 slots.append(candidate)
 
@@ -330,6 +388,21 @@ def backtrack_search(variables: List[dict], variable_domains: Dict[str, List[dic
     assigned_slots = []
     iterations = 0
     domains = {k: list(v) for k, v in variable_domains.items()}
+    
+    # Parse all busy blocks upfront to convert ISO strings to datetime objects
+    parsed_busy_blocks_by_date = {}
+    for date_key, blocks in busy_blocks_by_date.items():
+        parsed_blocks = []
+        for b in blocks:
+            parsed_block = {}
+            for key, val in b.items():
+                if key in ["start", "end"] and isinstance(val, str):
+                    # Parse ISO string to datetime
+                    parsed_block[key] = datetime.fromisoformat(val.replace('Z', '+00:00'))
+                else:
+                    parsed_block[key] = val
+            parsed_blocks.append(parsed_block)
+        parsed_busy_blocks_by_date[date_key] = parsed_blocks
 
     def backtrack():
         nonlocal iterations, domains
@@ -354,7 +427,7 @@ def backtrack_search(variables: List[dict], variable_domains: Dict[str, List[dic
         for slot in ordered:
             candidate_slot = {"start": slot["start"], "end": slot["end"], "minutes": variable["chunkMinutes"], "dateKey": slot.get("dateKey"), "taskId": variable["taskId"]}
             working_window = build_working_window(slot["start"], working_hours)
-            busy_blocks = busy_blocks_by_date.get(slot.get("dateKey"), [])
+            busy_blocks = parsed_busy_blocks_by_date.get(slot.get("dateKey"), [])
 
             if not satisfies_hard_constraints(candidate_slot=candidate_slot, existing_assignments=assigned_slots, busy_blocks_for_day=busy_blocks, working_window=working_window, deadline=variable.get("deadline")):
                 continue

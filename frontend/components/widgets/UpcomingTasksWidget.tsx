@@ -11,6 +11,7 @@ import { BaseWidgetProps } from "../../utils/widgetFactory";
 import { COLORS, ICON_SIZES, SPACING } from "../../theme";
 import { updateSubTask } from "../../services/taskService";
 import { useTaskContext } from "../../context/TaskContext";
+import { useOptionalStatsContext } from "../../context/StatsContext";
 import { ProgressIcon } from "../icons/ProgressIcon";
 import { Checkbox } from "../icons/Checkbox";
 import Icon from "../icons/Icon";
@@ -26,8 +27,8 @@ import {
   getSubtaskIdFromSession,
   getTimeParts,
   computeTaskProgress,
-  getWidgetEntranceProps,
-} from "./widgetHelpers";
+} from "./taskHelpers";
+import { getWidgetEntranceProps } from "./widgetHelpers";
 
 type TaskItem = {
   id: string;
@@ -68,6 +69,7 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({
 }) => {
   const payload = data as UpcomingTasksData;
   const { notifyTaskUpdate } = useTaskContext();
+  const { notifyStatsChange } = useOptionalStatsContext();
   const { width } = useWindowDimensions();
 
   const [completedParts, setCompletedParts] = useState<Set<string>>(new Set());
@@ -133,10 +135,17 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({
 
     try {
       if (canPersist && subtaskId) {
-        const success = await updateSubTask(taskId, subtaskId, {
+        const result = await updateSubTask(taskId, subtaskId, {
           status: nextCompleted ? "done" : "todo",
         });
-        if (!success) throw new Error("Update failed");
+        if (!result.success) throw new Error("Update failed");
+        
+        // Notify stats change if gamification data was returned
+        if (result.gamification) {
+          console.log("[UpcomingTasksWidget] Gamification update:", result.gamification);
+          notifyStatsChange(result.gamification);
+        }
+        
         await new Promise((resolve) => setTimeout(resolve, 300));
       }
 
@@ -291,7 +300,6 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     width: "100%",
     gap: SPACING.md,
-    minWidth: 450,
   },
   headerTitle: {
     color: COLORS.black,
@@ -323,7 +331,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    minWidth: 450,
     width: "100%",
     marginTop: SPACING.xs,
     marginBottom: SPACING.md,

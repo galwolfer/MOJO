@@ -14,15 +14,11 @@ import List, { ListCellProps } from "../layout/List";
 import { getCategoryMeta } from "../../config/categoryMeta";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
 import { useTaskContext } from "../../context/TaskContext";
+import { useOptionalStatsContext } from "../../context/StatsContext";
 import { completeTask, toggleTaskCompletion } from "../../services/taskService";
 import { TaskTagsRow, ScheduledSessionsSection, getSessionKey } from "../special/task";
-import {
-  getCategoryDisplay,
-  toggleSessionSmart,
-  computeTaskProgress,
-  handleTaskPress,
-  getWidgetEntranceProps,
-} from "./widgetHelpers";
+import { getCategoryDisplay, computeTaskProgress } from "./taskHelpers";
+import { toggleSessionSmart, handleTaskPress, getWidgetEntranceProps } from "./widgetHelpers";
 import { getTaskProgress } from "../../services/taskService";
 import { useTaskUpdateSubscription } from "../../context/TaskContext";
 import { ProgressIcon } from "../icons/ProgressIcon";
@@ -71,6 +67,7 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({
   const [checkedTasks, setCheckedTasks] = useState<Set<string>>(new Set());
   const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
   const { notifyTaskUpdate } = useTaskContext();
+  const { notifyStatsChange } = useOptionalStatsContext();
 
   // Selected task id (only one task may be selected/expanded at a time)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -170,6 +167,7 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({
       loadingParts,
       setLoadingParts,
       notifyTaskUpdate,
+      notifyStatsChange,
       onAction,
     });
   };
@@ -289,7 +287,7 @@ const styles = StyleSheet.create({
   container: {
     width: "100%",
     justifyContent: "space-between",
-    overflow: "visible",
+    overflow: "hidden",
     flex: 1,
   },
   emptyText: {

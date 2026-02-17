@@ -36,12 +36,12 @@ import {
   importanceIcon,
   effortColor,
   effortIcon,
-  getWidgetEntranceProps,
   toggleSubtask,
-  toggleSession,
-} from "./widgetHelpers";
+} from "./taskHelpers";
+import { getWidgetEntranceProps, toggleSessionSmart } from "./widgetHelpers";
 import { TaskTitle, TaskTagsRow, ScheduledSessionsSection, renderTaskField, TwoColumnGrid } from "../special/task";
 import { useTaskContext } from "../../context/TaskContext";
+import { useOptionalStatsContext } from "../../context/StatsContext";
 
 interface TaskDetail {
   id: string;
@@ -94,6 +94,7 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
 }) => {
   const task: TaskDetail = data.task || data;
   const { notifyTaskUpdate } = useTaskContext();
+  const { notifyStatsChange } = useOptionalStatsContext();
 
   const [completedParts, setCompletedParts] = useState<Set<string>>(new Set());
   const [loadingParts, setLoadingParts] = useState<Set<string>>(new Set());
@@ -124,6 +125,7 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
       loadingParts,
       setLoadingParts,
       notifyTaskUpdate,
+      notifyStatsChange,
       onAction,
     });
   };
@@ -134,7 +136,7 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
     index: number,
     subtasksParam?: Subtask[],
   ) => {
-    await toggleSession({
+    await toggleSessionSmart({
       taskId: taskIdParam,
       session,
       index,
@@ -144,6 +146,7 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
       loadingParts,
       setLoadingParts,
       notifyTaskUpdate,
+      notifyStatsChange,
       onAction,
     });
   };
@@ -212,6 +215,7 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
         progressPercentage={task.progressPercentage ?? null}
         sessionHeaderMode="date"
         dividerColor={COLORS.white}
+        taskStatus={task.status}
       />
     </View>,
   ];

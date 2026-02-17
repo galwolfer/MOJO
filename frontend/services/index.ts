@@ -15,3 +15,6 @@ export * from "./userService";
 
 // Task services
 export * from "./taskService";
+
+// Notification services
+export * from "./notificationService";

@@ -683,6 +683,16 @@ router.post("/:id/toggle", taskController.toggleTaskCompletion);
 router.post("/:id/complete", taskController.completeTask);
 
 /* ─────────────────────────────────────────────────────────────────────────
+   DEBUG ENDPOINTS (for testing completedAt)
+   ───────────────────────────────────────────────────────────────────────── */
+
+// DEBUG: Update task completedAt for testing
+router.patch("/:id/debug/completed-at", taskController.debugUpdateTaskCompletedAt);
+
+// DEBUG: Update subtask completedAt for testing
+router.patch("/:taskId/subtasks/:subId/debug/completed-at", taskController.debugUpdateSubtaskCompletedAt);
+
+/* ─────────────────────────────────────────────────────────────────────────
    TASK SCHEDULING
    Generate and save automatic plans for tasks
    ───────────────────────────────────────────────────────────────────────── */

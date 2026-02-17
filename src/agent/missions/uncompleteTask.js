@@ -1,16 +1,16 @@
 import { z } from "zod";
 import { LightMission } from "./LightMission.js";
 import * as taskService from "../../services/taskService.js";
-import { awardTaskCompletionPoints } from "../../controllers/userController.js";
+import { reverseTaskCompletion } from "../../controllers/userController.js";
 import { buildWidgetString } from "../widgets/widgetUtils.js";
 import { getDisplayName } from "../../config/categories.js";
 
-const completeTaskMission = new LightMission({
-  name: "complete_task",
+const uncompleteTaskMission = new LightMission({
+  name: "uncomplete_task",
   group: "task",
-  description: "Mark a task as DONE/COMPLETED. ALWAYS use this (not update_task) when user wants to complete, finish, check off, or mark done. Awards points and updates streak.",
+  description: "Mark a completed task as NOT DONE/INCOMPLETE. Use when user wants to undo, revert, uncheck, or mark a task as not finished. This will subtract the points that were awarded and decrement the task count.",
   missionInfo:
-    "Complete a task and award gamification points. Use task name or ID. Celebrate the completion briefly.",
+    "Revert a completed task back to incomplete status. Subtracts earned points and decrements task count. Use task name or ID.",
   widgets: ["task_detail", "confirmation"],
   schema: z.object({
     taskId: z.string().optional().describe("Task ID (MongoDB ObjectId) if known"),
@@ -20,7 +20,7 @@ const completeTaskMission = new LightMission({
     const { taskId, taskName } = args;
 
     if (!taskId && !taskName) {
-      return `ok=false\nerr="Please provide either taskId or taskName to complete"`;
+      return `ok=false\nerr="Please provide either taskId or taskName to uncomplete"`;
     }
 
     try {
@@ -30,56 +30,59 @@ const completeTaskMission = new LightMission({
       if (!resolvedTaskId && taskName) {
         const tasks = await taskService.getTasksForUser(userId, {
           taskname: { $regex: taskName, $options: "i" },
-          status: { $ne: "done" },
+          status: "done", // Only search completed tasks
         });
 
         if (tasks.length === 0) {
-          return `ok=false\nerr="No incomplete task found matching '${taskName}'"`;
+          return `ok=false\nerr="No completed task found matching '${taskName}'"`;
         }
 
         if (tasks.length > 1) {
           // Return list for user to choose
           const taskList = tasks.map(t => `- ${t.taskname} (ID: ${t._id})`).join("\n");
-          return `ok=false\nerr="Multiple tasks found matching '${taskName}'. Please be more specific:\n${taskList}"`;
+          return `ok=false\nerr="Multiple completed tasks found matching '${taskName}'. Please be more specific:\n${taskList}"`;
         }
 
         resolvedTaskId = tasks[0]._id.toString();
       }
 
-      // Use the proper completeTask service that handles ML training
-      const result = await taskService.completeTask({ taskId: resolvedTaskId, userId });
+      // Toggle the task completion (which will revert it since it's done)
+      const result = await taskService.toggleTaskCompletion(resolvedTaskId, userId);
 
-      if (!result || result.success === false) {
-        return `ok=false\nerr="${result?.error || "Task not found or you don't have permission"}"`;
+      if (!result || !result.task) {
+        return `ok=false\nerr="Task not found or you don't have permission"`;
       }
 
-      // Award points only if this was a NEW completion
+      // Ensure the task was actually uncompleted (was done before)
+      if (!result.wasNewUncompletion) {
+        return `ok=false\nerr="Task '${result.task.taskname}' was not completed, so it cannot be uncompleted"`;
+      }
+
+      // Reverse the points
       let gamification = null;
-      let pointsAwarded = 0;
-      if (!result.wasAlreadyCompleted) {
-        try {
-          const reward = await awardTaskCompletionPoints(userId, result.task);
-          pointsAwarded = reward.points;
-          gamification = reward.gamification;
-          
-          // Save earnedPoints to the task
-          await taskService.updateTaskEarnedPoints(resolvedTaskId, pointsAwarded);
-          
-          console.log(`[completeTaskMission] Awarded ${pointsAwarded} points to user ${userId}`);
-        } catch (pointsError) {
-          console.warn("[completeTaskMission] Failed to award points:", pointsError.message);
-        }
+      let pointsSubtracted = 0;
+      try {
+        const taskWithPoints = { 
+          ...result.task, 
+          earnedPoints: result.task.previousEarnedPoints || 0 
+        };
+        const reversal = await reverseTaskCompletion(userId, taskWithPoints);
+        pointsSubtracted = reversal.pointsSubtracted;
+        gamification = reversal.gamification;
+        console.log(`[uncompleteTaskMission] Subtracted ${pointsSubtracted} points from user ${userId}`);
+      } catch (reversalError) {
+        console.warn("[uncompleteTaskMission] Failed to reverse points:", reversalError.message);
       }
 
       const task = result.task;
 
-      // Build task_detail widget showing the completed task (like old updateTask)
+      // Build task_detail widget showing the uncompleted task
       const widgetData = {
         task: {
           id: task._id,
           title: task.taskname,
           description: task.description,
-          status: "done",
+          status: task.status,
           dueDate: task.dueDate ? new Date(task.dueDate).toISOString() : null,
           taskname: task.taskname,
           deadline: task.dueDate ? new Date(task.dueDate).toISOString().split("T")[0] : null,
@@ -108,17 +111,17 @@ const completeTaskMission = new LightMission({
 
       const widgetString = buildWidgetString("task_detail", widgetData);
 
-      // Return success with gamification info
-      const statsLine = pointsAwarded > 0 
-        ? `points_awarded=${pointsAwarded}\nstreak=${gamification?.currentStreak || 0}\ntotal_points=${gamification?.points || 0}`
-        : `already_completed=true`;
+      // Return success with reversal info
+      const statsLine = pointsSubtracted > 0 
+        ? `points_subtracted=${pointsSubtracted}\ntotal_points=${gamification?.points || 0}\ncompleted_tasks=${gamification?.completedTasks || 0}`
+        : `no_points_to_subtract=true`;
 
-      return `ok=true\ntask_id=${task._id}\ntask_name=${task.taskname}\n${statsLine}\n${widgetString}`;
+      return `ok=true\ntask_id=${task._id}\ntask_name=${task.taskname}\nstatus=${task.status}\n${statsLine}\n${widgetString}`;
     } catch (error) {
-      console.error("[completeTaskMission] Error:", error);
+      console.error("[uncompleteTaskMission] Error:", error);
       return `ok=false\nerr="${error.message}"`;
     }
   },
 });
 
-export default completeTaskMission;
+export default uncompleteTaskMission;

@@ -4,7 +4,7 @@ import AppText from "../../common/AppText";
 import SessionRow from "./SessionRow";
 import List from "../../layout/List";
 import { COLORS, ICON_SIZES, SPACING } from "../../../theme";
-import { ScheduledSession, Subtask, getSessionKey } from "../../widgets/widgetHelpers";
+import { ScheduledSession, Subtask, getSessionKey } from "../../widgets/taskHelpers";
 import { useTaskUpdateSubscription } from "../../../context/TaskContext";
 import TaskTitle from "./TaskTitle";
 
@@ -25,6 +25,7 @@ export const ScheduledSessionsSection: React.FC<{
   hideTaskTitle?: boolean;
   dividerColor?: string;
   sessionHeaderMode?: "taskTitle" | "date" | "none";
+  taskStatus?: string;
 }> = ({
   taskId,
   taskTitle,
@@ -40,6 +41,7 @@ export const ScheduledSessionsSection: React.FC<{
   hideTaskTitle = false,
   sessionHeaderMode = "none",
   dividerColor = COLORS.white,
+  taskStatus,
 }) => {
   // Listen for task updates and invoke parent's refresh when task updates occur elsewhere
   useTaskUpdateSubscription((payload?: { taskId?: string }) => {
@@ -72,8 +74,11 @@ export const ScheduledSessionsSection: React.FC<{
           dividerColor={dividerColor}
           data={sessions.map((session, index) => {
             const key = getSessionKey(taskId, session, index, subtasks);
-            const isDone =
-              completedParts?.has(key) || session.subtaskStatus === "done" || session.status === "completed";
+            const subtaskId = (session as any).subtaskId;
+            // If no subtask, check task status; otherwise check subtask/session status
+            const isDone = subtaskId
+              ? completedParts?.has(key) || session.subtaskStatus === "done" || session.status === "completed"
+              : taskStatus === "done" || completedParts?.has(key);
             const id = key;
             return {
               id,

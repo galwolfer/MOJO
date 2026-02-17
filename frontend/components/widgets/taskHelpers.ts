@@ -1,27 +1,28 @@
 import { COLORS } from "../../theme";
 import { SVG_DATA_URIS } from "../icons/svg-data-uris";
-import { ScheduledSession, Subtask } from "./taskHelpers";
+import { getCategoryMeta } from "../../config/categoryMeta";
+import { updateSubTask } from "../../services/taskService";
 
-// Re-export types only from taskHelpers (functions are defined locally in this file)
-export { Subtask, ScheduledSession } from "./taskHelpers";
+export interface Subtask {
+  id?: string;
+  title: string;
+  description?: string;
+  status?: string;
+  completed?: boolean;
+  order?: number;
+  duration?: number;
+}
 
-export type WidgetEntranceProps = {
-  entranceEnabled?: boolean;
-  entranceDelay?: number;
-  entranceDuration?: number;
-  skipAnimation?: boolean;
-};
-
-export const getWidgetEntranceProps = (
-  { entranceEnabled, entranceDelay, entranceDuration, skipAnimation }: WidgetEntranceProps,
-  options?: { skipAnimation?: boolean },
-) => ({
-  // Default entranceEnabled to true so widgets animate in by default unless explicitly disabled
-  entranceEnabled: entranceEnabled ?? true,
-  entranceDelay,
-  entranceDuration,
-  skipAnimation: skipAnimation ?? options?.skipAnimation ?? false,
-});
+export interface ScheduledSession {
+  id?: string;
+  start?: string;
+  end?: string;
+  status?: string;
+  subtaskIndex?: number;
+  subtaskId?: string;
+  subtaskTitle?: string;
+  subtaskStatus?: string;
+}
 
 /**
  * getSubtaskIdFromSession
@@ -340,9 +341,6 @@ export const getColoredDataUri = (fileName: string, color: string) => {
   return `data:image/svg+xml;base64,${newBase64}`;
 };
 
-import { getCategoryMeta } from "../../config/categoryMeta";
-import { updateSubTask, toggleTaskCompletion, GamificationResult } from "../../services/taskService";
-
 /**
  * getCategoryDisplay
  * Returns the human-friendly display name for a task category.
@@ -399,73 +397,6 @@ export const computeTaskProgress = (task: any, completedParts: Set<string>): num
 };
 
 /**
- * handleTaskPress
- * Centralized handler for selecting/collapsing tasks from list widgets
- */
-export const handleTaskPress = ({
-  taskId,
-  selectedTaskId,
-  setSelectedTaskId,
-  onAction,
-}: {
-  taskId: string;
-  selectedTaskId: string | null;
-  setSelectedTaskId: React.Dispatch<React.SetStateAction<string | null>>;
-  onAction?: (action: string, data: any) => void;
-}) => {
-  // Ensure only one task is selected at a time; tapping same task collapses it
-  setSelectedTaskId((prev) => (prev === taskId ? null : taskId));
-  onAction?.("task_selected", { taskId });
-};
-
-/**
- * toggleSessionSmart
- * Wrapper to toggle a scheduled session:
- * - If the session maps to a real subtask (via subtaskId or subtaskIndex), delegate to `toggleSession` so the subtask is persisted.
- * - If no subtask exists, `toggleSession` will toggle the entire task completion.
- */
-export const toggleSessionSmart = async ({
-  taskId,
-  session,
-  index,
-  subtasks,
-  completedParts,
-  setCompletedParts,
-  loadingParts,
-  setLoadingParts,
-  notifyTaskUpdate,
-  notifyStatsChange,
-  onAction,
-}: {
-  taskId: string;
-  session: ScheduledSession;
-  index: number;
-  subtasks?: Subtask[];
-  completedParts: Set<string>;
-  setCompletedParts: React.Dispatch<React.SetStateAction<Set<string>>>;
-  loadingParts: Set<string>;
-  setLoadingParts: React.Dispatch<React.SetStateAction<Set<string>>>;
-  notifyTaskUpdate: (params: { taskId: string }, delayMs?: number) => void;
-  notifyStatsChange?: (gamification?: GamificationResult) => void;
-  onAction?: (action: string, data: any) => void;
-}) => {
-  // Delegate to toggleSession which handles both subtask and no-subtask cases
-  await toggleSession({
-    taskId,
-    session,
-    index,
-    subtasks,
-    completedParts,
-    setCompletedParts,
-    loadingParts,
-    setLoadingParts,
-    notifyTaskUpdate,
-    notifyStatsChange,
-    onAction,
-  });
-};
-
-/**
  * sessionRowData
  * Extracts the display-friendly pieces for a scheduled session row.
  * Keeps rendering logic in components clean and testable.
@@ -518,7 +449,7 @@ export function sessionRowData(
  * toggleSubtask
  * Handles toggling the completion state of a subtask.
  * Updates local state optimistically, persists to server, and reverts on failure.
- * Triggers task update notification, stats update, and onAction callback.
+ * Triggers task update notification and onAction callback.
  * @param params - Object containing taskId, subtaskId, and state management functions
  */
 export const toggleSubtask = async ({
@@ -529,7 +460,6 @@ export const toggleSubtask = async ({
   loadingParts,
   setLoadingParts,
   notifyTaskUpdate,
-  notifyStatsChange,
   onAction,
 }: {
   taskId: string;
@@ -539,7 +469,6 @@ export const toggleSubtask = async ({
   loadingParts: Set<string>;
   setLoadingParts: React.Dispatch<React.SetStateAction<Set<string>>>;
   notifyTaskUpdate: (params: { taskId: string }, delayMs?: number) => void;
-  notifyStatsChange?: (gamification?: GamificationResult) => void;
   onAction?: (action: string, data: any) => void;
 }) => {
   const isCompleted = completedParts.has(subtaskId);
@@ -558,39 +487,16 @@ export const toggleSubtask = async ({
 
   try {
     // Persist change to server
-    const result = await updateSubTask(taskId, subtaskId, { status: nextCompleted ? "done" : "todo" });
-    if (!result.success) throw new Error("Update failed");
+    const success = await updateSubTask(taskId, subtaskId, { status: nextCompleted ? "done" : "todo" });
+    if (!success) throw new Error("Update failed");
 
+    // Debug: log toggle
     // Notify other components of task update
     notifyTaskUpdate({ taskId });
     // Also schedule a delayed notify to give backend time to settle and ensure list widgets refresh
     notifyTaskUpdate({ taskId }, 300);
-
-    // If gamification data was returned, notify stats context
-    console.log("[toggleSubtask] Result from API:", { 
-      success: result.success, 
-      hasGamification: !!result.gamification,
-      gamification: result.gamification,
-      notifyStatsChangeExists: !!notifyStatsChange 
-    });
-    
-    if (result.gamification && notifyStatsChange) {
-      console.log("[toggleSubtask] Calling notifyStatsChange with:", result.gamification);
-      notifyStatsChange(result.gamification);
-    } else if (!result.gamification) {
-      console.log("[toggleSubtask] No gamification data in result");
-    } else if (!notifyStatsChange) {
-      console.log("[toggleSubtask] notifyStatsChange callback not provided");
-    }
-
     // Trigger action callback for widget interactions
-    onAction?.("subtask_toggled", {
-      taskId,
-      subtaskId,
-      completed: nextCompleted,
-      gamification: result.gamification,
-      parentTaskCompleted: result.gamification?.parentTaskCompleted,
-    });
+    onAction?.("subtask_toggled", { taskId, subtaskId, completed: nextCompleted });
   } catch (error) {
     // Revert optimistic update on failure
     setCompletedParts((prev) => {
@@ -613,7 +519,6 @@ export const toggleSubtask = async ({
  * toggleSession
  * Handles toggling the completion state of a session by finding its associated subtask.
  * Used in TaskDetailWidget where sessions are directly tied to subtasks.
- * If no subtask exists (task with scheduled session but no subtasks), toggles the entire task.
  * Delegates to toggleSubtask after extracting the subtask ID.
  * @param params - Object containing session details and state management functions
  */
@@ -627,7 +532,6 @@ export const toggleSession = async ({
   loadingParts,
   setLoadingParts,
   notifyTaskUpdate,
-  notifyStatsChange,
   onAction,
 }: {
   taskId: string;
@@ -639,83 +543,11 @@ export const toggleSession = async ({
   loadingParts: Set<string>;
   setLoadingParts: React.Dispatch<React.SetStateAction<Set<string>>>;
   notifyTaskUpdate: (params: { taskId: string }, delayMs?: number) => void;
-  notifyStatsChange?: (gamification?: GamificationResult) => void;
   onAction?: (action: string, data: any) => void;
 }) => {
   // Find the subtask ID associated with this session
   const subtaskId = getSubtaskIdFromSession(session, subtasks);
-
-  if (!subtaskId) {
-    // No subtask found - this is a task with scheduled session but no subtasks
-    // Toggle the entire task completion instead
-    const key = getSessionKey(taskId, session, index, subtasks);
-    const isCompleted = completedParts.has(key);
-    const nextCompleted = !isCompleted;
-
-    // Optimistically update UI
-    setCompletedParts((prev) => {
-      const updated = new Set(prev);
-      if (nextCompleted) updated.add(key);
-      else updated.delete(key);
-      return updated;
-    });
-
-    // Set loading state
-    setLoadingParts((prev) => new Set(prev).add(key));
-
-    try {
-      // Toggle the entire task completion
-      console.debug(`[toggleSession] Toggling task completion for task ${taskId} (no subtask)`);
-      const result = await toggleTaskCompletion(taskId);
-      if (!result.success) throw new Error("Toggle task failed");
-
-      // Notify task update
-      notifyTaskUpdate({ taskId });
-      notifyTaskUpdate({ taskId }, 300);
-
-      // Notify stats change for task completion with gamification data
-      console.log("[toggleSession] Task toggle result:", {
-        success: result.success,
-        hasGamification: !!result.gamification,
-        gamification: result.gamification,
-        notifyStatsChangeExists: !!notifyStatsChange,
-      });
-      
-      if (result.gamification && notifyStatsChange) {
-        console.log("[toggleSession] Calling notifyStatsChange with:", result.gamification);
-        notifyStatsChange(result.gamification);
-      } else if (!result.gamification) {
-        console.log("[toggleSession] No gamification data in task toggle result");
-        // Still refresh stats as fallback
-        if (notifyStatsChange) {
-          notifyStatsChange();
-        }
-      }
-
-      // Trigger action
-      onAction?.("task_toggled", {
-        taskId,
-        completed: nextCompleted,
-      });
-    } catch (error) {
-      // Revert optimistic update on failure
-      setCompletedParts((prev) => {
-        const updated = new Set(prev);
-        if (isCompleted) updated.add(key);
-        else updated.delete(key);
-        return updated;
-      });
-    } finally {
-      // Clear loading state
-      setLoadingParts((prev) => {
-        const updated = new Set(prev);
-        updated.delete(key);
-        return updated;
-      });
-    }
-    return;
-  }
-
+  if (!subtaskId) return;
   // Delegate to subtask toggle logic
   await toggleSubtask({
     taskId,
@@ -725,7 +557,6 @@ export const toggleSession = async ({
     loadingParts,
     setLoadingParts,
     notifyTaskUpdate,
-    notifyStatsChange,
     onAction,
   });
 };

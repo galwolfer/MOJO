@@ -2,11 +2,9 @@ import React from "react";
 import { View, Pressable } from "react-native";
 import AppText from "../../common/AppText";
 import { Checkbox } from "../../icons/Checkbox";
-import { getTimeParts } from "../../widgets/widgetHelpers";
+import { getTimeParts, getSubtaskIdFromSession, ScheduledSession, Subtask } from "../../widgets/taskHelpers";
 import { StyleSheet } from "react-native";
 import { ICON_SIZES, SPACING, COLORS } from "../../../theme";
-
-import { ScheduledSession, Subtask } from "../../widgets/widgetHelpers";
 
 export const SessionRow: React.FC<{
   session: ScheduledSession;
@@ -41,13 +39,22 @@ export const SessionRow: React.FC<{
 }) => {
   const checkboxHandler = checkboxOnToggle ?? rowOnPress ?? undefined;
   const rowPressHandler = rowOnPress ?? (canToggle ? (checkboxOnToggle ?? undefined) : undefined);
+
+  const onCheckboxPress = async () => {
+    if (isLoading) return;
+    const subtaskId = getSubtaskIdFromSession(session, subtasks);
+    const status = !isDone ? "done" : "todo";
+    console.debug("[SessionRow] sending fields to server", { taskId, subtaskId, sessionId: session.id, status });
+    await checkboxHandler?.();
+  };
+
   const startParts = getTimeParts(session.start);
   const endParts = getTimeParts(session.end);
   const subtaskTitle = session.subtaskTitle || `Part ${session.subtaskIndex ?? sessionIndex + 1}`;
 
   const Container: any = rowPressHandler ? Pressable : View;
   return (
-    <View>
+    <View style={styles.sessionRoot}>
       {showTaskDate && (
         <AppText variant="notes" style={[styles.sessionDateText, { color: categoryColor || COLORS.primary1 }]}>
           {session.start ? startParts.date : "Date"}
@@ -95,13 +102,13 @@ export const SessionRow: React.FC<{
 
         <View style={styles.sessionCheckbox}>
           {canToggle ? (
-            <Checkbox checked={isDone} onChange={() => checkboxHandler?.()} size={ICON_SIZES.sm} />
+            <Checkbox checked={isDone} onChange={onCheckboxPress} size={ICON_SIZES.sm} />
           ) : (
             <View style={styles.checkboxSpacer} />
           )}
         </View>
         <View style={styles.sessionTitleRow}>
-          <AppText variant="bodyText" style={[isDone && styles.sessionLabelDone]}>
+          <AppText variant="bodyText" style={[styles.sessionLabel, isDone && styles.sessionLabelDone]}>
             <AppText variant="boldText" style={styles.sessionSubtask}>
               {subtaskTitle}
             </AppText>
@@ -126,8 +133,13 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     paddingVertical: 4,
     width: "100%",
-    height: 2 * SPACING.xlg,
+    minHeight: 2 * SPACING.xlg,
     marginBottom: -SPACING.sm,
+  },
+  sessionRoot: {
+    flex: 1,
+    minWidth: 0,
+    width: "100%",
   },
   sessionDateText: {
     fontWeight: "600",
@@ -171,16 +183,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-start",
-    flexWrap: "nowrap",
-    gap: SPACING.xs,
+    flex: 1,
+    minWidth: 0,
+  },
+  sessionLabel: {
+    flexGrow: 1,
+    flexShrink: 1,
+    width: 0,
+    flexWrap: "wrap",
   },
   sessionLabelDone: {
     textDecorationLine: "line-through",
   },
   sessionSubtask: {
     fontWeight: "600",
+    flexShrink: 1,
   },
   sessionTask: {
     color: COLORS.black,
+    flexShrink: 1,
   },
 });
