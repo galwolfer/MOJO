@@ -53,24 +53,15 @@ export function useCalendarTasks(
       setIsLoading(true);
       setError(null);
 
-      // Fetch both regular tasks and scheduled sessions in parallel
-      const [taskGroups, scheduledGroups] = await Promise.all([
-        getTasksForDate(date),
-        getScheduledSessionsForDate(date),
-      ]);
+      // ONLY fetch scheduled sessions - don't show tasks by their deadline
+      // The daily view shows what's SCHEDULED for that day, not what's DUE
+      const scheduledGroups = await getScheduledSessionsForDate(date);
 
-      console.log("[useCalendarTasks] Fetched taskGroups:", taskGroups);
       console.log("[useCalendarTasks] Fetched scheduledGroups:", scheduledGroups);
 
-      // Use scheduled sessions if available, otherwise use regular tasks
-      let groupsToUse: TaskGroup[];
-      if (scheduledGroups.length > 0) {
-        groupsToUse = scheduledGroups;
-        console.log("[useCalendarTasks] Using scheduled groups");
-      } else {
-        groupsToUse = taskGroups;
-        console.log("[useCalendarTasks] Using task groups");
-      }
+      // Use only scheduled sessions
+      const groupsToUse: TaskGroup[] = scheduledGroups;
+      console.log("[useCalendarTasks] Using scheduled sessions only (no deadline-based tasks)");
 
       // Initialize completed sets from server state
       const doneSubtasks = new Set<string>();

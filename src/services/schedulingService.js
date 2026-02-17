@@ -26,6 +26,9 @@ import { env } from "../config/env.js";
 import { logger } from "../utils/logger.js";
 import { updateAllScores } from "../scripts/updateScores.js";
 import { spawn } from "child_process";
+import fs from "fs";
+import path from "path";
+import os from "os";
 
 /**
  * Helper: Trigger scheduler update after task operations
@@ -68,6 +71,16 @@ async function callPythonScheduler(tasks, options) {
         py.stderr.on("data", (chunk) => (stderr += chunk));
         py.on("error", (err) => reject(err));
         py.on("close", (code) => {
+          // Write stderr to debug log file
+          if (stderr) {
+            const debugLogPath = path.join(os.tmpdir(), 'csp_scheduler_node_debug.log');
+            try {
+              fs.appendFileSync(debugLogPath, `\n=== ${new Date().toISOString()} ===\n${stderr}\n`);
+              console.log(`[PYTHON-DEBUG] Logs written to: ${debugLogPath}`);
+            } catch (e) {
+              console.error('[PYTHON-DEBUG] Failed to write log file:', e.message);
+            }
+          }
           if (code !== 0) return reject(new Error(`Python scheduler (${cmd}) failed: ${stderr || `exit ${code}`}`));
           try {
             const parsed = JSON.parse(stdout || "{}");
@@ -249,6 +262,10 @@ export function describeRoutineWindows(blocks = DEFAULT_ROUTINE_BLOCKS) {
  */
 async function assignSubtaskIndices(plan) {
   if (!plan.length) return plan;
+
+  // If Python already provided subtaskIndex, use it directly
+  const allHaveIndex = plan.every(slot => slot.subtaskIndex != null);
+  if (allHaveIndex) return plan;
 
   // Group plan slots by taskId to track which subtask index to assign next
   const taskSlotMap = new Map();
@@ -440,12 +457,49 @@ export async function generatePlan({ userId, profile = {}, planningHorizonDays =
     return { plan: [], unscheduled: [], message: "All tasks already scheduled." };
   }
 
+  // DEBUG: Log tasks being sent to Python scheduler
+  console.log('[SCHEDULER-DEBUG] ========== TASKS BEING SENT TO PYTHON ==========');
+  tasksForPlanning.forEach(t => {
+    console.log(`\nTask: ${t.taskname}`);
+    console.log(`  _id: ${t._id}`);
+    console.log(`  taskType: ${t.taskType}`);
+    console.log(`  estimatedDuration: ${t.estimatedDuration} min`);
+    console.log(`  dueDate: ${t.dueDate}`);
+    console.log(`  chunkCount: ${t.chunkCount}`);
+    console.log(`  canSplit: ${t.canSplit}`);
+    if (t.subTasks && t.subTasks.length > 0) {
+      console.log(`  SubTasks (${t.subTasks.length}):`);
+      t.subTasks.forEach((st, idx) => {
+        console.log(`    [${idx}] index=${st.index}, minutes=${st.minutes}, title="${st.title}"`);
+      });
+    } else {
+      console.log(`  SubTasks: NONE`);
+    }
+  });
+  console.log('[SCHEDULER-DEBUG] ===================================================\n');
+
   const { plan, unscheduled } = await callPythonScheduler(tasksForPlanning, {
     busyBlocksByDate,
     planningHorizonDays,
     workingHours: profile.workingHours || { startHour: 9, startMinute: 0, endHour: 18, endMinute: 0 },
     dailyCapMinutes: profile.dailyCapMinutes || 240,
   });
+
+  // DEBUG: Log what Python returned
+  console.log('[SCHEDULER-DEBUG] ========== PYTHON RETURNED ==========');
+  console.log(`  Plan: ${plan.length} sessions`);
+  if (plan.length > 0) {
+    plan.forEach((session, idx) => {
+      console.log(`    [${idx}] taskId=${session.taskId}, subtaskIndex=${session.subtaskIndex}, start=${session.start}, end=${session.end}, duration=${session.minutes || 'N/A'}min`);
+    });
+  }
+  console.log(`  Unscheduled: ${unscheduled.length} tasks`);
+  if (unscheduled.length > 0) {
+    unscheduled.forEach((item, idx) => {
+      console.log(`    [${idx}] ${JSON.stringify(item)}`);
+    });
+  }
+  console.log('[SCHEDULER-DEBUG] ====================================\n');
 
   return { plan, unscheduled };
 }
