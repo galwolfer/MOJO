@@ -31,6 +31,7 @@ type BoxProps = {
    * Custom background color for the title bar. Defaults to `COLORS.primary1`.
    */
   titleColor?: string;
+  innerPadding?: boolean;
 };
 
 /**
@@ -46,8 +47,21 @@ const wrapStringChildren = (children?: React.ReactNode): React.ReactNode => {
  * Box - A styled container component with a title bar and content area.
  * @param title - The title to display in the header.
  * @param children - The content to display inside the box.
+ * @param widget - If true, uses a lighter surface color for embedding as a widget.
+ * @param style - Additional styles to apply to the content area.
+ * @param titleColor - Custom background color for the title bar.
+ * @param innerPadding - If true, applies default padding to the content area.
+ * @returns The Box component.
  */
-const Box: React.FC<BoxProps> = ({ title, titleIcon, children, widget = false, style, titleColor }) => {
+const Box: React.FC<BoxProps> = ({
+  title,
+  titleIcon,
+  children,
+  widget = false,
+  style,
+  titleColor,
+  innerPadding = true,
+}) => {
   const wrappedChildren = wrapStringChildren(children);
 
   return (
@@ -60,7 +74,7 @@ const Box: React.FC<BoxProps> = ({ title, titleIcon, children, widget = false, s
           </AppText>
         </View>
       )}
-      <View style={[styles.content, style]}>{wrappedChildren}</View>
+      <View style={[styles.content, style, innerPadding ? { padding: SPACING.md } : {}]}>{wrappedChildren}</View>
     </View>
   );
 };
@@ -101,7 +115,6 @@ const styles = StyleSheet.create({
     color: COLORS.colorWhite,
   },
   content: {
-    padding: SPACING.md,
     alignSelf: "stretch",
     overflow: "hidden",
   },

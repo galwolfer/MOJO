@@ -60,6 +60,7 @@ export const ICON_FILES: Record<string, string> = {
   plus: 'plus-1.svg',
   prefrences: 'prefrences.svg',
   puzzle: 'puzzle.svg',
+  random: 'random.svg',
   reflection: 'reflection.svg',
   repeat: 'repeat.svg',
   right: 'right.svg',

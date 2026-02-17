@@ -20,14 +20,72 @@ function safeJsonParse(jsonString: string): any {
   try {
     return JSON.parse(jsonString);
   } catch (e) {
+    // Helper: compute unmatched brace/bracket counts while ignoring strings
+    function computeDepths(s: string) {
+      let braceDepth = 0;
+      let bracketDepth = 0;
+      let inString = false;
+      let escape = false;
+      for (let i = 0; i < s.length; i++) {
+        const ch = s[i];
+        if (inString) {
+          if (escape) {
+            escape = false;
+          } else if (ch === "\\") {
+            escape = true;
+          } else if (ch === '"') {
+            inString = false;
+          }
+        } else {
+          if (ch === '"') {
+            inString = true;
+          } else if (ch === "{") {
+            braceDepth++;
+          } else if (ch === "}") {
+            braceDepth--;
+          } else if (ch === "[") {
+            bracketDepth++;
+          } else if (ch === "]") {
+            bracketDepth--;
+          }
+        }
+      }
+      return { braceDepth: Math.max(0, braceDepth), bracketDepth: Math.max(0, bracketDepth) };
+    }
+
+    // Attempt 1: If ends with ] but has unclosed braces, insert } before ]
     try {
-      // Try appending a closing brace
-      return JSON.parse(jsonString + "}");
+      const depths = computeDepths(jsonString);
+      const trimmedEnd = jsonString.trimEnd();
+      const lastChar = trimmedEnd[trimmedEnd.length - 1];
+
+      if (lastChar === "]" && depths.braceDepth > 0) {
+        const repaired = jsonString.replace(/\n  \]$/, "\n    }\n  ]\n}");
+        return JSON.parse(repaired);
+      }
     } catch (e2) {
+      // continue
+    }
+
+    // Attempt 2: Remove trailing commas and then balance closers
+    try {
+      let repaired = jsonString.replace(/,\s*([}\]])/g, "$1");
+      const depths2 = computeDepths(repaired);
+      if (depths2.braceDepth > 0 || depths2.bracketDepth > 0) {
+        repaired += "]".repeat(depths2.bracketDepth) + "}".repeat(depths2.braceDepth);
+      }
+      return JSON.parse(repaired);
+    } catch (e3) {
+      // continue
+    }
+
+    // Fallback: try simple braces as before
+    try {
+      return JSON.parse(jsonString + "}");
+    } catch (e4) {
       try {
-        // Try appending two closing braces (nested objects)
         return JSON.parse(jsonString + "}}");
-      } catch (e3) {
+      } catch (e5) {
         throw e;
       }
     }

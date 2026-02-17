@@ -78,7 +78,10 @@ export const renderTaskField = (task: any, key: string) => {
 
   // Get raw value, with special handling for subcategory
   const rawValue =
-    task[key] ?? (key === "subcategory" ? task.subcategoryDisplay || task.subCategory?.label : undefined);
+    task[key] ??
+    (key === "subcategory"
+      ? task.subcategoryDisplay || task.subCategory?.label || task.subCategory?.name
+      : undefined);
   // Apply formatter if defined
   const rendered = def.formatter ? def.formatter(rawValue, task) : rawValue;
 

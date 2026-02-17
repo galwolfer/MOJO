@@ -532,12 +532,13 @@ async function addTask() {
   });
 
   console.log(theme.success("✅ Task added! We'll keep its score in sync."));
-  if (created.subCategory?.label) {
+  const createdSubLabel = created.subCategory?.label || created.subCategory?.name;
+  if (createdSubLabel) {
     const confidence = created.subCategory?.confidence;
     const confidenceLabel = Number.isFinite(confidence) ? `${Math.round(confidence * 100)}%` : "n/a";
     console.log(
       theme.muted(
-        `Auto sub-category: ${created.subCategory.label} (${created.subCategory.source}, confidence ${confidenceLabel})`
+        `Auto sub-category: ${createdSubLabel} (${created.subCategory.source}, confidence ${confidenceLabel})`
       )
     );
   }
@@ -565,7 +566,7 @@ async function listTasks() {
   console.log(theme.accent(`\n${currentUser.username}'s tasks:`));
   tasks.forEach((task, index) => {
     const category = task.category || "uncategorized";
-    const subCategory = task.subCategory?.label || null;
+    const subCategory = task.subCategory?.label || task.subCategory?.name || null;
     const displayName = task.taskname || task.title || "(no title)";
     const detailParts = [
       `importance ${task.importance}`,
