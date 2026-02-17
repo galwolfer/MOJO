@@ -21,7 +21,7 @@ import { COLORS, SPACING } from "../../theme";
 import { useKeyboard } from "../../hooks";
 
 export default function MainLayout() {
-  const { activeTab, headerConfig, navBarConfig } = useNavigation();
+  const { activeTab, headerConfig, navBarConfig, navigationParams } = useNavigation();
   const { setHeaderHeight, setNavBarHeight } = useLayout();
   const { width, height } = useWindowDimensions();
   const isDesktopLike = Platform.OS === "web" ? width >= 900 : width >= 900;
@@ -64,7 +64,7 @@ export default function MainLayout() {
       case "create":
         return <CreateTaskScreen />;
       case "edit":
-        return <EditTaskScreen />;
+        return <EditTaskScreen taskId={navigationParams?.taskId || ""} />;
       default:
         return <ChatScreen />;
     }

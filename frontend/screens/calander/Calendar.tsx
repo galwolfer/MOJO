@@ -32,7 +32,7 @@ import { useCalendarTasks } from "./hooks/useCalendarTasks";
 import { Task } from "./types";
 
 export default function CalendarScreen() {
-  const { setHeaderConfig, setActiveTab } = useNavigation();
+  const { setHeaderConfig, setActiveTab, setActiveTabWithParams } = useNavigation();
   const { notifyTaskUpdate, subscribeToTaskUpdates } = useTaskContext();
 
   const stripTime = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -99,8 +99,9 @@ export default function CalendarScreen() {
   };
 
   const handleEditTask = (taskToEdit: Task) => {
-    console.log("Editing task:", taskToEdit);
-    setActiveTab("edit" as any);
+    // taskToEdit.id is the session ID; (taskToEdit as any).taskId is the actual task _id
+    const actualTaskId = (taskToEdit as any).taskId || taskToEdit.id;
+    setActiveTabWithParams("edit" as any, { taskId: actualTaskId });
   };
 
   const handleTaskPress = (taskId: string) => {
