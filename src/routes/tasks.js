@@ -709,6 +709,37 @@ router.post("/:taskId/subtasks/:subId/todo", taskController.markSubTaskTodo);
 // Update subtask status directly
 router.patch("/:taskId/subtasks/:subId/status", taskController.updateSubTaskStatus);
 
+/**
+ * Delete a single subtask and its corresponding TaskSchedule entries
+ * DELETE /api/tasks/:taskId/subtasks/:subId
+ */
+router.delete("/:taskId/subtasks/:subId", requireAuth, async (req, res, next) => {
+  try {
+    const { taskId, subId } = req.params;
+    const userId = req.user.userId;
+
+    // Find the subtask first so we can get its index
+    const subtask = await SubTask.findOne({ _id: subId, taskId, userId });
+    if (!subtask) {
+      return res.status(404).json({ success: false, message: "Subtask not found" });
+    }
+
+    const subtaskIndex = subtask.index;
+
+    // Delete the SubTask document
+    await SubTask.deleteOne({ _id: subId });
+
+    // Delete all TaskSchedule entries that belong to this subtask
+    if (subtaskIndex !== undefined && subtaskIndex !== null) {
+      await TaskSchedule.deleteMany({ taskId, subtaskIndex });
+    }
+
+    return res.json({ success: true, deletedSubtaskIndex: subtaskIndex });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Bulk update task with subtasks in one call
 router.patch("/:id/full", taskController.bulkUpdateTaskWithSubtasks);
 

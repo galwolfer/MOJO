@@ -17,7 +17,8 @@ import { ProgressIcon } from "../../../components/icons/ProgressIcon.native";
 import { CategoryMeta } from "../../../config/categoryMeta";
 import { Task } from "../types";
 import SubtaskItem from "./SubtaskItem";
-import Tag from "../../../components/inputs/tag";
+import { TaskTitle } from "../../../components/special/task/TaskTitle";
+import { TaskTagsRow } from "../../../components/special/task/TaskTagsRow";
 
 export interface ExpandedTaskCardProps {
   task: Task;
@@ -77,20 +78,21 @@ export default function ExpandedTaskCard({
         {/* Right: Content */}
         <View style={styles.expandedRightSection}>
           {/* Title Row */}
-          <View style={styles.expandedTitleRowInline}>
-            <Checkbox
-              checked={isCompleted}
-              onChange={(checked) => onToggleCompletion(effectiveId, checked)}
-              size={24}
-            />
-            {IconComponent &&
-              categoryMeta &&
-              React.createElement(IconComponent, {
-                size: ICON_SIZES.md,
-                color: categoryMeta.color,
-              })}
-            <AppText style={styles.expandedTitleInline}>{task.title}</AppText>
-          </View>
+          <TaskTitle
+            title={task.title}
+            category={task.category}
+            size="md"
+            style={styles.expandedTitleRowInline}
+            textStyle={styles.expandedTitleInline}
+            iconStyle={{ marginLeft: 0, marginBottom: 0 }}
+            leadingNode={
+              <Checkbox
+                checked={isCompleted}
+                onChange={(checked) => onToggleCompletion(effectiveId, checked)}
+                size={24}
+              />
+            }
+          />
 
           {/* Part info for multi-day tasks */}
           {task.partNumber && task.totalParts && task.totalParts > 1 && task.subtasks?.length === 1 && (
@@ -101,13 +103,13 @@ export default function ExpandedTaskCard({
 
           {/* Tags and Progress */}
           <View style={styles.expandedProgressAndTagsRow}>
-            {task.tags.length > 0 && (
-              <View style={styles.expandedTagsContainer}>
-                {task.tags.map((tag, idx) => (
-                  <Tag key={idx} label={tag} leftIcon={categoryMeta?.icon} colorIndex={4} />
-                ))}
-              </View>
-            )}
+            <View style={{ flex: 1 }}>
+              <TaskTagsRow
+                category={task.category}
+                importance={task.importance}
+                effort={task.effort}
+              />
+            </View>
             {task.subtasks && task.subtasks.length > 0 && (
               <ProgressIcon value={taskProgress} size={ICON_SIZES.md} />
             )}

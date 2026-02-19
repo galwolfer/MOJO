@@ -21,13 +21,18 @@
  * />
  * ```
  */
-import React from "react";
-import { Alert } from "react-native";
+import React, { useState } from "react";
+import { View, StyleSheet } from "react-native";
 import { getCategoryMeta } from "../../../config/categoryMeta";
 import { ICONS } from "../../../components/icons/icons";
+import { computeTaskProgress } from "../../../components/widgets/taskHelpers";
 import { Task } from "../types";
 import CompactTaskCard from "./CompactTaskCard";
 import ExpandedTaskCard from "./ExpandedTaskCard";
+import PopupBox from "../../../components/common/PopupBox";
+import AppText from "../../../components/common/AppText";
+import AppButton from "../../../components/common/AppButton";
+import { COLORS, SPACING } from "../../../theme";
 
 interface TaskCardProps {
   task: Task;
@@ -54,31 +59,15 @@ export default function TaskCard({
   onSubtaskToggle,
   onSubtaskDelete,
 }: TaskCardProps) {
+  const [deleteVisible, setDeleteVisible] = useState(false);
+
   // Resolve shared derived values once; pass down to sub-components
   const categoryMeta = task.category ? getCategoryMeta(task.category) : null;
   const IconComponent = categoryMeta ? ICONS[categoryMeta.icon] : null;
   const effectiveId = task.taskId || task.id;
 
-  // Compute progress: prefer server value, fall back to local optimistic count
-  const taskProgress = (() => {
-    if (!task.subtasks || task.subtasks.length === 0) return 0;
-    const completedCount = task.subtasks.filter((s) => completedSubtasks.has(s.id)).length;
-    const localProgress = completedCount / task.subtasks.length;
-    const serverProgress =
-      task.progressPercentage !== undefined ? task.progressPercentage / 100 : undefined;
-    return typeof serverProgress === "number" ? serverProgress : localProgress;
-  })();
-
-  const confirmDelete = () => {
-    Alert.alert(
-      "Delete Task",
-      `Are you sure you want to delete "${task.title}"? This will also remove all scheduled sessions.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: () => onDelete(effectiveId) },
-      ],
-    );
-  };
+  // Compute progress using shared utility; returns 0-100, normalise to 0-1 for sub-components
+  const taskProgress = computeTaskProgress(task, completedSubtasks) / 100;
 
   const sharedProps = {
     task,
@@ -91,12 +80,57 @@ export default function TaskCard({
     onPress,
     onToggleCompletion,
     onEdit,
-    onConfirmDelete: confirmDelete,
+    onConfirmDelete: () => setDeleteVisible(true),
     onSubtaskToggle,
   };
 
-  if (isExpanded) {
-    return <ExpandedTaskCard {...sharedProps} onSubtaskDelete={onSubtaskDelete} />;
-  }
-  return <CompactTaskCard {...sharedProps} />;
+  return (
+    <>
+      {isExpanded
+        ? <ExpandedTaskCard {...sharedProps} onSubtaskDelete={onSubtaskDelete} />
+        : <CompactTaskCard {...sharedProps} />}
+
+      <PopupBox
+        visible={deleteVisible}
+        onClose={() => setDeleteVisible(false)}
+        title="Delete Task"
+      >
+        <AppText style={styles.message}>
+          Are you sure you want to delete "{task.title}"? This will also remove all scheduled sessions.
+        </AppText>
+        <View style={styles.actions}>
+          <AppButton
+            title="Delete"
+            mode="filled"
+            color="primary1"
+            onPress={() => { setDeleteVisible(false); onDelete(effectiveId); }}
+            style={styles.actionBtn}
+          />
+          <AppButton
+            title="Cancel"
+            mode="light"
+            color="primary1"
+            onPress={() => setDeleteVisible(false)}
+            style={styles.actionBtn}
+          />
+        </View>
+      </PopupBox>
+    </>
+  );
 }
+
+const styles = StyleSheet.create({
+  message: {
+    color: COLORS.darkGray,
+    marginBottom: SPACING.lg,
+    lineHeight: 22,
+  },
+  actions: {
+    flexDirection: "row",
+    gap: SPACING.md,
+    justifyContent: "flex-end",
+  },
+  actionBtn: {
+    minWidth: 90,
+  },
+});

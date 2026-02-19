@@ -41,6 +41,8 @@ export interface Task {
   isScheduled?: boolean;      // True when sourced from a TaskSchedule document
   progressPercentage?: number; // Server-side completion 0-100
   mainTaskDescription?: string; // Parent task description for multi-part sessions
+  importance?: number;        // 1-5 importance level
+  effort?: number;            // 1-5 effort level
 }
 
 /**

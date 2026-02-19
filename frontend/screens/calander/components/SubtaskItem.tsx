@@ -14,12 +14,14 @@
  * />
  * ```
  */
-import React from "react";
+import React, { useState } from "react";
 import { View, StyleSheet, TouchableOpacity } from "react-native";
 import AppText from "../../../components/common/AppText";
+import AppButton from "../../../components/common/AppButton";
 import { COLORS, SPACING, FONT_SIZES, FONTS, ICON_SIZES } from "../../../theme";
 import { ICONS } from "../../../components/icons/icons";
 import { Checkbox } from "../../../components/icons/Checkbox.native";
+import PopupBox from "../../../components/common/PopupBox";
 import { Subtask } from "../types";
 
 interface SubtaskItemProps {
@@ -31,36 +33,66 @@ interface SubtaskItemProps {
 }
 
 export default function SubtaskItem({ subtask, parentTaskId, isCompleted, onToggle, onDelete }: SubtaskItemProps) {
+  const [deleteVisible, setDeleteVisible] = useState(false);
+
   return (
-    <View style={styles.subtaskContainer}>
-      <View style={styles.subtaskRow}>
-        <Checkbox
-          checked={isCompleted}
-          onChange={(checked) => {
-            onToggle(parentTaskId, subtask.id, checked);
-          }}
-          size={ICON_SIZES.sm}
-        />
-        <View style={{ flex: 1 }}>
-          <AppText variant="notes" style={[styles.subtaskText, isCompleted && styles.subtaskTextCompleted]}>
-            {subtask.title}
-          </AppText>
-          {subtask.timeRange && (
-            <AppText style={[styles.subtaskTimeRange, isCompleted && styles.subtaskTimeRangeCompleted]}>
-              {subtask.timeRange}
+    <>
+      <View style={styles.subtaskContainer}>
+        <View style={styles.subtaskRow}>
+          <Checkbox
+            checked={isCompleted}
+            onChange={(checked) => {
+              onToggle(parentTaskId, subtask.id, checked);
+            }}
+            size={ICON_SIZES.sm}
+          />
+          <View style={{ flex: 1 }}>
+            <AppText variant="notes" style={[styles.subtaskText, isCompleted && styles.subtaskTextCompleted]}>
+              {subtask.title}
             </AppText>
-          )}
+            {subtask.timeRange && (
+              <AppText style={[styles.subtaskTimeRange, isCompleted && styles.subtaskTimeRangeCompleted]}>
+                {subtask.timeRange}
+              </AppText>
+            )}
+          </View>
+          <TouchableOpacity onPress={() => setDeleteVisible(true)} style={styles.subtaskDeleteButton}>
+            <ICONS.trash size={ICON_SIZES.sm} color={COLORS.lightGray} />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity onPress={() => onDelete(parentTaskId, subtask.id)} style={styles.subtaskDeleteButton}>
-          <ICONS.trash size={ICON_SIZES.sm} color={COLORS.lightGray} />
-        </TouchableOpacity>
+        {subtask.description && (
+          <AppText style={[styles.subtaskDescription, isCompleted && styles.subtaskDescriptionCompleted]}>
+            {subtask.description}
+          </AppText>
+        )}
       </View>
-      {subtask.description && (
-        <AppText style={[styles.subtaskDescription, isCompleted && styles.subtaskDescriptionCompleted]}>
-          {subtask.description}
+
+      <PopupBox
+        visible={deleteVisible}
+        onClose={() => setDeleteVisible(false)}
+        title="Delete Subtask"
+      >
+        <AppText variant="bodyText" style={styles.popupMessage}>
+          Are you sure you want to delete "{subtask.title}"?
         </AppText>
-      )}
-    </View>
+        <View style={styles.popupActions}>
+          <AppButton
+            title="Delete"
+            mode="filled"
+            color="primary1"
+            onPress={() => { setDeleteVisible(false); onDelete(parentTaskId, subtask.id); }}
+            style={styles.popupBtn}
+          />
+          <AppButton
+            title="Cancel"
+            mode="light"
+            color="primary1"
+            onPress={() => setDeleteVisible(false)}
+            style={styles.popupBtn}
+          />
+        </View>
+      </PopupBox>
+    </>
   );
 }
 
@@ -108,5 +140,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginLeft: SPACING.sm,
+  },
+  popupMessage: {
+    color: COLORS.darkGray,
+    marginBottom: SPACING.lg,
+  },
+  popupActions: {
+    flexDirection: "row",
+    gap: SPACING.md,
+    justifyContent: "flex-end",
+  },
+  popupBtn: {
+    minWidth: 90,
   },
 });

@@ -1628,4 +1628,16 @@ export async function markSubTaskTodo(taskId: string, subTaskId: string): Promis
   }
 }
 
-
+/**
+ * Delete a single subtask and its corresponding TaskSchedule entries
+ * DELETE /api/tasks/:taskId/subtasks/:subId
+ */
+export async function deleteSubTask(taskId: string, subtaskId: string): Promise<boolean> {
+  try {
+    await del<{ success: boolean }>(`/tasks/${taskId}/subtasks/${subtaskId}`);
+    return true;
+  } catch (error) {
+    console.warn("Failed to delete subtask:", error);
+    return false;
+  }
+}

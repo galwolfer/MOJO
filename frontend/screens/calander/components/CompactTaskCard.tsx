@@ -15,6 +15,7 @@ import { ICONS } from "../../../components/icons/icons";
 import { Checkbox } from "../../../components/icons/Checkbox.native";
 import { ProgressIcon } from "../../../components/icons/ProgressIcon.native";
 import { CategoryMeta } from "../../../config/categoryMeta";
+import { TaskTitle } from "../../../components/special/task/TaskTitle";
 import { Task } from "../types";
 
 export interface CompactTaskCardProps {
@@ -58,20 +59,21 @@ export default function CompactTaskCard({
       {/* Multi-day subtask layout vs simple layout */}
       {task.subtasks && task.subtasks.length > 0 && task.partNumber && task.totalParts && task.totalParts > 1 ? (
         <View style={styles.taskCompactMiddle}>
-          <View style={styles.taskTitleRowCompact}>
-            <Checkbox
-              checked={isCompleted}
-              onChange={(checked) => onToggleCompletion(effectiveId, checked)}
-              size={ICON_SIZES.md}
-            />
-            {IconComponent &&
-              categoryMeta &&
-              React.createElement(IconComponent, {
-                size: ICON_SIZES.sm,
-                color: categoryMeta.color,
-              })}
-            <AppText style={styles.taskTitleCompact}>{task.title}</AppText>
-          </View>
+          <TaskTitle
+            title={task.title}
+            category={task.category}
+            size="sm"
+            style={[styles.taskTitleRowCompact, { marginBottom: 0 }]}
+            textStyle={styles.taskTitleCompact}
+            iconStyle={{ marginLeft: 0, marginBottom: 0 }}
+            leadingNode={
+              <Checkbox
+                checked={isCompleted}
+                onChange={(checked) => onToggleCompletion(effectiveId, checked)}
+                size={ICON_SIZES.md}
+              />
+            }
+          />
 
           {/* Inline subtask checkboxes for multi-day tasks */}
           <View style={styles.subtasksContainerCompact}>
@@ -101,20 +103,21 @@ export default function CompactTaskCard({
         </View>
       ) : (
         <View style={styles.taskCompactMiddle}>
-          <View style={styles.taskTitleRowCompact}>
-            <Checkbox
-              checked={isCompleted}
-              onChange={(checked) => onToggleCompletion(effectiveId, checked)}
-              size={20}
-            />
-            {IconComponent &&
-              categoryMeta &&
-              React.createElement(IconComponent, {
-                size: ICON_SIZES.sm,
-                color: categoryMeta.color,
-              })}
-            <AppText style={styles.taskTitleCompact}>{task.title}</AppText>
-          </View>
+          <TaskTitle
+            title={task.title}
+            category={task.category}
+            size="sm"
+            style={[styles.taskTitleRowCompact, { marginBottom: 0 }]}
+            textStyle={styles.taskTitleCompact}
+            iconStyle={{ marginLeft: 0, marginBottom: 0 }}
+            leadingNode={
+              <Checkbox
+                checked={isCompleted}
+                onChange={(checked) => onToggleCompletion(effectiveId, checked)}
+                size={20}
+              />
+            }
+          />
         </View>
       )}
 

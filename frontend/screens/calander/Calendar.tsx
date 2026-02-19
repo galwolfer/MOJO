@@ -16,9 +16,10 @@
  * ```
  */
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from "react-native";
+import { View, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
 import AppText from "../../components/common/AppText";
-import { COLORS, SPACING, FONT_SIZES, FONTS } from "../../theme";
+import AppButton from "../../components/common/AppButton";
+import { COLORS, SPACING } from "../../theme";
 import { ICONS } from "../../components/icons/icons";
 import { useNavigation } from "../../context/NavigationContext";
 import { useTaskContext } from "../../context/TaskContext";
@@ -97,19 +98,19 @@ export default function CalendarScreen() {
         {isLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={COLORS.primary1} />
-            <AppText style={styles.loadingText}>Loading tasks...</AppText>
+            <AppText variant="bodyText" style={{ color: COLORS.lightGray }}>Loading tasks...</AppText>
           </View>
         ) : error ? (
           <View style={styles.errorContainer}>
-            <AppText style={styles.errorTitle}>Unable to Load Tasks</AppText>
-            <AppText style={styles.errorMessage}>{error}</AppText>
-            <TouchableOpacity
-              style={styles.retryButton}
+            <AppText variant="boldText" style={{ color: COLORS.primary1, textAlign: "center" }}>Unable to Load Tasks</AppText>
+            <AppText variant="bodyText" style={{ color: COLORS.darkGray, textAlign: "center" }}>{error}</AppText>
+            <AppButton
+              title="Retry"
               onPress={() => fetchTasksForDate(selectedDate)}
-              activeOpacity={0.8}
-            >
-              <AppText style={styles.retryButtonText}>Retry</AppText>
-            </TouchableOpacity>
+              mode="filled"
+              color="primary1"
+              style={styles.retryButton}
+            />
           </View>
         ) : filteredTaskGroups.length === 0 ? (
           <EmptyState showCalendarPicker={showCalendarPicker} onAddTask={handleAddTask} />
@@ -167,11 +168,6 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xlg,
     gap: SPACING.md,
   },
-  loadingText: {
-    fontFamily: FONTS.fredokaRegular,
-    fontSize: FONT_SIZES.base,
-    color: COLORS.lightGray,
-  },
   errorContainer: {
     flex: 1,
     justifyContent: "center",
@@ -180,30 +176,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xlg,
     gap: SPACING.md,
   },
-  errorTitle: {
-    fontFamily: FONTS.fredokaSemiBold,
-    fontSize: FONT_SIZES.lg,
-    color: COLORS.primary1,
-    textAlign: "center",
-  },
-  errorMessage: {
-    fontFamily: FONTS.fredokaRegular,
-    fontSize: FONT_SIZES.base,
-    color: COLORS.darkGray,
-    textAlign: "center",
-    lineHeight: Math.round(FONT_SIZES.base * 1.4),
-  },
   retryButton: {
-    backgroundColor: COLORS.primary1,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: SPACING.md,
-    marginTop: SPACING.md,
-  },
-  retryButtonText: {
-    fontFamily: FONTS.fredokaSemiBold,
-    fontSize: FONT_SIZES.base,
-    color: COLORS.colorWhite,
-    textAlign: "center",
+    alignSelf: "center",
   },
 });

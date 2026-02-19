@@ -24,13 +24,13 @@
  */
 import { useState, useEffect } from "react";
 import {
-  getTasksForDate,
   getScheduledSessionsForDate,
   updateTask,
   getSubTasksForTask,
   markSubTaskComplete,
   markSubTaskTodo,
   deleteTask,
+  deleteSubTask,
 } from "../../../services/taskService";
 import { TaskGroup } from "../types";
 import { getLocalDateString } from "../../../utils/dateUtils";
@@ -243,14 +243,11 @@ export function useCalendarTasks(
   };
 
   /**
-   * Handle subtask deletion
+   * Handle subtask deletion — removes the SubTask and its TaskSchedule entries via API
    */
   const handleDeleteSubtask = async (taskId: string, subtaskId: string) => {
     try {
-      const fullSubtasks = await getSubTasksForTask(taskId);
-      const updatedSubtasks = fullSubtasks.filter((st) => st._id !== subtaskId);
-
-      const success = await updateTask(taskId, { subtasks: updatedSubtasks } as any);
+      const success = await deleteSubTask(taskId, subtaskId);
       if (success) {
         await fetchTasksForDate(selectedDate);
         notifyTaskUpdate();

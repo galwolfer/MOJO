@@ -17,9 +17,10 @@
  * ```
  */
 import React, { useEffect, useRef } from "react";
-import { View, StyleSheet, TouchableOpacity, Animated } from "react-native";
+import { View, StyleSheet, Animated } from "react-native";
 import AppText from "../../../components/common/AppText";
-import { COLORS, SPACING, FONT_SIZES, SHADOWS, FONTS, TYPOGRAPHY, ICON_SIZES } from "../../../theme";
+import { COLORS, SPACING, FONT_SIZES, FONTS, TYPOGRAPHY, ICON_SIZES } from "../../../theme";
+import AppButton from "../../../components/common/AppButton";
 import { ICONS } from "../../../components/icons/icons";
 
 interface EmptyStateProps {
@@ -72,9 +73,7 @@ export default function EmptyState({ showCalendarPicker, onAddTask }: EmptyState
 
         <AppText style={styles.emptyStateSubtext}>Want to add a new task or goal for this day?</AppText>
 
-        <TouchableOpacity style={styles.emptyStateButton} activeOpacity={0.8} onPress={onAddTask}>
-          <AppText style={styles.emptyStateButtonText}>+ Add Task</AppText>
-        </TouchableOpacity>
+        <AppButton title="+ Add Task" onPress={onAddTask} color="primary6" mode="filled" style={{ alignSelf: "center" }} />
       </View>
     </View>
   );
@@ -111,18 +110,5 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: SPACING.sm,
   },
-  emptyStateButton: {
-    backgroundColor: COLORS.primary6,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: SPACING.md,
-    marginTop: SPACING.md,
-    ...(SHADOWS.card as object),
-  },
-  emptyStateButtonText: {
-    fontFamily: FONTS.fredokaSemiBold,
-    fontSize: FONT_SIZES.base,
-    color: COLORS.white,
-    textAlign: "center",
-  },
+
 });

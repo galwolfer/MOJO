@@ -50,7 +50,7 @@ export const TaskTagsRow: React.FC<{
     <View style={styles.tagRow}>
       {category && (
         <Tag
-          label={categoryDisplay || category}
+          label={categoryDisplay || categoryMeta.displayName || category}
           leftIcon={categoryMeta.icon}
           colorIndex={categoryMeta.colorIndex}
           style={styles.tagItem}
