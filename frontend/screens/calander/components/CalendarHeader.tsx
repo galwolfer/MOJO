@@ -21,6 +21,7 @@ import { COLORS, SPACING, FONT_SIZES, FONTS, SHADOWS, ICON_SIZES } from "../../.
 import { ICONS } from "../../../components/icons/icons";
 import DateSelector from "../../../components/layout/DateSelector";
 import CalendarPicker from "../../../components/inputs/CalendarPicker";
+import { getLocalDateString } from "../../../utils/dateUtils";
 
 interface CalendarHeaderProps {
   selectedDate: Date;
@@ -28,16 +29,6 @@ interface CalendarHeaderProps {
   showCalendarPicker: boolean;
   setShowCalendarPicker: (show: boolean) => void;
 }
-
-/**
- * Convert local Date to YYYY-MM-DD string without UTC conversion
- */
-const getLocalDateString = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
 
 export default function CalendarHeader({
   selectedDate,

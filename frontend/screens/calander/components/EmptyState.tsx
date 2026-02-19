@@ -10,25 +10,46 @@
  * Usage:
  * ```tsx
  * <EmptyState
- *   rotationValue={rotationValue}
+
  *   showCalendarPicker={showCalendarPicker}
  *   onAddTask={handleAddTask}
  * />
  * ```
  */
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { View, StyleSheet, TouchableOpacity, Animated } from "react-native";
 import AppText from "../../../components/common/AppText";
 import { COLORS, SPACING, FONT_SIZES, SHADOWS, FONTS, TYPOGRAPHY, ICON_SIZES } from "../../../theme";
 import { ICONS } from "../../../components/icons/icons";
 
 interface EmptyStateProps {
-  rotationValue: Animated.Value;
   showCalendarPicker: boolean;
   onAddTask: () => void;
 }
 
-export default function EmptyState({ rotationValue, showCalendarPicker, onAddTask }: EmptyStateProps) {
+export default function EmptyState({ showCalendarPicker, onAddTask }: EmptyStateProps) {
+  const rotationValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    let isMounted = true;
+    const startRotation = () => {
+      if (!isMounted) return;
+      rotationValue.setValue(0);
+      Animated.timing(rotationValue, {
+        toValue: 1,
+        duration: 3000,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished && isMounted) startRotation();
+      });
+    };
+    startRotation();
+    return () => {
+      isMounted = false;
+      rotationValue.stopAnimation();
+    };
+  }, []);
+
   const rotation = rotationValue.interpolate({
     inputRange: [0, 1],
     outputRange: ["0deg", "360deg"],

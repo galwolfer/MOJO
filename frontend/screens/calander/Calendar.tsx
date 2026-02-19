@@ -15,62 +15,32 @@
  * <CalendarScreen />
  * ```
  */
-import React, { useEffect, useRef, useState } from "react";
-import { View, StyleSheet, ScrollView, Animated, ActivityIndicator, TouchableOpacity } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from "react-native";
 import AppText from "../../components/common/AppText";
-import Header from "../../components/common/Header";
-import { COLORS, SPACING, FONT_SIZES, FONTS, ICON_SIZES } from "../../theme";
+import { COLORS, SPACING, FONT_SIZES, FONTS } from "../../theme";
 import { ICONS } from "../../components/icons/icons";
 import { useNavigation } from "../../context/NavigationContext";
 import { useTaskContext } from "../../context/TaskContext";
-import DateSelector from "../../components/layout/DateSelector";
-import CalendarPicker from "../../components/inputs/CalendarPicker";
+import CalendarHeader from "./components/CalendarHeader";
 import EmptyState from "./components/EmptyState";
 import TaskGroup from "./components/TaskGroup";
-import FloatingActionButton from "./components/FloatingActionButton";
+import FloatingButton from "../../components/common/FloatingButton";
 import { useCalendarTasks } from "./hooks/useCalendarTasks";
 import { Task } from "./types";
+import { stripTime } from "../../utils/dateUtils";
 
 export default function CalendarScreen() {
   const { setHeaderConfig, setActiveTab, setActiveTabWithParams } = useNavigation();
   const { notifyTaskUpdate, subscribeToTaskUpdates } = useTaskContext();
 
-  const stripTime = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const [selectedDate, setSelectedDate] = useState<Date>(() => stripTime(new Date()));
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [showCalendarPicker, setShowCalendarPicker] = useState<boolean>(false);
 
-  // Animation for Mojo logo rotation in empty state
-  const rotationValue = useRef(new Animated.Value(0)).current;
-
   useEffect(() => {
     setSelectedDate(stripTime(new Date()));
   }, []);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const startRotation = () => {
-      if (!isMounted) return;
-      rotationValue.setValue(0);
-      Animated.timing(rotationValue, {
-        toValue: 1,
-        duration: 3000,
-        useNativeDriver: true,
-      }).start(({ finished }) => {
-        if (finished && isMounted) {
-          startRotation();
-        }
-      });
-    };
-
-    startRotation();
-
-    return () => {
-      isMounted = false;
-      rotationValue.stopAnimation();
-    };
-  }, [rotationValue, selectedDate]);
 
   useEffect(() => {
     setHeaderConfig({
@@ -99,8 +69,8 @@ export default function CalendarScreen() {
   };
 
   const handleEditTask = (taskToEdit: Task) => {
-    // taskToEdit.id is the session ID; (taskToEdit as any).taskId is the actual task _id
-    const actualTaskId = (taskToEdit as any).taskId || taskToEdit.id;
+    // taskToEdit.id is the session ID; taskToEdit.taskId is the actual task _id
+    const actualTaskId = taskToEdit.taskId || taskToEdit.id;
     setActiveTabWithParams("edit" as any, { taskId: actualTaskId });
   };
 
@@ -108,44 +78,14 @@ export default function CalendarScreen() {
     setExpandedTaskId(expandedTaskId === taskId ? null : taskId);
   };
 
-  const getLocalDateString = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
   return (
     <View style={styles.container}>
       {/* Header */}
-      <Header
-        title="MY TASKS"
-        show={true}
-        leftElement={
-          <TouchableOpacity
-            onPress={() => setShowCalendarPicker(!showCalendarPicker)}
-            activeOpacity={0.7}
-            style={styles.calendarIconButton}
-          >
-            <ICONS.calendar size={ICON_SIZES.md} color={COLORS.primary1} />
-          </TouchableOpacity>
-        }
-        element={
-          showCalendarPicker ? (
-            <CalendarPicker
-              onDateSelect={(dateString) => {
-                const date = new Date(dateString);
-                setSelectedDate(date);
-              }}
-              selectedDate={getLocalDateString(selectedDate)}
-              allowPastDates={true}
-              allowPreviousMonths={true}
-              lighterPastDates={true}
-            />
-          ) : (
-            <DateSelector selectedDate={selectedDate} setSelectedDate={setSelectedDate} />
-          )
-        }
+      <CalendarHeader
+        selectedDate={selectedDate}
+        setSelectedDate={setSelectedDate}
+        showCalendarPicker={showCalendarPicker}
+        setShowCalendarPicker={setShowCalendarPicker}
       />
 
       {/* Tasks List */}
@@ -172,7 +112,7 @@ export default function CalendarScreen() {
             </TouchableOpacity>
           </View>
         ) : filteredTaskGroups.length === 0 ? (
-          <EmptyState rotationValue={rotationValue} showCalendarPicker={showCalendarPicker} onAddTask={handleAddTask} />
+          <EmptyState showCalendarPicker={showCalendarPicker} onAddTask={handleAddTask} />
         ) : (
           filteredTaskGroups.map((group, groupIdx) => (
             <TaskGroup
@@ -193,7 +133,7 @@ export default function CalendarScreen() {
       </ScrollView>
 
       {/* Floating ADD Button */}
-      {filteredTaskGroups.length > 0 && <FloatingActionButton onPress={handleAddTask} />}
+      {filteredTaskGroups.length > 0 && <FloatingButton onPress={handleAddTask} text="" Icon={ICONS.plus} style={styles.fab} />}
     </View>
   );
 }
@@ -207,17 +147,18 @@ const styles = StyleSheet.create({
   tasksList: {
     flex: 1,
     backgroundColor: COLORS.white3,
-    zIndex: 1,
+  },
+  fab: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
   tasksListContent: {
     paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.md,
-    paddingBottom: SPACING.xlg * 6,
     paddingTop: SPACING.md + SPACING.sm + SPACING.xs,
-  },
-  calendarIconButton: {
-    justifyContent: "center",
-    alignItems: "center",
+    paddingBottom: SPACING.xlg * 6,
   },
   loadingContainer: {
     flex: 1,

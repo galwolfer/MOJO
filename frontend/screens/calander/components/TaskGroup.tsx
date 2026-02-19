@@ -64,7 +64,7 @@ export default function TaskGroup({
               key={task.id}
               task={task}
               isExpanded={expandedTaskId === task.id}
-              isCompleted={completedTasks.has((task as any).taskId || task.id)}
+              isCompleted={completedTasks.has(task.taskId || task.id)}
               completedSubtasks={completedSubtasks}
               onPress={onTaskPress}
               onToggleCompletion={onTaskToggle}

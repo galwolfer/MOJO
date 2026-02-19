@@ -31,10 +31,16 @@ export interface Task {
   color: string;
   category?: string;
   subtasks?: Subtask[];
-  dateString?: string; // Date in YYYY-MM-DD format for filtering
-  partNumber?: number; // Part number for multi-day tasks
-  totalParts?: number; // Total parts for multi-day tasks
-  parentTaskName?: string; // Parent task name for multi-day subtasks
+  dateString?: string;        // Date in YYYY-MM-DD format for filtering
+  partNumber?: number;        // Part number for multi-day tasks
+  totalParts?: number;        // Total parts for multi-day tasks
+  parentTaskName?: string;    // Parent task name for multi-day subtasks
+  // --- Scheduled-session fields (populated by getScheduledSessionsForDate) ---
+  taskId?: string;            // Actual MongoDB task _id (session id lives in `id`)
+  status?: string;            // "todo" | "in_progress" | "done"
+  isScheduled?: boolean;      // True when sourced from a TaskSchedule document
+  progressPercentage?: number; // Server-side completion 0-100
+  mainTaskDescription?: string; // Parent task description for multi-part sessions
 }
 
 /**

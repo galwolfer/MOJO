@@ -37,12 +37,6 @@ export default function SubtaskItem({ subtask, parentTaskId, isCompleted, onTogg
         <Checkbox
           checked={isCompleted}
           onChange={(checked) => {
-            console.log("[SubtaskItem] Checkbox clicked:", {
-              parentTaskId,
-              subtaskId: subtask.id,
-              subtaskTitle: subtask.title,
-              checked,
-            });
             onToggle(parentTaskId, subtask.id, checked);
           }}
           size={ICON_SIZES.sm}

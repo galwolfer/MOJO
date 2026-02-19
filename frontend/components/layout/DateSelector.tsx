@@ -27,8 +27,6 @@ interface DateSelectorProps {
 export default function DateSelector({ selectedDate, setSelectedDate }: DateSelectorProps) {
   const daysScrollRef = React.useRef<ScrollView>(null);
 
-  const stripTime = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-
   const getDaysArray = () => {
     const days = [];
     const now = new Date();

@@ -26,7 +26,7 @@ export default function FloatingButton({ onPress, text = "ADD", Icon, style, col
       ) : null}
       {Icon ? (
         <View style={styles.iconWrap}>
-          <Icon size={ICON_SIZES.sm} color={COLORS.white} style={styles.plusIcon} />
+          <Icon size={ICON_SIZES.sm} color={COLORS.white} style={text ? styles.plusIcon : undefined} />
         </View>
       ) : null}
     </TouchableOpacity>

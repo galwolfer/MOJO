@@ -33,6 +33,7 @@ import {
   deleteTask,
 } from "../../../services/taskService";
 import { TaskGroup } from "../types";
+import { getLocalDateString } from "../../../utils/dateUtils";
 
 export function useCalendarTasks(
   selectedDate: Date,
@@ -57,22 +58,19 @@ export function useCalendarTasks(
       // The daily view shows what's SCHEDULED for that day, not what's DUE
       const scheduledGroups = await getScheduledSessionsForDate(date);
 
-      console.log("[useCalendarTasks] Fetched scheduledGroups:", scheduledGroups);
-
       // Use only scheduled sessions
       const groupsToUse: TaskGroup[] = scheduledGroups;
-      console.log("[useCalendarTasks] Using scheduled sessions only (no deadline-based tasks)");
 
       // Initialize completed sets from server state
       const doneSubtasks = new Set<string>();
       const doneTasks = new Set<string>();
       groupsToUse.forEach((group) => {
         group.tasks.forEach((t) => {
-          const taskIdToUse = (t as any).taskId || t.id;
+          const taskIdToUse = t.taskId || t.id;
 
           // Handle tasks with NO subtasks
           if (!t.subtasks || t.subtasks.length === 0) {
-            if ((t as any).completed === true || (t as any).status === "done") {
+            if (t.completed === true || t.status === "done") {
               doneTasks.add(taskIdToUse);
             }
             return;
@@ -80,18 +78,18 @@ export function useCalendarTasks(
 
           // Handle tasks WITH subtasks
           t.subtasks.forEach((st) => {
-            if ((st as any).completed) doneSubtasks.add((st as any).id);
+            if (st.completed) doneSubtasks.add(st.id);
           });
 
-          const serverProg = (t as any).progressPercentage;
+          const serverProg = t.progressPercentage;
 
           if (typeof serverProg === "number" && serverProg === 100) {
             doneTasks.add(taskIdToUse);
           } else {
-            const totalParts = (t as any).totalParts;
+            const totalParts = t.totalParts;
             const isFullRepresentation = totalParts ? t.subtasks.length === totalParts : true;
 
-            if (isFullRepresentation && t.subtasks.every((s) => (s as any).completed)) {
+            if (isFullRepresentation && t.subtasks.every((s) => s.completed)) {
               doneTasks.add(taskIdToUse);
             }
           }
@@ -100,30 +98,6 @@ export function useCalendarTasks(
 
       setCompletedSubtasks(doneSubtasks);
       setCompletedTasks(doneTasks);
-
-      console.log("[useCalendarTasks] groupsToUse:", groupsToUse);
-
-      // Initialize completedSubtasks from the fetched data
-      const newCompletedSubtasks = new Set<string>();
-      groupsToUse.forEach((group, groupIdx) => {
-        console.log(`[useCalendarTasks] Group ${groupIdx}:`, group);
-        group.tasks.forEach((task, taskIdx) => {
-          console.log(
-            `[useCalendarTasks]   Task ${taskIdx}: id=${task.id}, title=${task.title}, subtasks=${task.subtasks?.length || 0}`,
-          );
-          if (task.subtasks) {
-            task.subtasks.forEach((subtask, subIdx) => {
-              console.log(
-                `[useCalendarTasks]     Subtask ${subIdx}: id=${subtask.id}, title=${subtask.title}, completed=${subtask.completed}`,
-              );
-              if (subtask.completed) {
-                newCompletedSubtasks.add(subtask.id);
-              }
-            });
-          }
-        });
-      });
-      setCompletedSubtasks(newCompletedSubtasks);
 
       setTaskGroups(groupsToUse);
     } catch (err) {
@@ -150,7 +124,7 @@ export function useCalendarTasks(
 
       // Locate the task card
       const allTasksFlat = taskGroups.flatMap((g) => g.tasks);
-      const card: any = allTasksFlat.find((t: any) => t.id === taskId || t.taskId === taskId);
+      const card = allTasksFlat.find((t) => t.id === taskId || t.taskId === taskId);
       const parentTaskId = card?.taskId || card?.id || taskId;
 
       // Keep parentTaskId flagged
@@ -167,7 +141,7 @@ export function useCalendarTasks(
           const full = await getSubTasksForTask(parentTaskId);
           subtaskIds = full.map((s) => s._id);
         } catch (e) {
-          subtaskIds = card.subtasks.map((s: any) => s.id);
+          subtaskIds = card.subtasks.map((s) => s.id);
         }
 
         const newSubtasksCompleted = new Set(completedSubtasks);
@@ -286,16 +260,6 @@ export function useCalendarTasks(
     } catch (error) {
       console.error("Error deleting subtask:", error);
     }
-  };
-
-  /**
-   * Convert local Date to YYYY-MM-DD string without UTC conversion
-   */
-  const getLocalDateString = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
   };
 
   /**
