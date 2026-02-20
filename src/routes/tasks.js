@@ -947,7 +947,7 @@ router.post("/:id/schedule", async (req, res, next) => {
     }
 
     // Get user profile for scheduling preferences
-    const user = await User.findById(userId).select("profile subCategories").lean();
+    const user = await User.findById(userId).select("profile subCategories schedulingPreferences").lean();
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -955,10 +955,16 @@ router.post("/:id/schedule", async (req, res, next) => {
       });
     }
 
+    // Merge schedulingPreferences into profile for the scheduler
+    const profileWithGap = {
+      ...(user.profile || {}),
+      minGapMinutes: user.schedulingPreferences?.minGapMinutes ?? 10,
+    };
+
     // Generate plan
     const { plan, unscheduled } = await generatePlan({
       userId,
-      profile: user.profile,
+      profile: profileWithGap,
       planningHorizonDays,
     });
 
@@ -978,6 +984,65 @@ router.post("/:id/schedule", async (req, res, next) => {
     res.status(201).json({
       success: true,
       message: `Schedule created successfully. ${plan.length} session(s) scheduled.`,
+      scheduledCount: plan.length,
+      unscheduledCount: unscheduled.length,
+      plan: plan.map((p) => ({
+        start: p.start,
+        end: p.end,
+        minutes: p.minutes,
+        taskId: p.taskId,
+        subtaskIndex: p.subtaskIndex || null,
+      })),
+      unscheduled,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/tasks/reschedule-all
+ * Force-regenerate the full scheduling plan for the authenticated user.
+ * Useful for testing scheduling fixes without creating/editing a task.
+ *
+ * Response:
+ * {
+ *   success: boolean,
+ *   message: string,
+ *   scheduledCount: number,
+ *   unscheduledCount: number,
+ *   plan: Array<{ start, end, minutes, taskId, subtaskIndex }>
+ * }
+ */
+router.post("/reschedule-all", async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+
+    const { generatePlan, savePlan } = await import("../services/schedulingService.js");
+
+    const user = await User.findById(userId).select("profile subCategories schedulingPreferences").lean();
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+
+    const profileWithGap = {
+      ...(user.profile || {}),
+      minGapMinutes: user.schedulingPreferences?.minGapMinutes ?? 10,
+    };
+
+    const { plan, unscheduled } = await generatePlan({
+      userId,
+      profile: profileWithGap,
+      planningHorizonDays: 14,
+    });
+
+    await savePlan({ userId, plan, unscheduled });
+
+    logger.info(`Force-rescheduled all tasks for user ${userId}: ${plan.length} sessions`);
+
+    res.status(200).json({
+      success: true,
+      message: `Rescheduled successfully. ${plan.length} session(s) planned.`,
       scheduledCount: plan.length,
       unscheduledCount: unscheduled.length,
       plan: plan.map((p) => ({

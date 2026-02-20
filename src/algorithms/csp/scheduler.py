@@ -112,6 +112,7 @@ def schedule_tasks_csp(tasks: List[dict], options: Dict = None) -> Dict:
     working_hours = options.get("workingHours", DEFAULT_WORKING_HOURS)
     planning_horizon_days = options.get("planningHorizonDays", 14)
     daily_cap_minutes = options.get("dailyCapMinutes", DEFAULT_DAILY_CAP_MINUTES)
+    gap_minutes = int(options.get("gapMinutes", 10))
 
     today = start_of_day(datetime.now(timezone.utc))
     horizon_end = add_days(today, planning_horizon_days)
@@ -145,7 +146,7 @@ def schedule_tasks_csp(tasks: List[dict], options: Dict = None) -> Dict:
         else:
             variables_without_domains.append(variable)
 
-    result = backtrack_search(variables_with_domains, variable_domains, busy_blocks_by_date, working_hours, daily_cap_minutes, today, rng)
+    result = backtrack_search(variables_with_domains, variable_domains, busy_blocks_by_date, working_hours, daily_cap_minutes, today, rng, gap_minutes)
 
     plan = []
     unscheduled = []
@@ -477,7 +478,7 @@ def generate_domain(variable: dict, today: datetime, horizon_end: datetime, busy
     return slots
 
 
-def backtrack_search(variables: List[dict], variable_domains: Dict[str, List[dict]], busy_blocks_by_date: Dict, working_hours: Dict, daily_cap_minutes: int, today: datetime, rng: Optional[random.Random] = None):
+def backtrack_search(variables: List[dict], variable_domains: Dict[str, List[dict]], busy_blocks_by_date: Dict, working_hours: Dict, daily_cap_minutes: int, today: datetime, rng: Optional[random.Random] = None, gap_minutes: int = 10):
     # Backtracking CSP search with forward checking and soft scoring
     assignments = []
     assigned_slots = []
@@ -535,7 +536,7 @@ def backtrack_search(variables: List[dict], variable_domains: Dict[str, List[dic
             working_window = build_working_window(slot["start"], working_hours)
             busy_blocks = parsed_busy_blocks_by_date.get(slot.get("dateKey"), [])
 
-            if not satisfies_hard_constraints(candidate_slot=candidate_slot, existing_assignments=assigned_slots, busy_blocks_for_day=busy_blocks, working_window=working_window, deadline=variable.get("deadline"), variable_id=variable["id"]):
+            if not satisfies_hard_constraints(candidate_slot=candidate_slot, existing_assignments=assigned_slots, busy_blocks_for_day=busy_blocks, working_window=working_window, deadline=variable.get("deadline"), variable_id=variable["id"], min_gap_minutes=gap_minutes):
                 continue
 
             slots_passed_hard += 1

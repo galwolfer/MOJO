@@ -47,7 +47,7 @@ def spread_penalty(same_task_sessions_on_day: int) -> int:
 
 
 # Aggregate hard-constraint checks to decide if a candidate slot is valid
-def satisfies_hard_constraints(*, candidate_slot: dict, existing_assignments: List[dict], busy_blocks_for_day: List[dict], working_window: dict, deadline: Optional[datetime], variable_id: Optional[str] = None) -> bool:
+def satisfies_hard_constraints(*, candidate_slot: dict, existing_assignments: List[dict], busy_blocks_for_day: List[dict], working_window: dict, deadline: Optional[datetime], variable_id: Optional[str] = None, min_gap_minutes: int = 10) -> bool:
     if not within_working_hours(candidate_slot, working_window):
         return False
 
@@ -86,10 +86,9 @@ def satisfies_hard_constraints(*, candidate_slot: dict, existing_assignments: Li
                     return False
 
     # minimum gap between sessions to avoid back-to-back scheduling
-    MIN_SESSION_GAP_MINUTES = 10
     from datetime import timedelta
 
-    gap_td = timedelta(minutes=MIN_SESSION_GAP_MINUTES)
+    gap_td = timedelta(minutes=min_gap_minutes)
 
     for assignment in existing_assignments:
         overlaps = not no_overlap(candidate_slot, assignment)

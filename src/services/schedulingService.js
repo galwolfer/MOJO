@@ -20,6 +20,7 @@ import { Task } from "../models/Task.js";
 import { TaskSchedule } from "../models/TaskSchedule.js";
 import { SubTask } from "../models/SubTask.js";
 import { BusyBlock } from "../models/BusyBlock.js";
+import { User } from "../models/User.js";
 import { startOfDay, addDays } from "../utils/dateUtils.js";
 import { logEvent } from "./telemetryService.js";
 import { env } from "../config/env.js";
@@ -29,6 +30,60 @@ import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import os from "os";
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Recurring busy-block expansion
+// ──────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Expand a recurring BusyBlock into concrete {key, start, end} occurrences
+ * over the given date range [fromDate, toDate].
+ *
+ * The block's `start` encodes the recurrence activation date + daily start time.
+ * The block's `end`   encodes the same reference date     + daily end time.
+ * block.recurrence.daysOfWeek lists which weekdays the block applies.
+ * block.recurrence.endDate (if set) stops the expansion on that date.
+ *
+ * @param {object} block      - Mongoose lean BusyBlock document
+ * @param {Date}   fromDate   - Inclusive start of the expansion window
+ * @param {Date}   toDate     - Inclusive end of the expansion window
+ * @returns {{ key: string, start: Date, end: Date }[]}
+ */
+function expandRecurringBlock(block, fromDate, toDate) {
+  const blockStart = new Date(block.start);
+  const activationDay = startOfDay(blockStart);
+
+  const startH = blockStart.getHours();
+  const startM = blockStart.getMinutes();
+  const blockEnd = new Date(block.end);
+  const endH = blockEnd.getHours();
+  const endM = blockEnd.getMinutes();
+
+  // Respect optional expiry date
+  const expiry = block.recurrence.endDate ? new Date(block.recurrence.endDate) : toDate;
+  const windowEnd = expiry < toDate ? expiry : toDate;
+
+  const occurrences = [];
+  let cursor = new Date(fromDate);
+
+  while (cursor <= windowEnd) {
+    const dayOfWeek = cursor.getDay(); // 0=Sun…6=Sat
+    if (cursor >= activationDay && block.recurrence.daysOfWeek.includes(dayOfWeek)) {
+      const oStart = new Date(cursor);
+      oStart.setHours(startH, startM, 0, 0);
+      const oEnd = new Date(cursor);
+      oEnd.setHours(endH, endM, 0, 0);
+      if (oEnd > oStart) {
+        // Use the UTC date of oStart as the key — this matches the UTC-based date keys
+        // that Python's CSP generates. Using cursor.toISOString() would give the wrong
+        // date on any UTC+ timezone server (local midnight serialises as UTC yesterday).
+        occurrences.push({ key: oStart.toISOString().slice(0, 10), start: oStart, end: oEnd });
+      }
+    }
+    cursor = addDays(cursor, 1);
+  }
+  return occurrences;
+}
 
 /**
  * Helper: Trigger scheduler update after task operations
@@ -42,7 +97,12 @@ import os from "os";
  */
 export async function triggerSchedulerUpdate(userId, operationType = "operation", location = "API") {
   try {
-    const { plan, unscheduled } = await generatePlan({ userId });
+    const user = await User.findById(userId).select("profile schedulingPreferences").lean();
+    const profileWithGap = {
+      ...(user?.profile || {}),
+      minGapMinutes: user?.schedulingPreferences?.minGapMinutes ?? 10,
+    };
+    const { plan, unscheduled } = await generatePlan({ userId, profile: profileWithGap });
     await savePlan({ userId, plan, unscheduled });
     logger.info(`[SCHEDULER] Updated after task ${operationType} (${location}): ${plan.length} sessions scheduled`);
     return { success: true, sessionCount: plan.length };
@@ -435,14 +495,37 @@ export async function generatePlan({ userId, profile = {}, planningHorizonDays =
 
   const busyBlocks = await BusyBlock.find({
     userId,
-    start: { $lt: horizonEnd },
-    end: { $gt: todayStart },
+    $or: [
+      // One-time blocks that overlap the planning horizon
+      {
+        isRecurring: { $ne: true },
+        start: { $lt: horizonEnd },
+        end: { $gt: todayStart },
+      },
+      // Recurring rules that are still active during the horizon
+      {
+        isRecurring: true,
+        $or: [
+          { "recurrence.endDate": null },
+          { "recurrence.endDate": { $gt: todayStart } },
+        ],
+      },
+    ],
   }).lean();
 
   for (const block of busyBlocks) {
-    const key = block.start.toISOString().slice(0, 10);
-    if (!busyBlocksByDate[key]) busyBlocksByDate[key] = [];
-    busyBlocksByDate[key].push({ start: new Date(block.start), end: new Date(block.end) });
+    if (block.isRecurring && block.recurrence?.daysOfWeek?.length) {
+      // Expand recurring rule over the entire planning horizon
+      for (const { key, start, end } of expandRecurringBlock(block, todayStart, horizonEnd)) {
+        if (!busyBlocksByDate[key]) busyBlocksByDate[key] = [];
+        busyBlocksByDate[key].push({ start, end });
+      }
+    } else {
+      // One-time block — original behaviour
+      const key = block.start.toISOString().slice(0, 10);
+      if (!busyBlocksByDate[key]) busyBlocksByDate[key] = [];
+      busyBlocksByDate[key].push({ start: new Date(block.start), end: new Date(block.end) });
+    }
   }
 
   const tasksForPlanning = tasksWithOrderedSubtasks
@@ -463,6 +546,7 @@ export async function generatePlan({ userId, profile = {}, planningHorizonDays =
     planningHorizonDays,
     workingHours: profile.workingHours || { startHour: 9, startMinute: 0, endHour: 18, endMinute: 0 },
     dailyCapMinutes: profile.dailyCapMinutes || 240,
+    gapMinutes: profile.minGapMinutes ?? 10,
   });
 
 
