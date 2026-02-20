@@ -30,6 +30,7 @@ import Box from "../components/layout/Box";
 import { ICONS } from "../components/icons/icons";
 import { CATEGORY_KEYS, getCategoryMeta, CATEGORY_META } from "../config/categoryMeta";
 import { getTaskById, updateTask, deleteTask, suggestCategory } from "../services/taskService";
+import { getImportanceColor } from "../components/widgets/taskHelpers";
 import { useNavigation } from "../context/NavigationContext";
 import { useTaskContext } from "../context/TaskContext";
 import { useLayout } from "../context/LayoutContext";
@@ -511,17 +512,6 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
       setIsLoading(false);
     }
   }, [formState, taskId, notifyTaskUpdate, setActiveTab]);
-
-  /**
-   * Get color based on importance value
-   */
-  const getImportanceColor = (value: number): string => {
-    if (value === 1) return COLORS.primary6; // Green - Low
-    if (value === 2) return COLORS.primary1; // Blue - Below Avg
-    if (value === 3) return COLORS.primary5; // Orange - Average
-    if (value === 4) return COLORS.primary4; // Pink - Above Avg
-    return "#D32F2F"; // Red - Critical
-  };
 
   const { dimensions } = useLayout();
 

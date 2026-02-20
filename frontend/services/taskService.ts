@@ -674,6 +674,8 @@ export async function createTask(taskData: {
     description?: string;
     minutes?: number;
   }>;
+  taskType?: "perfect" | "in_parts" | "leaky";
+  chunkCount?: number;
 }): Promise<Task | null> {
   try {
     const response = await post<{ success: boolean; task: Task }>("/tasks", taskData);
