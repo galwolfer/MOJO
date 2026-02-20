@@ -19,10 +19,11 @@
  */
 
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import { View, StyleSheet, ScrollView, Pressable, Alert, SafeAreaView } from "react-native";
+import { View, StyleSheet, ScrollView, Pressable, SafeAreaView } from "react-native";
 import { COLORS, SPACING, TYPOGRAPHY, SHADOWS, FONT_SIZES } from "../theme";
 import AppText from "../components/common/AppText";
 import AppButton from "../components/common/AppButton";
+import PopupBox from "../components/common/PopupBox";
 import Input from "../components/inputs/Input";
 import SliderComponent from "../components/inputs/Slider";
 import CalendarPicker from "../components/inputs/CalendarPicker";
@@ -84,6 +85,7 @@ const CreateTask: React.FC = () => {
   const [tagInput, setTagInput] = useState("");
   const [isCalendarModalVisible, setIsCalendarModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [popupInfo, setPopupInfo] = useState<{ title: string; message: string; resetOnClose?: boolean } | null>(null);
 
   const { notifyTaskUpdate } = useTaskContext();
 
@@ -282,12 +284,12 @@ const CreateTask: React.FC = () => {
   const handleCreateTask = useCallback(async () => {
     // Validate required fields
     if (!formState.taskName.trim()) {
-      Alert.alert("Validation Error", "Please enter a task name");
+      setPopupInfo({ title: "Validation Error", message: "Please enter a task name" });
       return;
     }
 
     if (!formState.timeToComplete.trim()) {
-      Alert.alert("Validation Error", "Please select a date to complete");
+      setPopupInfo({ title: "Validation Error", message: "Please select a date to complete" });
       return;
     }
 
@@ -357,26 +359,18 @@ const CreateTask: React.FC = () => {
 
         if (schedule?.success) {
           console.log(`✅ Task scheduled with ${schedule.scheduledCount} sessions`);
-          Alert.alert(
-            "Success!",
-            `Task created and scheduled with ${schedule.scheduledCount} session(s)!`,
-            [{ text: "OK", onPress: resetForm }]
-          );
+          setPopupInfo({ title: "Success", message: "Task has been created successfully.", resetOnClose: true });
         } else {
           console.warn("⚠️ Task created but scheduling failed");
-          Alert.alert(
-            "Success!",
-            "Task created successfully (scheduling failed, but that's okay!)",
-            [{ text: "OK", onPress: resetForm }]
-          );
+          setPopupInfo({ title: "Success", message: "Task has been created successfully.", resetOnClose: true });
         }
       } else {
-        Alert.alert("Error", "Failed to create task. Please try again.");
+        setPopupInfo({ title: "Error", message: "Failed to create task. Please try again." });
       }
     } catch (error) {
       console.error("=== ERROR CREATING TASK ===");
       console.error("Error details:", error);
-      Alert.alert("Error", `Failed to create task: ${error instanceof Error ? error.message : "Unknown error"}`);
+      setPopupInfo({ title: "Error", message: `Failed to create task: ${error instanceof Error ? error.message : "Unknown error"}` });
     } finally {
       setIsLoading(false);
     }
@@ -648,6 +642,24 @@ const CreateTask: React.FC = () => {
         <NavBar />
       </View>
 
+      {/* Alert popup */}
+      <PopupBox
+        visible={popupInfo !== null}
+        onClose={() => { if (popupInfo?.resetOnClose) resetForm(); setPopupInfo(null); }}
+        title={popupInfo?.title ?? ""}
+        titleColor={COLORS.primary1}
+      >
+        <AppText style={{ color: COLORS.darkGray, marginBottom: SPACING.lg }}>
+          {popupInfo?.message}
+        </AppText>
+        <AppButton
+          title="OK"
+          mode="filled"
+          color="primary1"
+          onPress={() => { if (popupInfo?.resetOnClose) resetForm(); setPopupInfo(null); }}
+          width="100%"
+        />
+      </PopupBox>
 
     </SafeAreaView>
   );
