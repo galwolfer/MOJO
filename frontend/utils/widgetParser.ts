@@ -53,6 +53,46 @@ function safeJsonParse(jsonString: string): any {
       return { braceDepth: Math.max(0, braceDepth), bracketDepth: Math.max(0, bracketDepth) };
     }
 
+    // Attempt 0: Handle premature root-level close — LLM sometimes emits
+    // {"a":1, "b":2}, "c":3, "d":4}  (closing brace before all fields are listed)
+    // Fix: find the premature root-level } and merge the orphaned fields back in.
+    try {
+      let depth = 0;
+      let inStr = false;
+      let esc = false;
+      let prematurePos = -1;
+      for (let i = 0; i < jsonString.length; i++) {
+        const ch = jsonString[i];
+        if (inStr) {
+          if (esc) esc = false;
+          else if (ch === "\\") esc = true;
+          else if (ch === '"') inStr = false;
+        } else {
+          if (ch === '"') inStr = true;
+          else if (ch === "{") depth++;
+          else if (ch === "}") {
+            depth--;
+            if (depth === 0 && i < jsonString.length - 1) {
+              prematurePos = i;
+              break;
+            }
+          }
+        }
+      }
+      if (prematurePos !== -1) {
+        const after = jsonString.slice(prematurePos + 1).trim();
+        // Only attempt repair if what follows looks like orphaned key-value pairs
+        if (/^,\s*"/.test(after)) {
+          const orphaned = after.replace(/^,\s*/, ""); // strip leading comma
+          const trimmedOrphaned = orphaned.replace(/\}\s*$/, ""); // strip trailing }
+          const repaired = jsonString.slice(0, prematurePos) + ", " + trimmedOrphaned + "}";
+          return JSON.parse(repaired);
+        }
+      }
+    } catch (e0) {
+      // continue
+    }
+
     // Attempt 1: If ends with ] but has unclosed braces, insert } before ]
     try {
       const depths = computeDepths(jsonString);
