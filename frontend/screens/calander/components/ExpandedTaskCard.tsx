@@ -108,6 +108,7 @@ export default function ExpandedTaskCard({
                 category={task.category}
                 importance={task.importance}
                 effort={task.effort}
+                tags={task.tags}
               />
             </View>
             {task.subtasks && task.subtasks.length > 0 && (

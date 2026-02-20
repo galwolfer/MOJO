@@ -18,8 +18,8 @@
  * ```
  */
 
-import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import { View, StyleSheet, ScrollView, Pressable, Modal, Alert, SafeAreaView, TouchableOpacity, ActivityIndicator } from "react-native";
+import React, { useState, useCallback, useEffect, useRef } from "react";
+import { View, StyleSheet, ScrollView, Pressable, SafeAreaView, TouchableOpacity, ActivityIndicator } from "react-native";
 import { COLORS, SPACING, TYPOGRAPHY, SHADOWS, FONT_SIZES, ICON_SIZES } from "../theme";
 import AppText from "../components/common/AppText";
 import AppButton from "../components/common/AppButton";
@@ -28,7 +28,9 @@ import SliderComponent from "../components/inputs/Slider";
 import CalendarPicker from "../components/inputs/CalendarPicker";
 import Box from "../components/layout/Box";
 import { ICONS } from "../components/icons/icons";
-import { CATEGORY_KEYS, getCategoryMeta, CATEGORY_META } from "../config/categoryMeta";
+import CategoryPicker from "../components/special/CategoryPicker";
+import TagsBelow from "../components/inputs/TagsBelow";
+import PopupBox from "../components/common/PopupBox";
 import { getTaskById, updateTask, deleteTask, suggestCategory } from "../services/taskService";
 import { getImportanceColor } from "../components/widgets/taskHelpers";
 import { useNavigation } from "../context/NavigationContext";
@@ -84,8 +86,13 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
   });
 
   const [tagInput, setTagInput] = useState("");
-  const [isCategoryModalVisible, setIsCategoryModalVisible] = useState(false);
   const [isCalendarModalVisible, setIsCalendarModalVisible] = useState(false);
+  const [popupInfo, setPopupInfo] = useState<{
+    title: string;
+    message: string;
+    navigateOnClose?: boolean;
+    confirmAction?: () => void;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -248,12 +255,6 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
     return () => clearTimeout(timeoutId);
   }, [formState.taskName]);
 
-  // Get category display names for dropdown options
-  const categoryOptions = useMemo(() => CATEGORY_KEYS.map((key) => CATEGORY_META[key]?.displayName || key), []);
-
-  // Get current category metadata
-  const currentCategoryMeta = getCategoryMeta(formState.category);
-
   /**
    * Handle task name input change
    */
@@ -349,7 +350,6 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
   const handleCategorySelect = useCallback((categoryKey: string) => {
     categoryManuallyChanged.current = true; // Mark as manually changed
     setFormState((prev) => ({ ...prev, category: categoryKey }));
-    setIsCategoryModalVisible(false);
   }, []);
 
   /**
@@ -385,39 +385,33 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
   /**
    * Handle task deletion - Delete task via API
    */
-  const handleDeleteTask = useCallback(async () => {
+  const handleDeleteTask = useCallback(() => {
     if (!taskId) {
-      Alert.alert("Error", "Task ID is missing. Unable to delete task.");
+      setPopupInfo({ title: "Error", message: "Task ID is missing. Unable to delete task." });
       return;
     }
 
-    Alert.alert("Delete Task", "Are you sure you want to delete this task? This action cannot be undone.", [
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-      {
-        text: "Delete",
-        onPress: async () => {
-          setIsLoading(true);
-          try {
-            const success = await deleteTask(taskId);
+    setPopupInfo({
+      title: "Delete Task",
+      message: "Are you sure you want to delete this task? This action cannot be undone.",
+      confirmAction: async () => {
+        setIsLoading(true);
+        try {
+          const success = await deleteTask(taskId);
 
-            if (success) {
-              notifyTaskUpdate({ taskId });
-              setActiveTab("calendar");
-            } else {
-              Alert.alert("Error", "Failed to delete task. Please try again.");
-            }
-          } catch (error) {
-            Alert.alert("Error", `Failed to delete task: ${error instanceof Error ? error.message : "Unknown error"}`);
-          } finally {
-            setIsLoading(false);
+          if (success) {
+            notifyTaskUpdate({ taskId });
+            setActiveTab("calendar");
+          } else {
+            setPopupInfo({ title: "Error", message: "Failed to delete task. Please try again." });
           }
-        },
-        style: "destructive",
+        } catch (error) {
+          setPopupInfo({ title: "Error", message: `Failed to delete task: ${error instanceof Error ? error.message : "Unknown error"}` });
+        } finally {
+          setIsLoading(false);
+        }
       },
-    ]);
+    });
   }, [taskId, setActiveTab, notifyTaskUpdate]);
 
   /**
@@ -426,17 +420,17 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
   const handleUpdateTask = useCallback(async () => {
     // Validate required fields
     if (!formState.taskName.trim()) {
-      Alert.alert("Validation Error", "Please enter a task name");
+      setPopupInfo({ title: "Validation Error", message: "Please enter a task name" });
       return;
     }
 
     if (!formState.timeToComplete.trim()) {
-      Alert.alert("Validation Error", "Please select a date to complete");
+      setPopupInfo({ title: "Validation Error", message: "Please select a date to complete" });
       return;
     }
 
     if (!taskId) {
-      Alert.alert("Error", "Task ID is missing. Unable to update task.");
+      setPopupInfo({ title: "Error", message: "Task ID is missing. Unable to update task." });
       return;
     }
 
@@ -495,19 +489,12 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
 
       if (updatedTask) {
         notifyTaskUpdate({ taskId });
-        Alert.alert("Success!", "Task updated successfully", [
-          {
-            text: "OK",
-            onPress: () => {
-              setActiveTab("calendar");
-            },
-          },
-        ]);
+        setPopupInfo({ title: "Success!", message: "Task updated successfully", navigateOnClose: true });
       } else {
-        Alert.alert("Error", "Failed to update task. Please try again.");
+        setPopupInfo({ title: "Error", message: "Failed to update task. Please try again." });
       }
     } catch (error) {
-      Alert.alert("Error", `Failed to update task: ${error instanceof Error ? error.message : "Unknown error"}`);
+      setPopupInfo({ title: "Error", message: `Failed to update task: ${error instanceof Error ? error.message : "Unknown error"}` });
     } finally {
       setIsLoading(false);
     }
@@ -643,28 +630,11 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
 
           {/* Task Category Dropdown */}
           <View style={styles.formField}>
-            <View style={styles.categoryLabelContainer}>
-              <AppText style={styles.label}>Task Category</AppText>
-            </View>
-            <Pressable style={styles.categoryButton} onPress={() => setIsCategoryModalVisible(true)}>
-              <View style={styles.categoryContent}>
-                <View style={[styles.categoryIcon, { backgroundColor: currentCategoryMeta.color }]}>
-                  {ICONS[currentCategoryMeta.icon] &&
-                    React.createElement(ICONS[currentCategoryMeta.icon], {
-                      size: 20,
-                      color: COLORS.white,
-                    })}
-                </View>
-                <AppText style={styles.categoryText}>{currentCategoryMeta.displayName}</AppText>
-              </View>
-              <View style={styles.dropdownChevron}>
-                {ICONS.down &&
-                  React.createElement(ICONS.down, {
-                    size: 20,
-                    color: COLORS.lightGray,
-                  })}
-              </View>
-            </Pressable>
+            <AppText style={styles.label}>Task Category</AppText>
+            <CategoryPicker
+              value={formState.category as any}
+              onChange={(v) => handleCategorySelect(v)}
+            />
           </View>
 
           {/* Task Tags Section */}
@@ -683,16 +653,7 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
             </View>
 
             {/* Rendered Tags */}
-            {formState.tags.length > 0 && (
-              <View style={styles.tagsDisplay}>
-                {formState.tags.map((tag, index) => (
-                  <Pressable key={`${tag}-${index}`} style={styles.tag} onPress={() => handleRemoveTag(tag)}>
-                    <AppText style={styles.tagText}>{tag}</AppText>
-                    <AppText style={styles.tagCloseIcon}> ✕</AppText>
-                  </Pressable>
-                ))}
-              </View>
-            )}
+            <TagsBelow selected={formState.tags} onRemove={handleRemoveTag} />
           </View>
 
           {/* Task Description Textarea */}
@@ -830,50 +791,43 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
         </View>
       </ScrollView>
 
-      {/* Category Selection Modal */}
-      <Modal
-        visible={isCategoryModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsCategoryModalVisible(false)}
+      {/* Popup / Alert */}
+      <PopupBox
+        visible={popupInfo !== null}
+        onClose={() => setPopupInfo(null)}
+        title={popupInfo?.title ?? ""}
+        titleColor={COLORS.primary1}
       >
-        <Pressable style={styles.modalOverlay} onPress={() => setIsCategoryModalVisible(false)}>
-          <View style={styles.modalContent}>
-            <AppText variant="title3" style={styles.modalTitle}>
-              Select Category
-            </AppText>
-            <ScrollView style={styles.categoryList}>
-              {CATEGORY_KEYS.map((categoryKey) => {
-                const meta = getCategoryMeta(categoryKey);
-                const isSelected = formState.category === categoryKey;
-                return (
-                  <Pressable
-                    key={categoryKey}
-                    style={[styles.categoryOption, isSelected && styles.categoryOptionSelected]}
-                    onPress={() => handleCategorySelect(categoryKey)}
-                  >
-                    <View style={styles.categoryOptionContent}>
-                      <View style={[styles.categoryOptionIcon, { backgroundColor: meta.color }]}>
-                        {ICONS[meta.icon] &&
-                          React.createElement(ICONS[meta.icon], {
-                            size: 24,
-                            color: COLORS.white,
-                          })}
-                      </View>
-                      <AppText style={styles.categoryOptionText}>{meta.displayName}</AppText>
-                    </View>
-                    {isSelected && (
-                      <View style={styles.checkmark}>
-                        <AppText style={styles.checkmarkText}>✓</AppText>
-                      </View>
-                    )}
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+        <AppText style={{ color: COLORS.darkGray, marginBottom: SPACING.lg }}>
+          {popupInfo?.message}
+        </AppText>
+        {popupInfo?.confirmAction ? (
+          <View style={{ flexDirection: "row", gap: SPACING.md }}>
+            <AppButton
+              title="Cancel"
+              mode="filled"
+              color="lightGray"
+              onPress={() => setPopupInfo(null)}
+              width="48%"
+            />
+            <AppButton
+              title="Delete"
+              mode="filled"
+              color="primary7"
+              onPress={() => { const action = popupInfo?.confirmAction; setPopupInfo(null); if (action) action(); }}
+              width="48%"
+            />
           </View>
-        </Pressable>
-      </Modal>
+        ) : (
+          <AppButton
+            title="OK"
+            mode="filled"
+            color="primary1"
+            onPress={() => { const nav = popupInfo?.navigateOnClose; setPopupInfo(null); if (nav) setActiveTab("calendar"); }}
+            width="100%"
+          />
+        )}
+      </PopupBox>
     </SafeAreaView>
   );
 };
@@ -950,12 +904,6 @@ const styles = StyleSheet.create({
     color: COLORS.darkGray,
     marginBottom: 4,
   },
-  categoryLabelContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.sm,
-    marginBottom: 4,
-  },
   timeToCompleteLabelContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -1018,39 +966,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     zIndex: 10,
-  },
-  categoryButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: COLORS.white,
-    borderRadius: 14,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.md,
-    borderWidth: 0.15,
-    borderColor: COLORS.brightP1,
-    minHeight: 52,
-  },
-  categoryContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.md,
-  },
-  categoryIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  categoryText: {
-    fontSize: FONT_SIZES.md,
-    color: COLORS.darkGray,
-    fontWeight: "500",
-  },
-  dropdownChevron: {
-    justifyContent: "center",
-    alignItems: "center",
   },
   subtaskCounterContainer: {
     flexDirection: "row",
@@ -1128,30 +1043,6 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.md,
     fontWeight: "bold",
   },
-  tagsDisplay: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: SPACING.sm,
-    marginTop: 3,
-  },
-  tag: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFB6D9",
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: SPACING.md,
-    ...SHADOWS.card,
-  },
-  tagText: {
-    color: "#C2185B",
-    fontWeight: "500",
-    marginRight: SPACING.sm,
-  },
-  tagCloseIcon: {
-    color: "#C2185B",
-    fontWeight: "bold",
-  },
   taskPartsGrid: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -1187,88 +1078,6 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
     paddingHorizontal: SPACING.md,
     marginTop: SPACING.md,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContent: {
-    backgroundColor: COLORS.white,
-    borderRadius: 20,
-    width: "85%",
-    maxHeight: "70%",
-    paddingVertical: SPACING.lg,
-    ...SHADOWS.card,
-  },
-  modalTitle: {
-    textAlign: "center",
-    color: COLORS.primary1,
-    fontWeight: "400",
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.md,
-  },
-  categoryList: {
-    paddingHorizontal: SPACING.md,
-  },
-  categoryOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.md,
-    borderRadius: 12,
-    marginBottom: SPACING.sm,
-  },
-  categoryOptionSelected: {
-    backgroundColor: COLORS.white2,
-  },
-  categoryOptionContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.md,
-  },
-  categoryOptionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  categoryOptionText: {
-    fontSize: FONT_SIZES.md,
-    color: COLORS.darkGray,
-    fontWeight: "500",
-  },
-  checkmark: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: COLORS.primary1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  checkmarkText: {
-    color: COLORS.white,
-    fontSize: FONT_SIZES.md,
-    fontWeight: "400",
-  },
-  calendarModalContainer: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-  },
-  calendarModalHeader: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.lg,
-    paddingBottom: SPACING.md,
-  },
-  calendarModalCloseText: {
-    fontSize: FONT_SIZES.lg,
-    color: COLORS.darkGray,
-    fontWeight: "400",
   },
 });
 
