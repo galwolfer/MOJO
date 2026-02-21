@@ -398,6 +398,12 @@ export async function getTaskById(taskId, userId) {
   if (!taskId) return null;
   const query = userId ? { _id: taskId, userId } : { _id: taskId };
   const task = await Task.findOne(query).populate("subCategory").lean();
+  if (!task) return null;
+  // Attach subtasks so the EditTask screen can pre-populate the parts form
+  const subTasks = await SubTask.find({ taskId: task._id })
+    .sort({ index: 1 })
+    .lean();
+  task.subTasks = subTasks;
   return attachSubcategoryLabel(task);
 }
 

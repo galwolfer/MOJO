@@ -1,77 +1,67 @@
 /**
  * EditTask Screen
  *
- * A comprehensive task editing form that allows users to:
- * - Edit task name and description
- * - Modify time to complete (with date picker)
- * - Adjust effort and importance using sliders
- * - Change task category from a dropdown
- * - Add/remove task tags
- * - View task statistics (effort, time, participants)
+ * Thin orchestration screen for editing an existing task.
+ * All UI sections are extracted into dedicated components:
  *
- * Uses existing UI components: Input, Slider, AppButton, Box, AppText, and ScrollableContent.
- *
- * Usage:
- * ```tsx
- * // In navigation or parent component
- * <EditTask />
- * ```
+ *  ┌─────────────────────────────────────────────────────────────────────┐
+ *  │  TaskDetailsSection      Task name, due date, sliders, category,   │
+ *  │                          tags, description                          │
+ *  ├─────────────────────────────────────────────────────────────────────┤
+ *  │  AdditionalDetailsSection  Estimated minutes, subtask parts editor  │
+ *  ├─────────────────────────────────────────────────────────────────────┤
+ *  │  TaskScheduleEditor      Manual / auto schedule (self-contained)   │
+ *  ├─────────────────────────────────────────────────────────────────────┤
+ *  │  TaskActionButtons       UPDATE / Discard / DELETE                  │
+ *  └─────────────────────────────────────────────────────────────────────┘
  */
 
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import { View, StyleSheet, ScrollView, Pressable, SafeAreaView, TouchableOpacity, ActivityIndicator } from "react-native";
-import { COLORS, SPACING, TYPOGRAPHY, SHADOWS, FONT_SIZES, ICON_SIZES } from "../theme";
+import { View, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, ActivityIndicator } from "react-native";
+import { COLORS, SPACING, FONT_SIZES, ICON_SIZES, SHADOWS } from "../theme";
+
+// ── Common components ─────────────────────────────────────────────────────────
 import AppText from "../components/common/AppText";
 import AppButton from "../components/common/AppButton";
-import Input from "../components/inputs/Input";
-import SliderComponent from "../components/inputs/Slider";
-import CalendarPicker from "../components/inputs/CalendarPicker";
-import Box from "../components/layout/Box";
-import { ICONS } from "../components/icons/icons";
-import CategoryPicker from "../components/special/CategoryPicker";
-import TagsBelow from "../components/inputs/TagsBelow";
 import PopupBox from "../components/common/PopupBox";
-import { getTaskById, updateTask, deleteTask, suggestCategory } from "../services/taskService";
-import { getImportanceColor } from "../components/widgets/taskHelpers";
+
+// ── Extracted task-form section components ────────────────────────────────────
+import TaskDetailsSection from "../components/special/task/TaskDetailsSection";
+import AdditionalDetailsSection from "../components/special/task/AdditionalDetailsSection";
+import TaskScheduleEditor from "../components/special/task/TaskScheduleEditor";
+import TaskActionButtons from "../components/special/task/TaskActionButtons";
+import { toLocalDateStr, toLocalTimeStr } from "../components/special/task/TaskScheduleEditor";
+import type { TaskFormState, Subtask, EditableSession } from "../components/special/task/taskFormTypes";
+
+// ── Icons and context ─────────────────────────────────────────────────────────
+import { ICONS } from "../components/icons/icons";
 import { useNavigation } from "../context/NavigationContext";
 import { useTaskContext } from "../context/TaskContext";
 import { useLayout } from "../context/LayoutContext";
 
+// ── Services ──────────────────────────────────────────────────────────────────
+import {
+  getTaskById,
+  updateTask,
+  deleteTask,
+  suggestCategory,
+  getTaskSessions,
+} from "../services/taskService";
+
 const NAVBAR_HEIGHT = 96;
 
-interface Subtask {
-  id: string;
-  title: string;
-  description: string;
-  minutes: string; // estimated minutes for this subtask
-  index?: number; // order within the parent task (set automatically)
-}
 
-interface TaskFormState {
-  taskName: string;
-  timeToComplete: string;
-  effort: number;
-  importance: number;
-  category: string;
-  tags: string[];
-  description: string;
-  estimatedMinutes: string;
-  numSubtasks: number;
-  subtasks: Subtask[];
-}
 
-/**
- * EditTask Screen Component
- *
- * Main screen for editing existing tasks with comprehensive form fields.
- *
- * @param {object} props - Component props
- * @param {string} props.taskId - The ID of the task to edit
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// Component
+// ─────────────────────────────────────────────────────────────────────────────
+
 const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
   const { setHeaderConfig, setActiveTab } = useNavigation();
   const { notifyTaskUpdate } = useTaskContext();
+  const { dimensions } = useLayout();
 
+  // ── Form state ────────────────────────────────────────────────────────────
   const [formState, setFormState] = useState<TaskFormState>({
     taskName: "",
     timeToComplete: "",
@@ -86,22 +76,26 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
   });
 
   const [tagInput, setTagInput] = useState("");
-  const [isCalendarModalVisible, setIsCalendarModalVisible] = useState(false);
+  const [isCalendarVisible, setIsCalendarVisible] = useState(false);
+
+  // ── UI / loading state ────────────────────────────────────────────────────
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [popupInfo, setPopupInfo] = useState<{
     title: string;
     message: string;
     navigateOnClose?: boolean;
     confirmAction?: () => void;
   } | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isFetching, setIsFetching] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Ref to track if category was manually changed by user
+  // ── Schedule initial state (seeded from API; owned by TaskScheduleEditor after mount) ──
+  const [initialSessions, setInitialSessions] = useState<EditableSession[]>([]);
+  const [initialIsManual, setInitialIsManual] = useState(false);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+
+  // ── Refs ──────────────────────────────────────────────────────────────────
   const categoryManuallyChanged = useRef(false);
-  // Ref to track the auto-generated subcategory tag
-  const autoGeneratedTag = useRef<string | null>(null);
-  // Ref to track if we've loaded the task data (prevent autofill overwriting loaded data)
   const hasLoadedTask = useRef(false);
 
   // Use the shared Header via NavigationContext so spacing matches other screens
@@ -195,6 +189,30 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
 
         hasLoadedTask.current = true;
         categoryManuallyChanged.current = true; // Prevent autofill from overwriting loaded category
+
+        // Load the task's current scheduled sessions for the schedule editor
+        setSessionsLoading(true);
+        try {
+          const sessionsData = await getTaskSessions(taskId);
+          if (!cancelled && sessionsData) {
+            setInitialIsManual(sessionsData.manualSchedule);
+            setInitialSessions(
+              (sessionsData.sessions ?? [])
+                .filter((s) => s.status !== "completed")
+                .map((s) => ({
+                  id: s._id,
+                  date: toLocalDateStr(s.start),
+                  startTime: toLocalTimeStr(s.start),
+                  endTime: toLocalTimeStr(s.end),
+                  subtaskIndex: s.subtaskIndex,
+                })),
+            );
+          }
+        } catch (_) {
+          // non-fatal — schedule editor simply shows empty
+        } finally {
+          if (!cancelled) setSessionsLoading(false);
+        }
       } catch (error) {
         if (!cancelled) {
           setFetchError(error instanceof Error ? error.message : "Failed to load task.");
@@ -241,11 +259,8 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
           setFormState((prev) => ({
             ...prev,
             category: suggestion.category,
-            tags: newTags, // This completely replaces the tags array
+            tags: newTags,
           }));
-
-          // Update the auto-generated tag reference
-          autoGeneratedTag.current = suggestion.subCategory || null;
         }
       } catch (error) {
         console.warn("Failed to auto-suggest category:", error);
@@ -275,7 +290,7 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
    */
   const handleDateSelect = useCallback((date: string) => {
     setFormState((prev) => ({ ...prev, timeToComplete: date }));
-    setIsCalendarModalVisible(false);
+    setIsCalendarVisible(false);
   }, []);
 
   /**
@@ -500,8 +515,6 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
     }
   }, [formState, taskId, notifyTaskUpdate, setActiveTab]);
 
-  const { dimensions } = useLayout();
-
   // Show loading spinner while fetching task data
   if (isFetching) {
     return (
@@ -542,253 +555,57 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
         ]}
         scrollIndicatorInsets={{ top: dimensions.headerHeight || SPACING.xlg * 3, bottom: NAVBAR_HEIGHT }}
       >
-        {/* Task Details Box */}
-        <Box title="TASK DETAILS" style={styles.boxContent}>
-          {/* Task Name Input */}
-          <View style={styles.formField}>
-            <AppText style={styles.customLabel}>Task Name</AppText>
-            <Input placeholder="Your Task" value={formState.taskName} onChangeText={handleTaskNameChange} type="text" />
-          </View>
+        <TaskDetailsSection
+          taskName={formState.taskName}
+          timeToComplete={formState.timeToComplete}
+          effort={formState.effort}
+          importance={formState.importance}
+          category={formState.category}
+          tags={formState.tags}
+          description={formState.description}
+          tagInput={tagInput}
+          isCalendarVisible={isCalendarVisible}
+          onTaskNameChange={handleTaskNameChange}
+          onTimeToCompleteChange={handleTimeToCompleteChange}
+          onDateSelect={handleDateSelect}
+          onCalendarToggle={() => setIsCalendarVisible((v) => !v)}
+          onEffortChange={handleEffortChange}
+          onImportanceChange={handleImportanceChange}
+          onCategorySelect={handleCategorySelect}
+          onDescriptionChange={handleDescriptionChange}
+          onTagInputChange={setTagInput}
+          onAddTag={handleAddTag}
+          onRemoveTag={handleRemoveTag}
+        />
 
-          {/* Time to Complete Input with Calendar Icon */}
-          <View style={styles.formField}>
-            <View style={styles.timeToCompleteLabelContainer}>
-              <AppText style={styles.label}>Time to Complete</AppText>
-            </View>
-            <View style={styles.timeToCompleteWrapper}>
-              <View style={styles.timeToCompleteInputContainer}>
-                <Input
-                  placeholder="Your Task"
-                  value={formState.timeToComplete}
-                  onChangeText={handleTimeToCompleteChange}
-                  type="text"
-                  editable={false}
-                />
-                <Pressable
-                  style={styles.calendarButton}
-                  onPress={() => setIsCalendarModalVisible(!isCalendarModalVisible)}
-                >
-                  {ICONS.calendar &&
-                    React.createElement(ICONS.calendar, {
-                      size: 24,
-                      color: COLORS.primary1,
-                    })}
-                </Pressable>
-              </View>
-
-              {/* Inline Calendar Dropdown */}
-              {isCalendarModalVisible && (
-                <View style={styles.inlineCalendarContainer}>
-                  <CalendarPicker onDateSelect={handleDateSelect} selectedDate={formState.timeToComplete} />
-                </View>
-              )}
-            </View>
-          </View>
-
-          {/* Effort and Importance Sliders */}
-          <View style={styles.slidersContainer}>
-            <View style={[styles.sliderWrapper, { flex: 1, marginRight: SPACING.md }]}>
-              <SliderComponent
-                value={formState.effort}
-                onValueChange={handleEffortChange}
-                min={1}
-                max={5}
-                step={1}
-                label="Effort"
-                trackColor={COLORS.lightGray}
-                TrackThumbColor={getImportanceColor(formState.effort)}
-                valueDescriptions={{
-                  1: "Very Easy",
-                  2: "Easy",
-                  3: "Moderate",
-                  4: "Hard",
-                  5: "Very Hard",
-                }}
-              />
-            </View>
-
-            <View style={[styles.sliderWrapper, { flex: 1 }]}>
-              <SliderComponent
-                value={formState.importance}
-                onValueChange={handleImportanceChange}
-                min={1}
-                max={5}
-                step={1}
-                label="Importance"
-                trackColor={COLORS.lightGray}
-                TrackThumbColor={getImportanceColor(formState.importance)}
-                valueDescriptions={{
-                  1: "Low",
-                  2: "Below Avg",
-                  3: "Average",
-                  4: "Above Avg",
-                  5: "Critical",
-                }}
-              />
-            </View>
-          </View>
-
-          {/* Task Category Dropdown */}
-          <View style={styles.formField}>
-            <AppText style={styles.label}>Task Category</AppText>
-            <CategoryPicker
-              value={formState.category as any}
-              onChange={(v) => handleCategorySelect(v)}
-            />
-          </View>
-
-          {/* Task Tags Section */}
-          <View style={styles.formField}>
-            <View style={styles.tagsLabelContainer}>
-              <AppText style={styles.label}>Task Tags</AppText>
-            </View>
-
-            <View style={styles.tagInputContainer}>
-              <Input placeholder="Your name" value={tagInput} onChangeText={setTagInput} type="text" />
-              <Pressable style={styles.addTagButton} onPress={handleAddTag}>
-                <AppText variant="title3" style={styles.addTagButtonText}>
-                  +
-                </AppText>
-              </Pressable>
-            </View>
-
-            {/* Rendered Tags */}
-            <TagsBelow selected={formState.tags} onRemove={handleRemoveTag} />
-          </View>
-
-          {/* Task Description Textarea */}
-          <View style={styles.formField}>
-            <AppText style={styles.customLabel}>Task Description</AppText>
-            <Input
-              placeholder="Your Task"
-              value={formState.description}
-              onChangeText={handleDescriptionChange}
-              type="longtext"
-              multiline
-              numberOfLines={6}
-            />
-          </View>
-        </Box>
-
-        {/* Spacer between boxes */}
         <View style={{ height: SPACING.lg }} />
 
-        {/* Additional Task Details Box */}
-        <Box title="ADDITIONAL DETAILS" style={styles.boxContent}>
-          {/* Estimated Minutes Input */}
-          <View style={styles.formField}>
-            <AppText style={styles.customLabel}>Estimated Minutes</AppText>
-            <Input
-              placeholder="e.g., 30"
-              value={formState.estimatedMinutes}
-              onChangeText={handleEstimatedMinutesChange}
-              type="number"
-            />
-          </View>
+        <AdditionalDetailsSection
+          estimatedMinutes={formState.estimatedMinutes}
+          numSubtasks={formState.numSubtasks}
+          subtasks={formState.subtasks}
+          onEstimatedMinutesChange={handleEstimatedMinutesChange}
+          onNumSubtasksChange={handleNumSubtasksChange}
+          onSubtaskUpdate={updateSubtask}
+        />
 
-          {/* Number of Subtasks */}
-          <View style={styles.formField}>
-            <AppText style={styles.label}>Split Task Into Parts</AppText>
-            <View style={styles.subtaskCounterContainer}>
-              <Pressable
-                style={styles.counterButton}
-                onPress={() => handleNumSubtasksChange(Math.max(1, formState.numSubtasks - 1))}
-              >
-                <AppText style={styles.counterButtonText}>−</AppText>
-              </Pressable>
-              <View style={styles.counterDisplay}>
-                <AppText style={styles.counterText}>{formState.numSubtasks}</AppText>
-              </View>
-              <Pressable
-                style={styles.counterButton}
-                onPress={() => handleNumSubtasksChange(formState.numSubtasks + 1)}
-              >
-                <AppText style={styles.counterButtonText}>+</AppText>
-              </Pressable>
-            </View>
-          </View>
+        <View style={{ height: SPACING.lg }} />
 
-          {/* Subtasks Section - Only show if numSubtasks >= 2 */}
-          {formState.numSubtasks >= 2 && (
-            <View style={styles.subtasksSection}>
-              <AppText style={[styles.label, { marginBottom: SPACING.md }]}>Define Subtasks</AppText>
-              {formState.subtasks.map((subtask, index) => (
-                <View key={subtask.id} style={styles.subtaskCard}>
-                  <AppText style={styles.subtaskHeader}>Part {index + 1}</AppText>
+        <TaskScheduleEditor
+          taskId={taskId}
+          initialSessions={initialSessions}
+          initialIsManualSchedule={initialIsManual}
+          isLoadingInitial={sessionsLoading}
+          onPopup={(title, message) => setPopupInfo({ title, message })}
+          onTaskUpdated={() => notifyTaskUpdate({ taskId })}
+        />
 
-                  {/* Subtask Title */}
-                  <View style={styles.formField}>
-                    <AppText style={styles.customLabel}>Part Name</AppText>
-                    <Input
-                      placeholder="e.g., Planning"
-                      value={subtask.title}
-                      onChangeText={(text) => updateSubtask(index, "title", text)}
-                      type="text"
-                    />
-                  </View>
-
-                  {/* Subtask Description */}
-                  <View style={styles.formField}>
-                    <AppText style={styles.customLabel}>Part Description</AppText>
-                    <Input
-                      placeholder="Describe this part..."
-                      value={subtask.description}
-                      onChangeText={(text) => updateSubtask(index, "description", text)}
-                      type="longtext"
-                      multiline
-                      numberOfLines={2}
-                    />
-                  </View>
-
-                  {/* Subtask Estimated Minutes */}
-                  <View style={styles.formField}>
-                    <Input
-                      label="Estimated Minutes"
-                      placeholder="e.g., 15"
-                      value={subtask.minutes}
-                      onChangeText={(text) => updateSubtask(index, "minutes", text)}
-                      type="number"
-                    />
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-        </Box>
-
-        {/* Update Task Button */}
-        <View style={styles.buttonContainer}>
-          <AppButton
-            title={isLoading ? "UPDATING..." : "UPDATE TASK"}
-            onPress={handleUpdateTask}
-            mode="filled"
-            color="#2ecc71"
-            icon={isLoading ? undefined : "check"}
-            iconPosition="right"
-            width="100%"
-            disabled={isLoading}
-          />
-        </View>
-
-        {/* Action Row: Discard + Delete */}
-        <View style={styles.actionRow}>
-          <AppButton
-            title="Discard Changes"
-            onPress={() => setActiveTab("calendar")}
-            mode="filled"
-            color="lightGray"
-            width="48%"
-          />
-
-          <AppButton
-            title="DELETE TASK"
-            onPress={handleDeleteTask}
-            mode="filled"
-            color="primary7"
-            width="48%"
-            disabled={isLoading}
-          />
-        </View>
+        <TaskActionButtons
+          onUpdate={handleUpdateTask}
+          onDiscard={() => setActiveTab("calendar")}
+          onDelete={handleDeleteTask}
+          isUpdating={isLoading}
+        />
       </ScrollView>
 
       {/* Popup / Alert */}

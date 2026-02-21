@@ -1193,6 +1193,75 @@ export async function getTasksForDate(date: Date): Promise<CalendarTaskGroup[]> 
 }
 
 /**
+ * Get raw scheduled sessions for a specific task (for the manual schedule editor).
+ * GET /api/tasks/:id/sessions
+ */
+export async function getTaskSessions(taskId: string): Promise<{
+  manualSchedule: boolean;
+  sessions: Array<{
+    _id: string;
+    start: string;
+    end: string;
+    minutes: number;
+    subtaskIndex: number | null;
+    subtaskTitle: string | null;
+    status: string;
+    manuallyScheduled: boolean;
+  }>;
+} | null> {
+  try {
+    const response = await get<any>(`/tasks/${taskId}/sessions`);
+    return {
+      manualSchedule: response.manualSchedule ?? false,
+      sessions: response.sessions ?? [],
+    };
+  } catch (error) {
+    console.warn("Failed to fetch task sessions:", error);
+    return null;
+  }
+}
+
+/**
+ * Replace a task's planned sessions with a manually-defined set.
+ * PATCH /api/tasks/:id/sessions
+ *
+ * On success the task is flagged `manualSchedule = true` so the
+ * auto-scheduler will not overwrite these sessions.
+ */
+export async function updateTaskSchedule(
+  taskId: string,
+  sessions: Array<{
+    id?: string;
+    start: string; // ISO string
+    end: string;   // ISO string
+    subtaskIndex?: number | null;
+  }>,
+): Promise<{
+  success: boolean;
+  error?: string;
+  sessions: Array<{
+    _id: string;
+    start: string;
+    end: string;
+    minutes: number;
+    subtaskIndex: number | null;
+    subtaskTitle: string | null;
+    status: string;
+  }>;
+}> {
+  try {
+    const response = await patch<any>(`/tasks/${taskId}/sessions`, { sessions });
+    return { success: true, sessions: response.sessions ?? [] };
+  } catch (error: any) {
+    const message =
+      error?.response?.data?.error ??
+      error?.message ??
+      "Failed to update schedule";
+    return { success: false, error: message, sessions: [] };
+  }
+}
+
+/**
  * Get scheduled sessions for a specific date
  * Fetches TaskSchedule documents and transforms them to Calendar format
  * Shows what the user is scheduled to work on for that day
