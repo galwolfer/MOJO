@@ -66,8 +66,14 @@ export default function TaskCard({
   const IconComponent = categoryMeta ? ICONS[categoryMeta.icon] : null;
   const effectiveId = task.taskId || task.id;
 
-  // Compute progress using shared utility; returns 0-100, normalise to 0-1 for sub-components
-  const taskProgress = computeTaskProgress(task, completedSubtasks) / 100;
+  // Compute progress: prefer the server's authoritative progressPercentage (computed from ALL
+  // subtasks), because the calendar API returns only the subtasks scheduled for a given day's
+  // session, which makes local re-computation give different results per date for multi-day tasks.
+  // Fall back to local computation only when progressPercentage is absent.
+  const taskProgress =
+    typeof task.progressPercentage === "number"
+      ? Math.max(0, Math.min(1, task.progressPercentage / 100))
+      : computeTaskProgress(task, completedSubtasks) / 100;
 
   const sharedProps = {
     task,

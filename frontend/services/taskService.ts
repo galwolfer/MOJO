@@ -225,6 +225,34 @@ export async function getOverdueTasks(): Promise<Task[]> {
 }
 
 /**
+ * Extend a task's deadline
+ * PATCH /api/tasks/expired/:id/extend
+ */
+export async function extendTaskDeadline(id: string, newDeadline: string): Promise<boolean> {
+  try {
+    await patch<{ success: boolean }>(`/tasks/expired/${id}/extend`, { newDeadline });
+    return true;
+  } catch (error) {
+    console.warn("Failed to extend task deadline:", error);
+    return false;
+  }
+}
+
+/**
+ * Forfeit (permanently delete) an overdue task and its scheduled sessions
+ * DELETE /api/tasks/expired/:id/forfeit
+ */
+export async function forfeitTask(id: string): Promise<boolean> {
+  try {
+    await del<{ success: boolean }>(`/tasks/expired/${id}/forfeit`);
+    return true;
+  } catch (error) {
+    console.warn("Failed to forfeit task:", error);
+    return false;
+  }
+}
+
+/**
  * Get task progress with subtasks and schedule
  * GET /api/tasks/:id/progress
  */

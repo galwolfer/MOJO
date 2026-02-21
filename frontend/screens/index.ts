@@ -3,3 +3,4 @@
 export { default as CalendarScreen } from "./calander/Calendar";
 export { default as CategoryPrioritiesScreen } from "./auth/components/CategoryPriorities";
 export { default as UserProfileScreen } from "./user/UserProfile";
+export { default as OverdueTasksScreen } from "./OverdueTasks";

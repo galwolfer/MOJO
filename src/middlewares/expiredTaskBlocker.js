@@ -19,6 +19,9 @@ const ALLOWED_ROUTES = [
   
   // Expired tasks routes (so user can handle them!)
   "/api/tasks/expired",
+
+  // Overdue tasks check (used by frontend to detect and redirect on startup)
+  "/api/tasks/overdue",
   
   // Static files
   "/static",

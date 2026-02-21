@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 
 /**
  * MainLayout
@@ -17,11 +17,13 @@ import CalendarScreen from "../../screens/calander/Calendar";
 import UserProfileScreen from "../../screens/user/UserProfile";
 import CreateTaskScreen from "../../screens/CreateTask";
 import EditTaskScreen from "../../screens/EditTask";
+import OverdueTasksScreen from "../../screens/OverdueTasks";
+import { getOverdueTasks } from "../../services/taskService";
 import { COLORS, SPACING } from "../../theme";
 import { useKeyboard } from "../../hooks";
 
 export default function MainLayout() {
-  const { activeTab, headerConfig, navBarConfig, navigationParams } = useNavigation();
+  const { activeTab, headerConfig, navBarConfig, navigationParams, setActiveTab } = useNavigation();
   const { setHeaderHeight, setNavBarHeight } = useLayout();
   const { width, height } = useWindowDimensions();
   const isDesktopLike = Platform.OS === "web" ? width >= 900 : width >= 900;
@@ -32,6 +34,19 @@ export default function MainLayout() {
   // Track actual measured heights of header and navbar
   const [localHeaderHeight, setLocalHeaderHeight] = useState(0);
   const [localNavBarHeight, setLocalNavBarHeight] = useState(0);
+
+  // On mount: check for overdue tasks and redirect if any exist.
+  // Using a ref to guarantee this runs only once even in StrictMode.
+  const overdueChecked = useRef(false);
+  useEffect(() => {
+    if (overdueChecked.current) return;
+    overdueChecked.current = true;
+    getOverdueTasks().then((tasks) => {
+      if (tasks.length > 0) {
+        setActiveTab("overdue");
+      }
+    });
+  }, []);
 
   const onHeaderLayout = useCallback(
     (event: LayoutChangeEvent) => {
@@ -65,6 +80,8 @@ export default function MainLayout() {
         return <CreateTaskScreen />;
       case "edit":
         return <EditTaskScreen taskId={navigationParams?.taskId || ""} />;
+      case "overdue":
+        return <OverdueTasksScreen />;
       default:
         return <ChatScreen />;
     }
