@@ -15,6 +15,10 @@ import { logger } from "../utils/logger.js";
 import { isValidCategory, getDisplayName } from "../config/categories.js";
 import { BusyBlock } from "../models/BusyBlock.js";
 import {
+  computeSessionHash,
+  withUserScheduleLock,
+} from "../services/schedulingService.js";
+import {
   addSubcategoryToUser,
   ensureGeneralSubcategory,
   findOrCreateSubcategory,
@@ -1066,26 +1070,43 @@ router.patch("/:id/sessions", requireAuth, async (req, res, next) => {
     const subTaskDocs = await SubTask.find({ taskId }).lean();
     const subTaskMap = new Map(subTaskDocs.map((st) => [st.index, st]));
 
-    // Replace existing non-completed sessions for this task
-    await TaskSchedule.deleteMany({ taskId, status: { $nin: ["completed"] } });
+    // Wrap the delete→insert in a per-user lock to prevent concurrent saves from
+    // doubling the sessions (same race condition the auto-scheduler guards against).
+    const inserted = await withUserScheduleLock(userId, async () => {
+      // Replace existing non-completed sessions for this task
+      await TaskSchedule.deleteMany({ taskId, status: { $nin: ["completed"] } });
 
-    const newDocs = parsed.map((s) => {
-      const subtask = s.subtaskIndex != null ? subTaskMap.get(s.subtaskIndex) : null;
-      return {
-        userId,
-        taskId,
-        subtaskIndex: s.subtaskIndex,
-        subtaskTitle: subtask?.title ?? null,
-        description: subtask?.description ?? null,
-        start: s.start,
-        end: s.end,
-        minutes: s.minutes,
-        status: "planned",
-        manuallyScheduled: true,
-      };
+      const newDocs = parsed.map((s) => {
+        const subtask = s.subtaskIndex != null ? subTaskMap.get(s.subtaskIndex) : null;
+        return {
+          userId,
+          taskId,
+          subtaskIndex: s.subtaskIndex,
+          subtaskTitle: subtask?.title ?? null,
+          description: subtask?.description ?? null,
+          start: s.start,
+          end: s.end,
+          minutes: s.minutes,
+          status: "planned",
+          manuallyScheduled: true,
+          // Give manual sessions the same DB-level dedup protection as auto-scheduled ones.
+          sessionHash: computeSessionHash(userId, taskId, s.start, s.end, s.subtaskIndex ?? null),
+        };
+      });
+
+      if (newDocs.length === 0) return [];
+
+      try {
+        return await TaskSchedule.insertMany(newDocs, { ordered: false });
+      } catch (err) {
+        if (err.code === 11000 || err.name === "MongoBulkWriteError") {
+          // Duplicate-key: a concurrent save already inserted these sessions.
+          // Return what was actually inserted (the write errors tell us the others).
+          return err.insertedDocs ?? [];
+        }
+        throw err;
+      }
     });
-
-    const inserted = newDocs.length > 0 ? await TaskSchedule.insertMany(newDocs) : [];
 
     // Mark task as manually scheduled so auto-scheduler skips it
     await Task.updateOne({ _id: taskId }, { $set: { manualSchedule: true } });

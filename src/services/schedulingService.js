@@ -114,7 +114,8 @@ const _userScheduleLocks = new Map();
  * @param {() => Promise<T>} fn
  * @returns {Promise<T>}
  */
-async function withUserScheduleLock(userId, fn) {
+// Export so manual-session routes can reuse the same per-user mutex
+export async function withUserScheduleLock(userId, fn) {
   const key = userId.toString();
   const prev = _userScheduleLocks.get(key) ?? Promise.resolve();
   let releaseLock;

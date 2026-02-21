@@ -1670,13 +1670,15 @@ export async function createTaskSchedule(
       return {
         success: true,
         message: response.message,
-        scheduledCount: response.scheduledCount,
+        scheduledCount: response.scheduledCount ?? 0,
         plan: response.plan,
       };
     }
-    return null;
-  } catch (error) {
+    // Backend returned success:false — scheduler ran but produced no slots
+    return { success: false, message: response.message ?? "No slots found", scheduledCount: 0 };
+  } catch (error: any) {
     console.error("Failed to create task schedule:", error);
+    // Return null to signal a network/server error (distinct from scheduler returning empty)
     return null;
   }
 }
