@@ -3,6 +3,7 @@ import { View, Pressable } from "react-native";
 import AppText from "../../common/AppText";
 import { Checkbox } from "../../icons/Checkbox";
 import { getTimeParts, getSubtaskIdFromSession, ScheduledSession, Subtask } from "../../widgets/taskHelpers";
+import { SessionTime } from "./SessionTime";
 import { StyleSheet } from "react-native";
 import { ICON_SIZES, SPACING, COLORS } from "../../../theme";
 
@@ -49,7 +50,6 @@ export const SessionRow: React.FC<{
   };
 
   const startParts = getTimeParts(session.start);
-  const endParts = getTimeParts(session.end);
   const subtaskTitle = session.subtaskTitle || `Part ${session.subtaskIndex ?? sessionIndex + 1}`;
 
   // Avoid making the row a Pressable when it contains interactive children (checkbox)
@@ -67,39 +67,7 @@ export const SessionRow: React.FC<{
         accessibilityState={rowPressHandler ? { disabled: !canToggle, busy: isLoading } : undefined}
         style={styles.sessionRow}
       >
-        <View style={styles.sessionTimeBlock}>
-          <View style={[styles.sessionTimeLine, { backgroundColor: categoryColor || COLORS.primary1 }]} />
-          <View style={styles.sessionTimeColumn}>
-            <AppText variant="notes" style={styles.sessionHourText}>
-              {session.start ? (
-                <>
-                  {startParts.time || "Time"}
-                  {startParts.ampm ? (
-                    <AppText variant="notes" style={styles.sessionAmPm}>
-                      {" " + startParts.ampm}
-                    </AppText>
-                  ) : null}
-                </>
-              ) : (
-                "Time"
-              )}
-            </AppText>
-            <AppText variant="notes" style={styles.sessionHourText}>
-              {session.end ? (
-                <>
-                  {endParts.time || ""}
-                  {endParts.ampm ? (
-                    <AppText variant="notes" style={styles.sessionAmPm}>
-                      {" " + endParts.ampm}
-                    </AppText>
-                  ) : null}
-                </>
-              ) : (
-                ""
-              )}
-            </AppText>
-          </View>
-        </View>
+        <SessionTime timeStart={session.start} timeEnd={session.end} categoryColor={categoryColor} />
 
         <View style={styles.sessionCheckbox}>
           {canToggle ? (
@@ -145,27 +113,6 @@ const styles = StyleSheet.create({
   sessionDateText: {
     fontWeight: "600",
     marginBottom: SPACING.xs,
-  },
-  sessionTimeBlock: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.xs,
-  },
-  sessionTimeColumn: {
-    alignItems: "flex-end",
-    gap: SPACING.xs,
-  },
-  sessionHourText: {
-    color: COLORS.lightGray,
-  },
-  sessionAmPm: {
-    fontSize: 10,
-    color: COLORS.lightGray,
-  },
-  sessionTimeLine: {
-    width: SPACING.xs,
-    alignSelf: "stretch",
-    borderRadius: 999,
   },
   sessionCheckbox: {
     width: SPACING.lg,

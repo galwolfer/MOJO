@@ -47,11 +47,13 @@ export function useCalendarTasks(
   const [completedSubtasks, setCompletedSubtasks] = useState<Set<string>>(new Set());
 
   /**
-   * Fetch both regular tasks and scheduled sessions from API for the selected date
+   * Fetch both regular tasks and scheduled sessions from API for the selected date.
+   * Pass silent=true to refresh data without showing the loading spinner (e.g. after
+   * optimistic updates so the UI doesn't flicker between states).
    */
-  const fetchTasksForDate = async (date: Date) => {
+  const fetchTasksForDate = async (date: Date, silent = false) => {
     try {
-      setIsLoading(true);
+      if (!silent) setIsLoading(true);
       setError(null);
 
       // ONLY fetch scheduled sessions - don't show tasks by their deadline
@@ -102,10 +104,10 @@ export function useCalendarTasks(
       setTaskGroups(groupsToUse);
     } catch (err) {
       console.error("Failed to load tasks:", err);
-      setError("Failed to load tasks. Please try again.");
+      if (!silent) setError("Failed to load tasks. Please try again.");
       setTaskGroups([]);
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   };
 
@@ -162,7 +164,7 @@ export function useCalendarTasks(
         );
         if (failed) {
           console.error("[handleTaskCompletionToggle] Failed to update one or more subtasks", results);
-          fetchTasksForDate(selectedDate);
+          fetchTasksForDate(selectedDate, true);
         }
       }
 
@@ -172,56 +174,34 @@ export function useCalendarTasks(
       // Notify other components
       notifyTaskUpdate();
 
-      // Revalidate
-      await fetchTasksForDate(selectedDate);
+      // Silently revalidate — don't show loading spinner so the UI doesn't flicker
+      await fetchTasksForDate(selectedDate, true);
     } catch (err) {
       console.error("Failed to update task completion:", err);
-      fetchTasksForDate(selectedDate);
+      fetchTasksForDate(selectedDate, true);
     }
   };
 
   /**
-   * Handle subtask completion toggle
+   * Handle subtask completion toggle.
+   * Visual state is managed locally in TaskCard to prevent re-rendering all sibling cards.
+   * This handler only persists to the server and silently re-fetches on failure so the
+   * card can revert its local state via the useEffect prop sync.
    */
   const handleSubtaskCompletionToggle = async (taskId: string, subtaskId: string, checked: boolean) => {
     try {
-      // Optimistically update local state
-      const newSubtasksCompleted = new Set(completedSubtasks);
-
-      if (checked) {
-        newSubtasksCompleted.add(subtaskId);
-      } else {
-        newSubtasksCompleted.delete(subtaskId);
-      }
-
-      setCompletedSubtasks(newSubtasksCompleted);
-
-      // Call the API
       const result = checked ? await markSubTaskComplete(taskId, subtaskId) : await markSubTaskTodo(taskId, subtaskId);
 
       if (!result.success) {
-        // Revert optimistic update on error
-        const revertSubtasksCompleted = new Set(completedSubtasks);
-        if (checked) {
-          revertSubtasksCompleted.delete(subtaskId);
-        } else {
-          revertSubtasksCompleted.add(subtaskId);
-        }
-        setCompletedSubtasks(revertSubtasksCompleted);
-        console.error("Failed to update subtask status");
+        console.error("Failed to update subtask status — reverting via silent refresh");
+        // Silent refresh: TaskCard useEffect will sync local state back to server truth
+        await fetchTasksForDate(selectedDate, true);
       } else {
         notifyTaskUpdate();
       }
     } catch (err) {
       console.error("Failed to update subtask completion:", err);
-      // Revert optimistic update on error
-      const revertSubtasksCompleted = new Set(completedSubtasks);
-      if (checked) {
-        revertSubtasksCompleted.delete(subtaskId);
-      } else {
-        revertSubtasksCompleted.add(subtaskId);
-      }
-      setCompletedSubtasks(revertSubtasksCompleted);
+      await fetchTasksForDate(selectedDate, true);
     }
   };
 
@@ -285,8 +265,10 @@ export function useCalendarTasks(
    * Subscribe to task updates
    */
   useEffect(() => {
+    // Always silent: a notify triggered by our own checkbox toggles must not
+    // show the loading spinner (that is the main flicker source).
     const unsubscribe = subscribeToTaskUpdates(() => {
-      fetchTasksForDate(selectedDate);
+      fetchTasksForDate(selectedDate, true);
     });
     return unsubscribe;
   }, [selectedDate, subscribeToTaskUpdates]);

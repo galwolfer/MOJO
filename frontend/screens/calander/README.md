@@ -53,7 +53,6 @@ Displays a task in compact or expanded view.
 - `isCompleted: boolean` - Completion state
 - `completedSubtasks: Set<string>` - Completed subtask IDs
 - `onPress: (taskId: string) => void` - Toggle expand/collapse
-- `onToggleCompletion: (taskId: string, checked: boolean) => void` - Toggle task completion
 - `onEdit: (task: Task) => void` - Edit handler
 - `onDelete: (taskId: string) => void` - Delete handler
 - `onSubtaskToggle: (taskId: string, subtaskId: string, checked: boolean) => void` - Subtask toggle

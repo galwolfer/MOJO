@@ -15,7 +15,7 @@
  * <CalendarScreen />
  * ```
  */
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { View, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from "react-native";
 import AppText from "../../components/common/AppText";
 import AppButton from "../../components/common/AppButton";
@@ -26,7 +26,7 @@ import { useLayout } from "../../context/LayoutContext";
 import { useTaskContext } from "../../context/TaskContext";
 import DateSelector from "../../components/layout/DateSelector";
 import CalendarPicker from "../../components/inputs/CalendarPicker";
-import { getLocalDateString, stripTime } from "../../utils/dateUtils";
+import { getLocalDateString } from "../../utils/dateUtils";
 import EmptyState from "./components/EmptyState";
 import TaskGroup from "./components/TaskGroup";
 import FloatingButton from "../../components/common/FloatingButton";
@@ -34,17 +34,17 @@ import { useCalendarTasks } from "./hooks/useCalendarTasks";
 import { Task } from "./types";
 
 export default function CalendarScreen() {
-  const { setHeaderConfig, setActiveTab, setActiveTabWithParams } = useNavigation();
+  const { setHeaderConfig, setActiveTab, setActiveTabWithParams, calendarSelectedDate, setCalendarSelectedDate } =
+    useNavigation();
   const { dimensions } = useLayout();
   const { notifyTaskUpdate, subscribeToTaskUpdates } = useTaskContext();
 
-  const [selectedDate, setSelectedDate] = useState<Date>(() => stripTime(new Date()));
+  // Use context-persisted date so the selection survives tab switches
+  const selectedDate = calendarSelectedDate;
+  const setSelectedDate = setCalendarSelectedDate;
+
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [showCalendarPicker, setShowCalendarPicker] = useState<boolean>(false);
-
-  useEffect(() => {
-    setSelectedDate(stripTime(new Date()));
-  }, []);
 
   useEffect(() => {
     const bottomElement = showCalendarPicker ? (
@@ -90,19 +90,22 @@ export default function CalendarScreen() {
 
   const filteredTaskGroups = getFilteredTaskGroups();
 
-  const handleAddTask = () => {
+  const handleAddTask = useCallback(() => {
     setActiveTab("create");
-  };
+  }, [setActiveTab]);
 
-  const handleEditTask = (taskToEdit: Task) => {
-    // taskToEdit.id is the session ID; taskToEdit.taskId is the actual task _id
-    const actualTaskId = taskToEdit.taskId || taskToEdit.id;
-    setActiveTabWithParams("edit" as any, { taskId: actualTaskId });
-  };
+  const handleEditTask = useCallback(
+    (taskToEdit: Task) => {
+      // taskToEdit.id is the session ID; taskToEdit.taskId is the actual task _id
+      const actualTaskId = taskToEdit.taskId || taskToEdit.id;
+      setActiveTabWithParams("edit" as any, { taskId: actualTaskId });
+    },
+    [setActiveTabWithParams],
+  );
 
-  const handleTaskPress = (taskId: string) => {
-    setExpandedTaskId(expandedTaskId === taskId ? null : taskId);
-  };
+  const handleTaskPress = useCallback((taskId: string) => {
+    setExpandedTaskId((prev) => (prev === taskId ? null : taskId));
+  }, []);
 
   return (
     <View style={styles.container}>
