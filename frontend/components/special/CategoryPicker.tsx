@@ -11,7 +11,7 @@ interface Props {
   disabled?: boolean;
 }
 
-export default function CategoryPicker({ value, onChange, label = "Parent category", disabled }: Props) {
+export default function CategoryPicker({ value, onChange, label, disabled }: Props) {
   const options = useMemo(() => {
     return CATEGORY_KEYS.map((key: CategoryKey) => {
       const m = getCategoryMeta(key);

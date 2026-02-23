@@ -20,12 +20,174 @@ import { Task } from "../models/Task.js";
 import { TaskSchedule } from "../models/TaskSchedule.js";
 import { SubTask } from "../models/SubTask.js";
 import { BusyBlock } from "../models/BusyBlock.js";
+import { User } from "../models/User.js";
 import { startOfDay, addDays } from "../utils/dateUtils.js";
 import { logEvent } from "./telemetryService.js";
 import { env } from "../config/env.js";
 import { logger } from "../utils/logger.js";
 import { updateAllScores } from "../scripts/updateScores.js";
 import { spawn } from "child_process";
+import { createHash } from "crypto";
+import fs from "fs";
+import path from "path";
+import os from "os";
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Deduplication helpers
+// ──────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Compute a deterministic SHA-256 fingerprint for a single schedule session.
+ * The hash encodes userId + taskId + start (UTC ISO) + end (UTC ISO) + subtaskIndex.
+ * Two sessions with identical values produce the same hash, making it usable as
+ * a unique key at both the application layer and the database layer.
+ *
+ * @param {string|ObjectId} userId
+ * @param {string|ObjectId} taskId
+ * @param {Date|string}     start
+ * @param {Date|string}     end
+ * @param {number|null}     subtaskIndex
+ * @returns {string} 64-char hex SHA-256 digest
+ */
+export function computeSessionHash(userId, taskId, start, end, subtaskIndex) {
+  const key = [
+    userId.toString(),
+    taskId.toString(),
+    new Date(start).toISOString(),
+    new Date(end).toISOString(),
+    subtaskIndex ?? "",
+  ].join("|");
+  return createHash("sha256").update(key).digest("hex");
+}
+
+/**
+ * Deduplicate a plan array in-memory by (taskId, start, end, subtaskIndex).
+ * First occurrence wins; subsequent duplicates are silently dropped.
+ * This is a safety-net applied BEFORE any DB write so that even if the
+ * CSP scheduler or a concurrent caller emits duplicate slots, we never
+ * attempt to persist them.
+ *
+ * @param {string|ObjectId}  userId
+ * @param {Array}            plan   - raw plan slots from generatePlan / persistPlan
+ * @returns {Array}          deduplicated plan
+ */
+export function deduplicatePlan(userId, plan) {
+  const seen = new Set();
+  const result = [];
+  for (const slot of plan) {
+    const h = computeSessionHash(userId, slot.taskId, slot.start, slot.end, slot.subtaskIndex ?? null);
+    if (seen.has(h)) {
+      logger.warn(
+        `[SCHEDULER] Duplicate plan slot dropped (taskId=${slot.taskId}, ` +
+        `start=${new Date(slot.start).toISOString()}) — hash ${h.slice(0, 12)}…`
+      );
+      continue;
+    }
+    seen.add(h);
+    result.push(slot);
+  }
+  return result;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Per-user scheduling lock
+// ──────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Map<userId, Promise<void>> used to serialize concurrent persistPlan calls
+ * for the same user.  Without this guard, two simultaneous invocations both
+ * execute deleteMany → insertMany, and both insertMany calls succeed, doubling
+ * the stored sessions.
+ *
+ * The lock is purely advisory (in-process only). For multi-process deployments
+ * a MongoDB findOneAndUpdate atomic step or a distributed lock (e.g. Redis) is
+ * needed, but for a single Node process this is sufficient.
+ */
+const _userScheduleLocks = new Map();
+
+/**
+ * Run `fn` exclusively for `userId`. If another call is already running for the
+ * same user, wait for it to finish before starting.
+ *
+ * @template T
+ * @param {string}          userId
+ * @param {() => Promise<T>} fn
+ * @returns {Promise<T>}
+ */
+// Export so manual-session routes can reuse the same per-user mutex
+export async function withUserScheduleLock(userId, fn) {
+  const key = userId.toString();
+  const prev = _userScheduleLocks.get(key) ?? Promise.resolve();
+  let releaseLock;
+  const lockToken = new Promise((resolve) => {
+    releaseLock = resolve;
+  });
+  // Chain: new callers will wait until this invocation releases the lock
+  _userScheduleLocks.set(key, prev.then(() => lockToken));
+  // Wait for any previous holder to finish
+  await prev;
+  try {
+    return await fn();
+  } finally {
+    releaseLock();
+    // Clean up the map entry once no further callers are waiting for this user
+    // (the next chained promise resolves immediately because lockToken resolved)
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Recurring busy-block expansion
+// ──────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Expand a recurring BusyBlock into concrete {key, start, end} occurrences
+ * over the given date range [fromDate, toDate].
+ *
+ * The block's `start` encodes the recurrence activation date + daily start time.
+ * The block's `end`   encodes the same reference date     + daily end time.
+ * block.recurrence.daysOfWeek lists which weekdays the block applies.
+ * block.recurrence.endDate (if set) stops the expansion on that date.
+ *
+ * @param {object} block      - Mongoose lean BusyBlock document
+ * @param {Date}   fromDate   - Inclusive start of the expansion window
+ * @param {Date}   toDate     - Inclusive end of the expansion window
+ * @returns {{ key: string, start: Date, end: Date }[]}
+ */
+function expandRecurringBlock(block, fromDate, toDate) {
+  const blockStart = new Date(block.start);
+  const activationDay = startOfDay(blockStart);
+
+  const startH = blockStart.getHours();
+  const startM = blockStart.getMinutes();
+  const blockEnd = new Date(block.end);
+  const endH = blockEnd.getHours();
+  const endM = blockEnd.getMinutes();
+
+  // Respect optional expiry date
+  const expiry = block.recurrence.endDate ? new Date(block.recurrence.endDate) : toDate;
+  const windowEnd = expiry < toDate ? expiry : toDate;
+
+  const occurrences = [];
+  let cursor = new Date(fromDate);
+
+  while (cursor <= windowEnd) {
+    const dayOfWeek = cursor.getDay(); // 0=Sun…6=Sat
+    if (cursor >= activationDay && block.recurrence.daysOfWeek.includes(dayOfWeek)) {
+      const oStart = new Date(cursor);
+      oStart.setHours(startH, startM, 0, 0);
+      const oEnd = new Date(cursor);
+      oEnd.setHours(endH, endM, 0, 0);
+      if (oEnd > oStart) {
+        // Use the UTC date of oStart as the key — this matches the UTC-based date keys
+        // that Python's CSP generates. Using cursor.toISOString() would give the wrong
+        // date on any UTC+ timezone server (local midnight serialises as UTC yesterday).
+        occurrences.push({ key: oStart.toISOString().slice(0, 10), start: oStart, end: oEnd });
+      }
+    }
+    cursor = addDays(cursor, 1);
+  }
+  return occurrences;
+}
 
 /**
  * Helper: Trigger scheduler update after task operations
@@ -39,7 +201,12 @@ import { spawn } from "child_process";
  */
 export async function triggerSchedulerUpdate(userId, operationType = "operation", location = "API") {
   try {
-    const { plan, unscheduled } = await generatePlan({ userId });
+    const user = await User.findById(userId).select("profile schedulingPreferences").lean();
+    const profileWithGap = {
+      ...(user?.profile || {}),
+      minGapMinutes: user?.schedulingPreferences?.minGapMinutes ?? 10,
+    };
+    const { plan, unscheduled } = await generatePlan({ userId, profile: profileWithGap });
     await savePlan({ userId, plan, unscheduled });
     logger.info(`[SCHEDULER] Updated after task ${operationType} (${location}): ${plan.length} sessions scheduled`);
     return { success: true, sessionCount: plan.length };
@@ -68,6 +235,15 @@ async function callPythonScheduler(tasks, options) {
         py.stderr.on("data", (chunk) => (stderr += chunk));
         py.on("error", (err) => reject(err));
         py.on("close", (code) => {
+          // Write stderr to debug log file
+          if (stderr) {
+            const debugLogPath = path.join(os.tmpdir(), 'csp_scheduler_node_debug.log');
+            try {
+              fs.appendFileSync(debugLogPath, `\n=== ${new Date().toISOString()} ===\n${stderr}\n`);
+            } catch (e) {
+              console.error('[PYTHON-DEBUG] Failed to write log file:', e.message);
+            }
+          }
           if (code !== 0) return reject(new Error(`Python scheduler (${cmd}) failed: ${stderr || `exit ${code}`}`));
           try {
             const parsed = JSON.parse(stdout || "{}");
@@ -250,6 +426,10 @@ export function describeRoutineWindows(blocks = DEFAULT_ROUTINE_BLOCKS) {
 async function assignSubtaskIndices(plan) {
   if (!plan.length) return plan;
 
+  // If Python already provided subtaskIndex, use it directly
+  const allHaveIndex = plan.every(slot => slot.subtaskIndex != null);
+  if (allHaveIndex) return plan;
+
   // Group plan slots by taskId to track which subtask index to assign next
   const taskSlotMap = new Map();
   for (const slot of plan) {
@@ -289,12 +469,36 @@ async function assignSubtaskIndices(plan) {
  * Clears existing future planned/skipped sessions before saving new ones.
  * Also cleans up orphan schedules (where task no longer exists).
  * Automatically assigns subtask indices for split tasks.
+ *
+ * ── Duplication prevention ────────────────────────────────────────────────────
+ * 1. Per-user advisory lock:  concurrent calls for the same userId are serialized
+ *    so that the deleteMany → insertMany sequence is never interleaved.
+ * 2. In-process plan deduplication: any duplicate slots from the CSP scheduler
+ *    or a double-trigger are removed before the DB write.
+ * 3. sessionHash unique index on TaskSchedule: a DB-level safety net that rejects
+ *    any remaining duplicates even if the two layers above are somehow bypassed
+ *    (e.g. multi-process deployment). insertMany uses `ordered: false` so that a
+ *    duplicate-key error on a single document does NOT abort the whole batch.
  */
 export async function persistPlan(userId, plan) {
+  return withUserScheduleLock(userId, () => _persistPlanLocked(userId, plan));
+}
+
+async function _persistPlanLocked(userId, plan) {
   const now = new Date();
 
   // Assign subtask indices before persisting
   const planWithSubtasks = await assignSubtaskIndices(plan);
+
+  // ── Safety-net: deduplicate the plan array itself ─────────────────────────
+  // Removes slots sharing the same (taskId, start, end, subtaskIndex) so we
+  // never attempt to insert two rows that would collide on the sessionHash index.
+  const dedupedPlan = deduplicatePlan(userId, planWithSubtasks);
+  if (dedupedPlan.length < planWithSubtasks.length) {
+    logger.warn(
+      `[SCHEDULER] persistPlan: dropped ${planWithSubtasks.length - dedupedPlan.length} duplicate slot(s) for user ${userId}`
+    );
+  }
 
   // Clean up orphan schedules (taskId references deleted tasks)
   const existingTaskIds = await Task.find({ userId }).distinct("_id");
@@ -305,21 +509,22 @@ export async function persistPlan(userId, plan) {
     await TaskSchedule.deleteMany({ _id: { $in: orphanIds } });
   }
 
-  // Clear future planned/skipped sessions (not completed ones)
+  // Clear future planned/skipped sessions (not completed ones, not manually-set ones)
   await TaskSchedule.deleteMany({
     userId,
     start: { $gte: now },
     status: { $ne: "completed" },
+    manuallyScheduled: { $ne: true },
   });
 
-  if (!planWithSubtasks.length) return;
+  if (!dedupedPlan.length) return;
 
   // Fetch all tasks to get subtask titles and descriptions for the schedule
-  const taskIds = Array.from(new Set(planWithSubtasks.map((p) => p.taskId.toString())));
+  const taskIds = Array.from(new Set(dedupedPlan.map((p) => p.taskId.toString())));
   const tasks = await Task.find({ _id: { $in: taskIds } }).populate('subTasks');
   const taskMap = new Map(tasks.map((t) => [t._id.toString(), t]));
 
-  const docs = planWithSubtasks.map((slot) => {
+  const docs = dedupedPlan.map((slot) => {
     let subtaskTitle = null;
     let description = null;
     
@@ -344,10 +549,28 @@ export async function persistPlan(userId, plan) {
       end: slot.end,
       minutes: slot.minutes,
       status: "planned",
+      // Deterministic hash — DB unique index is the last line of defence
+      sessionHash: computeSessionHash(userId, slot.taskId, slot.start, slot.end, slot.subtaskIndex ?? null),
     };
   });
 
-  await TaskSchedule.insertMany(docs);
+  // ordered: false ensures that a duplicate-key error on ONE document (e.g. from a
+  // race between this process and another) does not abort the entire batch.
+  try {
+    await TaskSchedule.insertMany(docs, { ordered: false });
+  } catch (err) {
+    // BulkWriteError code 11000 = duplicate key — log and continue; all non-
+    // duplicate documents were already inserted by MongoDB.
+    if (err.code === 11000 || err.name === "MongoBulkWriteError") {
+      const dupeCount = err.writeErrors?.length ?? "unknown number of";
+      logger.warn(
+        `[SCHEDULER] insertMany: ${dupeCount} duplicate session(s) rejected by DB unique index (sessionHash). ` +
+        `This indicates a race that was caught at the DB layer. Continuing normally.`
+      );
+    } else {
+      throw err;
+    }
+  }
 }
 
 // =============================================================================
@@ -365,6 +588,7 @@ export async function generatePlan({ userId, profile = {}, planningHorizonDays =
   const tasks = await Task.find({
     userId,
     status: { $in: ["todo", "in_progress"] },
+    manualSchedule: { $ne: true },  // skip tasks whose schedule is managed manually
   })
     .populate("subTasks") // Populate subtasks so we can use their durations
     .lean();
@@ -417,16 +641,53 @@ export async function generatePlan({ userId, profile = {}, planningHorizonDays =
     }
   }
 
+  // Also treat future manual sessions (of OTHER tasks with manualSchedule=true) as occupied time
+  // so the auto-scheduler doesn't double-book those slots.
+  const manualSessions = await TaskSchedule.find({
+    userId,
+    start: { $gte: now, $lt: horizonEnd },
+    status: "planned",
+    manuallyScheduled: true,
+  }).lean();
+  for (const session of manualSessions) {
+    const key = session.start.toISOString().slice(0, 10);
+    if (!busyBlocksByDate[key]) busyBlocksByDate[key] = [];
+    busyBlocksByDate[key].push({ start: new Date(session.start), end: new Date(session.end) });
+  }
+
   const busyBlocks = await BusyBlock.find({
     userId,
-    start: { $lt: horizonEnd },
-    end: { $gt: todayStart },
+    $or: [
+      // One-time blocks that overlap the planning horizon
+      {
+        isRecurring: { $ne: true },
+        start: { $lt: horizonEnd },
+        end: { $gt: todayStart },
+      },
+      // Recurring rules that are still active during the horizon
+      {
+        isRecurring: true,
+        $or: [
+          { "recurrence.endDate": null },
+          { "recurrence.endDate": { $gt: todayStart } },
+        ],
+      },
+    ],
   }).lean();
 
   for (const block of busyBlocks) {
-    const key = block.start.toISOString().slice(0, 10);
-    if (!busyBlocksByDate[key]) busyBlocksByDate[key] = [];
-    busyBlocksByDate[key].push({ start: new Date(block.start), end: new Date(block.end) });
+    if (block.isRecurring && block.recurrence?.daysOfWeek?.length) {
+      // Expand recurring rule over the entire planning horizon
+      for (const { key, start, end } of expandRecurringBlock(block, todayStart, horizonEnd)) {
+        if (!busyBlocksByDate[key]) busyBlocksByDate[key] = [];
+        busyBlocksByDate[key].push({ start, end });
+      }
+    } else {
+      // One-time block — original behaviour
+      const key = block.start.toISOString().slice(0, 10);
+      if (!busyBlocksByDate[key]) busyBlocksByDate[key] = [];
+      busyBlocksByDate[key].push({ start: new Date(block.start), end: new Date(block.end) });
+    }
   }
 
   const tasksForPlanning = tasksWithOrderedSubtasks
@@ -440,12 +701,17 @@ export async function generatePlan({ userId, profile = {}, planningHorizonDays =
     return { plan: [], unscheduled: [], message: "All tasks already scheduled." };
   }
 
+
+
   const { plan, unscheduled } = await callPythonScheduler(tasksForPlanning, {
     busyBlocksByDate,
     planningHorizonDays,
     workingHours: profile.workingHours || { startHour: 9, startMinute: 0, endHour: 18, endMinute: 0 },
     dailyCapMinutes: profile.dailyCapMinutes || 240,
+    gapMinutes: profile.minGapMinutes ?? 10,
   });
+
+
 
   return { plan, unscheduled };
 }

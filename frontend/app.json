@@ -35,8 +35,7 @@
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE",
         "android.permission.POST_NOTIFICATIONS"
-      ],
-      "googleServicesFile": "./services/secrets/google-services.json"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"

@@ -85,8 +85,24 @@ CRUD & helpers:
   - Response: `{ success: true, task }`
 
 - `PATCH /api/tasks/:id`
-  - Update a task (body fields: `name`, `tag`, `completed`, `deadline`)
-  - Response: `{ success: true, task }`
+  - Update a task with comprehensive fields
+  - Body: `{ name?, taskname?, description?, category?, subcategory?, deadline?, dueDate?, importance?, effort?, estimatedDuration?, estimatedMinutes?, tags?, subtasks?, taskType?, chunkCount?, status?, completed? }`
+  - Supported fields:
+    - `name` or `taskname`: Task title (string, max 200 chars)
+    - `description`: Task description (string, no angle brackets)
+    - `category`: Task category (string, one of 18 standard categories)
+    - `subcategory`: Task subcategory (string, auto-saved to user profile)
+    - `deadline` or `dueDate`: Task deadline (ISO 8601 date string or null)
+    - `importance`: Importance level (integer 1-5)
+    - `effort`: Effort level (integer 1-5)
+    - `estimatedDuration` or `estimatedMinutes`: Time estimate in minutes (number, minimum 15)
+    - `tags`: Array of tag strings (e.g., `["work", "urgent"]`)
+    - `subtasks`: Array of subtask objects with `id?, title, description?, minutes?, index?`
+    - `taskType`: Task type (string: "perfect", "in_parts", or "leaky")
+    - `chunkCount`: Number of chunks for split tasks (integer >= 1)
+    - `status`: Task status (string: "todo", "in_progress", or "done")
+    - `completed`: Boolean (sets status to "done" if true, "todo" if false)
+  - Response: `{ success: true, task, gamification?, message }`
 
 - `DELETE /api/tasks/:id`
   - Delete a task

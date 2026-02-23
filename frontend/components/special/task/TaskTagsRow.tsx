@@ -14,7 +14,8 @@ export const TaskTagsRow: React.FC<{
   subCategory?: { icon?: string | null; color?: string | null; source?: string | null; parent?: string | null } | null;
   importance?: number | null;
   effort?: number | null;
-}> = ({ category, categoryDisplay, subcategory, subcategoryDisplay, subCategory, importance, effort }) => {
+  tags?: string[];
+}> = ({ category, categoryDisplay, subcategory, subcategoryDisplay, subCategory, importance, effort, tags }) => {
   const categoryMeta = getCategoryMeta(category);
   const subLabel = subcategoryDisplay || subcategory || "";
 
@@ -50,7 +51,7 @@ export const TaskTagsRow: React.FC<{
     <View style={styles.tagRow}>
       {category && (
         <Tag
-          label={categoryDisplay || category}
+          label={categoryDisplay || categoryMeta.displayName || category}
           leftIcon={categoryMeta.icon}
           colorIndex={categoryMeta.colorIndex}
           style={styles.tagItem}
@@ -112,6 +113,18 @@ export const TaskTagsRow: React.FC<{
           style={styles.tagItem}
         />
       ) : null}
+
+      {tags && tags.length > 0
+        ? tags.map((tag) => (
+            <Tag
+              key={tag}
+              label={tag}
+              leftIcon={categoryMeta.icon}
+              colorIndex={categoryMeta.colorIndex}
+              style={styles.tagItem}
+            />
+          ))
+        : null}
     </View>
   );
 };

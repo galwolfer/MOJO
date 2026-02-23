@@ -15,6 +15,14 @@ const taskScheduleSchema = new mongoose.Schema(
     end: { type: Date, required: true },
     minutes: { type: Number, required: true },
     status: { type: String, enum: ["planned", "completed", "skipped"], default: "planned" },
+    /** True when the user manually set this session via the schedule editor; the auto-scheduler will not delete it */
+    manuallyScheduled: { type: Boolean, default: false },
+    /**
+     * Deterministic SHA-256 fingerprint: SHA256("userId|taskId|start.iso|end.iso|subtaskIndex")
+     * Used as a DB-level unique guard against duplicate sessions.
+     * Sparse so that legacy documents without the field are not affected.
+     */
+    sessionHash: { type: String, index: { unique: true, sparse: true } },
   },
   { timestamps: true }
 );

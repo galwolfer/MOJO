@@ -67,6 +67,9 @@ const taskSchema = new mongoose.Schema(
     tags: { type: [String], default: [] },
     // Temporary storage for subtask data provided during task creation (not persisted)
     _pendingSubtasks: { type: [Object], default: [] },
+    /** True when this task's schedule is managed manually via the schedule editor.
+     *  The auto-scheduler will skip this task to avoid overwriting manual sessions. */
+    manualSchedule: { type: Boolean, default: false },
   },
   { timestamps: true, toJSON: { virtuals: true } },
 );

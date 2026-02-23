@@ -169,4 +169,26 @@ export async function deleteAccount(): Promise<any> {
   return del<any>("/auth/account");
 }
 
-export default { setApiBase, setAuthToken, login, register, updateCategoryPriorities, getUserPreferences, uploadProfileImage, updateProfile, deleteAccount };
+export type SchedulingPreferences = { minGapMinutes: number };
+
+/**
+ * Get scheduling preferences (minGapMinutes)
+ * — already returned by GET /api/auth/preferences, but available standalone too
+ */
+export async function getSchedulingPreferences(): Promise<SchedulingPreferences> {
+  const { get } = await import("./httpClient");
+  const data = await get<{ schedulingPreferences: SchedulingPreferences }>("/auth/preferences");
+  return data.schedulingPreferences ?? { minGapMinutes: 10 };
+}
+
+/**
+ * Update scheduling preferences
+ * PATCH /api/auth/scheduling-preferences
+ */
+export async function updateSchedulingPreferences(prefs: SchedulingPreferences): Promise<SchedulingPreferences> {
+  const { patch } = await import("./httpClient");
+  const data = await patch<{ schedulingPreferences: SchedulingPreferences }>("/auth/scheduling-preferences", prefs);
+  return data.schedulingPreferences;
+}
+
+export default { setApiBase, setAuthToken, login, register, updateCategoryPriorities, getUserPreferences, uploadProfileImage, updateProfile, deleteAccount, getSchedulingPreferences, updateSchedulingPreferences };

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 
 /**
  * MainLayout
@@ -13,14 +13,17 @@ import { useLayout } from "../../context/LayoutContext";
 import Header from "../common/Header";
 import NavBar from "../common/NavBar";
 import ChatScreen from "../../screens/chat/Chat";
-import CalendarScreen from "../../screens/Calendar";
+import CalendarScreen from "../../screens/calander/Calendar";
 import UserProfileScreen from "../../screens/user/UserProfile";
 import CreateTaskScreen from "../../screens/CreateTask";
+import EditTaskScreen from "../../screens/EditTask";
+import OverdueTasksScreen from "../../screens/OverdueTasks";
+import { getOverdueTasks } from "../../services/taskService";
 import { COLORS, SPACING } from "../../theme";
 import { useKeyboard } from "../../hooks";
 
 export default function MainLayout() {
-  const { activeTab, headerConfig, navBarConfig } = useNavigation();
+  const { activeTab, headerConfig, navBarConfig, navigationParams, setActiveTab } = useNavigation();
   const { setHeaderHeight, setNavBarHeight } = useLayout();
   const { width, height } = useWindowDimensions();
   const isDesktopLike = Platform.OS === "web" ? width >= 900 : width >= 900;
@@ -32,13 +35,26 @@ export default function MainLayout() {
   const [localHeaderHeight, setLocalHeaderHeight] = useState(0);
   const [localNavBarHeight, setLocalNavBarHeight] = useState(0);
 
+  // On mount: check for overdue tasks and redirect if any exist.
+  // Using a ref to guarantee this runs only once even in StrictMode.
+  const overdueChecked = useRef(false);
+  useEffect(() => {
+    if (overdueChecked.current) return;
+    overdueChecked.current = true;
+    getOverdueTasks().then((tasks) => {
+      if (tasks.length > 0) {
+        setActiveTab("overdue");
+      }
+    });
+  }, []);
+
   const onHeaderLayout = useCallback(
     (event: LayoutChangeEvent) => {
       const { height } = event.nativeEvent.layout;
       setLocalHeaderHeight(height);
       setHeaderHeight(height);
     },
-    [setHeaderHeight]
+    [setHeaderHeight],
   );
 
   const onNavBarLayout = useCallback(
@@ -49,7 +65,7 @@ export default function MainLayout() {
       const effectiveHeight = height + SPACING.xlg;
       setNavBarHeight(height, effectiveHeight);
     },
-    [setNavBarHeight]
+    [setNavBarHeight],
   );
 
   const renderScreen = () => {
@@ -62,6 +78,10 @@ export default function MainLayout() {
         return <UserProfileScreen />;
       case "create":
         return <CreateTaskScreen />;
+      case "edit":
+        return <EditTaskScreen taskId={navigationParams?.taskId || ""} />;
+      case "overdue":
+        return <OverdueTasksScreen />;
       default:
         return <ChatScreen />;
     }

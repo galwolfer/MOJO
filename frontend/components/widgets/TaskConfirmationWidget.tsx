@@ -22,8 +22,56 @@ import {
 } from "./taskHelpers";
 import { getWidgetEntranceProps } from "./widgetHelpers";
 import { TaskTitle, TaskTagsRow, ScheduledSessionsSection, renderTaskField, TwoColumnGrid } from "../special/task";
-import { getCategoryMeta } from "../../config/categoryMeta";
+import { getCategoryMeta, resolveCategoryKey } from "../../config/categoryMeta";
 import { getCategoryDisplay } from "./taskHelpers";
+
+/**
+ * Normalises the raw widget data payload coming from the model.
+ * The model may output:
+ *  - snake_case field names  (task_name, can_split, estimated_duration …)
+ *  - category as a display name ("Social Activity") instead of a key ("social_activity")
+ *  - recurrence as a plain string + top-level interval/count instead of a nested object
+ *  - subcategory "Uncategorized" which is not meaningful as a sub-label
+ * All existing camelCase fields are preserved via spread; overrides come after.
+ */
+function normalizeConfirmationData(raw: Record<string, any>): TaskData {
+  // Recurrence: model may emit a plain string + top-level interval / count
+  let recurrence = raw.recurrence;
+  if (typeof recurrence === "string" && recurrence.trim() !== "") {
+    recurrence = {
+      type: recurrence,
+      interval: typeof raw.interval === "number" ? raw.interval : undefined,
+      count: typeof raw.count === "number" ? raw.count : undefined,
+      endDate: raw.end_date ?? raw.endDate ?? undefined,
+    };
+  }
+
+  // Suppress "Uncategorized" subcategory — it adds no information
+  const subcategory =
+    raw.subcategory && raw.subcategory.toLowerCase() !== "uncategorized" ? raw.subcategory : undefined;
+
+  return {
+    ...(raw as any),
+    // Title — model uses task_name, components use title/taskname
+    title: raw.title || raw.taskname || raw.task_name || "",
+    taskname: raw.taskname || raw.task_name || raw.title || "",
+    // Resolve category: display name ("Social Activity") → key ("social_activity")
+    category: resolveCategoryKey(raw.category),
+    categoryDisplay: undefined, // always re-derive from resolved key
+    subcategory,
+    // camelCase normalization for snake_case model fields
+    estimatedDuration: raw.estimatedDuration ?? raw.estimated_duration,
+    canSplit: raw.canSplit ?? raw.can_split,
+    chunkMinutes: raw.chunkMinutes ?? raw.chunk_minutes,
+    chunkCount: raw.chunkCount ?? raw.chunk_count,
+    minChunk: raw.minChunk ?? raw.min_chunk,
+    minMinutes: raw.minMinutes ?? raw.min_minutes,
+    maxMinutes: raw.maxMinutes ?? raw.max_minutes,
+    earliestStart: raw.earliestStart ?? raw.earliest_start,
+    // Normalised recurrence object
+    recurrence,
+  } as TaskData;
+}
 
 interface TaskData {
   id: string;
@@ -102,9 +150,9 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
   entranceDelay,
   entranceDuration,
 }) => {
-  // Data is passed directly - use as TaskData
-  const task: TaskData = data as TaskData;
-  // Normalize category display name for UI (prefer explicit display from payload, then server meta, then raw key)
+  // Normalise raw model payload (snake_case → camelCase, category key resolution, recurrence shape)
+  const task: TaskData = normalizeConfirmationData(data as Record<string, any>);
+  // Derive display name from the now-resolved category key
   const categoryDisplayNormalized = getCategoryDisplay(task.category, task.categoryDisplay);
 
   const widgetEntranceProps = getWidgetEntranceProps({ entranceEnabled, entranceDelay, entranceDuration });

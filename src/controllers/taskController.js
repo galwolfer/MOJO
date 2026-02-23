@@ -1329,7 +1329,7 @@ export async function markSubTaskComplete(req, res) {
     });
 
     if (!result || result.success === false) {
-      return res.status(404).json({ success: false, error: result ? result.error : "Subtask not found" });
+      return res.status(404).json({ success: false, error: result ? result.error : "Subtask not found" }); 
     }
 
     // Award points for subtask completion (only if this was a NEW completion)

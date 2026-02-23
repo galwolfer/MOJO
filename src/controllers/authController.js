@@ -565,11 +565,57 @@ export async function getPreferences(req, res, next) {
         }
       : null;
 
+    const schedPrefs = user.schedulingPreferences
+      ? (typeof user.schedulingPreferences.toObject === "function"
+          ? user.schedulingPreferences.toObject()
+          : JSON.parse(JSON.stringify(user.schedulingPreferences)))
+      : { minGapMinutes: 10 };
+
     res.json({
       success: true,
       priorities,
       ojoType,
+      schedulingPreferences: schedPrefs,
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Update scheduling preferences (minGapMinutes, etc.)
+ * PATCH /api/auth/scheduling-preferences
+ */
+export async function updateSchedulingPreferences(req, res, next) {
+  try {
+    const userId = req.user.userId;
+    const { minGapMinutes } = req.body;
+
+    if (minGapMinutes === undefined) {
+      return res.status(400).json({ success: false, error: "minGapMinutes is required" });
+    }
+
+    const gap = parseInt(minGapMinutes, 10);
+    if (isNaN(gap) || gap < 0 || gap > 120) {
+      return res.status(400).json({ success: false, error: "minGapMinutes must be a number between 0 and 120" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+
+    if (!user.schedulingPreferences) {
+      user.schedulingPreferences = {};
+    }
+    user.schedulingPreferences.minGapMinutes = gap;
+    await user.save();
+
+    const saved = typeof user.schedulingPreferences.toObject === "function"
+      ? user.schedulingPreferences.toObject()
+      : JSON.parse(JSON.stringify(user.schedulingPreferences));
+
+    res.json({ success: true, schedulingPreferences: saved });
   } catch (error) {
     next(error);
   }

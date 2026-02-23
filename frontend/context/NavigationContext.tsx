@@ -6,7 +6,7 @@ import React, { createContext, useState, useContext, ReactNode } from "react";
  * Centralized navigation and header/navbar configuration for the app.
  */
 
-export type TabName = "chat" | "calendar" | "user" | "create";
+export type TabName = "chat" | "calendar" | "user" | "create" | "edit" | "overdue";
 
 export type HeaderConfig = {
   title?: string;
@@ -32,9 +32,13 @@ export type ChatScrollState = {
 
 export type ScrollPositions = Record<string, number>;
 
+export type NavigationParams = Record<string, any>;
+
 type NavigationContextType = {
   activeTab: TabName;
   setActiveTab: (tab: TabName) => void;
+  navigationParams: NavigationParams;
+  setActiveTabWithParams: (tab: TabName, params: NavigationParams) => void;
   headerConfig: HeaderConfig;
   setHeaderConfig: (config: HeaderConfig) => void;
   navBarConfig: NavBarConfig;
@@ -49,6 +53,13 @@ const NavigationContext = createContext<NavigationContextType>({} as NavigationC
 
 export const NavigationProvider = ({ children }: { children: ReactNode }) => {
   const [activeTab, setActiveTab] = useState<TabName>("chat");
+  const [navigationParams, setNavigationParams] = useState<NavigationParams>({});
+
+  const setActiveTabWithParams = (tab: TabName, params: NavigationParams) => {
+    setNavigationParams(params);
+    setActiveTab(tab);
+  };
+
   const [headerConfig, setHeaderConfig] = useState<HeaderConfig>({
     title: "Mojo",
     show: true,
@@ -73,6 +84,8 @@ export const NavigationProvider = ({ children }: { children: ReactNode }) => {
       value={{
         activeTab,
         setActiveTab,
+        navigationParams,
+        setActiveTabWithParams,
         headerConfig,
         setHeaderConfig,
         navBarConfig,

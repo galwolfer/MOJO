@@ -10,6 +10,7 @@ import healthRouter from "./health.js";
 import chatRouter from "./chat.js";
 import authRouter from "./auth.js";
 import tasksRouter from "./tasks.js";
+import busyBlocksRouter from "./busyBlocks.js";
 import notificationsRouter from "./notifications.js";
 import {
   // Profile controllers
@@ -41,6 +42,9 @@ router.use("/chat", chatRouter);
 
 // Tasks routes
 router.use("/tasks", tasksRouter);
+
+// Busy blocks routes
+router.use("/busy-blocks", busyBlocksRouter);
 
 // Notifications routes (push notification management)
 router.use("/notifications", notificationsRouter);

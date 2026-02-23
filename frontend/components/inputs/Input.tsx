@@ -11,6 +11,8 @@ import {
   Easing,
   // Changed to Pressable for better handling of simultaneous gestures
   Pressable,
+  ScrollView,
+  useWindowDimensions,
 } from "react-native";
 import {
   COLORS,
@@ -132,6 +134,7 @@ function Input<T = any>({
 }: InputProps<T>) {
   const borderColorAnim = useRef(new Animated.Value(0)).current;
   const webNativeID = useWebCaret();
+  const { height: windowHeight } = useWindowDimensions();
   const {
     onChangeText: onChangeTextProp,
     onFocus: onFocusProp,
@@ -453,6 +456,12 @@ function Input<T = any>({
                 },
               ]}
             >
+              <ScrollView
+                style={{ maxHeight: windowHeight * 0.35 }}
+                showsVerticalScrollIndicator={true}
+                bounces={false}
+                keyboardShouldPersistTaps="handled"
+              >
               {(normalizedOptions || []).map((option, index) => {
                 const optionValue = option.value;
                 const optionLabel = option.label;
@@ -500,12 +509,13 @@ function Input<T = any>({
                         )}
                         <AppText style={{ flex: 1 }}>{optionLabel}</AppText>
                       </View>
-                      {multiSelect && <Checkbox checked={isSelected} onChange={() => {}} size={ICON_SIZES[iconSize]} />}
+                      {(multiSelect || isSelected) && <Checkbox checked={isSelected} onChange={() => {}} size={ICON_SIZES[iconSize]} />}
                     </Pressable>
                     {index < (normalizedOptions || []).length - 1 && <View style={styles.optionDivider} />}
                   </React.Fragment>
                 );
               })}
+              </ScrollView>
             </Animated.View>
           </Pressable>
         </Modal>
