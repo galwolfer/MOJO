@@ -20,7 +20,6 @@ import React, { useEffect, useRef } from "react";
 import { View, StyleSheet, Animated } from "react-native";
 import AppText from "../../../components/common/AppText";
 import { COLORS, SPACING, FONT_SIZES, FONTS, TYPOGRAPHY, ICON_SIZES } from "../../../theme";
-import AppButton from "../../../components/common/AppButton";
 import { ICONS } from "../../../components/icons/icons";
 
 interface EmptyStateProps {
@@ -72,8 +71,6 @@ export default function EmptyState({ showCalendarPicker, onAddTask }: EmptyState
         <AppText style={styles.emptyStateDescription}>You have cleared your schedule!</AppText>
 
         <AppText style={styles.emptyStateSubtext}>Want to add a new task or goal for this day?</AppText>
-
-        <AppButton title="+ Add Task" onPress={onAddTask} color="primary6" mode="filled" style={{ alignSelf: "center" }} />
       </View>
     </View>
   );
@@ -110,5 +107,4 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: SPACING.sm,
   },
-
 });

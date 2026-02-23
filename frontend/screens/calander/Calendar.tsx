@@ -156,10 +156,8 @@ export default function CalendarScreen() {
         )}
       </ScrollView>
 
-      {/* Floating ADD Button */}
-      {filteredTaskGroups.length > 0 && (
-        <FloatingButton onPress={handleAddTask} text="" Icon={ICONS.plus} style={styles.fab} />
-      )}
+      {/* Floating ADD Button - Always visible */}
+      <FloatingButton onPress={handleAddTask} text="Add Task" Icon={ICONS.plus} />
     </View>
   );
 }
@@ -174,13 +172,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.white3,
   },
-  fab: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-  },
+
   tasksListContent: {
     paddingHorizontal: SPACING.sm,
     paddingBottom: SPACING.xlg * 6,
