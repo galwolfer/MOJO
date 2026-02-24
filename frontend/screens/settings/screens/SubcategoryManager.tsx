@@ -382,11 +382,7 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
         )}
 
         {/* Global add popup (opens from FloatingButton) */}
-        <AddSubcategoryPopup
-          visible={showAddPopup}
-          onClose={closeAddPopup}
-          onCreate={createFromPopup}
-        />
+        <AddSubcategoryPopup visible={showAddPopup} onClose={closeAddPopup} onCreate={createFromPopup} />
 
         {/* Edit popup */}
         <AddSubcategoryPopup

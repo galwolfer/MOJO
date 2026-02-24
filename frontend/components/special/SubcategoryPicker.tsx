@@ -132,7 +132,12 @@ export default function SubcategoryPicker({
     onSelect(v);
   };
 
-  const handleCreate = async (payload: { name: string; category: CategoryKey; icon?: string | null; color?: string | null }) => {
+  const handleCreate = async (payload: {
+    name: string;
+    category: CategoryKey;
+    icon?: string | null;
+    color?: string | null;
+  }) => {
     if (!category) {
       Alert.alert("Error", "No category selected. Please select a category first.");
       return;

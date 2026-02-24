@@ -100,21 +100,11 @@ export default function AddSubcategoryPopup({
 
   return (
     <PopupBox visible={visible} onClose={onClose} title={title} titleColor={COLORS.primary1}>
-      <Input
-        label="Subcategory name"
-        placeholder="e.g. Morning Run"
-        value={name}
-        onChangeText={setName}
-        type="text"
-      />
+      <Input label="Subcategory name" placeholder="e.g. Morning Run" value={name} onChangeText={setName} type="text" />
 
       {/* Category picker – hidden when a category is already fixed by the parent */}
       {!fixedCategory && (
-        <CategoryPicker
-          value={category}
-          onChange={(v: CategoryKey) => setCategory(v)}
-          disabled={mode === "edit"}
-        />
+        <CategoryPicker value={category} onChange={(v: CategoryKey) => setCategory(v)} disabled={mode === "edit"} />
       )}
 
       <SubcategoryColorPicker label="Choose a color" value={color} onChange={setColor} />
@@ -122,13 +112,7 @@ export default function AddSubcategoryPopup({
 
       <View style={styles.buttonRow}>
         <AppButton title="Cancel" onPress={onClose} mode="light" color="lightGray" />
-        <AppButton
-          title={submitLabel}
-          onPress={handleSubmit}
-          mode="filled"
-          color="primary6"
-          disabled={isLoading}
-        />
+        <AppButton title={submitLabel} onPress={handleSubmit} mode="filled" color="primary6" disabled={isLoading} />
       </View>
     </PopupBox>
   );
