@@ -29,7 +29,7 @@ export const TaskTitle: React.FC<{
       {meta?.icon ? (
         <Icon name={meta.icon} size={iconSize} color={meta.color} style={[styles.icon, iconStyle]} />
       ) : null}
-      <AppText variant={titleVariant} numberOfLines={2}>
+      <AppText variant={titleVariant} numberOfLines={2} style={{ flex: 1 }}>
         {title || taskname}
       </AppText>
     </View>

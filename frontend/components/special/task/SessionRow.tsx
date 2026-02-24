@@ -101,6 +101,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: SPACING.sm,
     paddingVertical: 4,
+    alignSelf: "stretch",
     width: "100%",
     minHeight: 2 * SPACING.xlg,
     marginBottom: -SPACING.sm,
@@ -108,6 +109,7 @@ const styles = StyleSheet.create({
   sessionRoot: {
     flex: 1,
     minWidth: 0,
+    alignSelf: "stretch",
     width: "100%",
   },
   sessionDateText: {
@@ -135,9 +137,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   sessionLabel: {
-    flexGrow: 1,
-    flexShrink: 1,
-    width: 0,
+    flex: 1,
     flexWrap: "wrap",
   },
   sessionLabelDone: {
