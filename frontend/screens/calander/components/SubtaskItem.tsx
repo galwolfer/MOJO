@@ -27,11 +27,19 @@ interface SubtaskItemProps {
   parentTaskId: string;
   isCompleted: boolean;
   categoryColor?: string;
+  showTime?: boolean;
   onToggle: (parentTaskId: string, subtaskId: string, checked: boolean) => void;
   onDelete?: (parentTaskId: string, subtaskId: string) => void;
 }
 
-export default function SubtaskItem({ subtask, parentTaskId, isCompleted, categoryColor, onToggle }: SubtaskItemProps) {
+export default function SubtaskItem({
+  subtask,
+  parentTaskId,
+  isCompleted,
+  categoryColor,
+  showTime = true,
+  onToggle,
+}: SubtaskItemProps) {
   const handlePress = useCallback(() => {
     onToggle(parentTaskId, subtask.id, !isCompleted);
   }, [onToggle, parentTaskId, subtask.id, isCompleted]);
@@ -47,7 +55,7 @@ export default function SubtaskItem({ subtask, parentTaskId, isCompleted, catego
           <AppText variant="notes" style={[styles.subtaskText, isCompleted && styles.subtaskTextCompleted]}>
             {subtask.title}
           </AppText>
-          {subtask.timeRange && (
+          {showTime && subtask.timeRange && (
             <View style={styles.timeRangeRow}>
               <AppText style={[styles.subtaskTimeRange, isCompleted && styles.subtaskTimeRangeCompleted]}>
                 {subtask.timeRange}

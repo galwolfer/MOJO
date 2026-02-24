@@ -160,6 +160,7 @@ function TaskCard({
                           parentTaskId={effectiveId}
                           isCompleted={localSubtasks.has(subtask.id)}
                           categoryColor={categoryColor}
+                          showTime={(task.subtasks?.length ?? 0) > 1}
                           onToggle={handleSubtaskToggle}
                           onDelete={onSubtaskDelete}
                         />
@@ -182,6 +183,7 @@ function TaskCard({
                       parentTaskId={effectiveId}
                       isCompleted={localSubtasks.has(subtask.id)}
                       categoryColor={categoryColor}
+                      showTime={(task.subtasks?.length ?? 0) > 1}
                       onToggle={handleSubtaskToggle}
                     />
                   ),
