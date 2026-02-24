@@ -19,19 +19,22 @@ export const TaskTitle: React.FC<{
   textStyle?: StyleProp<TextStyle>;
   /** Merged with the default icon style */
   iconStyle?: StyleProp<ViewStyle>;
-}> = ({ title, taskname, category, size = "lg", leadingNode, style, textStyle, iconStyle }) => {
+  reversed?: boolean;
+}> = ({ title, taskname, category, size = "lg", reversed = false, leadingNode, style, textStyle, iconStyle }) => {
   const meta = getCategoryMeta(category);
   const iconSize = size === "sm" ? ICON_SIZES.sm : size === "md" ? ICON_SIZES.md : ICON_SIZES.big;
   const titleVariant = size === "sm" ? "bodyText" : size === "md" ? "boldText" : "title3";
   return (
-    <View style={[styles.titleRow, style]}>
-      {leadingNode}
+    <View style={[styles.titleRow, style, reversed ? styles.reversedRow : null]}>
       {meta?.icon ? (
         <Icon name={meta.icon} size={iconSize} color={meta.color} style={[styles.icon, iconStyle]} />
       ) : null}
-      <AppText variant={titleVariant} numberOfLines={2} style={{ flex: 1 }}>
-        {title || taskname}
-      </AppText>
+      <View style={styles.rightTitle}>
+        {leadingNode}
+        <AppText variant={titleVariant} numberOfLines={2} style={{ flex: 1 }}>
+          {title || taskname}
+        </AppText>
+      </View>
     </View>
   );
 };
@@ -41,9 +44,20 @@ export default TaskTitle;
 const styles = StyleSheet.create({
   titleRow: {
     flexDirection: "row",
-    alignItems: "center",
+    justifyContent: "space-between",
+    alignContent: "center",
     gap: SPACING.sm,
     marginBottom: SPACING.sm,
+  },
+
+  reversedRow: {
+    flexDirection: "row-reverse",
+  },
+
+  rightTitle: {
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    alignContent: "center",
   },
 
   icon: {
