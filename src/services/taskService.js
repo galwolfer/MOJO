@@ -140,7 +140,6 @@ export async function createTask({
   category = "",
   subCategory = null,
   recurrence = null,
-  tags = [],
   subtasks = [],
 }) {
   const illegalFields = getIllegalDisplayFields({
@@ -190,7 +189,6 @@ export async function createTask({
     category,
     subCategory: resolvedSubCategoryId,
     recurrence,
-    tags: tags || [],
     _pendingSubtasks: subtasks && subtasks.length > 0 ? subtasks : undefined,
   });
 
@@ -400,9 +398,7 @@ export async function getTaskById(taskId, userId) {
   const task = await Task.findOne(query).populate("subCategory").lean();
   if (!task) return null;
   // Attach subtasks so the EditTask screen can pre-populate the parts form
-  const subTasks = await SubTask.find({ taskId: task._id })
-    .sort({ index: 1 })
-    .lean();
+  const subTasks = await SubTask.find({ taskId: task._id }).sort({ index: 1 }).lean();
   task.subTasks = subTasks;
   return attachSubcategoryLabel(task);
 }
@@ -678,7 +674,6 @@ export async function updateTask({ userId, taskId, updates }) {
     "category",
     "subCategory",
     "actualCompletionMinutes",
-    "tags",
     "subtasks",
   ];
 
@@ -1457,21 +1452,18 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
       // If task is being completed, set completedAt and calculate actualCompletionMinutes
       if (parentTaskCompleted && !parentTaskWasCompleted) {
         updatePayload.completedAt = new Date();
-        
+
         // Calculate actual completion time from all completed sessions
         const completedSessions = await TaskSchedule.find({
           taskId: updated.taskId,
           status: "completed",
         }).lean();
-        const actualCompletionMinutes = completedSessions.reduce(
-          (total, session) => total + (session.minutes || 0),
-          0
-        );
+        const actualCompletionMinutes = completedSessions.reduce((total, session) => total + (session.minutes || 0), 0);
         updatePayload.actualCompletionMinutes = actualCompletionMinutes;
       }
 
       await Task.updateOne({ _id: updated.taskId }, { $set: updatePayload });
-      
+
       // ========================================================================
       // ML TRAINING: Train when parent task is auto-completed via subtasks
       // ========================================================================
@@ -1479,11 +1471,11 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
         try {
           // Re-fetch the updated parent task with all fields for ML training
           const updatedParentTask = await Task.findById(updated.taskId).lean();
-          
+
           if (updatedParentTask) {
             console.log(`🤖 [ML Training] Parent task auto-completed via subtasks, training model...`);
             const trainingResult = await trainTask(updatedParentTask);
-            
+
             if (trainingResult.success) {
               console.log(`✅ [ML Training] Model trained successfully (reward: ${trainingResult.reward?.toFixed(3)})`);
             } else {
@@ -1596,11 +1588,7 @@ export async function updateBusyBlock({ blockId, userId, title, start, end, isRe
     }
   }
 
-  const block = await BusyBlock.findOneAndUpdate(
-    { _id: blockId, userId },
-    { $set: update },
-    { new: true }
-  );
+  const block = await BusyBlock.findOneAndUpdate({ _id: blockId, userId }, { $set: update }, { new: true });
   if (!block) throw new Error("Busy block not found or access denied.");
   return block;
 }

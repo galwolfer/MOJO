@@ -6,24 +6,23 @@
  *   - Due date picker (inline CalendarPicker dropdown)
  *   - Effort + Importance sliders (side-by-side)
  *   - Category picker
- *   - Tags editor + TagsBelow chip list
+ *   - Subcategory picker (shows options for selected category)
  *   - Description textarea
  *
  * All state lives in the parent; this component is purely presentational + layout.
  */
 
 import React from "react";
-import { View, StyleSheet, Pressable } from "react-native";
-import { COLORS, SPACING, FONT_SIZES, SHADOWS } from "../../../theme";
-import AppText from "../../../components/common/AppText";
+import { View, StyleSheet } from "react-native";
+import { COLORS, SPACING, SHADOWS } from "../../../theme";
 import Input from "../../../components/inputs/Input";
 import SliderComponent from "../../../components/inputs/Slider";
 import CalendarPicker from "../../../components/inputs/CalendarPicker";
-import TagsBelow from "../../../components/inputs/TagsBelow";
 import Box from "../../../components/layout/Box";
 import { ICONS } from "../../../components/icons/icons";
 import CategoryPicker from "../../../components/special/CategoryPicker";
 import { getImportanceColor } from "../../../components/widgets/taskHelpers";
+import type { Subcategory } from "../../../services/subcategoryService";
 
 interface Props {
   // values
@@ -32,9 +31,9 @@ interface Props {
   effort: number;
   importance: number;
   category: string;
-  tags: string[];
+  subCategoryId: string | null;
+  subcategories: Subcategory[];
   description: string;
-  tagInput: string;
   isCalendarVisible: boolean;
 
   // callbacks
@@ -45,9 +44,7 @@ interface Props {
   onEffortChange: (v: number) => void;
   onImportanceChange: (v: number) => void;
   onCategorySelect: (key: string) => void;
-  onTagInputChange: (v: string) => void;
-  onAddTag: () => void;
-  onRemoveTag: (tag: string) => void;
+  onSubCategorySelect: (id: string | null) => void;
   onDescriptionChange: (v: string) => void;
 
   /** Optional extra style applied to the inner box content wrapper */
@@ -60,9 +57,9 @@ const TaskDetailsSection: React.FC<Props> = ({
   effort,
   importance,
   category,
-  tags,
+  subCategoryId,
+  subcategories,
   description,
-  tagInput,
   isCalendarVisible,
   onTaskNameChange,
   onTimeToCompleteChange,
@@ -71,12 +68,15 @@ const TaskDetailsSection: React.FC<Props> = ({
   onEffortChange,
   onImportanceChange,
   onCategorySelect,
-  onTagInputChange,
-  onAddTag,
-  onRemoveTag,
+  onSubCategorySelect,
   onDescriptionChange,
   boxContentStyle,
 }) => {
+  const subcategoryOptions = subcategories.map((s) => ({
+    label: s.name,
+    value: s.id,
+  }));
+
   return (
     <Box title="TASK DETAILS" style={[styles.boxContent, boxContentStyle]}>
       {/* Task Name */}
@@ -148,23 +148,19 @@ const TaskDetailsSection: React.FC<Props> = ({
         <CategoryPicker label="Task Category" value={category as any} onChange={onCategorySelect} />
       </View>
 
-      {/* Tags */}
+      {/* Subcategory */}
       <View style={styles.formField}>
         <Input
-          label="Task Tags"
-          placeholder="Add a tag"
-          value={tagInput}
-          onChangeText={onTagInputChange}
-          type="text"
-          rightElement={
-            <Pressable onPress={onAddTag}>
-              <AppText variant="title3" style={styles.addTagButtonText}>
-                +
-              </AppText>
-            </Pressable>
-          }
+          label="Subcategory"
+          placeholder={subcategories.length === 0 ? "No subcategories yet" : "Select subcategory"}
+          options={subcategoryOptions}
+          value={subCategoryId ?? undefined}
+          onSelect={(vals: string[]) => {
+            const v = vals && vals[0];
+            onSubCategorySelect(v ?? null);
+          }}
+          disabled={subcategories.length === 0}
         />
-        <TagsBelow selected={tags} onRemove={onRemoveTag} />
       </View>
 
       {/* Description */}
@@ -193,11 +189,6 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
     overflow: "visible",
   },
-  label: {
-    fontWeight: "400",
-    color: COLORS.darkGray,
-    marginBottom: 4,
-  },
   slidersContainer: {
     flexDirection: "row",
     marginBottom: SPACING.sm,
@@ -216,11 +207,6 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
     overflow: "hidden",
     ...SHADOWS.card,
-  },
-  addTagButtonText: {
-    color: COLORS.primary1,
-    fontSize: FONT_SIZES.md,
-    fontWeight: "bold",
   },
 });
 

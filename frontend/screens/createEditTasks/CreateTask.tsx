@@ -4,7 +4,7 @@
  * A task creation form that lets users:
  * - Enter task name, description, and deadline
  * - Adjust effort and importance
- * - Select category and tags
+ * - Select category and subcategory
  * - Split the task into subtasks
  *
  * Layout mirrors other screens (Settings, etc.):
@@ -23,6 +23,7 @@ import { TaskDetailsSection, TimeAndPartsSection } from "../../components/specia
 import type { TaskFormState, Subtask } from "../../components/special/task";
 import { CATEGORY_KEYS } from "../../config/categoryMeta";
 import { createTask, suggestCategory, createTaskSchedule } from "../../services/taskService";
+import { fetchSubcategoriesForCategory, type Subcategory } from "../../services/subcategoryService";
 import { useNavigation } from "../../context/NavigationContext";
 import { useTaskContext } from "../../context/TaskContext";
 
@@ -34,7 +35,7 @@ const DEFAULT_FORM: TaskFormState = {
   effort: 3,
   importance: 3,
   category: CATEGORY_KEYS[0] || "uncategorized",
-  tags: [],
+  subCategoryId: null,
   description: "",
   estimatedMinutes: "",
   numSubtasks: 1,
@@ -48,7 +49,7 @@ const CreateTask: React.FC = () => {
   const { notifyTaskUpdate } = useTaskContext();
 
   const [formState, setFormState] = useState<TaskFormState>(DEFAULT_FORM);
-  const [tagInput, setTagInput] = useState("");
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [popupInfo, setPopupInfo] = useState<{
@@ -81,7 +82,30 @@ const CreateTask: React.FC = () => {
     });
   }, [setHeaderConfig, setActiveTab]);
 
-  // Autofill category from task name
+  // Load subcategories when category changes
+  useEffect(() => {
+    if (!formState.category) return;
+    let cancelled = false;
+    fetchSubcategoriesForCategory(formState.category)
+      .then((subs) => {
+        if (!cancelled) {
+          setSubcategories(subs);
+          // Reset subCategoryId if it's no longer valid for this category
+          setFormState((prev) => {
+            const stillValid = subs.some((s) => s.id === prev.subCategoryId);
+            return stillValid ? prev : { ...prev, subCategoryId: null };
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setSubcategories([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [formState.category]);
+
+  // Autofill category + subcategory from task name
   useEffect(() => {
     if (!formState.taskName.trim()) return;
     categoryManuallyChanged.current = false;
@@ -92,8 +116,16 @@ const CreateTask: React.FC = () => {
           setFormState((prev) => ({
             ...prev,
             category: suggestion.category,
-            tags: suggestion.subCategory ? [suggestion.subCategory] : [],
           }));
+          // Try to match suggested subcategory name to the loaded list
+          if (suggestion.subCategory) {
+            const subs = await fetchSubcategoriesForCategory(suggestion.category).catch(() => []);
+            setSubcategories(subs);
+            const match = subs.find((s) => s.name.toLowerCase() === suggestion.subCategory!.toLowerCase());
+            if (match) {
+              setFormState((prev) => ({ ...prev, subCategoryId: match.id }));
+            }
+          }
         }
       } catch {
         /* silent */
@@ -113,19 +145,11 @@ const CreateTask: React.FC = () => {
   const handleImportanceChange = useCallback((v: number) => setFormState((p) => ({ ...p, importance: v })), []);
   const handleCategorySelect = useCallback((key: string) => {
     categoryManuallyChanged.current = true;
-    setFormState((p) => ({ ...p, category: key }));
+    setFormState((p) => ({ ...p, category: key, subCategoryId: null }));
   }, []);
-  const handleTagInputChange = useCallback((v: string) => setTagInput(v), []);
-  const handleAddTag = useCallback(() => {
-    if (tagInput.trim() && !formState.tags.includes(tagInput.trim())) {
-      setFormState((p) => ({ ...p, tags: [...p.tags, tagInput.trim()] }));
-      setTagInput("");
-    }
-  }, [tagInput, formState.tags]);
-  const handleRemoveTag = useCallback(
-    (tag: string) => setFormState((p) => ({ ...p, tags: p.tags.filter((t) => t !== tag) })),
-    [],
-  );
+  const handleSubCategorySelect = useCallback((id: string | null) => {
+    setFormState((p) => ({ ...p, subCategoryId: id }));
+  }, []);
   const handleDescriptionChange = useCallback((v: string) => setFormState((p) => ({ ...p, description: v })), []);
   const handleEstimatedMinutesChange = useCallback(
     (v: string) => setFormState((p) => ({ ...p, estimatedMinutes: v })),
@@ -156,7 +180,7 @@ const CreateTask: React.FC = () => {
 
   const resetForm = useCallback(() => {
     setFormState(DEFAULT_FORM);
-    setTagInput("");
+    setSubcategories([]);
   }, []);
 
   const handleCreateTask = useCallback(async () => {
@@ -193,7 +217,7 @@ const CreateTask: React.FC = () => {
         effort: formState.effort,
         deadline: formState.timeToComplete,
         estimatedMinutes: formState.estimatedMinutes ? parseInt(formState.estimatedMinutes, 10) : undefined,
-        tags: formState.tags.length > 0 ? formState.tags : undefined,
+        subcategoryId: formState.subCategoryId ?? undefined,
         subtasks: subtasksData.length > 0 ? subtasksData : undefined,
         taskType,
         chunkCount: formState.numSubtasks > 1 ? formState.numSubtasks : undefined,
@@ -236,9 +260,9 @@ const CreateTask: React.FC = () => {
         effort={formState.effort}
         importance={formState.importance}
         category={formState.category}
-        tags={formState.tags}
+        subCategoryId={formState.subCategoryId}
+        subcategories={subcategories}
         description={formState.description}
-        tagInput={tagInput}
         isCalendarVisible={isCalendarVisible}
         onTaskNameChange={handleTaskNameChange}
         onTimeToCompleteChange={handleTimeToCompleteChange}
@@ -247,9 +271,7 @@ const CreateTask: React.FC = () => {
         onEffortChange={handleEffortChange}
         onImportanceChange={handleImportanceChange}
         onCategorySelect={handleCategorySelect}
-        onTagInputChange={handleTagInputChange}
-        onAddTag={handleAddTag}
-        onRemoveTag={handleRemoveTag}
+        onSubCategorySelect={handleSubCategorySelect}
         onDescriptionChange={handleDescriptionChange}
       />
 

@@ -19,7 +19,8 @@ export interface TaskFormState {
   effort: number;
   importance: number;
   category: string;
-  tags: string[];
+  /** Selected subcategory ID (MongoDB ObjectId string) or null if none selected */
+  subCategoryId: string | null;
   description: string;
   estimatedMinutes: string;
   numSubtasks: number;

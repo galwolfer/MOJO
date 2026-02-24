@@ -74,7 +74,6 @@ export type Task = {
   earliestStart?: string | null;
   priorityScore?: number;
   progressPercentage?: number;
-  tags?: string[] | null;
   subtasks?: SubTask[];
   scheduledSessions?: ScheduledSession[];
   createdAt: string;
@@ -696,7 +695,8 @@ export async function createTask(taskData: {
   effort?: number;
   deadline?: string; // Backend expects 'deadline' not 'dueDate'
   estimatedMinutes?: number;
-  tags?: string[];
+  /** Subcategory MongoDB ObjectId string or name string */
+  subcategoryId?: string;
   subtasks?: Array<{
     title: string;
     description?: string;
@@ -982,7 +982,6 @@ export interface CalendarTask {
   endTime?: string;
   title: string;
   emoji: string;
-  tags: string[];
   dueDate: string;
   description: string;
   completed: boolean;
@@ -1110,7 +1109,6 @@ export function transformTaskToCalendarFormat(apiTask: TaskWithSubtasks): Calend
     time,
     title: apiTask.taskname,
     emoji,
-    tags: apiTask.tags || [],
     dueDate,
     description: apiTask.description || "",
     completed: apiTask.status === "done" || apiTask.completed === true,
@@ -1438,7 +1436,6 @@ export async function getScheduledSessionsForDate(date: Date): Promise<CalendarT
         // Include subtaskTitle explicitly for the UI to show as subtitle
         subtaskTitle: subtaskTitle || null,
         emoji: iconEmoji,
-        tags: task.tags || [],
         dueDate: task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "",
         // For multi-day tasks, description should show the actual subtask description; otherwise show task/subtask description
         description: isMultiDay ? actualSubtaskDescription || "" : subtaskDescription || task.description || "",

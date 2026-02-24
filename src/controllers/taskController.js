@@ -211,7 +211,6 @@ export async function createTask(req, res) {
       canSplit,
       minChunk,
       description,
-      tags,
       subtasks,
       taskType,
       chunkCount,
@@ -228,7 +227,6 @@ export async function createTask(req, res) {
       canSplit,
       minChunk,
       description,
-      tags,
       subtasks,
       taskType,
       chunkCount,
@@ -341,7 +339,6 @@ export async function createTask(req, res) {
       minMinutes: typeof minMinutes === "number" ? minMinutes : undefined,
       maxMinutes: typeof maxMinutes === "number" ? maxMinutes : undefined,
       recurrence,
-      tags: Array.isArray(tags) && tags.length > 0 ? tags : undefined,
       subtasks: subtasks || undefined,
     });
 
@@ -715,18 +712,6 @@ export async function updateTask(req, res) {
       }
 
       updates.recurrence = rec;
-    }
-
-    // Tags
-    if (raw.tags !== undefined) {
-      if (Array.isArray(raw.tags)) {
-        // Validate each tag
-        const validTags = raw.tags
-          .filter((tag) => typeof tag === "string")
-          .map((tag) => tag.trim())
-          .filter((tag) => tag.length > 0);
-        updates.tags = validTags;
-      }
     }
 
     // Subtasks
@@ -1329,7 +1314,7 @@ export async function markSubTaskComplete(req, res) {
     });
 
     if (!result || result.success === false) {
-      return res.status(404).json({ success: false, error: result ? result.error : "Subtask not found" }); 
+      return res.status(404).json({ success: false, error: result ? result.error : "Subtask not found" });
     }
 
     // Award points for subtask completion (only if this was a NEW completion)

@@ -63,8 +63,6 @@ const taskSchema = new mongoose.Schema(
     subCategory: { type: mongoose.Schema.Types.ObjectId, ref: "Subcategory", default: null },
     // Task progress tracking (for split tasks)
     progressPercentage: { type: Number, min: 0, max: 100, default: 0 }, // 0-100, synced from subtasks
-    // User-defined tags for categorization and filtering
-    tags: { type: [String], default: [] },
     // Temporary storage for subtask data provided during task creation (not persisted)
     _pendingSubtasks: { type: [Object], default: [] },
     /** True when this task's schedule is managed manually via the schedule editor.
@@ -81,19 +79,20 @@ import { SubTask } from "./SubTask.js";
 async function syncSubTasksForTask(taskDoc) {
   try {
     console.log(`[syncSubTasksForTask] Task ${taskDoc._id} (${taskDoc.taskname}) taskType: ${taskDoc.taskType}`);
-    
+
     // Only relevant for "in_parts" or "leaky"
     if (!["in_parts", "leaky"].includes(taskDoc.taskType)) {
-      console.log(`[syncSubTasksForTask] Task type is "${taskDoc.taskType}", not creating subtasks. Deleting any existing...`);
+      console.log(
+        `[syncSubTasksForTask] Task type is "${taskDoc.taskType}", not creating subtasks. Deleting any existing...`,
+      );
       // If switching to "perfect", remove any existing subtasks
       await SubTask.deleteMany({ taskId: taskDoc._id }).catch(() => {});
       return;
     }
 
     // Check if we have explicit subtask data from task creation
-    const pendingSubtasks = taskDoc._pendingSubtasks && taskDoc._pendingSubtasks.length > 0 
-      ? taskDoc._pendingSubtasks 
-      : null;
+    const pendingSubtasks =
+      taskDoc._pendingSubtasks && taskDoc._pendingSubtasks.length > 0 ? taskDoc._pendingSubtasks : null;
 
     if (pendingSubtasks) {
       const existing = await SubTask.find({ taskId: taskDoc._id });
@@ -101,10 +100,10 @@ async function syncSubTasksForTask(taskDoc) {
         console.log(`[syncSubTasksForTask] Creating ${pendingSubtasks.length} subtasks from pending data`);
         // Use the provided subtask data
         const desiredCount = pendingSubtasks.length;
-        
+
         // Remove all existing subtasks first
         await SubTask.deleteMany({ taskId: taskDoc._id }).catch(() => {});
-        
+
         // Create subtasks with the exact provided data
         const createOps = pendingSubtasks.map((subtask, index) => ({
           taskId: taskDoc._id,
@@ -114,13 +113,17 @@ async function syncSubTasksForTask(taskDoc) {
           description: subtask.description || "",
           minutes: subtask.minutes ? parseInt(subtask.minutes, 10) : 0,
         }));
-        
+
         if (createOps.length) {
           const created = await SubTask.insertMany(createOps);
-          console.log(`[syncSubTasksForTask] Created ${created.length} subtasks: ${created.map(st => st._id).join(", ")}`);
+          console.log(
+            `[syncSubTasksForTask] Created ${created.length} subtasks: ${created.map((st) => st._id).join(", ")}`,
+          );
         }
       } else {
-        console.log(`[syncSubTasksForTask] Task already has ${existing.length} subtasks, skipping pending data processing`);
+        console.log(
+          `[syncSubTasksForTask] Task already has ${existing.length} subtasks, skipping pending data processing`,
+        );
       }
       // Clear _pendingSubtasks from DB
       await Task.updateOne({ _id: taskDoc._id }, { $unset: { _pendingSubtasks: 1 } });
@@ -298,12 +301,7 @@ taskSchema.pre("save", async function () {
       this.subCategory = null;
     }
 
-    console.log(
-      "[Task.pre-save] Generated subcategory:",
-      generated?.label,
-      "source:",
-      generated?.source,
-    );
+    console.log("[Task.pre-save] Generated subcategory:", generated?.label, "source:", generated?.source);
   } else {
     console.log("[Task.pre-save] Keeping existing subcategory:", currentSubcategory?.name);
   }

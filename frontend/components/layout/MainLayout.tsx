@@ -13,7 +13,7 @@ import { useLayout } from "../../context/LayoutContext";
 import Header from "../common/Header";
 import NavBar from "../common/NavBar";
 import ChatScreen from "../../screens/chat/Chat";
-import CalendarScreen from "../../screens/calander/Calendar";
+import CalendarScreen from "../../screens/calendar/Calendar";
 import UserProfileScreen from "../../screens/user/UserProfile";
 import CreateTaskScreen from "../../screens/createEditTasks/CreateTask";
 import EditTaskScreen from "../../screens/createEditTasks/EditTask";
