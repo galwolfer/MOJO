@@ -1,293 +1,169 @@
-/**
+﻿/**
  * CreateTask Screen
  *
- * A comprehensive task creation form that allows users to:
- * - Enter task name and description
- * - Set time to complete (with date picker)
- * - Adjust effort and importance using sliders
- * - Select a task category from a dropdown
- * - Add/remove task tags
- * - View task statistics (effort, time, participants)
+ * A task creation form that lets users:
+ * - Enter task name, description, and deadline
+ * - Adjust effort and importance
+ * - Select category and tags
+ * - Split the task into subtasks
  *
- * Uses existing UI components: Input, Slider, AppButton, Box, AppText, and ScrollableContent.
- *
- * Usage:
- * ```tsx
- * // In navigation or parent component
- * <CreateTask />
- * ```
+ * Layout mirrors other screens (Settings, etc.):
+ * header via NavigationContext + ScrollableContent.
  */
 
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import { View, StyleSheet, ScrollView, Pressable, SafeAreaView } from "react-native";
-import { COLORS, SPACING, TYPOGRAPHY, SHADOWS, FONT_SIZES } from "../theme";
-import AppText from "../components/common/AppText";
+import { View, StyleSheet, TouchableOpacity } from "react-native";
+import { COLORS, SPACING, ICON_SIZES } from "../theme";
 import AppButton from "../components/common/AppButton";
+import AppText from "../components/common/AppText";
 import PopupBox from "../components/common/PopupBox";
-import Input from "../components/inputs/Input";
-import SliderComponent from "../components/inputs/Slider";
-import CalendarPicker from "../components/inputs/CalendarPicker";
-import TagsBelow from "../components/inputs/TagsBelow";
-import Box from "../components/layout/Box";
+import ScrollableContent from "../components/layout/ScrollableContent";
 import { ICONS } from "../components/icons/icons";
-import NavBar from "../components/common/NavBar";
-import CategoryPicker from "../components/special/CategoryPicker";
+import { TaskDetailsSection, TimeAndPartsSection } from "../components/special/task";
+import type { TaskFormState, Subtask } from "../components/special/task";
 import { CATEGORY_KEYS } from "../config/categoryMeta";
 import { createTask, suggestCategory, createTaskSchedule } from "../services/taskService";
-import { getImportanceColor } from "../components/widgets/taskHelpers";
 import { useNavigation } from "../context/NavigationContext";
 import { useTaskContext } from "../context/TaskContext";
 
-interface Subtask {
-  id: string;
-  title: string;
-  description: string;
-  minutes: string; // estimated minutes for this subtask
-  index?: number; // order within the parent task (set automatically)
-}
+// --- Default form state ---
 
-interface TaskFormState {
-  taskName: string;
-  timeToComplete: string;
-  effort: number;
-  importance: number;
-  category: string;
-  tags: string[];
-  description: string;
-  estimatedMinutes: string;
-  numSubtasks: number;
-  subtasks: Subtask[];
-}
+const DEFAULT_FORM: TaskFormState = {
+  taskName: "",
+  timeToComplete: "",
+  effort: 3,
+  importance: 3,
+  category: CATEGORY_KEYS[0] || "uncategorized",
+  tags: [],
+  description: "",
+  estimatedMinutes: "",
+  numSubtasks: 1,
+  subtasks: [],
+};
 
-/**
- * CreateTask Screen Component
- *
- * Main screen for creating new tasks with comprehensive form fields.
- */
+// --- Component ---
 
 const CreateTask: React.FC = () => {
-  const { setHeaderConfig } = useNavigation();
-  const [headerHeight, setHeaderHeight] = useState(0);
-  const [navbarHeight, setNavbarHeight] = useState(0);
-  const [formState, setFormState] = useState<TaskFormState>({
-    taskName: "",
-    timeToComplete: "",
-    effort: 3,
-    importance: 3,
-    category: CATEGORY_KEYS[0] || "uncategorized",
-    tags: [],
-    description: "",
-    estimatedMinutes: "",
-    numSubtasks: 1,
-    subtasks: [],
-  });
-
-  const [tagInput, setTagInput] = useState("");
-  const [isCalendarModalVisible, setIsCalendarModalVisible] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [popupInfo, setPopupInfo] = useState<{ title: string; message: string; resetOnClose?: boolean } | null>(null);
-
+  const { setHeaderConfig, setActiveTab } = useNavigation();
   const { notifyTaskUpdate } = useTaskContext();
 
-  // Ref to track if category was manually changed by user
+  const [formState, setFormState] = useState<TaskFormState>(DEFAULT_FORM);
+  const [tagInput, setTagInput] = useState("");
+  const [isCalendarVisible, setIsCalendarVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [popupInfo, setPopupInfo] = useState<{
+    title: string;
+    message: string;
+    resetOnClose?: boolean;
+  } | null>(null);
+
   const categoryManuallyChanged = useRef(false);
 
-  // Hide the NavigationContext header since CreateTask has its own built-in header
+  // Header
+  const LeftIcon = ICONS.left;
+  const PlusIcon = ICONS.plus;
+
   useEffect(() => {
+    const handleBackPress = () => setActiveTab("calendar");
+
     setHeaderConfig({
-      show: false,
+      title: "Create Task",
+      show: true,
+      icon: ICONS.plus,
+      leftElement: (
+        <TouchableOpacity onPress={handleBackPress}>
+          <LeftIcon size={ICON_SIZES.md} color={COLORS.primary1} />
+        </TouchableOpacity>
+      ),
+      rightElement: (
+        <View style={styles.headerRight}>{PlusIcon && <PlusIcon size={ICON_SIZES.md} color={COLORS.primary1} />}</View>
+      ),
     });
-  }, [setHeaderConfig]);
+  }, [setHeaderConfig, setActiveTab]);
 
-  // Debounced autofill for category and subcategory based on task name
+  // Autofill category from task name
   useEffect(() => {
-    if (!formState.taskName.trim()) {
-      return; // Don't autofill if task name is empty
-    }
-
-    // Reset manual change flag when task name changes (allow autofill for new name)
+    if (!formState.taskName.trim()) return;
     categoryManuallyChanged.current = false;
-
-    const timeoutId = setTimeout(async () => {
+    const id = setTimeout(async () => {
       try {
-        console.log("🔄 Autofill triggered for task name:", formState.taskName);
-        console.log("📋 Current tags before autofill:", formState.tags);
-
         const suggestion = await suggestCategory(formState.taskName);
-        console.log("💡 Suggestion received:", suggestion);
-
         if (suggestion && !categoryManuallyChanged.current) {
-          // First, clear all tags and update category in one state update
-          const newTags = suggestion.subCategory ? [suggestion.subCategory] : [];
-          console.log("✨ Clearing all tags and setting to:", newTags);
-
           setFormState((prev) => ({
             ...prev,
             category: suggestion.category,
-            tags: newTags, // This completely replaces the tags array
+            tags: suggestion.subCategory ? [suggestion.subCategory] : [],
           }));
-
         }
-      } catch (error) {
-        console.warn("Failed to auto-suggest category:", error);
+      } catch {
+        /* silent */
       }
-    }, 800); // Debounce for 800ms
-
-    return () => clearTimeout(timeoutId);
+    }, 800);
+    return () => clearTimeout(id);
   }, [formState.taskName]);
 
-  /**
-   * Handle task name input change
-   */
-  const handleTaskNameChange = useCallback((text: string) => {
-    setFormState((prev) => ({ ...prev, taskName: text }));
-  }, []);
-
-  /**
-   * Handle time to complete input change
-   */
-  const handleTimeToCompleteChange = useCallback((text: string) => {
-    setFormState((prev) => ({ ...prev, timeToComplete: text }));
-  }, []);
-
-  /**
-   * Handle date selection from calendar picker
-   */
+  // Form handlers
+  const handleTaskNameChange = useCallback((v: string) => setFormState((p) => ({ ...p, taskName: v })), []);
+  const handleTimeToCompleteChange = useCallback((v: string) => setFormState((p) => ({ ...p, timeToComplete: v })), []);
   const handleDateSelect = useCallback((date: string) => {
-    setFormState((prev) => ({ ...prev, timeToComplete: date }));
-    setIsCalendarModalVisible(false);
+    setFormState((p) => ({ ...p, timeToComplete: date }));
+    setIsCalendarVisible(false);
   }, []);
-
-  /**
-   * Handle estimated minutes input change
-   */
-  const handleEstimatedMinutesChange = useCallback((text: string) => {
-    setFormState((prev) => ({ ...prev, estimatedMinutes: text }));
+  const handleEffortChange = useCallback((v: number) => setFormState((p) => ({ ...p, effort: v })), []);
+  const handleImportanceChange = useCallback((v: number) => setFormState((p) => ({ ...p, importance: v })), []);
+  const handleCategorySelect = useCallback((key: string) => {
+    categoryManuallyChanged.current = true;
+    setFormState((p) => ({ ...p, category: key }));
   }, []);
+  const handleTagInputChange = useCallback((v: string) => setTagInput(v), []);
+  const handleAddTag = useCallback(() => {
+    if (tagInput.trim() && !formState.tags.includes(tagInput.trim())) {
+      setFormState((p) => ({ ...p, tags: [...p.tags, tagInput.trim()] }));
+      setTagInput("");
+    }
+  }, [tagInput, formState.tags]);
+  const handleRemoveTag = useCallback(
+    (tag: string) => setFormState((p) => ({ ...p, tags: p.tags.filter((t) => t !== tag) })),
+    [],
+  );
+  const handleDescriptionChange = useCallback((v: string) => setFormState((p) => ({ ...p, description: v })), []);
+  const handleEstimatedMinutesChange = useCallback(
+    (v: string) => setFormState((p) => ({ ...p, estimatedMinutes: v })),
+    [],
+  );
 
-  /**
-   * Handle number of subtasks change
-   */
   const handleNumSubtasksChange = useCallback(
     (value: number) => {
-      if (value < 1) value = 1;
-      if (value > 10) value = 10; // limit to 10 subtasks
-
-      const currentSubtasks = formState.subtasks;
-      const newSubtasks: Subtask[] = [];
-
-      // Keep existing subtasks and add new ones if needed
-      for (let i = 0; i < value; i++) {
-        if (currentSubtasks[i]) {
-          newSubtasks.push(currentSubtasks[i]);
-        } else {
-          newSubtasks.push({
-            id: `subtask-${i}-${Date.now()}`,
-            title: "",
-            description: "",
-            minutes: "",
-            index: i + 1,
-          });
-        }
-      }
-
-      setFormState((prev) => ({ ...prev, numSubtasks: value, subtasks: newSubtasks }));
+      const clamped = Math.min(10, Math.max(1, value));
+      const existing = formState.subtasks;
+      const next: Subtask[] = Array.from(
+        { length: clamped },
+        (_, i) =>
+          existing[i] ?? { id: `subtask-${i}-${Date.now()}`, title: "", description: "", minutes: "", index: i + 1 },
+      );
+      setFormState((p) => ({ ...p, numSubtasks: clamped, subtasks: next }));
     },
     [formState.subtasks],
   );
 
-  /**
-   * Update a specific subtask
-   */
-  const updateSubtask = useCallback((index: number, field: keyof Subtask, value: any) => {
-    setFormState((prev) => {
-      const updatedSubtasks = [...prev.subtasks];
-      updatedSubtasks[index] = {
-        ...updatedSubtasks[index],
-        [field]: value,
-      };
-      return { ...prev, subtasks: updatedSubtasks };
+  const handleSubtaskUpdate = useCallback((index: number, field: keyof Subtask, value: any) => {
+    setFormState((p) => {
+      const updated = [...p.subtasks];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...p, subtasks: updated };
     });
-  }, []);
-
-  /**
-   * Handle effort slider change
-   */
-  const handleEffortChange = useCallback((value: number) => {
-    setFormState((prev) => ({ ...prev, effort: value }));
-  }, []);
-
-  /**
-   * Handle importance slider change
-   */
-  const handleImportanceChange = useCallback((value: number) => {
-    setFormState((prev) => ({ ...prev, importance: value }));
-  }, []);
-
-  /**
-   * Handle category selection
-   */
-  const handleCategorySelect = useCallback((categoryKey: string) => {
-    categoryManuallyChanged.current = true; // Mark as manually changed
-    setFormState((prev) => ({ ...prev, category: categoryKey }));
-  }, []);
-
-  /**
-   * Handle description input change
-   */
-  const handleDescriptionChange = useCallback((text: string) => {
-    setFormState((prev) => ({ ...prev, description: text }));
-  }, []);
-
-  /**
-   * Add a tag to the tag list
-   */
-  const handleAddTag = useCallback(() => {
-    if (tagInput.trim() && !formState.tags.includes(tagInput.trim())) {
-      setFormState((prev) => ({
-        ...prev,
-        tags: [...prev.tags, tagInput.trim()],
-      }));
-      setTagInput("");
-    }
-  }, [tagInput, formState.tags]);
-
-  /**
-   * Remove a tag from the tag list
-   */
-  const handleRemoveTag = useCallback((tagToRemove: string) => {
-    setFormState((prev) => ({
-      ...prev,
-      tags: prev.tags.filter((tag) => tag !== tagToRemove),
-    }));
   }, []);
 
   const resetForm = useCallback(() => {
-    setFormState({
-      taskName: "",
-      timeToComplete: "",
-      effort: 3,
-      importance: 3,
-      category: CATEGORY_KEYS[0] || "uncategorized",
-      tags: [],
-      description: "",
-      estimatedMinutes: "",
-      numSubtasks: 1,
-      subtasks: [],
-    });
+    setFormState(DEFAULT_FORM);
     setTagInput("");
   }, []);
 
-  /**
-   * Handle form submission - Create task via API
-   */
   const handleCreateTask = useCallback(async () => {
-    // Validate required fields
     if (!formState.taskName.trim()) {
       setPopupInfo({ title: "Validation Error", message: "Please enter a task name" });
       return;
     }
-
     if (!formState.timeToComplete.trim()) {
       setPopupInfo({ title: "Validation Error", message: "Please select a date to complete" });
       return;
@@ -295,606 +171,136 @@ const CreateTask: React.FC = () => {
 
     setIsLoading(true);
     try {
-      // Prepare subtasks data
       const subtasksData = formState.subtasks
-        .filter((st) => st.title.trim()) // Only include subtasks with titles
+        .filter((st) => st.title.trim())
         .map((st) => ({
           title: st.title,
           description: st.description || undefined,
           minutes: st.minutes ? parseInt(st.minutes, 10) : undefined,
         }));
 
-      // Determine task type based on number of parts and time distribution
       let taskType: "perfect" | "in_parts" | "leaky" = "perfect";
-      let chunkCount: number | undefined = undefined;
-
       if (formState.numSubtasks > 1) {
-        // Check if subtasks have different durations (leaky task)
-        const subtaskMinutes = formState.subtasks
-          .map((st) => (st.minutes ? parseInt(st.minutes, 10) : 0))
-          .filter((m) => m > 0);
-
-        if (subtaskMinutes.length >= 2) {
-          // Check if all minutes are the same
-          const allSame = subtaskMinutes.every((m) => m === subtaskMinutes[0]);
-          taskType = allSame ? "in_parts" : "leaky";
-        } else {
-          // No specific minutes set, default to in_parts
-          taskType = "in_parts";
-        }
-        chunkCount = formState.numSubtasks;
+        const mins = formState.subtasks.map((st) => (st.minutes ? parseInt(st.minutes, 10) : 0)).filter((m) => m > 0);
+        taskType = mins.length >= 2 && !mins.every((m) => m === mins[0]) ? "leaky" : "in_parts";
       }
 
-      // Create task payload
-      const taskPayload = {
+      const result = await createTask({
         taskname: formState.taskName,
         description: formState.description || undefined,
         category: formState.category,
         importance: formState.importance,
         effort: formState.effort,
-        deadline: formState.timeToComplete, // Backend expects 'deadline' not 'dueDate'
+        deadline: formState.timeToComplete,
         estimatedMinutes: formState.estimatedMinutes ? parseInt(formState.estimatedMinutes, 10) : undefined,
         tags: formState.tags.length > 0 ? formState.tags : undefined,
         subtasks: subtasksData.length > 0 ? subtasksData : undefined,
         taskType,
-        chunkCount,
-      };
-
-      console.log("=== CREATING TASK ===");
-      console.log("Payload:", JSON.stringify(taskPayload, null, 2));
-
-      // Call API to create task
-      const result = await createTask(taskPayload);
-
-      console.log("=== TASK CREATED ===");
-      console.log("Result:", JSON.stringify(result, null, 2));
+        chunkCount: formState.numSubtasks > 1 ? formState.numSubtasks : undefined,
+      });
 
       if (result) {
         notifyTaskUpdate();
-        // Now automatically generate a schedule for the task
-        console.log("=== SCHEDULING TASK ===");
-        const schedule = await createTaskSchedule(result._id, {
-          planningHorizonDays: 14,
-        });
-
-        if (schedule?.success) {
-          console.log(`✅ Task scheduled with ${schedule.scheduledCount} sessions`);
-          setPopupInfo({ title: "Success", message: "Task has been created successfully.", resetOnClose: true });
-        } else {
-          console.warn("⚠️ Task created but scheduling failed");
-          setPopupInfo({ title: "Success", message: "Task has been created successfully.", resetOnClose: true });
-        }
+        await createTaskSchedule(result._id, { planningHorizonDays: 14 }).catch(() => {});
+        setPopupInfo({ title: "Success", message: "Task created successfully.", resetOnClose: true });
       } else {
         setPopupInfo({ title: "Error", message: "Failed to create task. Please try again." });
       }
     } catch (error) {
-      console.error("=== ERROR CREATING TASK ===");
-      console.error("Error details:", error);
-      setPopupInfo({ title: "Error", message: `Failed to create task: ${error instanceof Error ? error.message : "Unknown error"}` });
+      setPopupInfo({
+        title: "Error",
+        message: `Failed to create task: ${error instanceof Error ? error.message : "Unknown error"}`,
+      });
     } finally {
       setIsLoading(false);
     }
-  }, [formState, resetForm, notifyTaskUpdate]);
+  }, [formState, notifyTaskUpdate]);
+
+  const closePopup = useCallback(() => {
+    if (popupInfo?.resetOnClose) resetForm();
+    setPopupInfo(null);
+  }, [popupInfo, resetForm]);
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Sticky Header Section */}
-      <View
-        style={styles.headerSection}
-        onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
-      >
-        <AppText variant="title2" style={styles.mainTitle}>
-          + CREATE A TASK
-        </AppText>
-      </View>
+    <ScrollableContent
+      respectHeader
+      respectNavBar
+      extraTopPadding={SPACING.lg}
+      scrollKey="create-task"
+      contentContainerStyle={styles.contentContainer}
+      extraBottomPadding={SPACING.xlg * 3}
+    >
+      <TaskDetailsSection
+        taskName={formState.taskName}
+        timeToComplete={formState.timeToComplete}
+        effort={formState.effort}
+        importance={formState.importance}
+        category={formState.category}
+        tags={formState.tags}
+        description={formState.description}
+        tagInput={tagInput}
+        isCalendarVisible={isCalendarVisible}
+        onTaskNameChange={handleTaskNameChange}
+        onTimeToCompleteChange={handleTimeToCompleteChange}
+        onDateSelect={handleDateSelect}
+        onCalendarToggle={() => setIsCalendarVisible((v) => !v)}
+        onEffortChange={handleEffortChange}
+        onImportanceChange={handleImportanceChange}
+        onCategorySelect={handleCategorySelect}
+        onTagInputChange={handleTagInputChange}
+        onAddTag={handleAddTag}
+        onRemoveTag={handleRemoveTag}
+        onDescriptionChange={handleDescriptionChange}
+      />
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[
-          styles.contentContainer,
-          {
-            paddingTop: headerHeight + SPACING.sm,
-            paddingBottom: navbarHeight + SPACING.lg,
-          },
-        ]}
-        scrollIndicatorInsets={{ top: headerHeight, bottom: navbarHeight }}
-      >
+      <TimeAndPartsSection
+        estimatedMinutes={formState.estimatedMinutes}
+        numSubtasks={formState.numSubtasks}
+        subtasks={formState.subtasks}
+        onEstimatedMinutesChange={handleEstimatedMinutesChange}
+        onNumSubtasksChange={handleNumSubtasksChange}
+        onSubtaskUpdate={handleSubtaskUpdate}
+      />
 
-
-      {/* Task Details Box */}
-      <Box title="TASK DETAILS" style={styles.boxContent}>
-        {/* Task Name Input */}
-        <View style={styles.formField}>
-          <AppText style={styles.customLabel}>Task Name</AppText>
-          <Input
-            placeholder="Your Task"
-            value={formState.taskName}
-            onChangeText={handleTaskNameChange}
-            type="text"
-          />
-        </View>
-
-        {/* Time to Complete Input with Calendar Icon */}
-
-          {/* Time to Complete Input with Calendar Icon */}
-          <View style={styles.formField}>
-            <View style={styles.timeToCompleteLabelContainer}>
-              <AppText style={styles.label}>Time to Complete</AppText>
-            </View>
-            <View style={styles.timeToCompleteWrapper}>
-              <View style={styles.timeToCompleteInputContainer}>
-                <Input
-                  placeholder="Your Task"
-                  value={formState.timeToComplete}
-                  onChangeText={handleTimeToCompleteChange}
-                  type="text"
-                  editable={false}
-                />
-                <Pressable
-                  style={styles.calendarButton}
-                  onPress={() => setIsCalendarModalVisible(!isCalendarModalVisible)}
-                >
-                  {ICONS.calendar &&
-                    React.createElement(ICONS.calendar, {
-                      size: 24,
-                      color: COLORS.primary1,
-                    })}
-                </Pressable>
-              </View>
-
-              {/* Inline Calendar Dropdown */}
-              {isCalendarModalVisible && (
-                <View style={styles.inlineCalendarContainer}>
-                  <CalendarPicker onDateSelect={handleDateSelect} selectedDate={formState.timeToComplete} />
-                </View>
-              )}
-            </View>
-          </View>
-
-          {/* Effort and Importance Sliders */}
-          <View style={styles.slidersContainer}>
-            <View style={[styles.sliderWrapper, { flex: 1, marginRight: SPACING.md }]}>
-              <SliderComponent
-                value={formState.effort}
-                onValueChange={handleEffortChange}
-                min={1}
-                max={5}
-                step={1}
-                label="Effort"
-                trackColor={COLORS.lightGray}
-                TrackThumbColor={getImportanceColor(formState.effort)}
-                valueDescriptions={{
-                  1: "Very Easy",
-                  2: "Easy",
-                  3: "Moderate",
-                  4: "Hard",
-                  5: "Very Hard",
-                }}
-              />
-            </View>
-
-            <View style={[styles.sliderWrapper, { flex: 1 }]}>
-              <SliderComponent
-                value={formState.importance}
-                onValueChange={handleImportanceChange}
-                min={1}
-                max={5}
-                step={1}
-                label="Importance"
-                trackColor={COLORS.lightGray}
-                TrackThumbColor={getImportanceColor(formState.importance)}
-                valueDescriptions={{
-                  1: "Low",
-                  2: "Below Avg",
-                  3: "Average",
-                  4: "Above Avg",
-                  5: "Critical",
-                }}
-              />
-            </View>
-          </View>
-
-          {/* Task Category Dropdown */}
-          <View style={styles.formField}>
-            <AppText style={styles.label}>Task Category</AppText>
-            <CategoryPicker
-              value={formState.category as any}
-              onChange={(v) => handleCategorySelect(v)}
-            />
-          </View>
-
-          {/* Task Tags Section */}
-          <View style={styles.formField}>
-            <View style={styles.tagsLabelContainer}>
-              <AppText style={styles.label}>Task Tags</AppText>
-            </View>
-
-            <View style={styles.tagInputContainer}>
-              <Input placeholder="Your name" value={tagInput} onChangeText={setTagInput} type="text" />
-              <Pressable style={styles.addTagButton} onPress={handleAddTag}>
-                <AppText variant="title3" style={styles.addTagButtonText}>
-                  +
-                </AppText>
-              </Pressable>
-            </View>
-
-            {/* Rendered Tags */}
-            <TagsBelow selected={formState.tags} onRemove={handleRemoveTag} />
-          </View>
-
-          {/* Task Description Textarea */}
-          <View style={styles.formField}>
-            <AppText style={styles.customLabel}>Task Description</AppText>
-            <Input
-              placeholder="Your Task"
-              value={formState.description}
-              onChangeText={handleDescriptionChange}
-              type="longtext"
-              multiline
-              numberOfLines={6}
-            />
-          </View>
-        </Box>
-
-        {/* Additional Task Details Box */}
-        <Box title="ADDITIONAL DETAILS" style={styles.boxContent}>
-          {/* Estimated Minutes Input */}
-          <View style={styles.formField}>
-            <AppText style={styles.customLabel}>Estimated Minutes</AppText>
-            <Input
-              placeholder="e.g., 30"
-              value={formState.estimatedMinutes}
-              onChangeText={handleEstimatedMinutesChange}
-              type="number"
-            />
-          </View>
-
-          {/* Number of Subtasks */}
-          <View style={styles.formField}>
-            <AppText style={styles.label}>Split Task Into Parts</AppText>
-            <View style={styles.subtaskCounterContainer}>
-              <Pressable
-                style={styles.counterButton}
-                onPress={() => handleNumSubtasksChange(Math.max(1, formState.numSubtasks - 1))}
-              >
-                <AppText style={styles.counterButtonText}>−</AppText>
-              </Pressable>
-              <View style={styles.counterDisplay}>
-                <AppText style={styles.counterText}>{formState.numSubtasks}</AppText>
-              </View>
-              <Pressable
-                style={styles.counterButton}
-                onPress={() => handleNumSubtasksChange(formState.numSubtasks + 1)}
-              >
-                <AppText style={styles.counterButtonText}>+</AppText>
-              </Pressable>
-            </View>
-          </View>
-
-          {/* Subtasks Section - Only show if numSubtasks >= 2 */}
-          {formState.numSubtasks >= 2 && (
-            <View style={styles.subtasksSection}>
-              <AppText style={[styles.label, { marginBottom: SPACING.md }]}>Define Subtasks</AppText>
-              {formState.subtasks.map((subtask, index) => (
-                <View key={subtask.id} style={styles.subtaskCard}>
-                  <AppText style={styles.subtaskHeader}>Part {index + 1}</AppText>
-
-                  {/* Subtask Title */}
-                  <View style={styles.formField}>
-                    <AppText style={styles.customLabel}>Part Name</AppText>
-                    <Input
-                      placeholder="e.g., Planning"
-                      value={subtask.title}
-                      onChangeText={(text) => updateSubtask(index, "title", text)}
-                      type="text"
-                    />
-                  </View>
-
-                  {/* Subtask Description */}
-                  <View style={styles.formField}>
-                    <AppText style={styles.customLabel}>Part Description</AppText>
-                    <Input
-                      placeholder="Describe this part..."
-                      value={subtask.description}
-                      onChangeText={(text) => updateSubtask(index, "description", text)}
-                      type="longtext"
-                      multiline
-                      numberOfLines={2}
-                    />
-                  </View>
-
-                  {/* Subtask Estimated Minutes */}
-                  <View style={styles.formField}>
-                    <Input
-                      label="Estimated Minutes"
-                      placeholder="e.g., 15"
-                      value={subtask.minutes}
-                      onChangeText={(text) => updateSubtask(index, "minutes", text)}
-                      type="number"
-                    />
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-        </Box>
-
-        {/* Create Task Button */}
-        <View style={styles.buttonContainer}>
-          <AppButton
-            title={isLoading ? "CREATING..." : "CREATE TASK"}
-            onPress={handleCreateTask}
-            mode="filled"
-            color="#2ecc71"
-            icon={isLoading ? undefined : "plus"}
-            iconPosition="right"
-            width="100%"
-            disabled={isLoading}
-          />
-        </View>
-      </ScrollView>
-
-      {/* Sticky NavBar at Bottom */}
-      <View
-        onLayout={(e) => setNavbarHeight(e.nativeEvent.layout.height)}
-        style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}
-      >
-        <NavBar />
-      </View>
-
-      {/* Alert popup */}
-      <PopupBox
-        visible={popupInfo !== null}
-        onClose={() => { if (popupInfo?.resetOnClose) resetForm(); setPopupInfo(null); }}
-        title={popupInfo?.title ?? ""}
-        titleColor={COLORS.primary1}
-      >
-        <AppText style={{ color: COLORS.darkGray, marginBottom: SPACING.lg }}>
-          {popupInfo?.message}
-        </AppText>
+      <View style={styles.buttonContainer}>
         <AppButton
-          title="OK"
+          title={isLoading ? "CREATING..." : "CREATE TASK"}
+          onPress={handleCreateTask}
           mode="filled"
-          color="primary1"
-          onPress={() => { if (popupInfo?.resetOnClose) resetForm(); setPopupInfo(null); }}
+          color={COLORS.primary6}
+          icon={isLoading ? undefined : "plus"}
+          iconPosition="right"
           width="100%"
+          disabled={isLoading}
         />
-      </PopupBox>
+      </View>
 
-    </SafeAreaView>
+      <PopupBox visible={!!popupInfo} onClose={closePopup} title={popupInfo?.title ?? ""} titleColor={COLORS.primary1}>
+        <AppText style={styles.popupMessage}>{popupInfo?.message}</AppText>
+        <AppButton title="OK" mode="filled" color="primary1" onPress={closePopup} width="100%" />
+      </PopupBox>
+    </ScrollableContent>
   );
 };
 
 const styles = StyleSheet.create({
-  scrollView: {
-    flex: 1,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.white3,
-    flexDirection: "column",
-  },
   contentContainer: {
-    padding: SPACING.sm,
+    alignItems: "center",
+    gap: SPACING.lg,
+    paddingBottom: SPACING.xlg * 6,
   },
-  headerSection: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
-    elevation: 10, // Android
-    paddingTop: SPACING.xlg,
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.lg,
-    borderBottomLeftRadius: SPACING.xlg,
-    borderBottomRightRadius: SPACING.xlg,
-    ...(SHADOWS.card as object),
-    backgroundColor: "#ffffff",
+  headerRight: {
+    alignItems: "center",
     justifyContent: "center",
-  },
-  mainTitle: {
-    color: COLORS.primary1,
-    fontWeight: "400",
-  },
-  boxContent: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.md,
-    overflow: "visible",
-  },
-  formField: {
-    marginBottom: SPACING.sm,
-    overflow: "visible",
-  },
-  slidersContainer: {
-    flexDirection: "row",
-    marginBottom: SPACING.sm,
-    gap: SPACING.sm,
-  },
-  sliderWrapper: {
-    gap: SPACING.sm,
-  },
-  sliderLabel: {
-    fontWeight: "400",
-    color: COLORS.darkGray,
-    marginBottom: 4,
-  },
-  label: {
-    fontWeight: "400",
-    color: COLORS.darkGray,
-    marginBottom: 4,
-  },
-  customLabel: {
-    fontWeight: "400",
-    color: COLORS.darkGray,
-    marginBottom: 4,
-  },
-  timeToCompleteLabelContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.sm,
-    marginBottom: 4,
-  },
-  timeToCompleteInputContainer: {
-    position: "relative",
-    marginBottom: 3,
-  },
-  timeToCompleteWrapper: {
-    overflow: "visible",
-  },
-  inlineCalendarContainer: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    marginTop: SPACING.sm,
-    marginBottom: SPACING.sm,
-    overflow: "hidden",
-    ...SHADOWS.card,
-  },
-  inlineCalendarHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.brightP1,
-  },
-  inlineCalendarTitle: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: "400",
-    color: COLORS.primary1,
-  },
-  inlineCalendarClose: {
-    fontSize: FONT_SIZES.lg,
-    color: COLORS.darkGray,
-    fontWeight: "400",
-  },
-  inlineCalendarContent: {
-    padding: SPACING.md,
-    minHeight: 250,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  inlineCalendarPlaceholder: {
-    color: COLORS.lightGray,
-    fontSize: FONT_SIZES.md,
-  },
-  calendarButton: {
-    position: "absolute",
-    right: SPACING.sm,
-    top: "50%",
-    transform: [{ translateY: -22 }],
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: "transparent",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 10,
-  },
-  subtaskCounterContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.md,
-    marginTop: SPACING.sm,
-  },
-  counterButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: COLORS.primary1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  counterButtonText: {
-    color: COLORS.white,
-    fontSize: FONT_SIZES.lg,
-    fontWeight: "bold",
-  },
-  counterDisplay: {
-    flex: 1,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.md,
-    backgroundColor: COLORS.white,
-    borderRadius: 10,
-    alignItems: "center",
-    ...SHADOWS.card,
-  },
-  counterText: {
-    fontSize: FONT_SIZES.lg,
-    fontWeight: "600",
-    color: COLORS.primary1,
-  },
-  subtasksSection: {
-    marginTop: SPACING.sm,
-    marginBottom: SPACING.sm,
-  },
-  subtaskCard: {
-    backgroundColor: COLORS.white2,
-    borderRadius: 12,
-    padding: SPACING.md,
-    marginBottom: SPACING.sm,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.primary1,
-  },
-  subtaskHeader: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: "600",
-    color: COLORS.primary1,
-    marginBottom: SPACING.md,
-  },
-  tagsLabelContainer: {
-    // marginBottom: 1,
-  },
-  tagInputContainer: {
-    position: "relative",
-    marginBottom: 3,
-  },
-  addTagButton: {
-    position: "absolute",
-    right: SPACING.sm,
-    top: "50%",
-    transform: [{ translateY: -22 }],
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: "transparent",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 10,
-  },
-  addTagButtonText: {
-    color: COLORS.primary1,
-    fontSize: FONT_SIZES.md,
-    fontWeight: "bold",
-  },
-  taskPartsGrid: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    paddingVertical: SPACING.lg,
-  },
-  taskPartItem: {
-    alignItems: "center",
-    gap: SPACING.sm,
-  },
-  taskPartIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
-    backgroundColor: COLORS.white3,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  taskPartLabel: {
-    textAlign: "center",
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.darkGray,
-    maxWidth: 80,
   },
   buttonContainer: {
-    paddingVertical: 6,
+    width: "100%",
     paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
+  popupMessage: {
+    color: COLORS.darkGray,
+    marginBottom: SPACING.lg,
   },
 });
 

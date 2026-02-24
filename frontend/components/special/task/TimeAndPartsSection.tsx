@@ -1,7 +1,7 @@
 /**
- * AdditionalDetailsSection
+ * TimeAndPartsSection
  *
- * Renders the "ADDITIONAL DETAILS" box:
+ * Renders the "TIME & PARTS" box:
  *   - Estimated minutes input
  *   - Split-into-parts counter (+/− stepper)
  *   - Per-subtask cards (title, description, estimated minutes) when count ≥ 2
@@ -14,6 +14,7 @@ import { View, StyleSheet, Pressable } from "react-native";
 import { COLORS, SPACING, FONT_SIZES, SHADOWS } from "../../../theme";
 import AppText from "../../common/AppText";
 import Input from "../../inputs/Input";
+import SliderComponent from "../../inputs/Slider";
 import Box from "../../layout/Box";
 import { Subtask } from "./taskFormTypes";
 
@@ -29,7 +30,7 @@ interface Props {
   boxContentStyle?: object;
 }
 
-const AdditionalDetailsSection: React.FC<Props> = ({
+const TimeAndPartsSection: React.FC<Props> = ({
   estimatedMinutes,
   numSubtasks,
   subtasks,
@@ -39,53 +40,56 @@ const AdditionalDetailsSection: React.FC<Props> = ({
   boxContentStyle,
 }) => {
   return (
-    <Box title="ADDITIONAL DETAILS" style={[styles.boxContent, boxContentStyle]}>
-      {/* Estimated Minutes */}
+    <Box title="TIME & PARTS" style={[styles.boxContent, boxContentStyle]}>
+      {/* Split task counter slider */}
       <View style={styles.formField}>
-        <AppText style={styles.label}>Estimated Minutes</AppText>
-        <Input
-          placeholder="e.g., 30"
-          value={estimatedMinutes}
-          onChangeText={onEstimatedMinutesChange}
-          type="number"
+        <SliderComponent
+          label="Split into Parts"
+          value={numSubtasks}
+          onValueChange={onNumSubtasksChange}
+          min={1}
+          max={10}
+          step={1}
+          trackColor={COLORS.lightGray}
+          TrackThumbColor={COLORS.primary1}
+          valueDescriptions={{
+            1: "Single Task",
+            2: "2 Parts",
+            3: "3 Parts",
+            4: "4 Parts",
+            5: "5 Parts",
+            6: "6 Parts",
+            7: "7 Parts",
+            8: "8 Parts",
+            9: "9 Parts",
+            10: "10 Parts",
+          }}
         />
       </View>
 
-      {/* Split task counter */}
-      <View style={styles.formField}>
-        <AppText style={styles.label}>Split Task Into Parts</AppText>
-        <View style={styles.subtaskCounterContainer}>
-          <Pressable
-            style={styles.counterButton}
-            onPress={() => onNumSubtasksChange(Math.max(1, numSubtasks - 1))}
-          >
-            <AppText style={styles.counterButtonText}>−</AppText>
-          </Pressable>
-
-          <View style={styles.counterDisplay}>
-            <AppText style={styles.counterText}>{numSubtasks}</AppText>
-          </View>
-
-          <Pressable
-            style={styles.counterButton}
-            onPress={() => onNumSubtasksChange(numSubtasks + 1)}
-          >
-            <AppText style={styles.counterButtonText}>+</AppText>
-          </Pressable>
+      {/* Estimated Minutes (only when not splitting) */}
+      {numSubtasks === 1 && (
+        <View style={styles.formField}>
+          <Input
+            label="Estimated Minutes"
+            placeholder="e.g., 30"
+            value={estimatedMinutes}
+            onChangeText={onEstimatedMinutesChange}
+            type="number"
+          />
         </View>
-      </View>
+      )}
 
       {/* Subtask cards — only when ≥ 2 parts */}
       {numSubtasks >= 2 && (
         <View style={styles.subtasksSection}>
-          <AppText style={[styles.label, { marginBottom: SPACING.md }]}>Define Subtasks</AppText>
           {subtasks.map((subtask, index) => (
             <View key={subtask.id} style={styles.subtaskCard}>
               <AppText style={styles.subtaskHeader}>Part {index + 1}</AppText>
 
               <View style={styles.formField}>
-                <AppText style={styles.label}>Part Name</AppText>
                 <Input
+                  label="Part Name"
                   placeholder="e.g., Planning"
                   value={subtask.title}
                   onChangeText={(t) => onSubtaskUpdate(index, "title", t)}
@@ -94,8 +98,8 @@ const AdditionalDetailsSection: React.FC<Props> = ({
               </View>
 
               <View style={styles.formField}>
-                <AppText style={styles.label}>Part Description</AppText>
                 <Input
+                  label="Part Description"
                   placeholder="Describe this part..."
                   value={subtask.description}
                   onChangeText={(t) => onSubtaskUpdate(index, "description", t)}
@@ -137,39 +141,6 @@ const styles = StyleSheet.create({
     color: COLORS.darkGray,
     marginBottom: 4,
   },
-  subtaskCounterContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.md,
-    marginTop: SPACING.sm,
-  },
-  counterButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: COLORS.primary1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  counterButtonText: {
-    color: COLORS.white,
-    fontSize: FONT_SIZES.lg,
-    fontWeight: "bold",
-  },
-  counterDisplay: {
-    flex: 1,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.md,
-    backgroundColor: COLORS.white,
-    borderRadius: 10,
-    alignItems: "center",
-    ...SHADOWS.card,
-  },
-  counterText: {
-    fontSize: FONT_SIZES.lg,
-    fontWeight: "600",
-    color: COLORS.primary1,
-  },
   subtasksSection: {
     marginTop: SPACING.sm,
     marginBottom: SPACING.sm,
@@ -190,4 +161,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default AdditionalDetailsSection;
+export default TimeAndPartsSection;

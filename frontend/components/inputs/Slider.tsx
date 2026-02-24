@@ -181,7 +181,7 @@ const SliderComponent: React.FC<SliderComponentProps> = ({
   return (
     <View style={[styles.container, { minHeight: WRAPPER_HEIGHT + SPACING.lg }, style]}>
       {label && (
-        <AppText variant="notes" style={styles.label}>
+        <AppText variant="boldText" style={styles.label}>
           {label}
         </AppText>
       )}
@@ -244,11 +244,11 @@ const SliderComponent: React.FC<SliderComponentProps> = ({
 const styles = StyleSheet.create({
   container: {
     width: "100%",
+    marginBottom: SPACING.lg,
   },
   label: {
-    marginBottom: SPACING.sm,
-    color: COLORS.black,
-    fontWeight: "600",
+    marginBottom: -SPACING.sm,
+    marginTop: SPACING.sm,
   },
   sliderWrapper: {
     width: "100%",

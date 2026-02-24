@@ -27,7 +27,7 @@ import PopupBox from "../components/common/PopupBox";
 
 // ── Extracted task-form section components ────────────────────────────────────
 import TaskDetailsSection from "../components/special/task/TaskDetailsSection";
-import AdditionalDetailsSection from "../components/special/task/AdditionalDetailsSection";
+import TimeAndPartsSection from "../components/special/task/TimeAndPartsSection";
 import TaskScheduleEditor from "../components/special/task/TaskScheduleEditor";
 import TaskActionButtons from "../components/special/task/TaskActionButtons";
 import { toLocalDateStr, toLocalTimeStr } from "../components/special/task/TaskScheduleEditor";
@@ -591,7 +591,7 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
 
         <View style={{ height: SPACING.lg }} />
 
-        <AdditionalDetailsSection
+        <TimeAndPartsSection
           estimatedMinutes={formState.estimatedMinutes}
           numSubtasks={formState.numSubtasks}
           subtasks={formState.subtasks}

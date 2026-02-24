@@ -119,7 +119,7 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({
   };
 
   return (
-    <View>
+    <View style={styles.container}>
       {/* Header with Month/Year and Navigation */}
       <View style={styles.header}>
         <Pressable
@@ -129,7 +129,7 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({
         >
           {ICONS.left &&
             React.createElement(ICONS.left, {
-              size: ICON_SIZES.md,
+              size: ICON_SIZES.sm,
               color: !allowPreviousMonths && isCurrentMonth() ? COLORS.lightGray : COLORS.white,
             })}
         </Pressable>
@@ -139,7 +139,7 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({
         <Pressable style={styles.navButton} onPress={handleNextMonth}>
           {ICONS.right &&
             React.createElement(ICONS.right, {
-              size: ICON_SIZES.md,
+              size: ICON_SIZES.sm,
               color: COLORS.white,
             })}
         </Pressable>
@@ -197,11 +197,15 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({
 };
 
 const styles = StyleSheet.create({
+  container: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
+  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md,
     paddingHorizontal: SPACING.sm,
   },
   navButton: {
@@ -227,7 +231,7 @@ const styles = StyleSheet.create({
   },
   dayLabelsContainer: {
     flexDirection: "row",
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md,
     paddingHorizontal: SPACING.sm,
   },
   dayLabelCell: {

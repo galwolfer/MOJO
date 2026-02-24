@@ -8,7 +8,7 @@ export { SessionRow } from "./SessionRow";
 export { ScheduledSessionsSection } from "./ScheduledSessionsSection";
 // Task form section components (used by EditTask / CreateTask)
 export { default as TaskDetailsSection } from "./TaskDetailsSection";
-export { default as AdditionalDetailsSection } from "./AdditionalDetailsSection";
+export { default as TimeAndPartsSection } from "./TimeAndPartsSection";
 export { default as TaskScheduleEditor } from "./TaskScheduleEditor";
 export { default as TaskActionButtons } from "./TaskActionButtons";
 export type { Subtask, TaskFormState, EditableSession } from "./taskFormTypes";
