@@ -63,8 +63,8 @@ export const SessionRow: React.FC<{
       )}
       <Container
         onPress={rowPressHandler && !isLoading ? rowPressHandler : undefined}
-        accessibilityRole={rowPressHandler ? "button" : undefined}
-        accessibilityState={rowPressHandler ? { disabled: !canToggle, busy: isLoading } : undefined}
+        accessibilityRole={rowPressHandler && !canToggle ? "button" : undefined}
+        accessibilityState={rowPressHandler && !canToggle ? { disabled: !canToggle, busy: isLoading } : undefined}
         style={styles.sessionRow}
       >
         <SessionTime timeStart={session.start} timeEnd={session.end} categoryColor={categoryColor} />

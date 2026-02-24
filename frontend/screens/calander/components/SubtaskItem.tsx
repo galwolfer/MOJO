@@ -14,107 +14,93 @@
  * />
  * ```
  */
-import React, { useState } from "react";
+import React, { useCallback } from "react";
 import { View, StyleSheet, TouchableOpacity } from "react-native";
 import AppText from "../../../components/common/AppText";
-import AppButton from "../../../components/common/AppButton";
 import { COLORS, SPACING, FONT_SIZES, FONTS, ICON_SIZES } from "../../../theme";
-import { ICONS } from "../../../components/icons/icons";
 import { Checkbox } from "../../../components/icons/Checkbox.native";
-import PopupBox from "../../../components/common/PopupBox";
+import { ICONS } from "../../../components/icons/icons";
 import { Subtask } from "../types";
 
 interface SubtaskItemProps {
   subtask: Subtask;
   parentTaskId: string;
   isCompleted: boolean;
+  categoryColor?: string;
   onToggle: (parentTaskId: string, subtaskId: string, checked: boolean) => void;
-  onDelete: (parentTaskId: string, subtaskId: string) => void;
+  onDelete?: (parentTaskId: string, subtaskId: string) => void;
 }
 
-export default function SubtaskItem({ subtask, parentTaskId, isCompleted, onToggle, onDelete }: SubtaskItemProps) {
-  const [deleteVisible, setDeleteVisible] = useState(false);
+export default function SubtaskItem({ subtask, parentTaskId, isCompleted, categoryColor, onToggle }: SubtaskItemProps) {
+  const handlePress = useCallback(() => {
+    onToggle(parentTaskId, subtask.id, !isCompleted);
+  }, [onToggle, parentTaskId, subtask.id, isCompleted]);
 
   return (
-    <>
-      <View style={styles.subtaskContainer}>
-        <View style={styles.subtaskRow}>
-          <Checkbox
-            checked={isCompleted}
-            onChange={(checked) => {
-              onToggle(parentTaskId, subtask.id, checked);
-            }}
-            size={ICON_SIZES.sm}
-          />
-          <View style={{ flex: 1 }}>
-            <AppText variant="notes" style={[styles.subtaskText, isCompleted && styles.subtaskTextCompleted]}>
-              {subtask.title}
-            </AppText>
-            {subtask.timeRange && (
+    <TouchableOpacity style={styles.subtaskContainer} onPress={handlePress} activeOpacity={0.6}>
+      <View style={styles.subtaskRow}>
+        {/* Checkbox is visual-only; the outer TouchableOpacity handles the toggle */}
+        <View pointerEvents="none">
+          <Checkbox checked={isCompleted} onChange={() => {}} size={ICON_SIZES.sm} />
+        </View>
+        <View style={styles.subtaskContent}>
+          <AppText variant="notes" style={[styles.subtaskText, isCompleted && styles.subtaskTextCompleted]}>
+            {subtask.title}
+          </AppText>
+          {subtask.timeRange && (
+            <View style={styles.timeRangeRow}>
               <AppText style={[styles.subtaskTimeRange, isCompleted && styles.subtaskTimeRangeCompleted]}>
                 {subtask.timeRange}
               </AppText>
-            )}
-          </View>
-          <TouchableOpacity onPress={() => setDeleteVisible(true)} style={styles.subtaskDeleteButton}>
-            <ICONS.trash size={ICON_SIZES.sm} color={COLORS.lightGray} />
-          </TouchableOpacity>
+              <ICONS.clock
+                size={ICON_SIZES.xs}
+                color={isCompleted ? COLORS.lightGray : (categoryColor ?? COLORS.darkGray)}
+              />
+            </View>
+          )}
         </View>
-        {subtask.description && (
-          <AppText style={[styles.subtaskDescription, isCompleted && styles.subtaskDescriptionCompleted]}>
-            {subtask.description}
-          </AppText>
-        )}
       </View>
-
-      <PopupBox
-        visible={deleteVisible}
-        onClose={() => setDeleteVisible(false)}
-        title="Delete Subtask"
-      >
-        <AppText variant="bodyText" style={styles.popupMessage}>
-          Are you sure you want to delete "{subtask.title}"?
+      {subtask.description && (
+        <AppText style={[styles.subtaskDescription, isCompleted && styles.subtaskDescriptionCompleted]}>
+          {subtask.description}
         </AppText>
-        <View style={styles.popupActions}>
-          <AppButton
-            title="Delete"
-            mode="filled"
-            color="primary1"
-            onPress={() => { setDeleteVisible(false); onDelete(parentTaskId, subtask.id); }}
-            style={styles.popupBtn}
-          />
-          <AppButton
-            title="Cancel"
-            mode="light"
-            color="primary1"
-            onPress={() => setDeleteVisible(false)}
-            style={styles.popupBtn}
-          />
-        </View>
-      </PopupBox>
-    </>
+      )}
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   subtaskContainer: {
     gap: SPACING.xs,
+    width: "100%",
   },
   subtaskRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: SPACING.sm,
+    width: "100%",
+  },
+  subtaskContent: {
+    flex: 1,
+    gap: 2,
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   subtaskText: {
     fontFamily: FONTS.fredokaRegular,
     fontSize: FONT_SIZES.base,
     color: COLORS.black,
   },
+  timeRangeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.xs,
+  },
   subtaskTimeRange: {
     fontFamily: FONTS.fredokaRegular,
     fontSize: FONT_SIZES.sm,
     color: COLORS.darkGray,
-    marginTop: SPACING.xs,
   },
   subtaskTimeRangeCompleted: {
     textDecorationLine: "line-through",
@@ -134,23 +120,5 @@ const styles = StyleSheet.create({
   subtaskDescriptionCompleted: {
     textDecorationLine: "line-through",
     color: COLORS.lightGray,
-  },
-  subtaskDeleteButton: {
-    padding: SPACING.xs,
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: SPACING.sm,
-  },
-  popupMessage: {
-    color: COLORS.darkGray,
-    marginBottom: SPACING.lg,
-  },
-  popupActions: {
-    flexDirection: "row",
-    gap: SPACING.md,
-    justifyContent: "flex-end",
-  },
-  popupBtn: {
-    minWidth: 90,
   },
 });

@@ -26,8 +26,10 @@ export const TaskTitle: React.FC<{
   return (
     <View style={[styles.titleRow, style]}>
       {leadingNode}
-      {meta?.icon ? <Icon name={meta.icon} size={iconSize} color={meta.color} style={[styles.icon, iconStyle]} /> : null}
-      <AppText variant={titleVariant} style={[styles.titleText, textStyle]} numberOfLines={3}>
+      {meta?.icon ? (
+        <Icon name={meta.icon} size={iconSize} color={meta.color} style={[styles.icon, iconStyle]} />
+      ) : null}
+      <AppText variant={titleVariant} numberOfLines={2}>
         {title || taskname}
       </AppText>
     </View>
@@ -43,11 +45,7 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     marginBottom: SPACING.sm,
   },
-  titleText: {
-    fontWeight: "600",
-    flex: 1,
-    textAlign: "left",
-  },
+
   icon: {
     marginLeft: SPACING.sm,
     marginBottom: -SPACING.xs,

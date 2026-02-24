@@ -12,7 +12,6 @@ import AppButton from "../../../components/common/AppButton";
 import PopupBox from "../../../components/common/PopupBox";
 import { COLORS, SPACING, FONT_SIZES, FONTS, ICON_SIZES } from "../../../theme";
 import { ICONS } from "../../../components/icons/icons";
-import { Checkbox } from "../../../components/icons/Checkbox.native";
 import { ProgressIcon } from "../../../components/icons/ProgressIcon.native";
 import { getCategoryMeta } from "../../../config/categoryMeta";
 import { computeTaskProgress } from "../../../components/widgets/taskHelpers";
@@ -20,6 +19,7 @@ import { TaskTitle } from "../../../components/special/task/TaskTitle";
 import { TaskTagsRow } from "../../../components/special/task/TaskTagsRow";
 import { SessionTime } from "../../../components/special/task/SessionTime";
 import SubtaskItem from "./SubtaskItem";
+import List from "../../../components/layout/List";
 import { Task } from "../types";
 
 interface TaskCardProps {
@@ -151,57 +151,48 @@ function TaskCard({
                 )}
 
                 {task.subtasks && task.subtasks.length > 0 && (
-                  <View style={styles.subtaskList}>
-                    {task.subtasks.map((subtask) => (
-                      <SubtaskItem
-                        key={subtask.id}
-                        subtask={subtask}
-                        parentTaskId={effectiveId}
-                        isCompleted={localSubtasks.has(subtask.id)}
-                        onToggle={handleSubtaskToggle}
-                        onDelete={onSubtaskDelete}
-                      />
-                    ))}
-                  </View>
+                  <List
+                    data={task.subtasks.map((subtask) => ({
+                      id: subtask.id,
+                      content: (
+                        <SubtaskItem
+                          subtask={subtask}
+                          parentTaskId={effectiveId}
+                          isCompleted={localSubtasks.has(subtask.id)}
+                          categoryColor={categoryColor}
+                          onToggle={handleSubtaskToggle}
+                          onDelete={onSubtaskDelete}
+                        />
+                      ),
+                    }))}
+                    gap={SPACING.sm}
+                    style={{ marginTop: SPACING.sm, paddingLeft: SPACING.md }}
+                  />
                 )}
               </>
             )}
 
             {!isExpanded && isMultiDay && (
-              <View style={styles.subtaskList}>
-                {task.subtasks!.map((subtask) => (
-                  <View key={subtask.id} style={styles.subtaskRow}>
-                    <Checkbox
-                      checked={localSubtasks.has(subtask.id)}
-                      onChange={(checked) => handleSubtaskToggle(effectiveId, subtask.id, checked)}
-                      size={ICON_SIZES.sm}
+              <List
+                data={task.subtasks!.map((subtask) => ({
+                  id: subtask.id,
+                  content: (
+                    <SubtaskItem
+                      subtask={subtask}
+                      parentTaskId={effectiveId}
+                      isCompleted={localSubtasks.has(subtask.id)}
+                      categoryColor={categoryColor}
+                      onToggle={handleSubtaskToggle}
                     />
-                    <AppText style={[styles.subtaskText, localSubtasks.has(subtask.id) && styles.completedText]}>
-                      {subtask.title}
-                    </AppText>
-                  </View>
-                ))}
-              </View>
+                  ),
+                }))}
+                gap={SPACING.sm}
+                style={{ marginTop: SPACING.sm, paddingLeft: SPACING.md }}
+              />
             )}
           </View>
         </View>
       </TouchableOpacity>
-
-      <PopupBox visible={deleteVisible} onClose={handleCancelDelete} title="Delete Task">
-        <AppText variant="bodyText" style={styles.popupMessage}>
-          Are you sure you want to delete this task? This cannot be undone.
-        </AppText>
-        <View style={styles.popupActions}>
-          <AppButton
-            title="Cancel"
-            onPress={handleCancelDelete}
-            mode="light"
-            color="primary1"
-            style={styles.popupBtn}
-          />
-          <AppButton title="Delete" onPress={handleDelete} mode="filled" color="primary1" style={styles.popupBtn} />
-        </View>
-      </PopupBox>
     </>
   );
 }
