@@ -23,6 +23,7 @@ export const SessionRow: React.FC<{
   canToggle?: boolean;
   hideTaskTitle?: boolean;
   showTaskDate?: boolean;
+  lightTitle?: boolean;
 }> = ({
   session,
   taskId,
@@ -37,6 +38,7 @@ export const SessionRow: React.FC<{
   canToggle = false,
   hideTaskTitle = false,
   showTaskDate = false,
+  lightTitle = false,
 }) => {
   const checkboxHandler = checkboxOnToggle ?? rowOnPress ?? undefined;
   const rowPressHandler = rowOnPress ?? (canToggle ? (checkboxOnToggle ?? undefined) : undefined);
@@ -78,7 +80,7 @@ export const SessionRow: React.FC<{
         </View>
         <View style={styles.sessionTitleRow}>
           <AppText variant="bodyText" style={[styles.sessionLabel, isDone && styles.sessionLabelDone]}>
-            <AppText variant="boldText" style={styles.sessionSubtask}>
+            <AppText variant={lightTitle ? "notes" : "boldText"} style={styles.sessionSubtask}>
               {subtaskTitle}
             </AppText>
             {!hideTaskTitle && taskTitle ? (

@@ -104,7 +104,8 @@ export const ScheduledSessionsSection: React.FC<{
               checkboxOnToggle={onToggleSession ? () => onToggleSession(taskId, session, index, subtasks) : undefined}
               rowOnPress={onToggleSession ? () => onToggleSession(taskId, session, index, subtasks) : undefined}
               canToggle={!!onToggleSession}
-              hideTaskTitle={hideTaskTitle}
+              hideTaskTitle={hideTaskTitle || sessions.length === 1}
+              lightTitle={titleMode || hideTaskTitle}
               // Show date only for the first group
               showTaskDate={sessionHeaderMode === "date" && groupIdx === 0}
             />
