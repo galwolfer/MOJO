@@ -26,12 +26,8 @@ import Input from "../../inputs/Input";
 import CalendarPicker from "../../inputs/CalendarPicker";
 import Box from "../../layout/Box";
 import { ICONS } from "../../icons/icons";
-import {
-  getTaskSessions,
-  updateTaskSchedule,
-  createTaskSchedule,
-} from "../../../services/taskService";
-import { EditableSession } from "./taskFormTypes";
+import { getTaskSessions, updateTaskSchedule, createTaskSchedule } from "../../../services/taskService";
+import { EditableSession } from "../../../screens/createEditTasks/components/taskFormTypes";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pure helpers (no React)
@@ -69,8 +65,7 @@ export function validateEditableSessions(sessions: EditableSession[]): string | 
   // Overlap check
   const sorted = [...sessions.map((s, i) => ({ s, i }))].sort(
     (a, b) =>
-      combineLocalDateTime(a.s.date, a.s.startTime).getTime() -
-      combineLocalDateTime(b.s.date, b.s.startTime).getTime(),
+      combineLocalDateTime(a.s.date, a.s.startTime).getTime() - combineLocalDateTime(b.s.date, b.s.startTime).getTime(),
   );
   for (let i = 0; i < sorted.length - 1; i++) {
     const currEnd = combineLocalDateTime(sorted[i].s.date, sorted[i].s.endTime);
@@ -129,10 +124,7 @@ const TaskScheduleEditor: React.FC<Props> = ({
 
   const handleAddSession = useCallback(() => {
     const today = toLocalDateStr(new Date());
-    setSessions((prev) => [
-      ...prev,
-      { date: today, startTime: "09:00", endTime: "10:00", subtaskIndex: null },
-    ]);
+    setSessions((prev) => [...prev, { date: today, startTime: "09:00", endTime: "10:00", subtaskIndex: null }]);
     setScheduleError(null);
   }, []);
 
@@ -142,17 +134,14 @@ const TaskScheduleEditor: React.FC<Props> = ({
     setScheduleError(null);
   }, []);
 
-  const updateSessionField = useCallback(
-    (idx: number, field: keyof EditableSession, value: string | number | null) => {
-      setSessions((prev) => {
-        const next = [...prev];
-        next[idx] = { ...next[idx], [field]: value };
-        return next;
-      });
-      setScheduleError(null);
-    },
-    [],
-  );
+  const updateSessionField = useCallback((idx: number, field: keyof EditableSession, value: string | number | null) => {
+    setSessions((prev) => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], [field]: value };
+      return next;
+    });
+    setScheduleError(null);
+  }, []);
 
   const handleSaveSchedule = useCallback(async () => {
     const validErr = validateEditableSessions(sessions);
@@ -182,7 +171,10 @@ const TaskScheduleEditor: React.FC<Props> = ({
           })),
         );
         onTaskUpdated();
-        onPopup("Schedule Saved! ✅", "Your custom schedule has been saved. The auto-scheduler will no longer modify it.");
+        onPopup(
+          "Schedule Saved! ✅",
+          "Your custom schedule has been saved. The auto-scheduler will no longer modify it.",
+        );
       } else {
         setScheduleError(result.error ?? "Failed to save schedule");
       }
@@ -241,10 +233,7 @@ const TaskScheduleEditor: React.FC<Props> = ({
           {/* Mode badge row */}
           <View style={styles.modeRow}>
             <View style={styles.modeBadge}>
-              <AppText
-                variant="notes"
-                style={[styles.modeText, isManual ? styles.modeManual : styles.modeAuto]}
-              >
+              <AppText variant="notes" style={[styles.modeText, isManual ? styles.modeManual : styles.modeAuto]}>
                 {isManual ? "🔒 Manual — auto-scheduler Disabled" : "⚡ Auto-managed"}
               </AppText>
             </View>
@@ -276,11 +265,7 @@ const TaskScheduleEditor: React.FC<Props> = ({
                   Session {idx + 1}
                   {session.subtaskIndex != null ? ` — Part ${session.subtaskIndex}` : ""}
                 </AppText>
-                <Pressable
-                  onPress={() => handleRemoveSession(idx)}
-                  style={styles.deleteBtn}
-                  hitSlop={8}
-                >
+                <Pressable onPress={() => handleRemoveSession(idx)} style={styles.deleteBtn} hitSlop={8}>
                   <AppText style={styles.deleteBtnText}>✕</AppText>
                 </Pressable>
               </View>
@@ -293,8 +278,7 @@ const TaskScheduleEditor: React.FC<Props> = ({
                   style={styles.datePill}
                 >
                   <AppText style={styles.datePillText}>{session.date || "Select date"}</AppText>
-                  {ICONS.calendar &&
-                    React.createElement(ICONS.calendar, { size: 16, color: COLORS.primary1 })}
+                  {ICONS.calendar && React.createElement(ICONS.calendar, { size: 16, color: COLORS.primary1 })}
                 </Pressable>
               </View>
 
@@ -336,13 +320,7 @@ const TaskScheduleEditor: React.FC<Props> = ({
 
           {/* Add session */}
           <View style={{ marginTop: SPACING.sm }}>
-            <AppButton
-              title="+ Add Session"
-              onPress={handleAddSession}
-              mode="light"
-              color="primary1"
-              width="100%"
-            />
+            <AppButton title="+ Add Session" onPress={handleAddSession} mode="light" color="primary1" width="100%" />
           </View>
 
           {/* Inline error */}

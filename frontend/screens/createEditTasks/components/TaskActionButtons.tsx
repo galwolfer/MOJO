@@ -11,7 +11,7 @@
 import React from "react";
 import { View, StyleSheet } from "react-native";
 import { SPACING } from "../../../theme";
-import AppButton from "../../common/AppButton";
+import AppButton from "../../../components/common/AppButton";
 
 interface Props {
   onUpdate: () => void;
@@ -37,13 +37,7 @@ const TaskActionButtons: React.FC<Props> = ({ onUpdate, onDiscard, onDelete, isU
       </View>
 
       <View style={styles.actionRow}>
-        <AppButton
-          title="Discard Changes"
-          onPress={onDiscard}
-          mode="filled"
-          color="lightGray"
-          width="48%"
-        />
+        <AppButton title="Discard Changes" onPress={onDiscard} mode="filled" color="lightGray" width="48%" />
         <AppButton
           title="DELETE TASK"
           onPress={onDelete}

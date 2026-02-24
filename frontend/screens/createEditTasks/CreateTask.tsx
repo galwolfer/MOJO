@@ -13,18 +13,18 @@
 
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { View, StyleSheet, TouchableOpacity } from "react-native";
-import { COLORS, SPACING, ICON_SIZES } from "../theme";
-import AppButton from "../components/common/AppButton";
-import AppText from "../components/common/AppText";
-import PopupBox from "../components/common/PopupBox";
-import ScrollableContent from "../components/layout/ScrollableContent";
-import { ICONS } from "../components/icons/icons";
-import { TaskDetailsSection, TimeAndPartsSection } from "../components/special/task";
-import type { TaskFormState, Subtask } from "../components/special/task";
-import { CATEGORY_KEYS } from "../config/categoryMeta";
-import { createTask, suggestCategory, createTaskSchedule } from "../services/taskService";
-import { useNavigation } from "../context/NavigationContext";
-import { useTaskContext } from "../context/TaskContext";
+import { COLORS, SPACING, ICON_SIZES } from "../../theme";
+import AppButton from "../../components/common/AppButton";
+import AppText from "../../components/common/AppText";
+import PopupBox from "../../components/common/PopupBox";
+import ScrollableContent from "../../components/layout/ScrollableContent";
+import { ICONS } from "../../components/icons/icons";
+import { TaskDetailsSection, TimeAndPartsSection } from "../../components/special/task";
+import type { TaskFormState, Subtask } from "../../components/special/task";
+import { CATEGORY_KEYS } from "../../config/categoryMeta";
+import { createTask, suggestCategory, createTaskSchedule } from "../../services/taskService";
+import { useNavigation } from "../../context/NavigationContext";
+import { useTaskContext } from "../../context/TaskContext";
 
 // --- Default form state ---
 

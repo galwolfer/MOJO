@@ -15,15 +15,15 @@
 import React from "react";
 import { View, StyleSheet, Pressable } from "react-native";
 import { COLORS, SPACING, FONT_SIZES, SHADOWS } from "../../../theme";
-import AppText from "../../common/AppText";
-import Input from "../../inputs/Input";
-import SliderComponent from "../../inputs/Slider";
-import CalendarPicker from "../../inputs/CalendarPicker";
-import TagsBelow from "../../inputs/TagsBelow";
-import Box from "../../layout/Box";
-import { ICONS } from "../../icons/icons";
-import CategoryPicker from "../CategoryPicker";
-import { getImportanceColor } from "../../widgets/taskHelpers";
+import AppText from "../../../components/common/AppText";
+import Input from "../../../components/inputs/Input";
+import SliderComponent from "../../../components/inputs/Slider";
+import CalendarPicker from "../../../components/inputs/CalendarPicker";
+import TagsBelow from "../../../components/inputs/TagsBelow";
+import Box from "../../../components/layout/Box";
+import { ICONS } from "../../../components/icons/icons";
+import CategoryPicker from "../../../components/special/CategoryPicker";
+import { getImportanceColor } from "../../../components/widgets/taskHelpers";
 
 interface Props {
   // values

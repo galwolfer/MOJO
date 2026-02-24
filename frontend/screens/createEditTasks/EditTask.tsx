@@ -18,29 +18,29 @@
 
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { View, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, ActivityIndicator } from "react-native";
-import { COLORS, SPACING, FONT_SIZES, ICON_SIZES } from "../theme";
+import { COLORS, SPACING, FONT_SIZES, ICON_SIZES } from "../../theme";
 
 // ── Common components ─────────────────────────────────────────────────────────
-import AppText from "../components/common/AppText";
-import AppButton from "../components/common/AppButton";
-import PopupBox from "../components/common/PopupBox";
+import AppText from "../../components/common/AppText";
+import AppButton from "../../components/common/AppButton";
+import PopupBox from "../../components/common/PopupBox";
 
 // ── Extracted task-form section components ────────────────────────────────────
-import TaskDetailsSection from "../components/special/task/TaskDetailsSection";
-import TimeAndPartsSection from "../components/special/task/TimeAndPartsSection";
-import TaskScheduleEditor from "../components/special/task/TaskScheduleEditor";
-import TaskActionButtons from "../components/special/task/TaskActionButtons";
-import { toLocalDateStr, toLocalTimeStr } from "../components/special/task/TaskScheduleEditor";
-import type { TaskFormState, Subtask, EditableSession } from "../components/special/task/taskFormTypes";
+import TaskDetailsSection from "./components/TaskDetailsSection";
+import TimeAndPartsSection from "./components/TimeAndPartsSection";
+import TaskScheduleEditor from "../../components/special/task/TaskScheduleEditor";
+import TaskActionButtons from "./components/TaskActionButtons";
+import { toLocalDateStr, toLocalTimeStr } from "../../components/special/task/TaskScheduleEditor";
+import type { TaskFormState, Subtask, EditableSession } from "./components/taskFormTypes";
 
 // ── Icons and context ─────────────────────────────────────────────────────────
-import { ICONS } from "../components/icons/icons";
-import { useNavigation } from "../context/NavigationContext";
-import { useTaskContext } from "../context/TaskContext";
-import { useLayout } from "../context/LayoutContext";
+import { ICONS } from "../../components/icons/icons";
+import { useNavigation } from "../../context/NavigationContext";
+import { useTaskContext } from "../../context/TaskContext";
+import { useLayout } from "../../context/LayoutContext";
 
 // ── Services ──────────────────────────────────────────────────────────────────
-import { getTaskById, updateTask, deleteTask, suggestCategory, getTaskSessions } from "../services/taskService";
+import { getTaskById, updateTask, deleteTask, suggestCategory, getTaskSessions } from "../../services/taskService";
 
 const NAVBAR_HEIGHT = 96;
 

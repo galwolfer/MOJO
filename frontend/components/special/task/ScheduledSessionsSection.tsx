@@ -6,7 +6,7 @@ import { SessionTime } from "./SessionTime";
 import List from "../../layout/List";
 import { COLORS, ICON_SIZES, SPACING } from "../../../theme";
 import { ScheduledSession, Subtask, getSessionKey, getTimeParts } from "../../widgets/taskHelpers";
-import SubtaskItem from "../../../screens/calander/components/SubtaskItem";
+import SubtaskItem from "../../../screens/calendar/components/SubtaskItem";
 import { useTaskUpdateSubscription } from "../../../context/TaskContext";
 import TaskTitle from "./TaskTitle";
 
@@ -157,7 +157,7 @@ export const ScheduledSessionsSection: React.FC<{
                     isCompleted={isDone ?? false}
                     categoryColor={categoryColor}
                     showTime={!!timeRange}
-                    onToggle={(_parentId, _subtaskId, _checked) => {
+                    onToggle={(_parentId: string, _subtaskId: string, _checked: boolean) => {
                       if (!isLoading) onToggleSession?.(taskId, session, index, subtasks);
                     }}
                   />

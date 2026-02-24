@@ -12,11 +12,11 @@
 import React from "react";
 import { View, StyleSheet, Pressable } from "react-native";
 import { COLORS, SPACING, FONT_SIZES, SHADOWS } from "../../../theme";
-import AppText from "../../common/AppText";
-import Input from "../../inputs/Input";
-import SliderComponent from "../../inputs/Slider";
-import Box from "../../layout/Box";
-import { Subtask } from "../../../screens/createEditTasks/components/taskFormTypes";
+import AppText from "../../../components/common/AppText";
+import Input from "../../../components/inputs/Input";
+import SliderComponent from "../../../components/inputs/Slider";
+import Box from "../../../components/layout/Box";
+import { Subtask } from "./taskFormTypes";
 
 interface Props {
   estimatedMinutes: string;
