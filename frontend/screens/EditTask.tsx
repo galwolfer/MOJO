@@ -40,17 +40,9 @@ import { useTaskContext } from "../context/TaskContext";
 import { useLayout } from "../context/LayoutContext";
 
 // ── Services ──────────────────────────────────────────────────────────────────
-import {
-  getTaskById,
-  updateTask,
-  deleteTask,
-  suggestCategory,
-  getTaskSessions,
-} from "../services/taskService";
+import { getTaskById, updateTask, deleteTask, suggestCategory, getTaskSessions } from "../services/taskService";
 
 const NAVBAR_HEIGHT = 96;
-
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
@@ -258,12 +250,8 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
 
           setFormState((prev) => {
             // Remove the previously-injected AI tag (if any), keep all user-added tags
-            const userTags = prevAutoTag
-              ? prev.tags.filter((t) => t !== prevAutoTag)
-              : prev.tags;
-            const nextTags = newAutoTag && !userTags.includes(newAutoTag)
-              ? [newAutoTag, ...userTags]
-              : userTags;
+            const userTags = prevAutoTag ? prev.tags.filter((t) => t !== prevAutoTag) : prev.tags;
+            const nextTags = newAutoTag && !userTags.includes(newAutoTag) ? [newAutoTag, ...userTags] : userTags;
             return {
               ...prev,
               category: suggestion.category,
@@ -432,7 +420,10 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
             setPopupInfo({ title: "Error", message: "Failed to delete task. Please try again." });
           }
         } catch (error) {
-          setPopupInfo({ title: "Error", message: `Failed to delete task: ${error instanceof Error ? error.message : "Unknown error"}` });
+          setPopupInfo({
+            title: "Error",
+            message: `Failed to delete task: ${error instanceof Error ? error.message : "Unknown error"}`,
+          });
         } finally {
           setIsLoading(false);
         }
@@ -520,7 +511,10 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
         setPopupInfo({ title: "Error", message: "Failed to update task. Please try again." });
       }
     } catch (error) {
-      setPopupInfo({ title: "Error", message: `Failed to update task: ${error instanceof Error ? error.message : "Unknown error"}` });
+      setPopupInfo({
+        title: "Error",
+        message: `Failed to update task: ${error instanceof Error ? error.message : "Unknown error"}`,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -626,23 +620,19 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
         title={popupInfo?.title ?? ""}
         titleColor={COLORS.primary1}
       >
-        <AppText style={{ color: COLORS.darkGray, marginBottom: SPACING.lg }}>
-          {popupInfo?.message}
-        </AppText>
+        <AppText style={{ color: COLORS.darkGray, marginBottom: SPACING.lg }}>{popupInfo?.message}</AppText>
         {popupInfo?.confirmAction ? (
           <View style={{ flexDirection: "row", gap: SPACING.md }}>
-            <AppButton
-              title="Cancel"
-              mode="filled"
-              color="lightGray"
-              onPress={() => setPopupInfo(null)}
-              width="48%"
-            />
+            <AppButton title="Cancel" mode="filled" color="lightGray" onPress={() => setPopupInfo(null)} width="48%" />
             <AppButton
               title="Delete"
               mode="filled"
               color="primary7"
-              onPress={() => { const action = popupInfo?.confirmAction; setPopupInfo(null); if (action) action(); }}
+              onPress={() => {
+                const action = popupInfo?.confirmAction;
+                setPopupInfo(null);
+                if (action) action();
+              }}
               width="48%"
             />
           </View>
@@ -651,7 +641,11 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
             title="OK"
             mode="filled"
             color="primary1"
-            onPress={() => { const nav = popupInfo?.navigateOnClose; setPopupInfo(null); if (nav) setActiveTab("calendar"); }}
+            onPress={() => {
+              const nav = popupInfo?.navigateOnClose;
+              setPopupInfo(null);
+              if (nav) setActiveTab("calendar");
+            }}
             width="100%"
           />
         )}
