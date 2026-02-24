@@ -11,7 +11,7 @@
  * header via NavigationContext + ScrollableContent.
  */
 
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { View, StyleSheet, TouchableOpacity } from "react-native";
 import { COLORS, SPACING, ICON_SIZES } from "../../theme";
 import AppButton from "../../components/common/AppButton";
@@ -22,7 +22,7 @@ import { ICONS } from "../../components/icons/icons";
 import { TaskDetailsSection, TimeAndPartsSection } from "../../components/special/task";
 import type { TaskFormState, Subtask } from "../../components/special/task";
 import { CATEGORY_KEYS } from "../../config/categoryMeta";
-import { createTask, suggestCategory, createTaskSchedule } from "../../services/taskService";
+import { createTask, createTaskSchedule } from "../../services/taskService";
 import { fetchSubcategoriesForCategory, type Subcategory } from "../../services/subcategoryService";
 import { useNavigation } from "../../context/NavigationContext";
 import { useTaskContext } from "../../context/TaskContext";
@@ -58,8 +58,6 @@ const CreateTask: React.FC = () => {
     resetOnClose?: boolean;
   } | null>(null);
 
-  const categoryManuallyChanged = useRef(false);
-
   // Header
   const LeftIcon = ICONS.left;
   const PlusIcon = ICONS.plus;
@@ -90,10 +88,10 @@ const CreateTask: React.FC = () => {
       .then((subs) => {
         if (!cancelled) {
           setSubcategories(subs);
-          // Reset subCategoryId if it's no longer valid for this category
+          // Keep current selection if still valid; otherwise auto-select the first ("General [Category]")
           setFormState((prev) => {
             const stillValid = subs.some((s) => s.id === prev.subCategoryId);
-            return stillValid ? prev : { ...prev, subCategoryId: null };
+            return stillValid ? prev : { ...prev, subCategoryId: subs[0]?.id ?? null };
           });
         }
       })
@@ -105,35 +103,6 @@ const CreateTask: React.FC = () => {
     };
   }, [formState.category]);
 
-  // Autofill category + subcategory from task name
-  useEffect(() => {
-    if (!formState.taskName.trim()) return;
-    categoryManuallyChanged.current = false;
-    const id = setTimeout(async () => {
-      try {
-        const suggestion = await suggestCategory(formState.taskName);
-        if (suggestion && !categoryManuallyChanged.current) {
-          setFormState((prev) => ({
-            ...prev,
-            category: suggestion.category,
-          }));
-          // Try to match suggested subcategory name to the loaded list
-          if (suggestion.subCategory) {
-            const subs = await fetchSubcategoriesForCategory(suggestion.category).catch(() => []);
-            setSubcategories(subs);
-            const match = subs.find((s) => s.name.toLowerCase() === suggestion.subCategory!.toLowerCase());
-            if (match) {
-              setFormState((prev) => ({ ...prev, subCategoryId: match.id }));
-            }
-          }
-        }
-      } catch {
-        /* silent */
-      }
-    }, 800);
-    return () => clearTimeout(id);
-  }, [formState.taskName]);
-
   // Form handlers
   const handleTaskNameChange = useCallback((v: string) => setFormState((p) => ({ ...p, taskName: v })), []);
   const handleTimeToCompleteChange = useCallback((v: string) => setFormState((p) => ({ ...p, timeToComplete: v })), []);
@@ -144,11 +113,13 @@ const CreateTask: React.FC = () => {
   const handleEffortChange = useCallback((v: number) => setFormState((p) => ({ ...p, effort: v })), []);
   const handleImportanceChange = useCallback((v: number) => setFormState((p) => ({ ...p, importance: v })), []);
   const handleCategorySelect = useCallback((key: string) => {
-    categoryManuallyChanged.current = true;
     setFormState((p) => ({ ...p, category: key, subCategoryId: null }));
   }, []);
   const handleSubCategorySelect = useCallback((id: string | null) => {
     setFormState((p) => ({ ...p, subCategoryId: id }));
+  }, []);
+  const handleSubcategoryCreated = useCallback((newSub: Subcategory) => {
+    setSubcategories((prev) => [...prev, newSub]);
   }, []);
   const handleDescriptionChange = useCallback((v: string) => setFormState((p) => ({ ...p, description: v })), []);
   const handleEstimatedMinutesChange = useCallback(
@@ -272,6 +243,7 @@ const CreateTask: React.FC = () => {
         onImportanceChange={handleImportanceChange}
         onCategorySelect={handleCategorySelect}
         onSubCategorySelect={handleSubCategorySelect}
+        onSubcategoryCreated={handleSubcategoryCreated}
         onDescriptionChange={handleDescriptionChange}
       />
 

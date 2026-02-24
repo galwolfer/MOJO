@@ -14,13 +14,9 @@ import { Subcategory } from "../models/Subcategory.js";
 import { logger } from "../utils/logger.js";
 import { isValidCategory, getDisplayName } from "../config/categories.js";
 import { BusyBlock } from "../models/BusyBlock.js";
-import {
-  computeSessionHash,
-  withUserScheduleLock,
-} from "../services/schedulingService.js";
+import { computeSessionHash, withUserScheduleLock } from "../services/schedulingService.js";
 import {
   addSubcategoryToUser,
-  ensureGeneralSubcategory,
   findOrCreateSubcategory,
   findSubcategoryByName,
 } from "../services/subcategoryService.js";
@@ -364,7 +360,13 @@ router.delete("/subcategories/:id", async (req, res, next) => {
     }
 
     const parentCategory = subcategoryDoc.parent;
-    const generalSub = await ensureGeneralSubcategory({ userId, parent: parentCategory });
+    // Look up the system-level general subcategory (never create under user's ID)
+    const systemUserId = "000000000000000000000000";
+    const generalSub = await Subcategory.findOne({
+      userId: systemUserId,
+      parent: parentCategory,
+      source: "category-default",
+    }).lean();
     const generalId = generalSub?._id || null;
 
     if (generalId) {
@@ -901,9 +903,7 @@ router.get("/:id/sessions", requireAuth, async (req, res, next) => {
       return res.status(404).json({ success: false, error: "Task not found" });
     }
 
-    const sessions = await TaskSchedule.find({ taskId })
-      .sort({ start: 1 })
-      .lean();
+    const sessions = await TaskSchedule.find({ taskId }).sort({ start: 1 }).lean();
 
     return res.json({
       success: true,
@@ -961,7 +961,7 @@ router.patch("/:id/sessions", requireAuth, async (req, res, next) => {
 
     // Get user minGapMinutes
     const user = await User.findById(userId).select("schedulingPreferences").lean();
-    const minGapMs = ((user?.schedulingPreferences?.minGapMinutes ?? 10)) * 60_000;
+    const minGapMs = (user?.schedulingPreferences?.minGapMinutes ?? 10) * 60_000;
 
     // Parse and validate each session
     const parsed = [];

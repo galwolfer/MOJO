@@ -375,7 +375,13 @@ function Input<T = any>({
         >
           {/* Display selected option's icon for single-select dropdowns */}
           {selectedOption?.icon && (
-            <View style={styles.selectedIconWrapper}>
+            <View
+              style={[
+                styles.selectedIconWrapper,
+                selectedOption.iconBackground ? styles.selectedIconBox : undefined,
+                selectedOption.iconBackground ? { backgroundColor: selectedOption.iconBackground } : undefined,
+              ]}
+            >
               {React.createElement(selectedOption.icon, {
                 size: ICON_SIZES[iconSize],
                 color: selectedOption.iconColor || COLORS.primary1,
@@ -637,6 +643,11 @@ const styles = StyleSheet.create({
     marginLeft: SPACING.md,
     alignItems: "center",
     justifyContent: "center",
+  },
+  selectedIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
   },
   rightElementWrapper: {
     marginRight: SPACING.sm,

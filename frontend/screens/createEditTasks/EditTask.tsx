@@ -16,7 +16,7 @@
  *  └─────────────────────────────────────────────────────────────────────┘
  */
 
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { View, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, ActivityIndicator } from "react-native";
 import { COLORS, SPACING, FONT_SIZES, ICON_SIZES } from "../../theme";
 
@@ -40,7 +40,7 @@ import { useTaskContext } from "../../context/TaskContext";
 import { useLayout } from "../../context/LayoutContext";
 
 // ── Services ──────────────────────────────────────────────────────────────────
-import { getTaskById, updateTask, deleteTask, suggestCategory, getTaskSessions } from "../../services/taskService";
+import { getTaskById, updateTask, deleteTask, getTaskSessions } from "../../services/taskService";
 import { fetchSubcategoriesForCategory, type Subcategory } from "../../services/subcategoryService";
 
 const NAVBAR_HEIGHT = 96;
@@ -88,8 +88,6 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
   const [sessionsLoading, setSessionsLoading] = useState(false);
 
   // ── Refs ──────────────────────────────────────────────────────────────────
-  const categoryManuallyChanged = useRef(false);
-  const hasLoadedTask = useRef(false);
 
   // Use the shared Header via NavigationContext so spacing matches other screens
   useEffect(() => {
@@ -191,9 +189,6 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
             .catch(() => {});
         }
 
-        hasLoadedTask.current = true;
-        categoryManuallyChanged.current = true; // Prevent autofill from overwriting loaded category
-
         // Load the task's current scheduled sessions for the schedule editor
         setSessionsLoading(true);
         try {
@@ -235,51 +230,10 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
     };
   }, [taskId]);
 
-  // Debounced autofill for category and subcategory based on task name
-  // Only runs when user manually changes the task name (not during initial load)
-  useEffect(() => {
-    if (!formState.taskName.trim() || !hasLoadedTask.current) {
-      return; // Don't autofill if task name is empty or we haven't loaded yet
-    }
-
-    // Don't autofill if category was manually changed or set by loading
-    if (categoryManuallyChanged.current) {
-      return;
-    }
-
-    const timeoutId = setTimeout(async () => {
-      try {
-        const suggestion = await suggestCategory(formState.taskName);
-
-        if (suggestion && !categoryManuallyChanged.current) {
-          setFormState((prev) => ({
-            ...prev,
-            category: suggestion.category,
-          }));
-
-          // Try to match suggested subcategory name in the fetched list
-          if (suggestion.subCategory) {
-            const subs = await fetchSubcategoriesForCategory(suggestion.category).catch(() => [] as Subcategory[]);
-            setSubcategories(subs);
-            const match = subs.find((s) => s.name.toLowerCase() === suggestion.subCategory!.toLowerCase());
-            if (match) {
-              setFormState((prev) => ({ ...prev, subCategoryId: match.id }));
-            }
-          }
-        }
-      } catch (error) {
-        console.warn("Failed to auto-suggest category:", error);
-      }
-    }, 800); // Debounce for 800ms
-
-    return () => clearTimeout(timeoutId);
-  }, [formState.taskName]);
-
   /**
    * Handle task name input change
    */
   const handleTaskNameChange = useCallback((text: string) => {
-    categoryManuallyChanged.current = false; // Allow autofill when user changes name
     setFormState((prev) => ({ ...prev, taskName: text }));
   }, []);
 
@@ -368,11 +322,13 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
    * Handle category selection
    */
   const handleCategorySelect = useCallback((categoryKey: string) => {
-    categoryManuallyChanged.current = true; // Mark as manually changed
     setFormState((prev) => ({ ...prev, category: categoryKey, subCategoryId: null }));
-    // Fetch subcategories for the new category
+    // Fetch subcategories for the new category and auto-select the first one ("General [Category]")
     fetchSubcategoriesForCategory(categoryKey)
-      .then((subs) => setSubcategories(subs))
+      .then((subs) => {
+        setSubcategories(subs);
+        setFormState((prev) => ({ ...prev, subCategoryId: subs[0]?.id ?? null }));
+      })
       .catch(() => setSubcategories([]));
   }, []);
 
@@ -381,6 +337,9 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
    */
   const handleSubCategorySelect = useCallback((id: string | null) => {
     setFormState((prev) => ({ ...prev, subCategoryId: id }));
+  }, []);
+  const handleSubcategoryCreated = useCallback((newSub: Subcategory) => {
+    setSubcategories((prev) => [...prev, newSub]);
   }, []);
 
   /**
@@ -572,6 +531,7 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
           onImportanceChange={handleImportanceChange}
           onCategorySelect={handleCategorySelect}
           onSubCategorySelect={handleSubCategorySelect}
+          onSubcategoryCreated={handleSubcategoryCreated}
           onDescriptionChange={handleDescriptionChange}
         />
 

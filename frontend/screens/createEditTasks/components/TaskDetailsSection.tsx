@@ -21,6 +21,7 @@ import CalendarPicker from "../../../components/inputs/CalendarPicker";
 import Box from "../../../components/layout/Box";
 import { ICONS } from "../../../components/icons/icons";
 import CategoryPicker from "../../../components/special/CategoryPicker";
+import SubcategoryPicker from "../../../components/special/SubcategoryPicker";
 import { getImportanceColor } from "../../../components/widgets/taskHelpers";
 import type { Subcategory } from "../../../services/subcategoryService";
 
@@ -45,6 +46,7 @@ interface Props {
   onImportanceChange: (v: number) => void;
   onCategorySelect: (key: string) => void;
   onSubCategorySelect: (id: string | null) => void;
+  onSubcategoryCreated?: (newSub: Subcategory) => void;
   onDescriptionChange: (v: string) => void;
 
   /** Optional extra style applied to the inner box content wrapper */
@@ -69,14 +71,10 @@ const TaskDetailsSection: React.FC<Props> = ({
   onImportanceChange,
   onCategorySelect,
   onSubCategorySelect,
+  onSubcategoryCreated,
   onDescriptionChange,
   boxContentStyle,
 }) => {
-  const subcategoryOptions = subcategories.map((s) => ({
-    label: s.name,
-    value: s.id,
-  }));
-
   return (
     <Box title="TASK DETAILS" style={[styles.boxContent, boxContentStyle]}>
       {/* Task Name */}
@@ -150,16 +148,13 @@ const TaskDetailsSection: React.FC<Props> = ({
 
       {/* Subcategory */}
       <View style={styles.formField}>
-        <Input
+        <SubcategoryPicker
           label="Subcategory"
-          placeholder={subcategories.length === 0 ? "No subcategories yet" : "Select subcategory"}
-          options={subcategoryOptions}
-          value={subCategoryId ?? undefined}
-          onSelect={(vals: string[]) => {
-            const v = vals && vals[0];
-            onSubCategorySelect(v ?? null);
-          }}
-          disabled={subcategories.length === 0}
+          subcategories={subcategories}
+          value={subCategoryId}
+          onSelect={onSubCategorySelect}
+          onSubcategoryCreated={onSubcategoryCreated}
+          category={category}
         />
       </View>
 

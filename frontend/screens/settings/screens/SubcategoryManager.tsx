@@ -11,7 +11,7 @@ import SubcategoryIconPicker from "../../../components/special/IconPicker";
 import SubcategoryColorPicker from "../../../components/special/ColorPicker";
 import { ICONS } from "../../../components/icons/icons";
 import { COLORS, SPACING, SHADOWS, ICON_SIZES, FONT_SIZES } from "../../../theme";
-import AddSubcategoryPopup from "./components/AddSubcategoryPopup";
+import AddSubcategoryPopup from "../../../components/special/AddSubcategoryPopup";
 import FloatingButton from "../../../components/common/FloatingButton";
 import { CATEGORY_KEYS, getCategoryMeta, type CategoryKey } from "../../../config/categoryMeta";
 import { useNavigation } from "../../../context/NavigationContext";
@@ -140,16 +140,6 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
 
   const openAddPopup = () => setShowAddPopup(true);
   const closeAddPopup = () => setShowAddPopup(false);
-
-  // Category options used by the popup
-  const simpleCategoryOptions = useMemo(
-    () =>
-      CATEGORY_KEYS.map((key) => {
-        const m = getCategoryMeta(key);
-        return { value: key as CategoryKey, label: m.displayName || key };
-      }),
-    [],
-  );
 
   // Handler to create a staged subcategory from the popup
   const createFromPopup = (payload: {
@@ -391,20 +381,18 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
           </Box>
         )}
 
-        {/* Global add popup (opens from header + can be used elsewhere) */}
+        {/* Global add popup (opens from FloatingButton) */}
         <AddSubcategoryPopup
           visible={showAddPopup}
           onClose={closeAddPopup}
           onCreate={createFromPopup}
-          categoryOptions={simpleCategoryOptions}
         />
 
-        {/* Edit popup using the same component */}
+        {/* Edit popup */}
         <AddSubcategoryPopup
           visible={showEditPopup}
           onClose={handleCloseEditPopup}
           onCreate={handleStageEdit}
-          categoryOptions={simpleCategoryOptions}
           mode="edit"
           initialData={
             editingSubcategory
@@ -429,7 +417,10 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
             return (
               <Box key={categoryKey} title={meta.displayName || categoryKey} titleColor={COLORS.primary1}>
                 {subs.map((subcategory) => {
-                  const isDefault = subcategory.source === "category-default" || subcategory.name === "General";
+                  const isDefault =
+                    subcategory.isDefault ||
+                    subcategory.source === "category-default" ||
+                    subcategory.name === "General";
                   const Icon = isDefault
                     ? ICONS[meta.icon] || DefaultIcon
                     : subcategory.icon && ICONS[subcategory.icon]
