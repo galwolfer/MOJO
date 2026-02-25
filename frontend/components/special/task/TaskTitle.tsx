@@ -11,6 +11,8 @@ export const TaskTitle: React.FC<{
   taskname?: string;
   category?: string;
   size?: "sm" | "md" | "lg";
+  /** When true, the category icon is never rendered regardless of category value */
+  hideIcon?: boolean;
   /** Rendered before the category icon — use for Checkbox or other leading controls */
   leadingNode?: React.ReactNode;
   /** Merged with the default row container style */
@@ -20,13 +22,24 @@ export const TaskTitle: React.FC<{
   /** Merged with the default icon style */
   iconStyle?: StyleProp<ViewStyle>;
   reversed?: boolean;
-}> = ({ title, taskname, category, size = "lg", reversed = false, leadingNode, style, textStyle, iconStyle }) => {
+}> = ({
+  title,
+  taskname,
+  category,
+  hideIcon = false,
+  size = "lg",
+  reversed = false,
+  leadingNode,
+  style,
+  textStyle,
+  iconStyle,
+}) => {
   const meta = getCategoryMeta(category);
   const iconSize = size === "sm" ? ICON_SIZES.sm : size === "md" ? ICON_SIZES.md : ICON_SIZES.big;
   const titleVariant = size === "sm" ? "bodyText" : size === "md" ? "boldText" : "title3";
   return (
     <View style={[styles.titleRow, style, reversed ? styles.reversedRow : null]}>
-      {meta?.icon ? (
+      {!hideIcon && meta?.icon ? (
         <Icon name={meta.icon} size={iconSize} color={meta.color} style={[styles.icon, iconStyle]} />
       ) : null}
       <View style={styles.rightTitle}>

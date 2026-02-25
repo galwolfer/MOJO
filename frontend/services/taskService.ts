@@ -991,6 +991,14 @@ export interface CalendarTask {
   dateString?: string; // Date in YYYY-MM-DD format for filtering
   // Optional authoritative progress percentage provided by server (0-100)
   progressPercentage?: number;
+  // Detail fields for expanded TaskCard view
+  importance?: number;
+  effort?: number;
+  subcategoryDisplay?: string;
+  subCategory?: { name?: string; icon?: string | null; color?: string | null; parent?: string; source?: string } | null;
+  estimatedDuration?: number;
+  earliestStart?: string;
+  deadline?: string;
 }
 
 /**
@@ -1487,6 +1495,14 @@ export async function getScheduledSessionsForDate(date: Date): Promise<CalendarT
         totalParts,
         parentTaskName: task.taskname,
         subtaskIndex: session.subtaskIndex,
+        // Detail fields for expanded TaskCard view
+        importance: task.importance ?? undefined,
+        effort: task.effort ?? undefined,
+        subcategoryDisplay: task.subCategory?.name ?? undefined,
+        subCategory: task.subCategory ?? undefined,
+        estimatedDuration: task.estimatedDuration ?? undefined,
+        earliestStart: task.earliestStart ?? undefined,
+        deadline: task.dueDate ?? undefined,
       } as CalendarTask & { taskId: string; partNumber: number; totalParts: number; parentTaskName: string };
     });
 

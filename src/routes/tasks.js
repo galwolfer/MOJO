@@ -802,7 +802,9 @@ router.get("/schedule/sessions", requireAuth, async (req, res, next) => {
       .populate({
         path: "taskId",
         match: { userId }, // Only include sessions for tasks owned by this user
-        select: "taskname description category tags dueDate subTasks",
+        select:
+          "taskname description category tags dueDate importance effort subCategory estimatedDuration earliestStart progressPercentage subTasks",
+        populate: { path: "subCategory" },
       })
       .sort({ start: 1 })
       .lean();

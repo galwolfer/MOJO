@@ -17,6 +17,7 @@ import { getCategoryMeta } from "../../../config/categoryMeta";
 import { computeTaskProgress } from "../../../components/widgets/taskHelpers";
 import { TaskTitle } from "../../../components/special/task/TaskTitle";
 import { TaskTagsRow } from "../../../components/special/task/TaskTagsRow";
+import { TwoColumnGrid, renderTaskField } from "../../../components/special/task";
 import { SessionTime } from "../../../components/special/task/SessionTime";
 import SubtaskItem from "./SubtaskItem";
 import List from "../../../components/layout/List";
@@ -124,8 +125,13 @@ function TaskCard({
             <TaskTitle
               title={task.title}
               category={task.category}
+              hideIcon={isExpanded}
               size={isExpanded ? "md" : "sm"}
-              style={[styles.titleRow, { marginBottom: isExpanded ? SPACING.sm : 0 }]}
+              style={[
+                styles.titleRow,
+                isExpanded ? styles.titleRowExpanded : undefined,
+                { marginBottom: isExpanded ? SPACING.sm : 0 },
+              ]}
               textStyle={[styles.titleText, { fontFamily: isExpanded ? FONTS.fredokaSemiBold : FONTS.fredokaRegular }]}
               iconStyle={{ marginLeft: 0, marginBottom: 0 }}
               leadingNode={<ProgressIcon value={taskProgress} size={ICON_SIZES.md} />}
@@ -138,6 +144,8 @@ function TaskCard({
                   <View style={{ flex: 1 }}>
                     <TaskTagsRow
                       category={task.category}
+                      subcategoryDisplay={task.subcategoryDisplay}
+                      subCategory={task.subCategory}
                       importance={task.importance}
                       effort={task.effort}
                       tags={task.tags}
@@ -145,11 +153,16 @@ function TaskCard({
                   </View>
                 </View>
 
-                {task.dueDate && !task.isScheduled && <AppText style={styles.dueDate}>{task.dueDate}</AppText>}
+                <TwoColumnGrid
+                  items={[
+                    renderTaskField({ dueDate: task.deadline }, "dueDate"),
+                    renderTaskField(task, "earliestStart"),
+                    renderTaskField({ estimatedDuration: task.estimatedDuration }, "estimatedDuration"),
+                  ]}
+                />
+
                 {task.mainTaskDescription && <AppText style={styles.description}>{task.mainTaskDescription}</AppText>}
-                {task.description && (!task.subtasks || task.subtasks.length === 0) && (
-                  <AppText style={styles.description}>{task.description}</AppText>
-                )}
+                {task.description && <AppText style={styles.description}>{task.description}</AppText>}
 
                 {task.subtasks && task.subtasks.length > 0 && (
                   <List
@@ -232,6 +245,10 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     flex: 1,
     minWidth: 0,
+  },
+  titleRowExpanded: {
+    // Reserve space so title text doesn't bleed under the absolute-positioned edit/delete buttons
+    paddingRight: SPACING.xlg * 2 + SPACING.md,
   },
   editBtn: {
     position: "absolute",
