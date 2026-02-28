@@ -11,6 +11,18 @@ export interface Subtask {
   minutes: string;
   /** 1-based order within the parent task */
   index?: number;
+
+  // ── Schedule fields (populated in edit mode) ──────────────────────────────
+  /** "auto" = scheduler decides the time; "manual" = user picks date/time */
+  scheduleMode?: "auto" | "manual";
+  /** Backend session _id when a session already exists */
+  sessionId?: string;
+  /** YYYY-MM-DD in user local time */
+  sessionDate?: string;
+  /** HH:MM (24-hour) in user local time */
+  sessionStartTime?: string;
+  /** HH:MM (24-hour) in user local time */
+  sessionEndTime?: string;
 }
 
 export interface TaskFormState {

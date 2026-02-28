@@ -6,6 +6,12 @@
  *   - Split-into-parts counter (+/− stepper)
  *   - Per-subtask cards (title, description, estimated minutes) when count ≥ 2
  *
+ * When `editMode` is true (used by EditTask):
+ *   - Each subtask card is replaced by SubtaskScheduleCard which adds an
+ *     Auto / Manual toggle and inline session time fields.
+ *   - For single-task mode (numSubtasks === 1) an inline schedule section
+ *     appears below the estimated minutes input.
+ *
  * All state lives in the parent. This component is purely presentational.
  */
 
@@ -18,6 +24,18 @@ import Box from "../../../components/layout/Box";
 import List, { ListCellProps } from "../../../components/layout/List";
 import { Subtask } from "./taskFormTypes";
 import SubtaskCard from "./SubtaskCard";
+import SubtaskScheduleCard from "./SubtaskScheduleCard";
+import ScheduleToggle from "./ScheduleToggle";
+import type { ScheduleToggleData } from "./ScheduleToggle";
+
+/** Schedule state for single-task mode in edit */
+export interface SingleTaskSchedule {
+  mode: "auto" | "manual";
+  sessionId?: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+}
 
 interface Props {
   estimatedMinutes: string;
@@ -29,8 +47,17 @@ interface Props {
   onSubtaskUpdate: (index: number, field: keyof Subtask, value: any) => void;
 
   boxContentStyle?: object;
+
+  // ── Edit-mode props (optional – only passed from EditTask) ────────────
+  /** When true, subtask cards include schedule controls */
+  editMode?: boolean;
+  /** Schedule state for single-task (numSubtasks === 1) edit mode */
+  singleTaskSchedule?: SingleTaskSchedule;
+  /** Called when a single-task schedule field changes */
+  onSingleTaskScheduleChange?: (field: keyof SingleTaskSchedule, value: any) => void;
 }
 
+/* ── List‑data mapper (create mode – no schedule) ─────────────────────── */
 const toListData = (
   subtasks: Subtask[],
   onSubtaskUpdate: (index: number, field: keyof Subtask, value: any) => void,
@@ -42,6 +69,23 @@ const toListData = (
     ),
   }));
 
+/* ── List‑data mapper (edit mode – with schedule) ─────────────────────── */
+const toScheduleListData = (
+  subtasks: Subtask[],
+  onSubtaskUpdate: (index: number, field: keyof Subtask, value: any) => void,
+): ListCellProps[] =>
+  subtasks.map((subtask, index) => ({
+    id: subtask.id,
+    content: (
+      <SubtaskScheduleCard
+        subtask={subtask}
+        index={index}
+        onUpdate={(field, value) => onSubtaskUpdate(index, field, value)}
+      />
+    ),
+  }));
+
+/* ── Main component ───────────────────────────────────────────────────── */
 const TimeAndPartsSection: React.FC<Props> = ({
   estimatedMinutes,
   numSubtasks,
@@ -50,6 +94,9 @@ const TimeAndPartsSection: React.FC<Props> = ({
   onNumSubtasksChange,
   onSubtaskUpdate,
   boxContentStyle,
+  editMode = false,
+  singleTaskSchedule,
+  onSingleTaskScheduleChange,
 }) => {
   return (
     <Box title="TIME & PARTS" style={[styles.boxContent, boxContentStyle]}>
@@ -92,8 +139,26 @@ const TimeAndPartsSection: React.FC<Props> = ({
         </View>
       )}
 
+      {/* Single-task schedule (edit mode only) */}
+      {editMode && numSubtasks === 1 && singleTaskSchedule && onSingleTaskScheduleChange && (
+        <ScheduleToggle
+          schedule={{
+            mode: singleTaskSchedule.mode,
+            date: singleTaskSchedule.date,
+            startTime: singleTaskSchedule.startTime,
+            endTime: singleTaskSchedule.endTime,
+          }}
+          onChange={(field, value) => onSingleTaskScheduleChange(field as keyof SingleTaskSchedule, value)}
+        />
+      )}
+
       {/* Subtask cards — only when ≥ 2 parts */}
-      {numSubtasks >= 2 && <List data={toListData(subtasks, onSubtaskUpdate)} />}
+      {numSubtasks >= 2 &&
+        (editMode ? (
+          <List data={toScheduleListData(subtasks, onSubtaskUpdate)} />
+        ) : (
+          <List data={toListData(subtasks, onSubtaskUpdate)} />
+        ))}
     </Box>
   );
 };

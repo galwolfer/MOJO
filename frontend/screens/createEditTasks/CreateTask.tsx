@@ -16,6 +16,7 @@ import { View, StyleSheet, TouchableOpacity } from "react-native";
 import { COLORS, SPACING, ICON_SIZES } from "../../theme";
 import AppButton from "../../components/common/AppButton";
 import AppText from "../../components/common/AppText";
+import ErrorBanner from "../../components/common/ErrorBanner";
 import PopupBox from "../../components/common/PopupBox";
 import ScrollableContent from "../../components/layout/ScrollableContent";
 import { ICONS } from "../../components/icons/icons";
@@ -57,6 +58,7 @@ const CreateTask: React.FC = () => {
     message: string;
     resetOnClose?: boolean;
   } | null>(null);
+  const [formErrors, setFormErrors] = useState<string[]>([]);
 
   // Header
   const LeftIcon = ICONS.left;
@@ -104,11 +106,18 @@ const CreateTask: React.FC = () => {
   }, [formState.category]);
 
   // Form handlers
-  const handleTaskNameChange = useCallback((v: string) => setFormState((p) => ({ ...p, taskName: v })), []);
-  const handleTimeToCompleteChange = useCallback((v: string) => setFormState((p) => ({ ...p, timeToComplete: v })), []);
+  const handleTaskNameChange = useCallback((v: string) => {
+    setFormState((p) => ({ ...p, taskName: v }));
+    setFormErrors([]);
+  }, []);
+  const handleTimeToCompleteChange = useCallback((v: string) => {
+    setFormState((p) => ({ ...p, timeToComplete: v }));
+    setFormErrors([]);
+  }, []);
   const handleDateSelect = useCallback((date: string) => {
     setFormState((p) => ({ ...p, timeToComplete: date }));
     setIsCalendarVisible(false);
+    setFormErrors([]);
   }, []);
   const handleEffortChange = useCallback((v: number) => setFormState((p) => ({ ...p, effort: v })), []);
   const handleImportanceChange = useCallback((v: number) => setFormState((p) => ({ ...p, importance: v })), []);
@@ -122,10 +131,13 @@ const CreateTask: React.FC = () => {
     setSubcategories((prev) => [...prev, newSub]);
   }, []);
   const handleDescriptionChange = useCallback((v: string) => setFormState((p) => ({ ...p, description: v })), []);
-  const handleEstimatedMinutesChange = useCallback(
-    (v: string) => setFormState((p) => ({ ...p, estimatedMinutes: v })),
-    [],
-  );
+  // Only allow numeric input for estimated minutes
+  const handleEstimatedMinutesChange = useCallback((v: string) => {
+    const numericOnly = v.replace(/[^0-9]/g, "");
+    setFormState((p) => ({ ...p, estimatedMinutes: numericOnly }));
+    // Clear errors when user starts correcting
+    setFormErrors([]);
+  }, []);
 
   const handleNumSubtasksChange = useCallback(
     (value: number) => {
@@ -142,27 +154,91 @@ const CreateTask: React.FC = () => {
   );
 
   const handleSubtaskUpdate = useCallback((index: number, field: keyof Subtask, value: any) => {
+    // For minutes field, only allow numeric input
+    const processedValue = field === "minutes" ? String(value).replace(/[^0-9]/g, "") : value;
     setFormState((p) => {
       const updated = [...p.subtasks];
-      updated[index] = { ...updated[index], [field]: value };
+      updated[index] = { ...updated[index], [field]: processedValue };
       return { ...p, subtasks: updated };
     });
+    // Clear errors when user starts correcting
+    setFormErrors([]);
   }, []);
 
   const resetForm = useCallback(() => {
     setFormState(DEFAULT_FORM);
     setSubcategories([]);
+    setFormErrors([]);
   }, []);
 
-  const handleCreateTask = useCallback(async () => {
+  // Validation function
+  const validateForm = useCallback((): string[] => {
+    const errors: string[] = [];
+
+    // Task name required
     if (!formState.taskName.trim()) {
-      setPopupInfo({ title: "Validation Error", message: "Please enter a task name" });
-      return;
+      errors.push("Task name is required");
     }
+
+    // Due date required
     if (!formState.timeToComplete.trim()) {
-      setPopupInfo({ title: "Validation Error", message: "Please select a date to complete" });
+      errors.push("Due date is required");
+    } else {
+      // Validate date format (YYYY-MM-DD)
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(formState.timeToComplete)) {
+        errors.push("Invalid date format (expected YYYY-MM-DD)");
+      } else {
+        const selectedDate = new Date(formState.timeToComplete);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (selectedDate < today) {
+          errors.push("Due date cannot be in the past");
+        }
+      }
+    }
+
+    // Validate estimated minutes (when single task)
+    if (formState.numSubtasks === 1 && formState.estimatedMinutes) {
+      const mins = parseInt(formState.estimatedMinutes, 10);
+      if (isNaN(mins) || mins <= 0) {
+        errors.push("Estimated minutes must be a positive number");
+      } else if (mins > 1440) {
+        errors.push("Estimated minutes cannot exceed 1440 (24 hours)");
+      }
+    }
+
+    // Validate subtasks (when split into parts)
+    if (formState.numSubtasks >= 2) {
+      const hasAtLeastOneTitle = formState.subtasks.some((st) => st.title.trim());
+      if (!hasAtLeastOneTitle) {
+        errors.push("At least one part must have a name");
+      }
+
+      // Validate each subtask's minutes if provided
+      formState.subtasks.forEach((st, idx) => {
+        if (st.minutes) {
+          const mins = parseInt(st.minutes, 10);
+          if (isNaN(mins) || mins <= 0) {
+            errors.push(`Part ${idx + 1}: minutes must be a positive number`);
+          } else if (mins > 1440) {
+            errors.push(`Part ${idx + 1}: minutes cannot exceed 1440 (24 hours)`);
+          }
+        }
+      });
+    }
+
+    return errors;
+  }, [formState]);
+
+  const handleCreateTask = useCallback(async () => {
+    // Run validation
+    const errors = validateForm();
+    if (errors.length > 0) {
+      setFormErrors(errors);
       return;
     }
+    setFormErrors([]);
 
     setIsLoading(true);
     try {
@@ -209,7 +285,7 @@ const CreateTask: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [formState, notifyTaskUpdate]);
+  }, [formState, notifyTaskUpdate, validateForm]);
 
   const closePopup = useCallback(() => {
     if (popupInfo?.resetOnClose) resetForm();
@@ -225,6 +301,9 @@ const CreateTask: React.FC = () => {
       contentContainerStyle={styles.contentContainer}
       extraBottomPadding={SPACING.xlg * 3}
     >
+      {/* Error banner at top */}
+      <ErrorBanner errors={formErrors} />
+
       <TaskDetailsSection
         taskName={formState.taskName}
         timeToComplete={formState.timeToComplete}
@@ -268,6 +347,9 @@ const CreateTask: React.FC = () => {
           disabled={isLoading}
         />
       </View>
+
+      {/* Error banner below button */}
+      <ErrorBanner errors={formErrors} />
 
       <PopupBox visible={!!popupInfo} onClose={closePopup} title={popupInfo?.title ?? ""} titleColor={COLORS.primary1}>
         <AppText style={styles.popupMessage}>{popupInfo?.message}</AppText>

@@ -831,13 +831,8 @@ export async function updateTask(
   id: string,
   updates: Partial<Omit<Task, "_id" | "userId" | "createdAt" | "updatedAt">>,
 ): Promise<Task | null> {
-  try {
-    const response = await patch<{ success: boolean; task: Task }>(`/tasks/${id}`, updates);
-    return response.task || null;
-  } catch (error) {
-    console.warn("Failed to update task:", error);
-    return null;
-  }
+  const response = await patch<{ success: boolean; task: Task }>(`/tasks/${id}`, updates);
+  return response.task || null;
 }
 
 /**

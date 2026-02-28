@@ -14,9 +14,15 @@ function normalizeName(name) {
   return String(name || "").trim();
 }
 
+const SYSTEM_USER_ID = "000000000000000000000000";
+
 export async function findSubcategoryById({ userId, subcategoryId }) {
   if (!userId || !subcategoryId) return null;
-  return Subcategory.findOne({ _id: subcategoryId, userId }).lean();
+  // Also accept system-wide (general) subcategories shared across all users
+  return Subcategory.findOne({
+    _id: subcategoryId,
+    userId: { $in: [userId, SYSTEM_USER_ID] },
+  }).lean();
 }
 
 export async function addSubcategoryToUser(userId, subcategoryId) {
@@ -97,7 +103,11 @@ export async function resolveSubcategoryId({
   }
 
   if (candidateId) {
-    const found = await Subcategory.findOne({ _id: candidateId, userId }).lean();
+    // Accept subcategories owned by the user OR the system-wide general ones
+    const found = await Subcategory.findOne({
+      _id: candidateId,
+      userId: { $in: [userId, SYSTEM_USER_ID] },
+    }).lean();
     return found ? found._id : null;
   }
 
@@ -114,7 +124,7 @@ export async function ensureGeneralSubcategory({ userId, parent } = {}) {
   if (!parent || !isValidCategory(parent)) return null;
 
   // System-wide general subcategory shared across all users
-  const systemUserId = "000000000000000000000000";
+  const systemUserId = SYSTEM_USER_ID;
   const displayName = getDisplayName(parent) || parent;
   const generalName = `General ${displayName}`;
 

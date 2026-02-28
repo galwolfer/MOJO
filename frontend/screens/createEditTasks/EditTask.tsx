@@ -1,49 +1,52 @@
 /**
  * EditTask Screen
  *
- * Thin orchestration screen for editing an existing task.
- * All UI sections are extracted into dedicated components:
+ * A task editing form that mirrors CreateTask's layout and behavior.
+ * Uses the same shared components (TaskDetailsSection, TimeAndPartsSection,
+ * ErrorBanner) via ScrollableContent for consistent look & feel.
  *
- *  ┌─────────────────────────────────────────────────────────────────────┐
- *  │  TaskDetailsSection      Task name, due date, sliders, category,   │
- *  │                          subcategory, description                   │
- *  ├─────────────────────────────────────────────────────────────────────┤
- *  │  AdditionalDetailsSection  Estimated minutes, subtask parts editor  │
- *  ├─────────────────────────────────────────────────────────────────────┤
- *  │  TaskScheduleEditor      Manual / auto schedule (self-contained)   │
- *  ├─────────────────────────────────────────────────────────────────────┤
- *  │  TaskActionButtons       UPDATE / Discard / DELETE                  │
- *  └─────────────────────────────────────────────────────────────────────┘
+ * Schedule editing is **merged into the subtask cards** so each subtask
+ * (or the single-task) can be toggled between Auto / Manual scheduling.
+ * Manual subtasks show inline date + start/end time fields; Auto subtasks
+ * are handled by the scheduler on save.
+ *
+ * Additionally includes:
+ *   - TaskActionButtons  (UPDATE / Discard / DELETE)
  */
 
 import React, { useState, useCallback, useEffect } from "react";
-import { View, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, ActivityIndicator } from "react-native";
+import { View, StyleSheet, SafeAreaView, TouchableOpacity, ActivityIndicator } from "react-native";
 import { COLORS, SPACING, FONT_SIZES, ICON_SIZES } from "../../theme";
 
 // ── Common components ─────────────────────────────────────────────────────────
 import AppText from "../../components/common/AppText";
 import AppButton from "../../components/common/AppButton";
+import ErrorBanner from "../../components/common/ErrorBanner";
 import PopupBox from "../../components/common/PopupBox";
+import ScrollableContent from "../../components/layout/ScrollableContent";
 
-// ── Extracted task-form section components ────────────────────────────────────
-import TaskDetailsSection from "./components/TaskDetailsSection";
-import TimeAndPartsSection from "./components/TimeAndPartsSection";
-import TaskScheduleEditor from "../../components/special/task/TaskScheduleEditor";
-import TaskActionButtons from "./components/TaskActionButtons";
+// ── Shared task-form section components ───────────────────────────────────────
+import { TaskDetailsSection, TimeAndPartsSection } from "../../components/special/task";
 import { toLocalDateStr, toLocalTimeStr } from "../../components/special/task/TaskScheduleEditor";
-import type { TaskFormState, Subtask, EditableSession } from "./components/taskFormTypes";
+import type { TaskFormState, Subtask, EditableSession } from "../../components/special/task";
+import type { SingleTaskSchedule } from "./components/TimeAndPartsSection";
 
 // ── Icons and context ─────────────────────────────────────────────────────────
 import { ICONS } from "../../components/icons/icons";
 import { useNavigation } from "../../context/NavigationContext";
 import { useTaskContext } from "../../context/TaskContext";
-import { useLayout } from "../../context/LayoutContext";
 
 // ── Services ──────────────────────────────────────────────────────────────────
-import { getTaskById, updateTask, deleteTask, getTaskSessions } from "../../services/taskService";
+import {
+  getTaskById,
+  updateTask,
+  deleteTask,
+  getTaskSessions,
+  updateTaskSchedule,
+  createTaskSchedule,
+} from "../../services/taskService";
 import { fetchSubcategoriesForCategory, type Subcategory } from "../../services/subcategoryService";
-
-const NAVBAR_HEIGHT = 96;
+import { combineLocalDateTime, validateEditableSessions } from "../../components/special/task/TaskScheduleEditor";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
@@ -52,7 +55,6 @@ const NAVBAR_HEIGHT = 96;
 const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
   const { setHeaderConfig, setActiveTab } = useNavigation();
   const { notifyTaskUpdate } = useTaskContext();
-  const { dimensions } = useLayout();
 
   // ── Form state ────────────────────────────────────────────────────────────
   const [formState, setFormState] = useState<TaskFormState>({
@@ -71,10 +73,19 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
 
+  // ── Single-task schedule (numSubtasks === 1) ──────────────────────────────
+  const [singleTaskSchedule, setSingleTaskSchedule] = useState<SingleTaskSchedule>({
+    mode: "auto",
+    date: "",
+    startTime: "",
+    endTime: "",
+  });
+
   // ── UI / loading state ────────────────────────────────────────────────────
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [formErrors, setFormErrors] = useState<string[]>([]);
   const [popupInfo, setPopupInfo] = useState<{
     title: string;
     message: string;
@@ -82,26 +93,19 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
     confirmAction?: () => void;
   } | null>(null);
 
-  // ── Schedule initial state (seeded from API; owned by TaskScheduleEditor after mount) ──
-  const [initialSessions, setInitialSessions] = useState<EditableSession[]>([]);
-  const [initialIsManual, setInitialIsManual] = useState(false);
-  const [sessionsLoading, setSessionsLoading] = useState(false);
+  // ── Header ────────────────────────────────────────────────────────────────
+  const LeftIcon = ICONS.left;
 
-  // ── Refs ──────────────────────────────────────────────────────────────────
-
-  // Use the shared Header via NavigationContext so spacing matches other screens
   useEffect(() => {
-    const handleBackPress = () => {
-      setActiveTab("calendar");
-    };
+    const handleBackPress = () => setActiveTab("calendar");
 
     setHeaderConfig({
       title: "Edit Task",
       show: true,
       icon: ICONS.edit,
       leftElement: (
-        <TouchableOpacity onPress={handleBackPress} style={styles.headerIconButton}>
-          {ICONS.left && React.createElement(ICONS.left, { size: ICON_SIZES.md, color: COLORS.primary1 })}
+        <TouchableOpacity onPress={handleBackPress}>
+          <LeftIcon size={ICON_SIZES.md} color={COLORS.primary1} />
         </TouchableOpacity>
       ),
       rightElement: (
@@ -110,14 +114,9 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
         </View>
       ),
     });
-
-    return () => {
-      // Clean up: hide header for other flows that expect no header
-      setHeaderConfig({ show: false });
-    };
   }, [setHeaderConfig, setActiveTab]);
 
-  // Load task data from API when the screen mounts or taskId changes
+  // ── Load task data from API ───────────────────────────────────────────────
   useEffect(() => {
     if (!taskId) {
       setIsFetching(false);
@@ -140,13 +139,11 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
           return;
         }
 
-        // Extract date portion from dueDate (YYYY-MM-DD).
-        // Use UTC getters so a midnight-UTC date is never shifted to the previous day
-        // for users in UTC− timezones (e.g. 2024-12-15T00:00Z → local "Dec 14" in UTC-5).
+        // Extract date portion from dueDate (YYYY-MM-DD) in UTC
         let dateStr = "";
         if (task.dueDate) {
           const d = new Date(task.dueDate);
-          dateStr = d.toISOString().slice(0, 10); // "YYYY-MM-DD" in UTC, matching server storage
+          dateStr = d.toISOString().slice(0, 10);
         }
 
         // Build subtask form state from API subtasks
@@ -157,6 +154,12 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
           description: st.description || "",
           minutes: st.minutes ? String(st.minutes) : "",
           index: st.index ?? idx + 1,
+          // Schedule fields will be populated after sessions are loaded
+          scheduleMode: "auto" as const,
+          sessionId: undefined,
+          sessionDate: "",
+          sessionStartTime: "",
+          sessionEndTime: "",
         }));
 
         const numSubtasks = formSubtasks.length > 0 ? formSubtasks.length : 1;
@@ -189,169 +192,232 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
             .catch(() => {});
         }
 
-        // Load the task's current scheduled sessions for the schedule editor
-        setSessionsLoading(true);
+        // ── Load sessions and merge into subtask / single-task schedule ──
         try {
           const sessionsData = await getTaskSessions(taskId);
           if (!cancelled && sessionsData) {
-            setInitialIsManual(sessionsData.manualSchedule);
-            setInitialSessions(
-              (sessionsData.sessions ?? [])
-                .filter((s) => s.status !== "completed")
-                .map((s) => ({
-                  id: s._id,
-                  date: toLocalDateStr(s.start),
-                  startTime: toLocalTimeStr(s.start),
-                  endTime: toLocalTimeStr(s.end),
-                  subtaskIndex: s.subtaskIndex,
-                })),
-            );
+            const isManual = sessionsData.manualSchedule;
+            const activeSessions = (sessionsData.sessions ?? [])
+              .filter((s: any) => s.status !== "completed")
+              .map((s: any) => ({
+                id: s._id,
+                date: toLocalDateStr(s.start),
+                startTime: toLocalTimeStr(s.start),
+                endTime: toLocalTimeStr(s.end),
+                subtaskIndex: s.subtaskIndex,
+              }));
+
+            if (numSubtasks >= 2) {
+              // Multi-part: merge sessions into subtasks by subtaskIndex
+              setFormState((prev) => ({
+                ...prev,
+                subtasks: prev.subtasks.map((st, idx) => {
+                  const session = activeSessions.find((s: any) => s.subtaskIndex === (st.index ?? idx + 1));
+                  return session
+                    ? {
+                        ...st,
+                        scheduleMode: isManual ? ("manual" as const) : ("auto" as const),
+                        sessionId: session.id,
+                        sessionDate: session.date,
+                        sessionStartTime: session.startTime,
+                        sessionEndTime: session.endTime,
+                      }
+                    : st;
+                }),
+              }));
+            } else {
+              // Single task: populate single-task schedule state
+              const firstSession = activeSessions[0];
+              if (firstSession) {
+                setSingleTaskSchedule({
+                  mode: isManual ? "manual" : "auto",
+                  sessionId: firstSession.id,
+                  date: firstSession.date,
+                  startTime: firstSession.startTime,
+                  endTime: firstSession.endTime,
+                });
+              }
+            }
           }
         } catch (_) {
-          // non-fatal — schedule editor simply shows empty
-        } finally {
-          if (!cancelled) setSessionsLoading(false);
+          // non-fatal — schedule section simply shows defaults
         }
       } catch (error) {
         if (!cancelled) {
           setFetchError(error instanceof Error ? error.message : "Failed to load task.");
         }
       } finally {
-        if (!cancelled) {
-          setIsFetching(false);
-        }
+        if (!cancelled) setIsFetching(false);
       }
     };
 
     loadTask();
-
     return () => {
       cancelled = true;
     };
   }, [taskId]);
 
-  /**
-   * Handle task name input change
-   */
-  const handleTaskNameChange = useCallback((text: string) => {
-    setFormState((prev) => ({ ...prev, taskName: text }));
+  // ── Form handlers (mirror CreateTask, with error clearing + numeric filtering) ──
+
+  const handleTaskNameChange = useCallback((v: string) => {
+    setFormState((p) => ({ ...p, taskName: v }));
+    setFormErrors([]);
   }, []);
 
-  /**
-   * Handle time to complete input change
-   */
-  const handleTimeToCompleteChange = useCallback((text: string) => {
-    setFormState((prev) => ({ ...prev, timeToComplete: text }));
+  const handleTimeToCompleteChange = useCallback((v: string) => {
+    setFormState((p) => ({ ...p, timeToComplete: v }));
+    setFormErrors([]);
   }, []);
 
-  /**
-   * Handle date selection from calendar picker
-   */
   const handleDateSelect = useCallback((date: string) => {
-    setFormState((prev) => ({ ...prev, timeToComplete: date }));
+    setFormState((p) => ({ ...p, timeToComplete: date }));
     setIsCalendarVisible(false);
+    setFormErrors([]);
   }, []);
 
-  /**
-   * Handle estimated minutes input change
-   */
-  const handleEstimatedMinutesChange = useCallback((text: string) => {
-    setFormState((prev) => ({ ...prev, estimatedMinutes: text }));
+  const handleEffortChange = useCallback((v: number) => setFormState((p) => ({ ...p, effort: v })), []);
+  const handleImportanceChange = useCallback((v: number) => setFormState((p) => ({ ...p, importance: v })), []);
+
+  const handleCategorySelect = useCallback((key: string) => {
+    setFormState((p) => ({ ...p, category: key, subCategoryId: null }));
+    fetchSubcategoriesForCategory(key)
+      .then((subs) => {
+        setSubcategories(subs);
+        setFormState((p) => ({ ...p, subCategoryId: subs[0]?.id ?? null }));
+      })
+      .catch(() => setSubcategories([]));
   }, []);
 
-  /**
-   * Handle number of subtasks change
-   */
+  const handleSubCategorySelect = useCallback((id: string | null) => {
+    setFormState((p) => ({ ...p, subCategoryId: id }));
+  }, []);
+
+  const handleSubcategoryCreated = useCallback((newSub: Subcategory) => {
+    setSubcategories((prev) => [...prev, newSub]);
+  }, []);
+
+  const handleDescriptionChange = useCallback((v: string) => setFormState((p) => ({ ...p, description: v })), []);
+
+  // Only allow numeric input for estimated minutes
+  const handleEstimatedMinutesChange = useCallback((v: string) => {
+    const numericOnly = v.replace(/[^0-9]/g, "");
+    setFormState((p) => ({ ...p, estimatedMinutes: numericOnly }));
+    setFormErrors([]);
+  }, []);
+
   const handleNumSubtasksChange = useCallback(
     (value: number) => {
-      if (value < 1) value = 1;
-      if (value > 10) value = 10; // limit to 10 subtasks
-
-      const currentSubtasks = formState.subtasks;
-      const newSubtasks: Subtask[] = [];
-
-      // Keep existing subtasks and add new ones if needed
-      for (let i = 0; i < value; i++) {
-        if (currentSubtasks[i]) {
-          newSubtasks.push(currentSubtasks[i]);
-        } else {
-          newSubtasks.push({
+      const clamped = Math.min(10, Math.max(1, value));
+      const existing = formState.subtasks;
+      const next: Subtask[] = Array.from(
+        { length: clamped },
+        (_, i) =>
+          existing[i] ?? {
             id: `subtask-${i}-${Date.now()}`,
             title: "",
             description: "",
             minutes: "",
             index: i + 1,
-          });
-        }
-      }
-
-      setFormState((prev) => ({ ...prev, numSubtasks: value, subtasks: newSubtasks }));
+            scheduleMode: "auto" as const,
+            sessionDate: "",
+            sessionStartTime: "",
+            sessionEndTime: "",
+          },
+      );
+      setFormState((p) => ({ ...p, numSubtasks: clamped, subtasks: next }));
     },
     [formState.subtasks],
   );
 
-  /**
-   * Update a specific subtask
-   */
-  const updateSubtask = useCallback((index: number, field: keyof Subtask, value: any) => {
-    setFormState((prev) => {
-      const updatedSubtasks = [...prev.subtasks];
-      updatedSubtasks[index] = {
-        ...updatedSubtasks[index],
-        [field]: value,
-      };
-      return { ...prev, subtasks: updatedSubtasks };
+  const handleSubtaskUpdate = useCallback((index: number, field: keyof Subtask, value: any) => {
+    const processedValue = field === "minutes" ? String(value).replace(/[^0-9]/g, "") : value;
+    setFormState((p) => {
+      const updated = [...p.subtasks];
+      updated[index] = { ...updated[index], [field]: processedValue };
+      return { ...p, subtasks: updated };
     });
+    setFormErrors([]);
   }, []);
 
-  /**
-   * Handle effort slider change
-   */
-  const handleEffortChange = useCallback((value: number) => {
-    setFormState((prev) => ({ ...prev, effort: value }));
+  const handleSingleTaskScheduleChange = useCallback((field: keyof SingleTaskSchedule, value: any) => {
+    setSingleTaskSchedule((p) => ({ ...p, [field]: value }));
+    setFormErrors([]);
   }, []);
 
-  /**
-   * Handle importance slider change
-   */
-  const handleImportanceChange = useCallback((value: number) => {
-    setFormState((prev) => ({ ...prev, importance: value }));
-  }, []);
+  // ── Validation ────────────────────────────────────────────────────────────
+  const validateForm = useCallback((): string[] => {
+    const errors: string[] = [];
 
-  /**
-   * Handle category selection
-   */
-  const handleCategorySelect = useCallback((categoryKey: string) => {
-    setFormState((prev) => ({ ...prev, category: categoryKey, subCategoryId: null }));
-    // Fetch subcategories for the new category and auto-select the first one ("General [Category]")
-    fetchSubcategoriesForCategory(categoryKey)
-      .then((subs) => {
-        setSubcategories(subs);
-        setFormState((prev) => ({ ...prev, subCategoryId: subs[0]?.id ?? null }));
-      })
-      .catch(() => setSubcategories([]));
-  }, []);
+    if (!formState.taskName.trim()) {
+      errors.push("Task name is required");
+    }
 
-  /**
-   * Handle subcategory selection
-   */
-  const handleSubCategorySelect = useCallback((id: string | null) => {
-    setFormState((prev) => ({ ...prev, subCategoryId: id }));
-  }, []);
-  const handleSubcategoryCreated = useCallback((newSub: Subcategory) => {
-    setSubcategories((prev) => [...prev, newSub]);
-  }, []);
+    if (!formState.timeToComplete.trim()) {
+      errors.push("Due date is required");
+    } else {
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(formState.timeToComplete)) {
+        errors.push("Invalid date format (expected YYYY-MM-DD)");
+      }
+    }
 
-  /**
-   * Handle description input change
-   */
-  const handleDescriptionChange = useCallback((text: string) => {
-    setFormState((prev) => ({ ...prev, description: text }));
-  }, []);
+    if (formState.numSubtasks === 1 && formState.estimatedMinutes) {
+      const mins = parseInt(formState.estimatedMinutes, 10);
+      if (isNaN(mins) || mins <= 0) {
+        errors.push("Estimated minutes must be a positive number");
+      } else if (mins > 1440) {
+        errors.push("Estimated minutes cannot exceed 1440 (24 hours)");
+      }
+    }
 
-  /**
-   * Handle task deletion - Delete task via API
-   */
+    // Validate single-task manual session
+    if (formState.numSubtasks === 1 && singleTaskSchedule.mode === "manual") {
+      if (singleTaskSchedule.date && singleTaskSchedule.startTime && singleTaskSchedule.endTime) {
+        const sessionErr = validateEditableSessions([
+          {
+            date: singleTaskSchedule.date,
+            startTime: singleTaskSchedule.startTime,
+            endTime: singleTaskSchedule.endTime,
+          },
+        ]);
+        if (sessionErr) errors.push(sessionErr);
+      }
+    }
+
+    if (formState.numSubtasks >= 2) {
+      const hasAtLeastOneTitle = formState.subtasks.some((st) => st.title.trim());
+      if (!hasAtLeastOneTitle) {
+        errors.push("At least one part must have a name");
+      }
+
+      formState.subtasks.forEach((st, idx) => {
+        if (st.minutes) {
+          const mins = parseInt(st.minutes, 10);
+          if (isNaN(mins) || mins <= 0) {
+            errors.push(`Part ${idx + 1}: minutes must be a positive number`);
+          } else if (mins > 1440) {
+            errors.push(`Part ${idx + 1}: minutes cannot exceed 1440 (24 hours)`);
+          }
+        }
+
+        // Validate manual session times for each subtask
+        if (st.scheduleMode === "manual" && st.sessionDate && st.sessionStartTime && st.sessionEndTime) {
+          const sessionErr = validateEditableSessions([
+            {
+              date: st.sessionDate,
+              startTime: st.sessionStartTime,
+              endTime: st.sessionEndTime,
+            },
+          ]);
+          if (sessionErr) errors.push(`Part ${idx + 1}: ${sessionErr}`);
+        }
+      });
+    }
+
+    return errors;
+  }, [formState, singleTaskSchedule]);
+
+  // ── Delete ────────────────────────────────────────────────────────────────
   const handleDeleteTask = useCallback(() => {
     if (!taskId) {
       setPopupInfo({ title: "Error", message: "Task ID is missing. Unable to delete task." });
@@ -365,7 +431,6 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
         setIsLoading(true);
         try {
           const success = await deleteTask(taskId);
-
           if (success) {
             notifyTaskUpdate({ taskId });
             setActiveTab("calendar");
@@ -384,31 +449,25 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
     });
   }, [taskId, setActiveTab, notifyTaskUpdate]);
 
-  /**
-   * Handle form submission - Update task via API
-   */
+  // ── Update (task details + schedule) ──────────────────────────────────────
   const handleUpdateTask = useCallback(async () => {
-    // Validate required fields
-    if (!formState.taskName.trim()) {
-      setPopupInfo({ title: "Validation Error", message: "Please enter a task name" });
+    const errors = validateForm();
+    if (errors.length > 0) {
+      setFormErrors(errors);
       return;
     }
-
-    if (!formState.timeToComplete.trim()) {
-      setPopupInfo({ title: "Validation Error", message: "Please select a date to complete" });
-      return;
-    }
+    setFormErrors([]);
 
     if (!taskId) {
-      setPopupInfo({ title: "Error", message: "Task ID is missing. Unable to update task." });
+      setFormErrors(["Task ID is missing. Unable to update task."]);
       return;
     }
 
     setIsLoading(true);
     try {
-      // Prepare subtasks data
+      // ── 1. Build & send task update ─────────────────────────────────────
       const subtasksData = formState.subtasks
-        .filter((st) => st.title.trim()) // Only include subtasks with titles
+        .filter((st) => st.title.trim())
         .map((st, idx) => ({
           id: st.id,
           title: st.title,
@@ -417,26 +476,15 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
           index: idx + 1,
         }));
 
-      // Determine task type based on number of parts and time distribution
       let taskType: "perfect" | "in_parts" | "leaky" = "perfect";
       let chunkCount: number | undefined = undefined;
 
       if (formState.numSubtasks > 1) {
-        // Check if subtasks have different durations (leaky task)
-        const subtaskMinutes = formState.subtasks
-          .map((st) => (st.minutes ? parseInt(st.minutes, 10) : 0))
-          .filter((m) => m > 0);
-
-        if (subtaskMinutes.length >= 2) {
-          const allSame = subtaskMinutes.every((m) => m === subtaskMinutes[0]);
-          taskType = allSame ? "in_parts" : "leaky";
-        } else {
-          taskType = "in_parts";
-        }
+        const mins = formState.subtasks.map((st) => (st.minutes ? parseInt(st.minutes, 10) : 0)).filter((m) => m > 0);
+        taskType = mins.length >= 2 && !mins.every((m) => m === mins[0]) ? "leaky" : "in_parts";
         chunkCount = formState.numSubtasks;
       }
 
-      // Build update payload
       const updates: any = {
         taskname: formState.taskName,
         description: formState.description || "",
@@ -450,120 +498,187 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
         chunkCount,
       };
 
-      // Only include subtasks if there are actual parts
       if (subtasksData.length > 0) {
         updates.subtasks = subtasksData;
       }
 
       const updatedTask = await updateTask(taskId, updates);
-
-      if (updatedTask) {
-        notifyTaskUpdate({ taskId });
-        setPopupInfo({ title: "Success!", message: "Task updated successfully", navigateOnClose: true });
-      } else {
-        setPopupInfo({ title: "Error", message: "Failed to update task. Please try again." });
+      if (!updatedTask) {
+        setFormErrors(["Server returned no task data. Please try again."]);
+        return;
       }
+
+      // ── 2. Save schedule (manual sessions) ─────────────────────────────
+      const manualSessions: Array<{
+        id?: string;
+        start: string;
+        end: string;
+        subtaskIndex: number | null;
+      }> = [];
+      let hasAutoSubtasks = false;
+
+      if (formState.numSubtasks >= 2) {
+        formState.subtasks.forEach((st, idx) => {
+          if (st.scheduleMode === "manual" && st.sessionDate && st.sessionStartTime && st.sessionEndTime) {
+            manualSessions.push({
+              id: st.sessionId,
+              start: combineLocalDateTime(st.sessionDate, st.sessionStartTime).toISOString(),
+              end: combineLocalDateTime(st.sessionDate, st.sessionEndTime).toISOString(),
+              subtaskIndex: st.index ?? idx + 1,
+            });
+          } else {
+            hasAutoSubtasks = true;
+          }
+        });
+      } else {
+        // Single task
+        if (
+          singleTaskSchedule.mode === "manual" &&
+          singleTaskSchedule.date &&
+          singleTaskSchedule.startTime &&
+          singleTaskSchedule.endTime
+        ) {
+          manualSessions.push({
+            id: singleTaskSchedule.sessionId,
+            start: combineLocalDateTime(singleTaskSchedule.date, singleTaskSchedule.startTime).toISOString(),
+            end: combineLocalDateTime(singleTaskSchedule.date, singleTaskSchedule.endTime).toISOString(),
+            subtaskIndex: null,
+          });
+        } else {
+          hasAutoSubtasks = true;
+        }
+      }
+
+      // Save manual sessions if any
+      if (manualSessions.length > 0) {
+        await updateTaskSchedule(taskId, manualSessions);
+      }
+
+      // Trigger auto-scheduling for remaining subtasks
+      if (hasAutoSubtasks) {
+        await createTaskSchedule(taskId, { planningHorizonDays: 14 }).catch(() => {});
+      }
+
+      notifyTaskUpdate({ taskId });
+      setPopupInfo({ title: "Success!", message: "Task updated successfully.", navigateOnClose: true });
     } catch (error) {
-      setPopupInfo({
-        title: "Error",
-        message: `Failed to update task: ${error instanceof Error ? error.message : "Unknown error"}`,
-      });
+      setFormErrors([
+        `Failed to update task: ${error instanceof Error ? error.message : "Unknown error"}`,
+      ]);
     } finally {
       setIsLoading(false);
     }
-  }, [formState, taskId, notifyTaskUpdate]);
+  }, [formState, taskId, singleTaskSchedule, notifyTaskUpdate, validateForm]);
 
-  // Show loading spinner while fetching task data
+  // ── Loading / error states ────────────────────────────────────────────────
   if (isFetching) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary1} />
-          <AppText style={styles.loadingText}>Loading task...</AppText>
-        </View>
+      <SafeAreaView style={styles.loadingWrapper}>
+        <ActivityIndicator size="large" color={COLORS.primary1} />
+        <AppText style={styles.loadingText}>Loading task...</AppText>
       </SafeAreaView>
     );
   }
 
-  // Show error state if task couldn't be loaded
   if (fetchError) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <AppText style={styles.errorText}>{fetchError}</AppText>
-          <AppButton
-            title="Go Back"
-            onPress={() => setActiveTab("calendar")}
-            mode="filled"
-            color="primary1"
-            width="60%"
-          />
-        </View>
+      <SafeAreaView style={styles.loadingWrapper}>
+        <AppText variant="errorText" style={styles.fetchErrorText}>
+          {fetchError}
+        </AppText>
+        <AppButton
+          title="Go Back"
+          onPress={() => setActiveTab("calendar")}
+          mode="filled"
+          color="primary1"
+          width="60%"
+        />
       </SafeAreaView>
     );
   }
 
+  // ── Main form ─────────────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[
-          styles.contentContainer,
-          { paddingTop: (dimensions.headerHeight || SPACING.xlg * 3) + SPACING.md },
-        ]}
-        scrollIndicatorInsets={{ top: dimensions.headerHeight || SPACING.xlg * 3, bottom: NAVBAR_HEIGHT }}
-      >
-        <TaskDetailsSection
-          taskName={formState.taskName}
-          timeToComplete={formState.timeToComplete}
-          effort={formState.effort}
-          importance={formState.importance}
-          category={formState.category}
-          subCategoryId={formState.subCategoryId}
-          subcategories={subcategories}
-          description={formState.description}
-          isCalendarVisible={isCalendarVisible}
-          onTaskNameChange={handleTaskNameChange}
-          onTimeToCompleteChange={handleTimeToCompleteChange}
-          onDateSelect={handleDateSelect}
-          onCalendarToggle={() => setIsCalendarVisible((v) => !v)}
-          onEffortChange={handleEffortChange}
-          onImportanceChange={handleImportanceChange}
-          onCategorySelect={handleCategorySelect}
-          onSubCategorySelect={handleSubCategorySelect}
-          onSubcategoryCreated={handleSubcategoryCreated}
-          onDescriptionChange={handleDescriptionChange}
+    <ScrollableContent
+      respectHeader
+      respectNavBar
+      extraTopPadding={SPACING.lg}
+      scrollKey="edit-task"
+      contentContainerStyle={styles.contentContainer}
+      extraBottomPadding={SPACING.xlg * 3}
+    >
+      {/* Error banner at top */}
+      <ErrorBanner errors={formErrors} />
+
+      <TaskDetailsSection
+        taskName={formState.taskName}
+        timeToComplete={formState.timeToComplete}
+        effort={formState.effort}
+        importance={formState.importance}
+        category={formState.category}
+        subCategoryId={formState.subCategoryId}
+        subcategories={subcategories}
+        description={formState.description}
+        isCalendarVisible={isCalendarVisible}
+        onTaskNameChange={handleTaskNameChange}
+        onTimeToCompleteChange={handleTimeToCompleteChange}
+        onDateSelect={handleDateSelect}
+        onCalendarToggle={() => setIsCalendarVisible((v) => !v)}
+        onEffortChange={handleEffortChange}
+        onImportanceChange={handleImportanceChange}
+        onCategorySelect={handleCategorySelect}
+        onSubCategorySelect={handleSubCategorySelect}
+        onSubcategoryCreated={handleSubcategoryCreated}
+        onDescriptionChange={handleDescriptionChange}
+      />
+
+      <TimeAndPartsSection
+        estimatedMinutes={formState.estimatedMinutes}
+        numSubtasks={formState.numSubtasks}
+        subtasks={formState.subtasks}
+        onEstimatedMinutesChange={handleEstimatedMinutesChange}
+        onNumSubtasksChange={handleNumSubtasksChange}
+        onSubtaskUpdate={handleSubtaskUpdate}
+        editMode
+        singleTaskSchedule={singleTaskSchedule}
+        onSingleTaskScheduleChange={handleSingleTaskScheduleChange}
+      />
+
+      {/* Action buttons */}
+      <View style={styles.buttonContainer}>
+        <AppButton
+          title={isLoading ? "UPDATING..." : "UPDATE TASK"}
+          onPress={handleUpdateTask}
+          mode="filled"
+          color={COLORS.primary6}
+          icon={isLoading ? undefined : "edit"}
+          iconPosition="right"
+          width="100%"
+          disabled={isLoading}
         />
+      </View>
 
-        <View style={{ height: SPACING.lg }} />
-
-        <TimeAndPartsSection
-          estimatedMinutes={formState.estimatedMinutes}
-          numSubtasks={formState.numSubtasks}
-          subtasks={formState.subtasks}
-          onEstimatedMinutesChange={handleEstimatedMinutesChange}
-          onNumSubtasksChange={handleNumSubtasksChange}
-          onSubtaskUpdate={updateSubtask}
+      <View style={styles.buttonRow}>
+        <AppButton
+          title="Discard"
+          onPress={() => setActiveTab("calendar")}
+          mode="filled"
+          color="lightGray"
+          width="48%"
+          disabled={isLoading}
         />
-
-        <View style={{ height: SPACING.lg }} />
-
-        <TaskScheduleEditor
-          taskId={taskId}
-          initialSessions={initialSessions}
-          initialIsManualSchedule={initialIsManual}
-          isLoadingInitial={sessionsLoading}
-          onPopup={(title, message) => setPopupInfo({ title, message })}
-          onTaskUpdated={() => notifyTaskUpdate({ taskId })}
+        <AppButton
+          title="Delete"
+          onPress={handleDeleteTask}
+          mode="filled"
+          color="primary7"
+          width="48%"
+          disabled={isLoading}
         />
+      </View>
 
-        <TaskActionButtons
-          onUpdate={handleUpdateTask}
-          onDiscard={() => setActiveTab("calendar")}
-          onDelete={handleDeleteTask}
-          isUpdating={isLoading}
-        />
-      </ScrollView>
+      {/* Error banner below buttons */}
+      <ErrorBanner errors={formErrors} />
 
       {/* Popup / Alert */}
       <PopupBox
@@ -572,9 +687,9 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
         title={popupInfo?.title ?? ""}
         titleColor={COLORS.primary1}
       >
-        <AppText style={{ color: COLORS.darkGray, marginBottom: SPACING.lg }}>{popupInfo?.message}</AppText>
+        <AppText style={styles.popupMessage}>{popupInfo?.message}</AppText>
         {popupInfo?.confirmAction ? (
-          <View style={{ flexDirection: "row", gap: SPACING.md }}>
+          <View style={styles.confirmRow}>
             <AppButton title="Cancel" mode="filled" color="lightGray" onPress={() => setPopupInfo(null)} width="48%" />
             <AppButton
               title="Delete"
@@ -602,49 +717,57 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
           />
         )}
       </PopupBox>
-    </SafeAreaView>
+    </ScrollableContent>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.white3,
-    flexDirection: "column",
-  },
-  scrollView: {
-    flex: 1,
-  },
   contentContainer: {
-    padding: SPACING.md,
-    paddingBottom: NAVBAR_HEIGHT + SPACING.xlg,
+    alignItems: "center",
+    gap: SPACING.lg,
+    paddingBottom: SPACING.xlg * 6,
   },
-  loadingContainer: {
+  headerRight: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  popupMessage: {
+    color: COLORS.darkGray,
+    marginBottom: SPACING.lg,
+  },
+  buttonContainer: {
+    width: "100%",
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
+  buttonRow: {
+    width: "100%",
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: SPACING.md,
+  },
+  confirmRow: {
+    flexDirection: "row",
+    gap: SPACING.md,
+  },
+  loadingWrapper: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     gap: SPACING.lg,
+    backgroundColor: COLORS.white3,
   },
   loadingText: {
     fontSize: FONT_SIZES.md,
     color: COLORS.darkGray,
     marginTop: SPACING.md,
   },
-  errorText: {
-    fontSize: FONT_SIZES.md,
-    color: "#D32F2F",
+  fetchErrorText: {
     textAlign: "center",
     marginBottom: SPACING.lg,
     paddingHorizontal: SPACING.xlg,
-  },
-  headerIconButton: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
   },
 });
 
