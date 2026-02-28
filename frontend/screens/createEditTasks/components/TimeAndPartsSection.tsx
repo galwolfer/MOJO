@@ -10,13 +10,14 @@
  */
 
 import React from "react";
-import { View, StyleSheet, Pressable } from "react-native";
-import { COLORS, SPACING, FONT_SIZES, SHADOWS } from "../../../theme";
-import AppText from "../../../components/common/AppText";
+import { View, StyleSheet } from "react-native";
+import { COLORS, SPACING } from "../../../theme";
 import Input from "../../../components/inputs/Input";
 import SliderComponent from "../../../components/inputs/Slider";
 import Box from "../../../components/layout/Box";
+import List, { ListCellProps } from "../../../components/layout/List";
 import { Subtask } from "./taskFormTypes";
+import SubtaskCard from "./SubtaskCard";
 
 interface Props {
   estimatedMinutes: string;
@@ -29,6 +30,17 @@ interface Props {
 
   boxContentStyle?: object;
 }
+
+const toListData = (
+  subtasks: Subtask[],
+  onSubtaskUpdate: (index: number, field: keyof Subtask, value: any) => void,
+): ListCellProps[] =>
+  subtasks.map((subtask, index) => ({
+    id: subtask.id,
+    content: (
+      <SubtaskCard subtask={subtask} index={index} onUpdate={(field, value) => onSubtaskUpdate(index, field, value)} />
+    ),
+  }));
 
 const TimeAndPartsSection: React.FC<Props> = ({
   estimatedMinutes,
@@ -81,47 +93,7 @@ const TimeAndPartsSection: React.FC<Props> = ({
       )}
 
       {/* Subtask cards — only when ≥ 2 parts */}
-      {numSubtasks >= 2 && (
-        <View style={styles.subtasksSection}>
-          {subtasks.map((subtask, index) => (
-            <View key={subtask.id} style={styles.subtaskCard}>
-              <AppText style={styles.subtaskHeader}>Part {index + 1}</AppText>
-
-              <View style={styles.formField}>
-                <Input
-                  label="Part Name"
-                  placeholder="e.g., Planning"
-                  value={subtask.title}
-                  onChangeText={(t) => onSubtaskUpdate(index, "title", t)}
-                  type="text"
-                />
-              </View>
-
-              <View style={styles.formField}>
-                <Input
-                  label="Part Description"
-                  placeholder="Describe this part..."
-                  value={subtask.description}
-                  onChangeText={(t) => onSubtaskUpdate(index, "description", t)}
-                  type="longtext"
-                  multiline
-                  numberOfLines={2}
-                />
-              </View>
-
-              <View style={styles.formField}>
-                <Input
-                  label="Estimated Minutes"
-                  placeholder="e.g., 15"
-                  value={subtask.minutes}
-                  onChangeText={(t) => onSubtaskUpdate(index, "minutes", t)}
-                  type="number"
-                />
-              </View>
-            </View>
-          ))}
-        </View>
-      )}
+      {numSubtasks >= 2 && <List data={toListData(subtasks, onSubtaskUpdate)} />}
     </Box>
   );
 };
@@ -138,26 +110,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontWeight: "400",
-    color: COLORS.darkGray,
     marginBottom: 4,
-  },
-  subtasksSection: {
-    marginTop: SPACING.sm,
-    marginBottom: SPACING.sm,
-  },
-  subtaskCard: {
-    backgroundColor: COLORS.white2,
-    borderRadius: 12,
-    padding: SPACING.md,
-    marginBottom: SPACING.sm,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.primary1,
-  },
-  subtaskHeader: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: "600",
-    color: COLORS.primary1,
-    marginBottom: SPACING.md,
   },
 });
 
