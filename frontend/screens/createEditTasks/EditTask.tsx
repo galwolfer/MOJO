@@ -562,9 +562,7 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
       notifyTaskUpdate({ taskId });
       setPopupInfo({ title: "Success!", message: "Task updated successfully.", navigateOnClose: true });
     } catch (error) {
-      setFormErrors([
-        `Failed to update task: ${error instanceof Error ? error.message : "Unknown error"}`,
-      ]);
+      setFormErrors([`Failed to update task: ${error instanceof Error ? error.message : "Unknown error"}`]);
     } finally {
       setIsLoading(false);
     }

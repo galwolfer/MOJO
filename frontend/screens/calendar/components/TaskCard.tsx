@@ -135,7 +135,7 @@ function TaskCard({
               textStyle={[styles.titleText, { fontFamily: isExpanded ? FONTS.fredokaSemiBold : FONTS.fredokaRegular }]}
               iconStyle={{ marginLeft: 0, marginBottom: 0 }}
               leadingNode={<ProgressIcon value={taskProgress} size={ICON_SIZES.md} />}
-              reversed={true}
+              reversed={!isExpanded}
             />
 
             {isExpanded && (
