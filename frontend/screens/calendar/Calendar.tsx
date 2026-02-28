@@ -70,6 +70,11 @@ export default function CalendarScreen() {
           <ICONS.calendar size={ICON_SIZES.md} color={COLORS.primary1} />
         </TouchableOpacity>
       ),
+      rightElement: (
+        <TouchableOpacity onPress={() => setActiveTab("alltasks")} activeOpacity={0.7}>
+          <ICONS.list size={ICON_SIZES.md} color={COLORS.primary1} />
+        </TouchableOpacity>
+      ),
       element: bottomElement,
     });
   }, [selectedDate, showCalendarPicker]);

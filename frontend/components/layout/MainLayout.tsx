@@ -18,6 +18,7 @@ import UserProfileScreen from "../../screens/user/UserProfile";
 import CreateTaskScreen from "../../screens/createEditTasks/CreateTask";
 import EditTaskScreen from "../../screens/createEditTasks/EditTask";
 import OverdueTasksScreen from "../../screens/OverdueTasks";
+import AllTasksScreen from "../../screens/calendar/AllTasksScreen";
 import { getOverdueTasks } from "../../services/taskService";
 import { COLORS, SPACING } from "../../theme";
 import { useKeyboard } from "../../hooks";
@@ -82,6 +83,8 @@ export default function MainLayout() {
         return <EditTaskScreen taskId={navigationParams?.taskId || ""} />;
       case "overdue":
         return <OverdueTasksScreen />;
+      case "alltasks":
+        return <AllTasksScreen />;
       default:
         return <ChatScreen />;
     }

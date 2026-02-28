@@ -8,17 +8,19 @@ interface PopupBoxProps {
   onClose: () => void;
   title?: string;
   titleColor?: string;
+  /** optional icon to render left of title text */
+  titleIcon?: React.ReactNode;
   children?: React.ReactNode;
   contentStyle?: object;
 }
 
-export default function PopupBox({ visible, onClose, title, titleColor, children }: PopupBoxProps) {
+export default function PopupBox({ visible, onClose, title, titleColor, titleIcon, children }: PopupBoxProps) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable onPress={(e) => e.stopPropagation()} style={styles.boxContainer}>
           <View style={styles.boxWrapper}>
-            <Box title={title} titleColor={titleColor || COLORS.primary1}>
+            <Box title={title} titleColor={titleColor || COLORS.primary1} titleIcon={titleIcon}>
               <View style={styles.scrollWrapper}>
                 <ScrollView showsVerticalScrollIndicator={true} nestedScrollEnabled={true} style={styles.scrollView}>
                   {children}
