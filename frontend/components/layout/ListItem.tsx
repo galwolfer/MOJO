@@ -4,6 +4,7 @@ import { moderateScale } from "react-native-size-matters";
 import AppText from "../../components/common/AppText";
 import { COLORS, SPACING } from "../../theme";
 import type { ListCellProps } from "./List";
+import { useColors } from "../../context/ThemeContext";
 
 export type ListItemProps = {
   title: string;
@@ -13,15 +14,17 @@ export type ListItemProps = {
 };
 
 export default function ListItem({ title, subtitle, logo, style }: ListItemProps) {
+  const colors = useColors();
+
   return (
     <View style={[styles.container, style]}>
       {logo ? <View style={styles.logo}>{logo}</View> : null}
       <View style={styles.textWrap}>
-        <AppText variant="bodyText" style={styles.title}>
+        <AppText variant="bodyText" style={[styles.title, { color: colors.text1 }]}>
           {title}
         </AppText>
         {subtitle ? (
-          <AppText variant="notes" style={styles.subtitle}>
+          <AppText variant="notes" style={[styles.subtitle, { color: colors.gray1 }]}>
             {subtitle}
           </AppText>
         ) : null}

@@ -4,6 +4,7 @@ import AppText from "../../common/AppText";
 import SessionRow from "./SessionRow";
 import List from "../../layout/List";
 import { COLORS, ICON_SIZES, SPACING } from "../../../theme";
+import { useColors } from "../../../context/ThemeContext";
 import { ScheduledSession, Subtask, getSessionKey } from "../../widgets/taskHelpers";
 import { useTaskUpdateSubscription } from "../../../context/TaskContext";
 import TaskTitle from "./TaskTitle";
@@ -40,9 +41,11 @@ export const ScheduledSessionsSection: React.FC<{
   hideTitle = false,
   hideTaskTitle = false,
   sessionHeaderMode = "none",
-  dividerColor = COLORS.white,
+  dividerColor,
   taskStatus,
 }) => {
+  const colors = useColors();
+  const resolvedDividerColor = dividerColor ?? colors.bg1;
   // Listen for task updates and invoke parent's refresh when task updates occur elsewhere
   useTaskUpdateSubscription((payload?: { taskId?: string }) => {
     if (!payload || !payload.taskId || payload.taskId === taskId) {
@@ -71,7 +74,7 @@ export const ScheduledSessionsSection: React.FC<{
         }}
       >
         <List
-          dividerColor={dividerColor}
+          dividerColor={resolvedDividerColor}
           data={sessions.map((session, index) => {
             const key = getSessionKey(taskId, session, index, subtasks);
             const subtaskId = (session as any).subtaskId;

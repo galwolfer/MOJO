@@ -13,9 +13,11 @@ import { ICONS } from "../components/icons/icons";
 import ScrollableContent from "../components/layout/ScrollableContent";
 import useContentInsets from "../hooks/useContentInsets";
 import FloatingButton from "../components/common/FloatingButton";
+import { useColors } from "../context/ThemeContext";
 
 export default function CalendarScreen() {
   const { setHeaderConfig, setActiveTab } = useNavigation();
+  const colors = useColors();
 
   const Calendar = (
     <View>

@@ -10,6 +10,7 @@ import { View, StyleSheet, Switch, TouchableOpacity, Text } from "react-native";
 import { moderateScale } from "react-native-size-matters";
 import { useNotifications } from "../../context/NotificationContext";
 import { COLORS, SPACING, FONT_SIZES } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 import { post } from "../../services/httpClient";
 import AppText from "../common/AppText";
 import AppButton from "../common/AppButton";
@@ -20,6 +21,7 @@ type NotificationSettingsProps = {
 };
 
 export default function NotificationSettings({ style }: NotificationSettingsProps) {
+  const colors = useColors();
   const {
     isInitialized,
     isLoading,
@@ -223,17 +225,17 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
       {/* Main Settings */}
       <Box title="Notification Preferences" titleColor={COLORS.primary1}>
         <View style={styles.boxContent}>
-          <AppText variant="bodyText" style={styles.description}>
+          <AppText variant="bodyText" style={[styles.description, { color: colors.gray2 }]}>
             Customize how and when you receive notifications from Mojo.
           </AppText>
 
           {/* Master toggle */}
-          <View style={styles.settingRow}>
+          <View style={[styles.settingRow, { borderBottomColor: colors.bg3 }]}>
             <View style={styles.settingInfo}>
-              <AppText variant="boldText" style={styles.settingLabel}>
+              <AppText variant="boldText" style={[styles.settingLabel, { color: colors.text1 }]}>
                 All Notifications
               </AppText>
-              <AppText variant="notes" style={styles.settingDescription}>
+              <AppText variant="notes" style={[styles.settingDescription, { color: colors.gray1 }]}>
                 Enable or disable all push notifications
               </AppText>
             </View>
@@ -241,20 +243,20 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
               value={preferences?.enabled ?? false}
               onValueChange={handleToggleNotifications}
               disabled={isSaving}
-              trackColor={{ false: COLORS.white2, true: COLORS.primary1 }}
-              thumbColor={preferences?.enabled ? COLORS.colorWhite : COLORS.lightGray}
+              trackColor={{ false: colors.bg2, true: COLORS.primary1 }}
+              thumbColor={preferences?.enabled ? colors.text2 : colors.gray1}
             />
           </View>
 
           {preferences?.enabled && (
             <>
               {/* Morning Digest */}
-              <View style={styles.settingRow}>
+              <View style={[styles.settingRow, { borderBottomColor: colors.bg3 }]}>
                 <View style={styles.settingInfo}>
-                  <AppText variant="boldText" style={styles.settingLabel}>
+                  <AppText variant="boldText" style={[styles.settingLabel, { color: colors.text1 }]}>
                     🌅 Morning Digest
                   </AppText>
-                  <AppText variant="notes" style={styles.settingDescription}>
+                  <AppText variant="notes" style={[styles.settingDescription, { color: colors.gray1 }]}>
                     Daily summary at {String(preferences?.morningDigest?.hour || 8).padStart(2, "0")}:
                     {String(preferences?.morningDigest?.minute || 0).padStart(2, "0")}
                   </AppText>
@@ -263,8 +265,8 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
                   value={preferences?.morningDigest?.enabled ?? true}
                   onValueChange={handleToggleMorningDigest}
                   disabled={isSaving}
-                  trackColor={{ false: COLORS.white2, true: COLORS.primary1 }}
-                  thumbColor={preferences?.morningDigest?.enabled ? COLORS.colorWhite : COLORS.lightGray}
+                  trackColor={{ false: colors.bg2, true: COLORS.primary1 }}
+                  thumbColor={preferences?.morningDigest?.enabled ? colors.text2 : colors.gray1}
                 />
               </View>
 
@@ -350,12 +352,12 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
               )}
 
               {/* Task Reminders */}
-              <View style={styles.settingRow}>
+              <View style={[styles.settingRow, { borderBottomColor: colors.bg3 }]}>
                 <View style={styles.settingInfo}>
-                  <AppText variant="boldText" style={styles.settingLabel}>
+                  <AppText variant="boldText" style={[styles.settingLabel, { color: colors.text1 }]}>
                     ⏰ Task Reminders
                   </AppText>
-                  <AppText variant="notes" style={styles.settingDescription}>
+                  <AppText variant="notes" style={[styles.settingDescription, { color: colors.gray1 }]}>
                     Get reminded before task deadlines
                   </AppText>
                 </View>
@@ -363,19 +365,19 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
                   value={preferences?.taskReminders?.enabled ?? true}
                   onValueChange={handleToggleTaskReminders}
                   disabled={isSaving}
-                  trackColor={{ false: COLORS.white2, true: COLORS.primary1 }}
-                  thumbColor={preferences?.taskReminders?.enabled ? COLORS.colorWhite : COLORS.lightGray}
+                  trackColor={{ false: colors.bg2, true: COLORS.primary1 }}
+                  thumbColor={preferences?.taskReminders?.enabled ? colors.text2 : colors.gray1}
                 />
               </View>
 
               {/* Smart Reminders */}
               {preferences?.taskReminders?.enabled && (
-                <View style={[styles.settingRow, styles.nestedSetting]}>
+                <View style={[styles.settingRow, styles.nestedSetting, { borderBottomColor: colors.bg3 }]}>
                   <View style={styles.settingInfo}>
-                    <AppText variant="boldText" style={styles.settingLabel}>
+                    <AppText variant="boldText" style={[styles.settingLabel, { color: colors.text1 }]}>
                       🧠 Smart Reminders
                     </AppText>
-                    <AppText variant="notes" style={styles.settingDescription}>
+                    <AppText variant="notes" style={[styles.settingDescription, { color: colors.gray1 }]}>
                       Use AI to optimize reminder timing
                     </AppText>
                   </View>
@@ -383,8 +385,8 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
                     value={preferences?.taskReminders?.useSmartReminders ?? true}
                     onValueChange={handleToggleSmartReminders}
                     disabled={isSaving}
-                    trackColor={{ false: COLORS.white2, true: COLORS.primary1 }}
-                    thumbColor={preferences?.taskReminders?.useSmartReminders ? COLORS.colorWhite : COLORS.lightGray}
+                    trackColor={{ false: colors.bg2, true: COLORS.primary1 }}
+                    thumbColor={preferences?.taskReminders?.useSmartReminders ? colors.text2 : colors.gray1}
                   />
                 </View>
               )}
@@ -397,7 +399,7 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
       {preferences?.enabled && (
         <Box title="Test Notifications" titleColor={COLORS.primary5}>
           <View style={styles.boxContent}>
-            <AppText variant="bodyText" style={styles.description}>
+            <AppText variant="bodyText" style={[styles.description, { color: colors.gray2 }]}>
               Send test notifications to verify your setup is working correctly.
             </AppText>
 

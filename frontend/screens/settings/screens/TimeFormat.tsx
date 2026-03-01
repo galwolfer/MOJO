@@ -7,6 +7,7 @@
 import React, { useEffect } from "react";
 import { View, StyleSheet, TouchableOpacity } from "react-native";
 import { COLORS, SPACING, ICON_SIZES } from "../../../theme";
+import { useColors } from "../../../context/ThemeContext";
 import { useNavigation } from "../../../context/NavigationContext";
 import { ICONS } from "../../../components/icons/icons";
 import ScrollableContent from "../../../components/layout/ScrollableContent";
@@ -21,6 +22,7 @@ type TimeFormatScreenProps = {
 };
 
 export default function TimeFormatScreen({ onBack }: TimeFormatScreenProps) {
+  const colors = useColors();
   const { setHeaderConfig } = useNavigation();
   const { preferences, setTimeFormat, isLoading, error } = useAccessibilityPreferences();
 
@@ -113,7 +115,6 @@ const styles = StyleSheet.create({
   },
 
   previewContainer: {
-    backgroundColor: COLORS.lightGray + "50",
     borderRadius: 8,
     padding: SPACING.md,
     gap: SPACING.md,
@@ -124,7 +125,6 @@ const styles = StyleSheet.create({
   },
 
   previewLabel: {
-    color: COLORS.lightGray,
     fontSize: 12,
   },
 
@@ -135,6 +135,5 @@ const styles = StyleSheet.create({
 
   divider: {
     height: 1,
-    backgroundColor: COLORS.lightGray,
   },
 });

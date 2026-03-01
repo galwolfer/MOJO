@@ -22,6 +22,7 @@ import { ICONS } from "../../components/icons/icons";
 import { COLORS, SPACING } from "../../theme";
 import { Box } from "../../components";
 import { useAuth } from "../../context/AuthContext";
+import { useColors } from "../../context/ThemeContext";
 import { useKeyboard } from "../../hooks";
 
 import WelcomeStep from "./components/WelcomeStep";
@@ -40,6 +41,7 @@ import {
 
 export default function AuthScreen() {
   const { signIn } = useAuth();
+  const colors = useColors();
   const [screen, setScreen] = useState<"welcome" | "name" | "login" | "signup" | "ojotype" | "priorities">("welcome");
   const [loginError, setLoginError] = useState<string | null>(null);
   const [signupError, setSignupError] = useState<string | null>(null);
@@ -263,13 +265,13 @@ export default function AuthScreen() {
 
   return (
     <ScrollView
-      style={styles.scroll}
+      style={[styles.scroll, { backgroundColor: colors.bg3 }]}
       contentContainerStyle={contentContainerStyle}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
       <View style={{ alignItems: "center", marginBottom: -3 * SPACING.sm }}>
-        {Mojo ? <Mojo width={SPACING.xlg * 5} color={COLORS.primary1} /> : null}
+        {Mojo ? <Mojo width={SPACING.xlg * 5} color={colors.primary1} /> : null}
       </View>
       {screen === "welcome" && (
         <View style={styles.centered}>

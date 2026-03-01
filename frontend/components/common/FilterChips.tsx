@@ -2,6 +2,7 @@ import React from "react";
 import { ScrollView, TouchableOpacity, StyleSheet } from "react-native";
 import AppText from "../common/AppText";
 import { COLORS, SPACING } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 
 type FilterChipsProps = {
   filters: string[];
@@ -11,6 +12,8 @@ type FilterChipsProps = {
 };
 
 export default function FilterChips({ filters, selected, onChange, style }: FilterChipsProps) {
+  const colors = useColors();
+
   return (
     <ScrollView
       horizontal
@@ -21,8 +24,16 @@ export default function FilterChips({ filters, selected, onChange, style }: Filt
       {filters.map((f) => {
         const isActive = selected === f;
         return (
-          <TouchableOpacity key={f} style={[styles.chip, isActive && styles.chipActive]} onPress={() => onChange(f)}>
-            <AppText style={{ color: isActive ? COLORS.white : COLORS.darkGray }}>{f}</AppText>
+          <TouchableOpacity
+            key={f}
+            style={[
+              styles.chip,
+              { backgroundColor: colors.bg1, borderColor: colors.inputBorder },
+              isActive && styles.chipActive,
+            ]}
+            onPress={() => onChange(f)}
+          >
+            <AppText style={{ color: isActive ? colors.text2 : colors.gray2 }}>{f}</AppText>
           </TouchableOpacity>
         );
       })}

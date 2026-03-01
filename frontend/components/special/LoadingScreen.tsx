@@ -2,6 +2,8 @@ import React, { useRef, useEffect, useState, useCallback } from "react";
 import { View, StyleSheet } from "react-native";
 import LottieView from "lottie-react-native";
 import { COLORS } from "../../theme";
+import { getDynamicColors } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 import { getApiBase } from "../../services/config";
 
 // Animation timing constants (in milliseconds)
@@ -21,6 +23,12 @@ interface LoadingScreenProps {
 type LoadingPhase = "initial" | "waitingForLoop" | "looping" | "finishing" | "complete";
 
 export default function LoadingScreen({ onLoadingComplete, isAppReady }: LoadingScreenProps) {
+  let colors;
+  try {
+    colors = useColors();
+  } catch {
+    colors = getDynamicColors("light");
+  }
   const lottieRef = useRef<LottieView>(null);
   const [serverConnected, setServerConnected] = useState(false);
   const [phase, setPhase] = useState<LoadingPhase>("initial");
@@ -251,7 +259,7 @@ export default function LoadingScreen({ onLoadingComplete, isAppReady }: Loading
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.bg3 }]}>
       <LottieView
         ref={lottieRef}
         source={colorizedAnimation}

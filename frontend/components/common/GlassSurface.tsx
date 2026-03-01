@@ -18,6 +18,7 @@ import { StyleProp, View, ViewStyle, StyleSheet, Platform } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { GLASS, COMPONENT_STYLES, COLORS, SPACING } from "../../theme";
+import { useColors, useTheme } from "../../context/ThemeContext";
 import { canUseNativeBlur } from "../../utils/blurSupport";
 
 type GlassSurfaceProps = {
@@ -28,18 +29,27 @@ type GlassSurfaceProps = {
 };
 
 export default function GlassSurface({ children, style, intensity = 50, pointerEvents }: GlassSurfaceProps) {
+  const { theme } = useTheme();
+  const colors = useColors();
   const useNativeBlur = canUseNativeBlur();
+
+  const isDark = theme === "dark";
+
+  // Create dynamic glass colors based on the current theme mode
+  const dynamicGlass = {
+    surface: isDark ? COLORS.black : GLASS.surface,
+    border: isDark ? COLORS.black2 : GLASS.border,
+    highlight: isDark ? COLORS.black2 : GLASS.highlight,
+    shade: isDark ? COLORS.black1 : GLASS.shade,
+  };
+
   // On Android where blur is not supported, render a solid white surface (no glass effect)
   const androidNoBlur = Platform.OS === "android" && !useNativeBlur;
   if (androidNoBlur) {
     return (
       <View
         pointerEvents={pointerEvents}
-        style={[
-          // allow other layout styles but **force** an opaque white background
-          style,
-          { backgroundColor: COLORS.colorWhite, borderRadius: SPACING.lg, opacity: 1 },
-        ]}
+        style={[style, { backgroundColor: colors.bg2, borderRadius: SPACING.lg, opacity: 1 }]}
       >
         {children}
       </View>
@@ -50,7 +60,13 @@ export default function GlassSurface({ children, style, intensity = 50, pointerE
 
   // Always use the component-level glass surface so platforms without native blur
   // still receive the translucent background, border and rounded corners.
-  const surfaceStyle = COMPONENT_STYLES.glassSurface;
+  const surfaceStyle = [
+    COMPONENT_STYLES.glassSurface,
+    {
+      backgroundColor: dynamicGlass.surface,
+      borderColor: dynamicGlass.border,
+    },
+  ];
 
   // Always render the gloss overlay so platforms without native blur still show a glassy highlight
   const showGloss = true;
@@ -58,13 +74,13 @@ export default function GlassSurface({ children, style, intensity = 50, pointerE
 
   return (
     <Surface
-      {...(useNativeBlur ? { intensity, tint: "light" } : {})}
+      {...(useNativeBlur ? { intensity, tint: isDark ? "dark" : "light" } : {})}
       pointerEvents={pointerEvents}
       style={[surfaceStyle, style]}
     >
       {showGloss && (
         <LinearGradient
-          colors={[GLASS.highlight, GLASS.shade, GLASS.shade]}
+          colors={[dynamicGlass.highlight, dynamicGlass.shade, dynamicGlass.shade]}
           locations={[0, 0.45, 1]}
           style={styles.glossOverlay}
           pointerEvents="none"
@@ -73,7 +89,9 @@ export default function GlassSurface({ children, style, intensity = 50, pointerE
 
       {/* Fallback blur simulation for platforms without native blur (e.g., many Android devices).
           Header/NavBar/Button all can share the same perceived "blurriness". */}
-      {!useNativeBlur && <View style={[styles.fauxBlurOverlay]} pointerEvents="none" />}
+      {!useNativeBlur && (
+        <View style={[styles.fauxBlurOverlay, { backgroundColor: dynamicGlass.surface }]} pointerEvents="none" />
+      )}
 
       {children}
     </Surface>

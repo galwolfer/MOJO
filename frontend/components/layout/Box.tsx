@@ -11,7 +11,7 @@
 import React from "react";
 import { View, StyleSheet, Platform, StyleProp, ViewStyle } from "react-native";
 import AppText from "../common/AppText";
-import { COLORS, SHADOWS, SPACING, FONT_SIZES, getThemeColors } from "../../theme";
+import { COLORS, SHADOWS, SPACING, FONT_SIZES, getDynamicColors } from "../../theme";
 import { useTheme } from "../../context/ThemeContext";
 
 type BoxProps = {
@@ -66,22 +66,17 @@ const Box: React.FC<BoxProps> = ({
   const wrappedChildren = wrapStringChildren(children);
 
   // Get theme colors (safely with fallback)
-  let themeColors;
+  let colors;
   try {
-    const { theme } = useTheme();
-    themeColors = getThemeColors(theme);
+    const { colors: c } = useTheme();
+    colors = c;
   } catch {
-    // If ThemeContext is not available, use default light theme
-    themeColors = getThemeColors("light");
+    colors = getDynamicColors("light");
   }
 
   return (
     <View
-      style={[
-        styles.box,
-        widget ? { backgroundColor: themeColors.bg3 } : SHADOWS.card,
-        { backgroundColor: themeColors.bg2 },
-      ]}
+      style={[styles.box, widget ? { backgroundColor: colors.bg3 } : SHADOWS.card, { backgroundColor: colors.bg2 }]}
     >
       {title && (
         <View style={[styles.titleWrap, titleColor && { backgroundColor: titleColor }]}>

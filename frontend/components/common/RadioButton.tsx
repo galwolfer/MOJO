@@ -10,6 +10,7 @@ import { moderateScale } from "react-native-size-matters";
 import { COLORS, SPACING } from "../../theme";
 import AppText from "./AppText";
 import List, { ListCellProps } from "../layout/List";
+import { useColors } from "../../context/ThemeContext";
 
 export type RadioButtonOption = {
   id: string;
@@ -29,20 +30,22 @@ type RadioButtonProps = {
  * RadioButton - Individual radio button option
  */
 export function RadioButton({ selected, label, description, onPress }: RadioButtonProps) {
+  const colors = useColors();
+
   return (
     <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
       {/* Radio circle */}
-      <View style={[styles.radioCircle, selected && styles.radioCircleSelected]}>
+      <View style={[styles.radioCircle, { borderColor: colors.gray1 }, selected && styles.radioCircleSelected]}>
         {selected && <View style={styles.radioDot} />}
       </View>
 
       {/* Label and description */}
       <View style={styles.content}>
-        <AppText variant="boldText" style={styles.label}>
+        <AppText variant="boldText" style={[styles.label, { color: colors.text1 }]}>
           {label}
         </AppText>
         {description && (
-          <AppText variant="notes" style={styles.description}>
+          <AppText variant="notes" style={[styles.description, { color: colors.gray1 }]}>
             {description}
           </AppText>
         )}

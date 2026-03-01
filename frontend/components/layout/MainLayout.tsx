@@ -18,10 +18,12 @@ import UserProfileScreen from "../../screens/user/UserProfile";
 import CreateTaskScreen from "../../screens/CreateTask";
 import { COLORS, SPACING } from "../../theme";
 import { useKeyboard } from "../../hooks";
+import { useColors } from "../../context/ThemeContext";
 
 export default function MainLayout() {
   const { activeTab, headerConfig, navBarConfig } = useNavigation();
   const { setHeaderHeight, setNavBarHeight } = useLayout();
+  const colors = useColors();
   const { width, height } = useWindowDimensions();
   const isDesktopLike = Platform.OS === "web" ? width >= 900 : width >= 900;
   const { visible: keyboardVisible, height: keyboardHeight } = useKeyboard();
@@ -38,7 +40,7 @@ export default function MainLayout() {
       setLocalHeaderHeight(height);
       setHeaderHeight(height);
     },
-    [setHeaderHeight]
+    [setHeaderHeight],
   );
 
   const onNavBarLayout = useCallback(
@@ -49,7 +51,7 @@ export default function MainLayout() {
       const effectiveHeight = height + SPACING.xlg;
       setNavBarHeight(height, effectiveHeight);
     },
-    [setNavBarHeight]
+    [setNavBarHeight],
   );
 
   const renderScreen = () => {
@@ -78,7 +80,7 @@ export default function MainLayout() {
 
   return (
     <View style={outerStyle}>
-      <View style={deviceStyle}>
+      <View style={[deviceStyle, { backgroundColor: colors.bg3 }]}>
         {/* Main Content Area - Full screen */}
         <View style={styles.contentArea}>{renderScreen()}</View>
 
@@ -110,18 +112,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     width: "100%",
-    backgroundColor: COLORS.white3,
   },
   desktopOuter: {
     flex: 1,
-    backgroundColor: COLORS.black,
     alignItems: "center",
     justifyContent: "center",
   },
   deviceFrame: {
     borderRadius: 20,
     overflow: "hidden",
-    backgroundColor: COLORS.white3,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.12,

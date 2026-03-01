@@ -3,6 +3,7 @@ import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from "react-nat
 import Input from "../../../components/inputs/Input";
 import { ICONS } from "../../../components/icons/icons";
 import { COLORS, FONT_SIZES, SHADOWS, SPACING } from "../../../theme";
+import { useColors } from "../../../context/ThemeContext";
 
 type ChatComposerProps = {
   isLoading: boolean;
@@ -10,6 +11,7 @@ type ChatComposerProps = {
 };
 
 export default function ChatComposer({ isLoading, onSend }: ChatComposerProps) {
+  const colors = useColors();
   const [draft, setDraft] = useState("");
 
   const canSend = useMemo(() => Boolean(draft.trim()) && !isLoading, [draft, isLoading]);
@@ -36,15 +38,15 @@ export default function ChatComposer({ isLoading, onSend }: ChatComposerProps) {
         />
       </View>
       <TouchableOpacity
-        style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
+        style={[styles.sendButton, !canSend && { backgroundColor: colors.gray1 }]}
         onPress={handleSend}
         disabled={!canSend}
         activeOpacity={0.7}
       >
         {isLoading ? (
-          <ActivityIndicator size="small" color={COLORS.colorWhite} />
+          <ActivityIndicator size="small" color={colors.text2} />
         ) : (
-          <ICONS.send size={FONT_SIZES.base} color={COLORS.colorWhite} />
+          <ICONS.send size={FONT_SIZES.base} color={colors.text2} />
         )}
       </TouchableOpacity>
     </View>

@@ -8,6 +8,7 @@
 import React, { useState, useEffect } from "react";
 import { View, StyleSheet, TouchableOpacity } from "react-native";
 import { COLORS, SPACING, ICON_SIZES } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 import { useNavigation } from "../../context/NavigationContext";
 import { ICONS } from "../../components/icons/icons";
 import ScrollableContent from "../../components/layout/ScrollableContent";
@@ -27,6 +28,7 @@ type AccessibilitySettingsScreenProps = {
 type CurrentScreen = "main" | "time-format" | "theme-mode";
 
 export default function AccessibilitySettingsScreen({ onBack }: AccessibilitySettingsScreenProps) {
+  const colors = useColors();
   const [currentScreen, setCurrentScreen] = useState<CurrentScreen>("main");
   const { setHeaderConfig } = useNavigation();
 
@@ -100,7 +102,7 @@ export default function AccessibilitySettingsScreen({ onBack }: AccessibilitySet
 
       {isLoading && (
         <View style={styles.loadingContainer}>
-          <AppText variant="notes" style={styles.loadingText}>
+          <AppText variant="notes" style={[styles.loadingText, { color: colors.gray1 }]}>
             Loading preferences...
           </AppText>
         </View>
@@ -147,9 +149,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  loadingText: {
-    color: COLORS.lightGray,
-  },
+  loadingText: {},
 
   listContent: {
     width: "100%",

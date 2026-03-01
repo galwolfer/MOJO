@@ -14,7 +14,7 @@
  */
 import React from "react";
 import { Text, TextProps, TextStyle, StyleProp } from "react-native";
-import { TYPOGRAPHY, getThemeColors } from "../../theme";
+import { TYPOGRAPHY, getDynamicColors } from "../../theme";
 import { useTheme } from "../../context/ThemeContext";
 
 type Variant = keyof typeof TYPOGRAPHY;
@@ -33,17 +33,16 @@ const AppText = React.forwardRef<Text, AppTextProps>(({ variant = "bodyText", st
   const variantStyle: TextStyle = (TYPOGRAPHY[variant] || TYPOGRAPHY.bodyText) as TextStyle;
 
   // Get theme colors (safely with fallback)
-  let themeColors;
+  let colors;
   try {
-    const { theme } = useTheme();
-    themeColors = getThemeColors(theme);
+    const { colors: c } = useTheme();
+    colors = c;
   } catch {
-    // If ThemeContext is not available, use default light theme
-    themeColors = getThemeColors("light");
+    colors = getDynamicColors("light");
   }
 
   // Apply theme-aware text color unless explicitly overridden in style
-  const textColor = (style as TextStyle)?.color || variantStyle.color || themeColors.text1;
+  const textColor = (style as TextStyle)?.color || colors.text1;
 
   return (
     <Text ref={ref} style={[variantStyle, { color: textColor }, style]} {...rest}>

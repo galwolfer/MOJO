@@ -14,6 +14,7 @@
 import React, { useEffect, useMemo, useRef, useState, memo } from "react";
 import { Animated, Easing, Platform, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { COLORS, SHADOWS, SPACING } from "../../../theme";
+import { useColors } from "../../../context/ThemeContext";
 import ConicGradientBubble from "../../../components/special/ConicGradientBubble";
 import { splitTextAndWidget } from "../../../utils/widgetParser";
 import { WidgetRenderer } from "../../../utils/widgetFactory";
@@ -223,13 +224,14 @@ const AnimatedTypingContent: React.FC<{
   typedChars: number;
   mode: TextBoubleMode;
 }> = ({ children, typedChars, mode }) => {
+  const themeColors = useColors();
   const content = cloneChildrenWithTyping(children, typedChars);
 
   if (React.isValidElement(children) && (children as any).type !== React.Fragment) {
     return React.cloneElement(
       children as any,
       {
-        style: [(children as any).props?.style, mode === "user" ? { color: COLORS.colorWhite } : undefined],
+        style: [(children as any).props?.style, mode === "user" ? { color: themeColors.text2 } : undefined],
       },
       content,
     );
@@ -352,6 +354,7 @@ const TextBouble: React.FC<Props> = ({
   gradientColors,
   onWidgetAction,
 }) => {
+  const colors = useColors();
   const resolvedTypewriter = typewriter ?? mode === "agent";
 
   // Extract raw text including potential widget JSON
@@ -614,7 +617,7 @@ const TextBouble: React.FC<Props> = ({
   }, [parsedContent.widget, isTyping, playOnceKey, widgetMounted, nonTextOpacity]);
 
   const radii = useMemo(() => getRadii(mode), [mode]);
-  const containerBg = useMemo(() => getContainerBackground(mode), [mode]);
+  const containerBg = useMemo(() => (mode === "user" ? COLORS.primary1 : colors.bg2), [mode, colors]);
   // Determine shadow color from persona gradient if provided
   const shadowColor = useMemo(
     () => (gradientColors && gradientColors.length > 0 ? gradientColors[0] : undefined),
@@ -676,10 +679,10 @@ const TextBouble: React.FC<Props> = ({
       renderTextContent(textToDisplay)
     ) : React.isValidElement(children) && (children as any).type !== React.Fragment ? (
       React.cloneElement(children as any, {
-        style: [(children as any).props?.style, mode === "user" ? { color: COLORS.colorWhite } : undefined],
+        style: [(children as any).props?.style, mode === "user" ? { color: colors.text2 } : undefined],
       })
     ) : typeof children === "string" ? (
-      <AppText variant="bodyText" style={mode === "user" ? { color: COLORS.colorWhite } : undefined}>
+      <AppText variant="bodyText" style={mode === "user" ? { color: colors.text2 } : undefined}>
         {children}
       </AppText>
     ) : (

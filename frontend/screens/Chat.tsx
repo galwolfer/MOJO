@@ -29,7 +29,8 @@ import {
   InteractionManager,
 } from "react-native";
 import AppText from "../components/common/AppText";
-import { COLORS, FONT_SIZES, SHADOWS, SPACING } from "../theme";
+import { COLORS, FONT_SIZES, ICON_SIZES, SHADOWS, SPACING } from "../theme";
+import { useColors } from "../context/ThemeContext";
 import { useNavigation } from "../context/NavigationContext";
 import { useAuth } from "../context/AuthContext";
 import { useTaskContext } from "../context/TaskContext";
@@ -37,7 +38,7 @@ import { useOptionalStatsContext } from "../context/StatsContext";
 import { ICONS } from "../components/icons/icons";
 import { setChatAuthToken } from "../services/chatService";
 import { useKeyboard, useContentInsets } from "../hooks";
-import GlassSurface from "../components/common/GlassSurface";
+
 import { useChatSessions, useChatMessages } from "../hooks";
 import { TimelineItem, buildTimelineItems } from "../utils/chatUtils";
 import ChatComposer from "./chat/components/ChatComposer";
@@ -46,6 +47,7 @@ import type { ChatSessionSummary } from "../services/chatService";
 
 export default function ChatScreen() {
   const { setHeaderConfig, setNavBarConfig, scrollPositions, setScrollPosition } = useNavigation();
+  const colors = useColors();
   const { token } = useAuth();
   const { notifyTaskUpdate } = useTaskContext();
   const { notifyStatsChange } = useOptionalStatsContext();
@@ -351,7 +353,7 @@ export default function ChatScreen() {
   }, [timelineItems.length, isAtBottom]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.bg3 }]}>
       {/* Messages List */}
       <FlatList
         ref={listRef}
@@ -368,15 +370,15 @@ export default function ChatScreen() {
         onLayout={handleLayout}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <AppText variant="bodyText" style={styles.emptyText}>
+            <AppText variant="bodyText" style={[styles.emptyText, { color: colors.gray2 }]}>
               Start a conversation with Mojo!
             </AppText>
-            <AppText variant="notes" style={styles.emptySubtext}>
+            <AppText variant="notes" style={[styles.emptySubtext, { color: colors.gray1 }]}>
               Ask me anything about your tasks, schedule, or how I can help you stay productive.
             </AppText>
             {isLoadingSessions ? (
               <View style={{ marginTop: SPACING.md }}>
-                <ActivityIndicator size="small" color={COLORS.lightGray} />
+                <ActivityIndicator size="small" color={colors.gray1} />
               </View>
             ) : null}
           </View>
@@ -400,9 +402,9 @@ export default function ChatScreen() {
           onPress={scrollToBottom}
           activeOpacity={0.8}
         >
-          <GlassSurface intensity={50} style={styles.scrollToBottomButtonSurface}>
-            <ICONS.down size={FONT_SIZES.base} color={COLORS.primary1} />
-          </GlassSurface>
+          <View style={[styles.scrollToBottomButtonSurface, { backgroundColor: colors.bg2 }]}>
+            <ICONS.down size={ICON_SIZES.sm} color={colors.primary1} />
+          </View>
         </TouchableOpacity>
       )}
     </View>

@@ -27,6 +27,7 @@ import {
 import AppText from "../common/AppText";
 import { Checkbox } from "../icons/Checkbox";
 import { Chevron } from "../icons/Chevron";
+import { useColors } from "../../context/ThemeContext";
 
 type InputType = "text" | "email" | "password" | "number" | "longtext";
 
@@ -72,9 +73,10 @@ const hexToRgba = (hex: string, alpha = 1) => {
 /**
  * Custom hook for web-specific caret and selection styling.
  * @param idPrefix - Prefix for the unique ID.
+ * @param placeholderColor - Color for placeholder text.
  * @returns The unique ID for the input.
  */
-function useWebCaret(idPrefix = "input") {
+function useWebCaret(idPrefix = "input", placeholderColor?: string, caretColor?: string) {
   const idRef = useRef<string | null>(null);
   useEffect(() => {
     if ((Platform as any).OS !== "web") return;
@@ -82,21 +84,23 @@ function useWebCaret(idPrefix = "input") {
     idRef.current = id;
     const style = document.createElement("style");
     style.id = `style-${id}`;
-    const selectionColor = hexToRgba(COLORS.primary1, 0.28);
+    const finalCaretColor = caretColor || COLORS.primary1;
+    const selectionColor = hexToRgba(finalCaretColor, 0.28);
+    const placeholderColorToUse = placeholderColor || COLORS.lightGray;
     // Localized rules for this input plus broader rules so web text inputs
     // and textareas use the light placeholder font. We keep the ID-specific
     // rules to control caret and selection for this input only.
     style.textContent =
-      `#${id} { caret-color: ${COLORS.primary1} !important; } ` +
+      `#${id} { caret-color: ${finalCaretColor} !important; } ` +
       `#${id}::selection { background: ${selectionColor} !important; } ` +
-      `#${id}::placeholder { font-family: '${FONTS.fredokaLight}' !important; font-weight: 300 !important; color: ${COLORS.lightGray} !important; } ` +
-      `input::placeholder, textarea::placeholder { font-family: '${FONTS.fredokaLight}' !important; font-weight: 300 !important; color: ${COLORS.lightGray} !important; }`;
+      `#${id}::placeholder { font-family: '${FONTS.fredokaLight}' !important; font-weight: 300 !important; color: ${placeholderColorToUse} !important; } ` +
+      `input::placeholder, textarea::placeholder { font-family: '${FONTS.fredokaLight}' !important; font-weight: 300 !important; color: ${placeholderColorToUse} !important; }`;
     document.head.appendChild(style);
     return () => {
       const el = document.getElementById(`style-${id}`);
       if (el) el.remove();
     };
-  }, [idPrefix]);
+  }, [idPrefix, placeholderColor, caretColor]);
   return idRef.current;
 }
 
@@ -130,8 +134,9 @@ function Input<T = any>({
   disabled = false,
   ...rest
 }: InputProps<T>) {
+  const colors = useColors();
   const borderColorAnim = useRef(new Animated.Value(0)).current;
-  const webNativeID = useWebCaret();
+  const webNativeID = useWebCaret("input", colors.gray1, colors.primary1);
   const {
     onChangeText: onChangeTextProp,
     onFocus: onFocusProp,
@@ -267,7 +272,7 @@ function Input<T = any>({
 
   const animatedBorderColor = borderColorAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [COLORS.primary1, COLORS.primary7],
+    outputRange: [colors.primary1, colors.primary7],
   });
 
   // dropdown-related rotation removed
@@ -289,8 +294,9 @@ function Input<T = any>({
   };
 
   const getSecureTextEntry = () => type === "password";
-  const selectionColor = Platform.OS === "android" ? hexToRgba(COLORS.primary1, 0.28) : COLORS.primary1;
-  const cursorColor = COLORS.primary1;
+  const selectionColor = Platform.OS === "android" ? hexToRgba(colors.primary1, 0.28) : colors.primary1;
+  const cursorColor = colors.primary1;
+  const placeholderColor = colors.gray1;
   const isMultiline = Boolean(restInputProps.multiline ?? type === "longtext");
   const handleKeyPress = (event: any) => {
     if (!enterToSubmit || (Platform as any).OS !== "web") {
@@ -359,14 +365,18 @@ function Input<T = any>({
         <Animated.View
           ref={wrapperRef}
           collapsable={false}
-          style={[styles.inputWrapper, { borderColor: animatedBorderColor }, disabled && styles.inputWrapperDisabled]}
+          style={[
+            styles.inputWrapper,
+            { borderColor: animatedBorderColor, backgroundColor: colors.inputBg },
+            disabled && styles.inputWrapperDisabled,
+          ]}
         >
           {/* Display selected option's icon for single-select dropdowns */}
           {selectedOption?.icon && (
             <View style={styles.selectedIconWrapper}>
               {React.createElement(selectedOption.icon, {
                 size: ICON_SIZES[iconSize],
-                color: selectedOption.iconColor || COLORS.primary1,
+                color: selectedOption.iconColor || colors.primary1,
               })}
             </View>
           )}
@@ -378,10 +388,11 @@ function Input<T = any>({
               (Platform as any).OS === "web" ? ({ outlineWidth: 0 } as any) : undefined,
               // Add left padding if there's a selected icon to prevent text overlap
               selectedOption?.icon ? { paddingLeft: SPACING.xs } : undefined,
+              { color: colors.text1 },
             ]}
             // Use the native placeholder on all platforms so tapping it focuses the input reliably
             placeholder={effectivePlaceholder}
-            placeholderTextColor={COLORS.lightGray}
+            placeholderTextColor={placeholderColor}
             keyboardType={getKeyboardType()}
             secureTextEntry={getSecureTextEntry()}
             editable={!options && !disabled}
@@ -438,6 +449,8 @@ function Input<T = any>({
               style={[
                 styles.dropdown,
                 {
+                  backgroundColor: colors.bg1,
+                  borderColor: colors.inputBorder,
                   top: dropdownLayout.top,
                   left: dropdownLayout.left,
                   width: dropdownLayout.width,
@@ -457,8 +470,8 @@ function Input<T = any>({
                 const optionValue = option.value;
                 const optionLabel = option.label;
                 const optionIcon = option.icon;
-                const optionIconColor = option.iconColor || COLORS.white;
-                const optionIconBackground = option.iconBackground || COLORS.white2;
+                const optionIconColor = option.iconColor || colors.text2;
+                const optionIconBackground = option.iconBackground || colors.bg2;
                 const isSelected = selected.includes(optionValue);
                 return (
                   <React.Fragment key={optionValue}>
@@ -487,7 +500,6 @@ function Input<T = any>({
                           onSelect?.(newSelected);
                         }
                       }}
-                      style={styles.option}
                     >
                       <View style={styles.optionContent}>
                         {optionIcon && (
@@ -514,7 +526,7 @@ function Input<T = any>({
       {/* dropdown removed - use external picker component if needed */}
 
       {error && (
-        <AppText variant="notes" style={styles.errorText}>
+        <AppText variant="notes" style={[styles.errorText, { color: colors.primary7 }]}>
           {error}
         </AppText>
       )}
@@ -572,10 +584,8 @@ const styles = StyleSheet.create({
   },
   dropdown: {
     position: "absolute",
-    backgroundColor: COLORS.white,
     borderRadius: SPACING.lg,
     borderWidth: 0.15,
-    borderColor: COLORS.brightP1,
     ...(SHADOWS.card as any),
   },
   option: {
@@ -616,7 +626,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   inputWrapperDisabled: {
-    backgroundColor: COLORS.white2,
     opacity: 0.7,
   },
 });

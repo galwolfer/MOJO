@@ -3,6 +3,7 @@ import { StyleSheet, TouchableOpacity, View } from "react-native";
 import AppText from "../common/AppText";
 import { ICONS } from "../icons/icons";
 import { COLORS, FONT_SIZES, SPACING, ICON_SIZES, SHADOWS } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 
 const DEFAULT_PRIMARY_COLORS = [
   COLORS.primary1,
@@ -30,6 +31,7 @@ export default function SubcategoryColorPicker({
   showAuto = true,
 }: SubcategoryColorPickerProps) {
   const palette = useMemo(() => (colors && colors.length > 0 ? colors : DEFAULT_PRIMARY_COLORS), [colors]);
+  const themeColors = useColors();
   const RandomIcon = ICONS.random;
 
   // Track if the currently chosen color was selected via the random button
@@ -53,7 +55,12 @@ export default function SubcategoryColorPicker({
       <View style={styles.grid}>
         {showAuto && (
           <TouchableOpacity
-            style={[styles.colorOption, styles.autoOption, randomSelected && styles.colorSelected]}
+            style={[
+              styles.colorOption,
+              styles.autoOption,
+              { backgroundColor: themeColors.bg1, borderColor: themeColors.lightP1 },
+              randomSelected && styles.colorSelected,
+            ]}
             onPress={() => {
               const random = palette[Math.floor(Math.random() * palette.length)];
               lastRandom.current = random;
@@ -62,7 +69,7 @@ export default function SubcategoryColorPicker({
             }}
             accessibilityLabel="Random color"
           >
-            {RandomIcon ? <RandomIcon size={ICON_SIZES.sm} color={COLORS.darkGray} /> : null}
+            {RandomIcon ? <RandomIcon size={ICON_SIZES.sm} color={themeColors.gray2} /> : null}
           </TouchableOpacity>
         )}
         {palette.map((color) => {

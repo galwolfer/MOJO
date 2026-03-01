@@ -3,6 +3,7 @@ import { View, StyleSheet } from "react-native";
 import { useWindowDimensions } from "react-native";
 import AppText from "../../../components/common/AppText";
 import { COLORS, SPACING, SHADOWS } from "../../../theme";
+import { useColors } from "../../../context/ThemeContext";
 import { moderateScale } from "react-native-size-matters";
 
 /**
@@ -26,6 +27,7 @@ type StatBadgeProps = {
 };
 
 const StatBadge: React.FC<StatBadgeProps> = ({ icon, value, label, color = COLORS.primary1 }) => {
+  const colors = useColors();
   const { width } = useWindowDimensions();
   const isSmall = width < 450;
 
@@ -34,11 +36,11 @@ const StatBadge: React.FC<StatBadgeProps> = ({ icon, value, label, color = COLOR
       <View style={[styles.container, styles.smallContainer, { backgroundColor: color }]}>
         <View style={styles.topRow}>
           <View style={styles.iconCircle}>{icon}</View>
-          <AppText variant="boldText" style={styles.value}>
+          <AppText variant="boldText" style={[styles.value, { color: colors.text2 }]}>
             {value}
           </AppText>
         </View>
-        <AppText variant="notes" style={styles.label}>
+        <AppText variant="notes" style={[styles.label, { color: colors.text2 }]}>
           {label}
         </AppText>
       </View>
@@ -49,10 +51,10 @@ const StatBadge: React.FC<StatBadgeProps> = ({ icon, value, label, color = COLOR
     <View style={[styles.container, { backgroundColor: color }]}>
       <View style={styles.iconCircle}>{icon}</View>
       <View style={styles.textContainer}>
-        <AppText variant="boldText" style={styles.value}>
+        <AppText variant="boldText" style={[styles.value, { color: colors.text2 }]}>
           {value}
         </AppText>
-        <AppText variant="notes" style={styles.label}>
+        <AppText variant="notes" style={[styles.label, { color: colors.text2 }]}>
           {label}
         </AppText>
       </View>

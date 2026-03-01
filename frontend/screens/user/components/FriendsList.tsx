@@ -2,6 +2,7 @@ import React from "react";
 import { View, StyleSheet } from "react-native";
 import FriendListItem from "./FriendListItem";
 import { SPACING, COLORS, SHADOWS } from "../../../theme";
+import { useColors } from "../../../context/ThemeContext";
 
 type Friend = {
   id: string;
@@ -12,17 +13,12 @@ type Friend = {
 };
 
 const FriendsList: React.FC<{ friends: Friend[] }> = ({ friends }) => {
+  const colors = useColors();
   return (
     <View style={styles.container}>
       <View style={styles.list}>
         {friends.map((f) => (
-          <FriendListItem
-            key={f.id}
-            name={f.name}
-            avatar={f.avatar}
-            isOnline={f.isOnline}
-            stats={f.stats}
-          />
+          <FriendListItem key={f.id} name={f.name} avatar={f.avatar} isOnline={f.isOnline} stats={f.stats} />
         ))}
       </View>
     </View>

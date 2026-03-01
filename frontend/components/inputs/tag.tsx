@@ -28,8 +28,16 @@ interface TagProps {
  */
 const Tag = ({ label, editable = false, onRemove, leftIcon, colorIndex, bgColor, textColor, style }: TagProps) => {
   const pair = getPalettePair(typeof colorIndex === "number" ? colorIndex : undefined);
-  const bg = bgColor || pair.bg;
-  const text = textColor || pair.text;
+  const paletteIndex = pair.index;
+
+  // Always use the raw static palette: dark variant for background, bright variant for text/icon.
+  // We intentionally bypass the dynamic theme tokens here because getDynamicColors swaps
+  // darkP↔lightP in dark mode, which would invert the tag colors undesirably.
+  const darkKey = `darkP${paletteIndex}` as keyof typeof COLORS;
+  const brightKey = `brightP${paletteIndex}` as keyof typeof COLORS;
+
+  const bg = bgColor || (COLORS[darkKey] as string);
+  const text = textColor || (COLORS[brightKey] as string);
 
   return (
     <View style={[styles.root, { backgroundColor: bg }, style]}>
@@ -72,7 +80,6 @@ const styles = StyleSheet.create({
   },
   label: {
     ...TYPOGRAPHY.notes,
-    color: COLORS.darkP4,
   },
   removeTouch: {
     marginLeft: 2,

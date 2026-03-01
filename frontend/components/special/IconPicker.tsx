@@ -5,6 +5,7 @@ import FilterChips from "../common/FilterChips";
 import { DEMO_FILTERS } from "../../config/iconFilters";
 import { ICONS, ICON_NAMES } from "../icons/icons";
 import { COLORS, FONT_SIZES, ICON_SIZES, SPACING } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 
 type SubcategoryIconPickerProps = {
   label?: string;
@@ -24,6 +25,7 @@ export default function SubcategoryIconPicker({
   selectedColor = null,
 }: SubcategoryIconPickerProps) {
   const [selectedFilter, setSelectedFilter] = useState<string>("All");
+  const colors = useColors();
 
   const availableIcons = useMemo(() => {
     // If options provided, use them; otherwise default to full ICON_NAMES registry
@@ -88,7 +90,11 @@ export default function SubcategoryIconPicker({
       <View style={styles.grid} onLayout={onGridLayout}>
         {allowNone && (
           <TouchableOpacity
-            style={[styles.iconOption, { width: itemSize, height: itemSize }, !value && styles.iconSelected]}
+            style={[
+              styles.iconOption,
+              { width: itemSize, height: itemSize, backgroundColor: colors.bg1, borderColor: colors.lightP1 },
+              !value && styles.iconSelected,
+            ]}
             onPress={() => onChange(null)}
             accessibilityLabel="No icon"
           ></TouchableOpacity>
@@ -97,17 +103,18 @@ export default function SubcategoryIconPicker({
           const Icon = ICONS[key] || DefaultIcon;
           const isSelected = value === key;
           const iconRenderSize = isSelected ? ICON_SIZES.md : ICON_SIZES.sm + 2;
-          const iconRenderColor = isSelected ? selectedColor || COLORS.primary1 : COLORS.darkGray;
+          const iconRenderColor = isSelected ? selectedColor || COLORS.primary1 : colors.gray2;
           return (
             <TouchableOpacity
               key={key}
               style={[
                 styles.iconOption,
-                { width: itemSize, height: itemSize },
+                { width: itemSize, height: itemSize, backgroundColor: colors.bg1, borderColor: colors.lightP1 },
                 isSelected && [
                   styles.iconSelected,
                   {
                     borderColor: selectedColor || COLORS.primary1,
+                    backgroundColor: colors.bg2,
                   },
                 ],
               ]}

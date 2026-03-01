@@ -7,7 +7,8 @@ import React from "react";
 import { View, StyleSheet } from "react-native";
 import AppText from "../common/AppText";
 import AppButton from "../common/AppButton";
-import { COLORS, SPACING } from "../../theme";
+import { SPACING } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 import Widget from "../special/Widget";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
 import { getWidgetEntranceProps } from "./widgetHelpers";
@@ -22,6 +23,7 @@ const ConfirmationWidget: React.FC<BaseWidgetProps> = ({
   entranceDelay,
   entranceDuration,
 }) => {
+  const colors = useColors();
   const { title, message, confirmText = "Yes", cancelText = "No", confirmColor, cancelColor, icon } = data;
 
   return (
@@ -39,7 +41,7 @@ const ConfirmationWidget: React.FC<BaseWidgetProps> = ({
 
         {/* Message */}
         {message && (
-          <AppText variant="bodyText" style={styles.message}>
+          <AppText variant="bodyText" style={[styles.message, { color: colors.gray2 }]}>
             {message}
           </AppText>
         )}
@@ -65,7 +67,6 @@ const styles = StyleSheet.create({
   message: {
     textAlign: "center",
     lineHeight: SPACING.xlg,
-    color: COLORS.darkGray,
   },
 });
 

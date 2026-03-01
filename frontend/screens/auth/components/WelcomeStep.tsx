@@ -14,6 +14,7 @@ import AppText from "../../../components/common/AppText";
 import AuthStep from "./AuthStep";
 import AuthButtonsGroup from "./AuthButtonsGroup";
 import { COLORS, SPACING } from "../../../theme";
+import { useColors } from "../../../context/ThemeContext";
 
 interface Props {
   onStartNew: () => void;
@@ -21,6 +22,7 @@ interface Props {
 }
 
 const WelcomeStep: React.FC<Props> = ({ onStartNew, onHaveAccount }) => {
+  const colors = useColors();
   return (
     <View style={{ alignItems: "center", gap: SPACING.lg }}>
       <AuthStep playOnceKey="auth:welcome">
@@ -28,7 +30,7 @@ const WelcomeStep: React.FC<Props> = ({ onStartNew, onHaveAccount }) => {
           <>
             <AppText variant="bodyText">
               {"Hi, I’m "}
-              <AppText variant="boldText" style={{ color: COLORS.primary1 }}>
+              <AppText variant="boldText" style={{ color: colors.primary1 }}>
                 ojo
               </AppText>
               {" 👋\nLet’s get to know each other so I can help you reach your goals."}

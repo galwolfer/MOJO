@@ -11,7 +11,7 @@ import { useNavigation } from "../../../context/NavigationContext";
 import { ICONS } from "../../../components/icons/icons";
 import ScrollableContent from "../../../components/layout/ScrollableContent";
 import { useAccessibilityPreferences, ThemeMode } from "../../../hooks/useAccessibilityPreferences";
-import { useTheme } from "../../../context/ThemeContext";
+import { useTheme, useColors } from "../../../context/ThemeContext";
 import AppText from "../../../components/common/AppText";
 import Box from "../../../components/layout/Box";
 import List, { ListCellProps } from "../../../components/layout/List";
@@ -26,6 +26,7 @@ export default function ThemeModeScreen({ onBack }: ThemeModeScreenProps) {
   const { setHeaderConfig } = useNavigation();
   const { preferences, isLoading, error } = useAccessibilityPreferences();
   const { setTheme } = useTheme();
+  const colors = useColors();
   const [selectedTheme, setSelectedTheme] = useState<ThemeMode>(preferences.theme || "light");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -110,7 +111,7 @@ export default function ThemeModeScreen({ onBack }: ThemeModeScreenProps) {
 
       {isLoading ? (
         <View style={styles.loadingContainer}>
-          <AppText variant="notes" style={styles.loadingText}>
+          <AppText variant="notes" style={[styles.loadingText, { color: colors.gray1 }]}>
             Loading theme settings...
           </AppText>
         </View>
@@ -151,9 +152,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  loadingText: {
-    color: COLORS.lightGray,
-  },
+  loadingText: {},
 
   listContent: {
     width: "100%",

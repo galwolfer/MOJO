@@ -8,7 +8,7 @@ import * as SplashScreen from "expo-splash-screen";
 import AuthScreen from "./screens/auth/Auth";
 import { COLORS } from "./theme";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import { ThemeProvider } from "./context/ThemeContext";
+import { ThemeProvider, useColors, useTheme } from "./context/ThemeContext";
 import { NavigationProvider } from "./context/NavigationContext";
 import { LayoutProvider } from "./context/LayoutContext";
 import { TaskProvider } from "./context/TaskContext";
@@ -22,6 +22,8 @@ SplashScreen.preventAutoHideAsync();
 
 function AppContent() {
   const { user, isLoading } = useAuth();
+  const colors = useColors();
+  const { theme } = useTheme();
   const [showLoadingScreen, setShowLoadingScreen] = useState(true);
   const [fontsLoaded, fontError] = useFonts({
     "Fredoka-Bold": require("./assets/fonts/Fredoka-Bold.ttf"),
@@ -50,7 +52,7 @@ function AppContent() {
   if (showLoadingScreen) {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <View style={styles.loadingContainer}>
+        <View style={[styles.loadingContainer, { backgroundColor: colors.bg3 }]}>
           <LoadingScreen onLoadingComplete={handleLoadingComplete} isAppReady={isAppReady} />
         </View>
       </GestureHandlerRootView>
@@ -69,12 +71,14 @@ function AppContent() {
   // The issue is MainLayout needs to stack Header/Content/Nav.
   // If we keep the frame here, we just render MainLayout inside it.
 
-  const outerStyle = isDesktopLike ? styles.desktopOuter : styles.container;
+  const outerStyle = isDesktopLike
+    ? [styles.desktopOuter, { backgroundColor: colors.text1 }]
+    : [styles.container, { backgroundColor: colors.bg3 }];
   const deviceWidth = isDesktopLike ? width : 800;
   const deviceHeight = Math.min(height, 1300);
   const deviceStyle = isDesktopLike
-    ? [styles.deviceFrame, { width: deviceWidth, height: deviceHeight }]
-    : styles.deviceFull;
+    ? [styles.deviceFrame, { width: deviceWidth, height: deviceHeight, backgroundColor: colors.bg3 }]
+    : [styles.deviceFull, { backgroundColor: colors.bg3 }];
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -87,7 +91,7 @@ function AppContent() {
           </View>
         )}
 
-        <StatusBar style="auto" />
+        <StatusBar style={theme === "dark" ? "light" : "dark"} />
       </View>
     </GestureHandlerRootView>
   );

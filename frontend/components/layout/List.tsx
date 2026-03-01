@@ -7,6 +7,7 @@ import React, { ReactNode } from "react";
 import { View, StyleSheet, ViewStyle } from "react-native";
 import AppText from "../common/AppText";
 import { COLORS, SPACING, DIVIDER, COMPONENT_STYLES } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 
 export interface ListCellPart {
   id: string;
@@ -53,6 +54,7 @@ export const ListCell: React.FC<ListCellProps> = ({
   divider = true,
   dividerColor,
 }) => {
+  const colors = useColors();
   const partsToRender: ListCellPart[] = parts && parts.length > 0 ? parts : [];
 
   return (
@@ -90,7 +92,7 @@ export const ListCell: React.FC<ListCellProps> = ({
               ))}
         </View>
       </TouchableOpacity>
-      {divider && <View style={[styles.dividerLine, { backgroundColor: dividerColor ?? COLORS.white3 }]} />}
+      {divider && <View style={[styles.dividerLine, { backgroundColor: dividerColor ?? colors.divider }]} />}
     </View>
   );
 };

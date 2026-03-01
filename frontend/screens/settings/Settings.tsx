@@ -6,6 +6,7 @@ import AppButton from "../../components/common/AppButton";
 import ErrorText from "../../components/common/ErrorText";
 import ProfileSettings from "./screens/ProfileSettings";
 import { COLORS, SPACING, SHADOWS, ICON_SIZES } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 import { useNavigation } from "../../context/NavigationContext";
 import { ICONS } from "../../components/icons/icons";
 import ScrollableContent from "../../components/layout/ScrollableContent";
@@ -42,6 +43,7 @@ export default function SettingsScreen({
   onAccessibilitySettings,
   onSubcategoryManager,
 }: SettingsScreenProps) {
+  const colors = useColors();
   const { user, signOut, signIn, token } = useAuth();
   const { setHeaderConfig } = useNavigation();
 
@@ -292,6 +294,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   preferenceText: {
-    color: COLORS.black,
+    // color: applied dynamically via colors.text1
   },
 });

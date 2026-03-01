@@ -8,15 +8,17 @@ import React from "react";
 import { View, StyleSheet } from "react-native";
 import AppText from "../../../components/common/AppText";
 import { COLORS, SPACING } from "../../../theme";
+import { useColors } from "../../../context/ThemeContext";
 
 interface SessionDividerProps {
   label: string;
 }
 
 export default function SessionDivider({ label }: SessionDividerProps) {
+  const colors = useColors();
   return (
     <View style={styles.sessionDivider}>
-      <AppText variant="notes" style={styles.sessionDividerText}>
+      <AppText variant="notes" style={[styles.sessionDividerText, { color: colors.gray1 }]}>
         {label}
       </AppText>
     </View>

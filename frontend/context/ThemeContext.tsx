@@ -3,14 +3,19 @@
  *
  * Provides theme mode (light/dark) state across the app.
  * Integrates with accessibility preferences to persist theme selection.
+ * Exposes a pre-computed `colors` object so components can bind to
+ * dynamic tokens without calling `getDynamicColors` themselves.
  */
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from "react";
 import { useAccessibilityPreferences, ThemeMode } from "../hooks/useAccessibilityPreferences";
+import { getDynamicColors, ThemeColors } from "../theme";
 
 interface ThemeContextValue {
   theme: ThemeMode;
   setTheme: (theme: ThemeMode) => Promise<void>;
+  /** Pre-computed dynamic color tokens for the current theme. */
+  colors: ThemeColors;
   isLoading: boolean;
 }
 
@@ -39,13 +44,27 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   };
 
-  return <ThemeContext.Provider value={{ theme, setTheme, isLoading }}>{children}</ThemeContext.Provider>;
+  // Memoize the dynamic color object so consumers don't re-render unless theme truly changes
+  const colors = useMemo(() => getDynamicColors(theme), [theme]);
+
+  return <ThemeContext.Provider value={{ theme, setTheme, colors, isLoading }}>{children}</ThemeContext.Provider>;
 };
 
+/**
+ * Access the full theme context (theme mode, setTheme, colors, isLoading).
+ */
 export const useTheme = () => {
   const context = useContext(ThemeContext);
   if (!context) {
     throw new Error("useTheme must be used within a ThemeProvider");
   }
   return context;
+};
+
+/**
+ * Convenience hook – returns only the dynamic color tokens for the current theme.
+ * Preferred shorthand for components that just need colors.
+ */
+export const useColors = (): ThemeColors => {
+  return useTheme().colors;
 };

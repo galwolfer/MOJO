@@ -10,7 +10,7 @@
  */
 import { motion, useMotionValue, animate, useTransform } from "motion/react";
 import { useEffect } from "react";
-import { COLORS } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 const svgPaths = { p24bd7b90: "M7 9.06818L8.33333 11.25L11 7.25" };
 
 interface CheckboxProps {
@@ -26,6 +26,8 @@ interface CheckboxProps {
  * @param size - The size of the checkbox.
  */
 export function Checkbox({ checked, onChange, size = 18 }: CheckboxProps) {
+  const colors = useColors();
+
   // Animation progress for check state
   const checkProgress = useMotionValue(0);
 
@@ -41,7 +43,7 @@ export function Checkbox({ checked, onChange, size = 18 }: CheckboxProps) {
   const strokeColor = useTransform(
     checkProgress,
     [0, 1],
-    [COLORS.lightGray, COLORS.primary6], // theme gray to theme green
+    [colors.gray1, colors.primary6], // theme gray to theme green
   );
 
   // Stroke width animation (gets thicker when checked)

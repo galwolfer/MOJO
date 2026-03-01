@@ -23,6 +23,7 @@ import GridEntranceItem from "../../../components/common/animations/GridEntrance
 import { CATEGORY_KEYS, getCategoryMeta, CategoryKey } from "../../../config/categoryMeta";
 import { ICONS } from "../../../components/icons/icons";
 import { COLORS, SPACING, FONT_SIZES } from "../../../theme";
+import { useColors } from "../../../context/ThemeContext";
 import Box from "../../../components/layout/Box";
 import SliderComponent from "../../../components/inputs/Slider";
 
@@ -56,6 +57,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
   entranceStagger,
   entranceDuration,
 }) => {
+  const colors = useColors();
   const { width } = Dimensions.get("window");
   const iconSize = Math.min(width * 0.18, 60); // responsive icon size
 
@@ -93,7 +95,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
       <Pressable
         key={categoryKey}
         onPress={() => onCategoryPress(categoryKey)}
-        android_ripple={{ color: COLORS.black }}
+        android_ripple={{ color: colors.text1 }}
         style={{ alignItems: "center", justifyContent: "center", width: "100%" }}
       >
         <Animated.View
@@ -117,7 +119,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
               height: "100%",
             }}
           >
-            {IconComponent && <IconComponent size={iconSize * 0.5} color={COLORS.colorWhite} />}
+            {IconComponent && <IconComponent size={iconSize * 0.5} color={colors.text2} />}
           </View>
         </Animated.View>
 
@@ -184,7 +186,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
                       <Box
                         title={selMeta.displayName?.toUpperCase()}
                         titleColor={selMeta.color}
-                        titleIcon={SelIcon ? <SelIcon size={FONT_SIZES.md} color={COLORS.colorWhite} /> : undefined}
+                        titleIcon={SelIcon ? <SelIcon size={FONT_SIZES.md} color={colors.text2} /> : undefined}
                       >
                         <AppText variant="bodyText" style={{ textAlign: "center", marginBottom: SPACING.md }}>
                           {`Set how much it important to you. (1 = Low, 5 = High)`}

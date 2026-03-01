@@ -6,6 +6,7 @@ import { getTimeParts, getSubtaskIdFromSession, ScheduledSession, Subtask } from
 import { useAccessibilityPreferences } from "../../../hooks/useAccessibilityPreferences";
 import { StyleSheet } from "react-native";
 import { ICON_SIZES, SPACING, COLORS } from "../../../theme";
+import { useColors } from "../../../context/ThemeContext";
 
 export const SessionRow: React.FC<{
   session: ScheduledSession;
@@ -39,6 +40,7 @@ export const SessionRow: React.FC<{
   showTaskDate = false,
 }) => {
   const { preferences } = useAccessibilityPreferences();
+  const colors = useColors();
   const checkboxHandler = checkboxOnToggle ?? rowOnPress ?? undefined;
   const rowPressHandler = rowOnPress ?? (canToggle ? (checkboxOnToggle ?? undefined) : undefined);
 
@@ -72,12 +74,12 @@ export const SessionRow: React.FC<{
         <View style={styles.sessionTimeBlock}>
           <View style={[styles.sessionTimeLine, { backgroundColor: categoryColor || COLORS.primary1 }]} />
           <View style={styles.sessionTimeColumn}>
-            <AppText variant="notes" style={styles.sessionHourText}>
+            <AppText variant="notes" style={[styles.sessionHourText, { color: colors.gray1 }]}>
               {session.start ? (
                 <>
                   {startParts.time || "Time"}
                   {startParts.ampm ? (
-                    <AppText variant="notes" style={styles.sessionAmPm}>
+                    <AppText variant="notes" style={[styles.sessionAmPm, { color: colors.gray1 }]}>
                       {" " + startParts.ampm}
                     </AppText>
                   ) : null}
@@ -86,12 +88,12 @@ export const SessionRow: React.FC<{
                 "Time"
               )}
             </AppText>
-            <AppText variant="notes" style={styles.sessionHourText}>
+            <AppText variant="notes" style={[styles.sessionHourText, { color: colors.gray1 }]}>
               {session.end ? (
                 <>
                   {endParts.time || ""}
                   {endParts.ampm ? (
-                    <AppText variant="notes" style={styles.sessionAmPm}>
+                    <AppText variant="notes" style={[styles.sessionAmPm, { color: colors.gray1 }]}>
                       {" " + endParts.ampm}
                     </AppText>
                   ) : null}
@@ -116,7 +118,7 @@ export const SessionRow: React.FC<{
               {subtaskTitle}
             </AppText>
             {!hideTaskTitle && taskTitle ? (
-              <AppText variant="bodyText" style={styles.sessionTask}>
+              <AppText variant="bodyText" style={[styles.sessionTask, { color: colors.text1 }]}>
                 {" - " + taskTitle}
               </AppText>
             ) : null}
@@ -157,12 +159,10 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     gap: SPACING.xs,
   },
-  sessionHourText: {
-    color: COLORS.lightGray,
-  },
+  sessionHourText: {},
+
   sessionAmPm: {
     fontSize: 10,
-    color: COLORS.lightGray,
   },
   sessionTimeLine: {
     width: SPACING.xs,
@@ -203,7 +203,6 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   sessionTask: {
-    color: COLORS.black,
     flexShrink: 1,
   },
 });

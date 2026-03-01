@@ -21,6 +21,7 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { View, StyleSheet, ScrollView, Pressable, Modal, Alert } from "react-native";
 import { COLORS, SPACING, TYPOGRAPHY, SHADOWS, FONT_SIZES } from "../theme";
+import { useColors } from "../context/ThemeContext";
 import AppText from "../components/common/AppText";
 import AppButton from "../components/common/AppButton";
 import Input from "../components/inputs/Input";
@@ -61,6 +62,7 @@ interface TaskFormState {
  */
 const CreateTask: React.FC = () => {
   const { setHeaderConfig } = useNavigation();
+  const colors = useColors();
 
   const [formState, setFormState] = useState<TaskFormState>({
     taskName: "",

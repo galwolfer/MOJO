@@ -9,6 +9,7 @@ import AppText from "../common/AppText";
 import { Checkbox } from "../icons/Checkbox";
 import { ICONS } from "../icons/icons";
 import { COLORS, ICON_SIZES, SPACING } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 import Widget from "../special/Widget";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
 import List from "../layout/List";
@@ -104,6 +105,7 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
 }) => {
   // Data is passed directly - use as TaskData
   const task: TaskData = data as TaskData;
+  const colors = useColors();
   // Normalize category display name for UI (prefer explicit display from payload, then server meta, then raw key)
   const categoryDisplayNormalized = getCategoryDisplay(task.category, task.categoryDisplay);
 
@@ -120,7 +122,7 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
         {/* Description */}
         {task.description ? (
           <View style={styles.field}>
-            <AppText variant="notes" style={styles.labelText}>
+            <AppText variant="notes" style={[styles.labelText, { color: colors.gray2 }]}>
               Description
             </AppText>
             <AppText variant="bodyText">{task.description}</AppText>
@@ -188,7 +190,10 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
                           variant="bodyText"
                           style={[
                             styles.subtaskTitle,
-                            (subtask.completed || subtask.status === "completed") && styles.subtaskCompleted,
+                            (subtask.completed || subtask.status === "completed") && [
+                              styles.subtaskCompleted,
+                              { color: colors.gray2 },
+                            ],
                           ]}
                         >
                           {subtask.title}
@@ -211,7 +216,7 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
                       )}
                     </View>
                     {subtask.description ? (
-                      <AppText variant="notes" style={styles.subtaskDescription}>
+                      <AppText variant="notes" style={[styles.subtaskDescription, { color: colors.gray2 }]}>
                         {subtask.description}
                       </AppText>
                     ) : null}
@@ -219,7 +224,7 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
                 ),
                 divider: index < (task.subtasks?.length || 0) - 1,
               }))}
-              dividerColor={COLORS.white2}
+              dividerColor={colors.bg2}
             />
           </View>
         )}
@@ -237,7 +242,6 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: SPACING.md,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.white2,
     paddingBottom: SPACING.sm,
   },
   headerTitle: {
@@ -247,9 +251,8 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
     gap: 4,
   },
-  labelText: {
-    color: COLORS.darkGray,
-  },
+  labelText: {},
+
   row: {
     flexDirection: "row",
     marginBottom: SPACING.md,
@@ -276,7 +279,6 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   scheduleCard: {
-    backgroundColor: COLORS.white2,
     padding: SPACING.sm,
     borderRadius: SPACING.md,
     borderLeftWidth: SPACING.xs,
@@ -290,9 +292,8 @@ const styles = StyleSheet.create({
     color: COLORS.primary1,
     fontWeight: "500",
   },
-  scheduleTime: {
-    color: COLORS.darkGray,
-  },
+  scheduleTime: {},
+
   subtaskCard: {
     width: "100%",
   },
@@ -320,13 +321,11 @@ const styles = StyleSheet.create({
   },
   subtaskCompleted: {
     textDecorationLine: "line-through",
-    color: COLORS.darkGray,
   },
   subtaskDuration: {
     color: COLORS.primary1,
   },
   subtaskDescription: {
-    color: COLORS.darkGray,
     marginTop: SPACING.xs,
     marginLeft: SPACING.sm,
   },
