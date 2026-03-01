@@ -21,8 +21,9 @@ import ErrorBanner from "../../components/common/ErrorBanner";
 import PopupBox from "../../components/common/PopupBox";
 import ScrollableContent from "../../components/layout/ScrollableContent";
 import { ICONS } from "../../components/icons/icons";
-import { TaskDetailsSection, TimeAndPartsSection } from "../../components/special/task";
-import type { TaskFormState, Subtask } from "../../components/special/task";
+import TaskDetailsSection from "./components/TaskDetailsSection";
+import TimeAndPartsSection from "./components/TimeAndPartsSection";
+import type { TaskFormState, Subtask } from "./components/taskFormTypes";
 import { CATEGORY_KEYS } from "../../config/categoryMeta";
 import { createTask, createTaskSchedule } from "../../services/taskService";
 import { fetchSubcategoriesForCategory, type Subcategory } from "../../services/subcategoryService";
@@ -129,15 +130,20 @@ const CreateTask: React.FC = () => {
   const handleSubCategorySelect = useCallback((id: string | null) => {
     setFormState((p) => ({ ...p, subCategoryId: id }));
   }, []);
-  const handleSubcategoryCreated = useCallback((newSub: Subcategory) => {
-    setSubcategories((prev) => [...prev, newSub]);
-  }, []);
+  const handleSubcategoryCreated = useCallback(
+    (id: string) => {
+      // Updated subcategory created; reload list for the current category
+      if (formState.category) {
+        fetchSubcategoriesForCategory(formState.category).then(setSubcategories);
+      }
+    },
+    [formState.category],
+  );
   const handleDescriptionChange = useCallback((v: string) => setFormState((p) => ({ ...p, description: v })), []);
   // Only allow numeric input for estimated minutes
   const handleEstimatedMinutesChange = useCallback((v: string) => {
     const numericOnly = v.replace(/[^0-9]/g, "");
     setFormState((p) => ({ ...p, estimatedMinutes: numericOnly }));
-    // Clear errors when user starts correcting
     setFormErrors([]);
   }, []);
 
@@ -266,10 +272,8 @@ const CreateTask: React.FC = () => {
         effort: formState.effort,
         deadline: formState.timeToComplete,
         estimatedMinutes: formState.estimatedMinutes ? parseInt(formState.estimatedMinutes, 10) : undefined,
-        subcategoryId: formState.subCategoryId ?? undefined,
+        tags: formState.subCategoryId ? [formState.subCategoryId] : undefined,
         subtasks: subtasksData.length > 0 ? subtasksData : undefined,
-        taskType,
-        chunkCount: formState.numSubtasks > 1 ? formState.numSubtasks : undefined,
       });
 
       if (result) {

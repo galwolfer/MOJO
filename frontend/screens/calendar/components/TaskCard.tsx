@@ -19,13 +19,13 @@ import { computeTaskProgress } from "../../../components/widgets/taskHelpers";
 import { TaskTitle } from "../../../components/special/task/TaskTitle";
 import { TaskTagsRow } from "../../../components/special/task/TaskTagsRow";
 import { TwoColumnGrid, renderTaskField } from "../../../components/special/task";
-import { SessionTime } from "../../../components/special/task/SessionTime";
+import { SessionRow } from "../../../components/special/task";
 import SubtaskItem from "./SubtaskItem";
 import List from "../../../components/layout/List";
-import { Task } from "../types";
+import type { Task } from "../../../services/taskService";
 
 interface TaskCardProps {
-  task: Task;
+  task: any;
   isExpanded: boolean;
   isCompleted: boolean;
   completedSubtasks: Set<string>;
@@ -121,7 +121,13 @@ function TaskCard({
         )}
 
         <View style={styles.row}>
-          <SessionTime startLabel={task.time} endLabel={task.endTime} categoryColor={categoryColor} />
+          <SessionRow
+            session={{ start: task.time, end: task.endTime }}
+            taskId={effectiveId}
+            taskTitle={task.title}
+            categoryColor={categoryColor}
+            sessionIndex={0}
+          />
 
           <View style={styles.right}>
             <TaskTitle
@@ -175,7 +181,7 @@ function TaskCard({
 
                 {task.subtasks && task.subtasks.length > 0 && (
                   <List
-                    data={task.subtasks.map((subtask) => ({
+                    data={task.subtasks.map((subtask: any) => ({
                       id: subtask.id,
                       content: (
                         <SubtaskItem
@@ -198,7 +204,7 @@ function TaskCard({
 
             {!isExpanded && isMultiDay && (
               <List
-                data={task.subtasks!.map((subtask) => ({
+                data={task.subtasks!.map((subtask: any) => ({
                   id: subtask.id,
                   content: (
                     <SubtaskItem

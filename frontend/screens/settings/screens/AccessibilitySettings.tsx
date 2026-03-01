@@ -7,19 +7,19 @@
 
 import React, { useState, useEffect } from "react";
 import { View, StyleSheet, TouchableOpacity } from "react-native";
-import { COLORS, SPACING, ICON_SIZES } from "../../theme";
-import { useColors } from "../../context/ThemeContext";
-import { useNavigation } from "../../context/NavigationContext";
-import { ICONS } from "../../components/icons/icons";
-import ScrollableContent from "../../components/layout/ScrollableContent";
-import { useAccessibilityPreferences } from "../../hooks/useAccessibilityPreferences";
-import AppText from "../../components/common/AppText";
-import Box from "../../components/layout/Box";
-import List, { ListCellProps } from "../../components/layout/List";
-import { makeListCell } from "../../components/layout/ListItem";
-import TimeFormatScreen from "./screens/TimeFormat";
-import ThemeModeScreen from "./screens/ThemeMode";
-import ErrorText from "../../components/common/ErrorText";
+import { COLORS, SPACING, ICON_SIZES } from "../../../theme";
+import { useColors } from "../../../context/ThemeContext";
+import { useNavigation } from "../../../context/NavigationContext";
+import { ICONS } from "../../../components/icons/icons";
+import ScrollableContent from "../../../components/layout/ScrollableContent";
+import { useAccessibilityPreferences } from "../../../hooks/useAccessibilityPreferences";
+import AppText from "../../../components/common/AppText";
+import Box from "../../../components/layout/Box";
+import List, { ListCellProps } from "../../../components/layout/List";
+import { makeListCell } from "../../../components/layout/ListItem";
+import TimeFormatScreen from "./TimeFormat";
+import ThemeModeScreen from "./ThemeMode";
+import ErrorText from "../../../components/common/ErrorText";
 
 type AccessibilitySettingsScreenProps = {
   onBack: () => void;

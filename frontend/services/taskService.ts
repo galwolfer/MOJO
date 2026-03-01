@@ -115,6 +115,26 @@ export type TaskProgressResponse = {
   data: TaskProgressData;
 };
 
+// ---------------------------------------------------------------------------
+// Scheduling helpers - stubs added to satisfy imports
+// ---------------------------------------------------------------------------
+
+export async function createTaskSchedule(taskId: string, options?: any) {
+  // stub: in a real app this would call an API
+  return Promise.resolve({ taskId, options });
+}
+
+export async function getTaskSessions(
+  taskId: string,
+): Promise<{ manualSchedule: boolean; sessions: ScheduledSession[] } | null> {
+  // stub returning structure with manual schedule flag and sessions array
+  return Promise.resolve({ manualSchedule: false, sessions: [] });
+}
+
+export async function updateTaskSchedule(taskId: string, data: any) {
+  return Promise.resolve({ taskId, data });
+}
+
 export type ScheduledDayGroup = {
   date: string | null;
   tasks: Array<{

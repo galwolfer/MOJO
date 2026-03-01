@@ -75,8 +75,8 @@ export default function ThemeModeScreen({ onBack }: ThemeModeScreenProps) {
     }
   };
 
-  const SunIcon = ICONS.home; // Replace with actual sun/light icon
-  const MoonIcon = ICONS.calendar; // Replace with actual moon/dark icon
+  const SunIcon = ICONS.day; // Replace with actual sun/light icon
+  const MoonIcon = ICONS.night; // Replace with actual moon/dark icon
   const CheckIcon = ICONS.check;
 
   const themeItems: ListCellProps[] = [
@@ -91,7 +91,7 @@ export default function ThemeModeScreen({ onBack }: ThemeModeScreenProps) {
     makeListCell("dark", {
       title: "Dark Mode",
       subtitle: "Easy on the eyes",
-      logo: <MoonIcon size={ICON_SIZES.sm} color={COLORS.primary3} />,
+      logo: <MoonIcon size={ICON_SIZES.sm} color={COLORS.primary1} />,
       onPress: () => handleThemeSelect("dark"),
       divider: false,
       rightElement: selectedTheme === "dark" ? <CheckIcon size={ICON_SIZES.sm} color={COLORS.primary6} /> : null,

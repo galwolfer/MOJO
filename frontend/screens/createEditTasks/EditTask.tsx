@@ -27,9 +27,15 @@ import PopupBox from "../../components/common/PopupBox";
 import ScrollableContent from "../../components/layout/ScrollableContent";
 
 // ── Shared task-form section components ───────────────────────────────────────
-import { TaskDetailsSection, TimeAndPartsSection } from "../../components/special/task";
-import { toLocalDateStr, toLocalTimeStr } from "../../components/special/task/TaskScheduleEditor";
-import type { TaskFormState, Subtask, EditableSession } from "../../components/special/task";
+import TaskDetailsSection from "./components/TaskDetailsSection";
+import TimeAndPartsSection from "./components/TimeAndPartsSection";
+import {
+  toLocalDateStr,
+  toLocalTimeStr,
+  combineLocalDateTime,
+  validateEditableSessions,
+} from "./components/TaskScheduleEditor";
+import type { TaskFormState, Subtask, EditableSession } from "./components/taskFormTypes";
 import type { SingleTaskSchedule } from "./components/TimeAndPartsSection";
 
 // ── Icons and context ─────────────────────────────────────────────────────────
@@ -47,7 +53,6 @@ import {
   createTaskSchedule,
 } from "../../services/taskService";
 import { fetchSubcategoriesForCategory, type Subcategory } from "../../services/subcategoryService";
-import { combineLocalDateTime, validateEditableSessions } from "../../components/special/task/TaskScheduleEditor";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
@@ -197,7 +202,7 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
         // ── Load sessions and merge into subtask / single-task schedule ──
         try {
           const sessionsData = await getTaskSessions(taskId);
-          if (!cancelled && sessionsData) {
+          if (!cancelled && sessionsData && "manualSchedule" in sessionsData && "sessions" in sessionsData) {
             const isManual = sessionsData.manualSchedule;
             const activeSessions = (sessionsData.sessions ?? [])
               .filter((s: any) => s.status !== "completed")
