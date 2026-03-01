@@ -10,15 +10,17 @@ import {
   Pressable,
 } from "react-native";
 import { useTaskContext } from "../context/TaskContext";
+import { useColors } from "../context/ThemeContext";
 import AppText from "../components/common/AppText";
 import AppButton from "../components/common/AppButton";
 import PopupBox from "../components/common/PopupBox";
 import Box from "../components/layout/Box";
 import CalendarPicker from "../components/inputs/CalendarPicker";
 import Icon from "../components/icons/Icon";
-import { COLORS, SPACING, FONT_SIZES } from "../theme";
+import { ProgressIcon } from "../components/icons/ProgressIcon.native";
+import List, { ListCellProps } from "../components/layout/List";
+import { COLORS, SPACING, FONT_SIZES, ICON_SIZES } from "../theme";
 import { getCategoryMeta } from "../config/categoryMeta";
-import TaskListItem from "./calendar/components/TaskListItem";
 import { getOverdueTasks, extendTaskDeadline, completeTask, declineOverdueTasks, Task } from "../services/taskService";
 
 // Extends the base Task type with fields added by the overdue endpoint
@@ -178,21 +180,106 @@ export default function OverdueTasksModal({ visible, onClose }: OverdueTasksModa
     notifyTaskUpdate(successPopup ? { taskId: successPopup.taskId } : undefined);
   }, [successPopup, notifyTaskUpdate]);
 
+  // ── Build list cells from tasks ──────────────────────────────────────────
+  const colors = useColors();
+
+  const buildTaskListCell = (task: OverdueTask): ListCellProps => {
+    const categoryMeta = getCategoryMeta(task.category);
+    const subCat = task.subCategory;
+    const subIcon = subCat?.icon;
+    const progress =
+      typeof task.progressPercentage === "number" ? Math.max(0, Math.min(1, task.progressPercentage / 100)) : 0;
+
+    return {
+      id: task._id,
+      content: (
+        <View>
+          {/* Task info row */}
+          <View style={[overdueListStyles.taskRow]}>
+            <View style={overdueListStyles.taskContent}>
+              <ProgressIcon value={progress} size={ICON_SIZES.sm} />
+              <AppText variant="bodyText" numberOfLines={1} style={overdueListStyles.taskName}>
+                {task.taskname || (task as any).title || "Untitled"}
+              </AppText>
+            </View>
+            <View style={overdueListStyles.taskIcons}>
+              {subIcon && subIcon !== categoryMeta.icon ? (
+                <Icon name={subIcon} size={ICON_SIZES.xs} color={colors.gray1} />
+              ) : null}
+              <Icon name={categoryMeta.icon as string} size={ICON_SIZES.sm} color={categoryMeta.color} />
+            </View>
+          </View>
+
+          {/* Action buttons */}
+          <View style={overdueListStyles.taskActionSection}>
+            <AppButton
+              title={actionInProgress === task._id ? "Working…" : "Completed"}
+              mode="filled"
+              color={colors.primary6}
+              icon="check"
+              iconPosition="left"
+              onPress={() => handleMarkComplete(task)}
+              disabled={actionInProgress === task._id}
+              style={overdueListStyles.taskActionBtn}
+            />
+            <AppButton
+              title={expandedCalendarId === task._id ? "Cancel" : "Extend"}
+              mode="light"
+              color={colors.primary1}
+              icon="calendar"
+              iconPosition="left"
+              onPress={() => toggleCalendar(task._id)}
+              disabled={actionInProgress === task._id}
+              style={overdueListStyles.taskActionBtn}
+            />
+            <AppButton
+              title="Decline"
+              mode="light"
+              color={colors.text2}
+              onPress={() => handleDeclineTask(task)}
+              disabled={actionInProgress === task._id}
+              style={overdueListStyles.taskActionBtn}
+            />
+          </View>
+
+          {/* Inline calendar picker */}
+          {expandedCalendarId === task._id && (
+            <View style={[overdueListStyles.calendarSection, { borderTopColor: colors.divider }]}>
+              <CalendarPicker selectedDate={selectedDate} onDateSelect={setSelectedDate} allowPastDates={false} />
+              {selectedDate ? (
+                <AppButton
+                  title={actionInProgress === task._id ? "Extending…" : `Confirm – ${selectedDate}`}
+                  mode="filled"
+                  color={colors.primary1}
+                  onPress={() => confirmExtend(task)}
+                  disabled={actionInProgress === task._id}
+                  style={overdueListStyles.taskActionBtn}
+                />
+              ) : null}
+            </View>
+          )}
+        </View>
+      ),
+    };
+  };
+
   // ── Render ─────────────────────────────────────────────────────────────────
+
+  const dynamicStyles = getOverdueStyles(colors);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={() => {}}>
       <StatusBar barStyle="dark-content" />
-      <Pressable style={styles.overlay} onPress={() => null}>
-        <Pressable onPress={(e) => e.stopPropagation()} style={styles.sheetContainer}>
-          <SafeAreaView style={styles.sheet}>
+      <Pressable style={dynamicStyles.overlay} onPress={() => null}>
+        <Pressable onPress={(e) => e.stopPropagation()} style={dynamicStyles.sheetContainer}>
+          <SafeAreaView style={dynamicStyles.sheet}>
             <Box
               title="Overdue Tasks"
-              titleColor={COLORS.primary7}
-              titleIcon={<Icon name="clock" size={22} color={COLORS.primary7} />}
+              titleColor={colors.primary7}
+              titleIcon={<Icon name="clock" size={22} color={colors.primary7} />}
             >
               {/* Subtitle */}
-              <AppText variant="notes" style={styles.subtitle}>
+              <AppText variant="notes" style={dynamicStyles.subtitle}>
                 {isLoading
                   ? "Checking for overdue tasks…"
                   : tasks.length === 1
@@ -204,81 +291,15 @@ export default function OverdueTasksModal({ visible, onClose }: OverdueTasksModa
 
               {/* Content */}
               {isLoading ? (
-                <View style={styles.centered}>
-                  <ActivityIndicator size="large" color={COLORS.primary1} />
+                <View style={dynamicStyles.centered}>
+                  <ActivityIndicator size="large" color={colors.primary1} />
                 </View>
               ) : tasks.length > 0 ? (
-                <ScrollView
-                  style={styles.listWrapper}
-                  contentContainerStyle={styles.listContent}
-                  showsVerticalScrollIndicator={false}
-                >
-                  {tasks.map((task) => (
-                    <View key={task._id} style={styles.taskRow}>
-                      <TaskListItem
-                        task={task}
-                        onPress={() => {}} // No-op since buttons are shown directly
-                      />
-
-                      {/* Action buttons directly under task */}
-                      <View style={styles.taskActionSection}>
-                        <AppButton
-                          title={actionInProgress === task._id ? "Working…" : "Completed"}
-                          mode="filled"
-                          color={COLORS.primary6}
-                          icon="check"
-                          iconPosition="left"
-                          onPress={() => handleMarkComplete(task)}
-                          disabled={actionInProgress === task._id}
-                          style={styles.taskActionBtn}
-                        />
-                        <AppButton
-                          title={expandedCalendarId === task._id ? "Cancel" : "Extend"}
-                          mode="light"
-                          color={COLORS.primary1}
-                          icon="calendar"
-                          iconPosition="left"
-                          onPress={() => toggleCalendar(task._id)}
-                          disabled={actionInProgress === task._id}
-                          style={styles.taskActionBtn}
-                        />
-                        <AppButton
-                          title="Decline"
-                          mode="light"
-                          color={COLORS.lightGray}
-                          onPress={() => handleDeclineTask(task)}
-                          disabled={actionInProgress === task._id}
-                          style={styles.taskActionBtn}
-                        />
-                      </View>
-
-                      {/* Inline calendar picker */}
-                      {expandedCalendarId === task._id && (
-                        <View style={styles.calendarSection}>
-                          <CalendarPicker
-                            selectedDate={selectedDate}
-                            onDateSelect={setSelectedDate}
-                            allowPastDates={false}
-                          />
-                          {selectedDate ? (
-                            <AppButton
-                              title={actionInProgress === task._id ? "Extending…" : `Confirm – ${selectedDate}`}
-                              mode="filled"
-                              color={COLORS.primary1}
-                              onPress={() => confirmExtend(task)}
-                              disabled={actionInProgress === task._id}
-                              style={styles.taskActionBtn}
-                            />
-                          ) : null}
-                        </View>
-                      )}
-                    </View>
-                  ))}
-                </ScrollView>
+                <List data={tasks.map((task) => buildTaskListCell(task))} />
               ) : (
-                <View style={styles.emptyState}>
-                  <Icon name="check" size={40} color={COLORS.primary6} />
-                  <AppText variant="boldText" style={styles.emptyText}>
+                <View style={dynamicStyles.emptyState}>
+                  <Icon name="check" size={40} color={colors.primary6} />
+                  <AppText variant="boldText" style={dynamicStyles.emptyText}>
                     All done!
                   </AppText>
                 </View>
@@ -293,17 +314,17 @@ export default function OverdueTasksModal({ visible, onClose }: OverdueTasksModa
         visible={successPopup !== null}
         onClose={dismissSuccess}
         title={successPopup?.title ?? ""}
-        titleColor={successPopup?.color ?? COLORS.primary6}
+        titleColor={successPopup?.color ?? colors.primary6}
       >
-        <AppText variant="bodyText" style={styles.popupBody}>
+        <AppText variant="bodyText" style={dynamicStyles.popupBody}>
           {successPopup?.body ?? ""}
         </AppText>
         <AppButton
           title="Got it"
           mode="filled"
-          color={successPopup?.color ?? COLORS.primary6}
+          color={successPopup?.color ?? colors.primary6}
           onPress={dismissSuccess}
-          style={styles.popupBtn}
+          style={dynamicStyles.popupBtn}
         />
       </PopupBox>
 
@@ -312,17 +333,17 @@ export default function OverdueTasksModal({ visible, onClose }: OverdueTasksModa
         visible={errorMsg !== ""}
         onClose={() => setErrorMsg("")}
         title="Something went wrong"
-        titleColor={COLORS.primary7}
+        titleColor={colors.primary7}
       >
-        <AppText variant="bodyText" style={styles.popupBody}>
+        <AppText variant="bodyText" style={dynamicStyles.popupBody}>
           {errorMsg}
         </AppText>
         <AppButton
           title="OK"
           mode="filled"
-          color={COLORS.primary1}
+          color={colors.primary1}
           onPress={() => setErrorMsg("")}
-          style={styles.popupBtn}
+          style={dynamicStyles.popupBtn}
         />
       </PopupBox>
     </Modal>
@@ -331,6 +352,111 @@ export default function OverdueTasksModal({ visible, onClose }: OverdueTasksModa
 
 // Keep a named screen export for backward-compat (index.ts re-exports it)
 export { OverdueTasksModal as OverdueTasksScreen };
+
+// ── Styles ─────────────────────────────────────────────────────────────────
+
+const overdueListStyles = StyleSheet.create({
+  taskRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  taskContent: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+  },
+  taskName: {
+    flex: 1,
+    fontSize: FONT_SIZES.md,
+    fontWeight: "600",
+  },
+  taskIcons: {
+    flexDirection: "row",
+    gap: SPACING.xs,
+    alignItems: "center",
+  },
+  taskActionSection: {
+    flexDirection: "row",
+    gap: SPACING.sm,
+    marginTop: SPACING.sm,
+    paddingHorizontal: SPACING.xs,
+  },
+  taskActionBtn: {
+    flex: 1,
+    paddingHorizontal: SPACING.xs,
+  },
+  calendarSection: {
+    marginTop: SPACING.md,
+    paddingHorizontal: SPACING.xs,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    gap: SPACING.sm,
+  },
+});
+
+const getOverdueStyles = (colors: any) =>
+  StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      justifyContent: "flex-end",
+    },
+    sheetContainer: {
+      flex: 1,
+      justifyContent: "flex-end",
+    },
+    sheet: {
+      backgroundColor: colors.bg1,
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      maxHeight: "88%",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: -4 },
+      shadowOpacity: 0.12,
+      shadowRadius: 8,
+      elevation: 6,
+    },
+    centered: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: SPACING.xlg,
+    },
+    emptyState: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: SPACING.xlg,
+      gap: SPACING.md,
+    },
+    emptyText: {
+      color: colors.primary6,
+      fontSize: FONT_SIZES.lg,
+    },
+    subtitle: {
+      color: colors.text2,
+      marginBottom: SPACING.md,
+      lineHeight: 20,
+    },
+    listWrapper: {
+      flex: 1,
+      marginVertical: SPACING.md,
+    },
+    listContent: {
+      paddingBottom: SPACING.md,
+    },
+    popupBody: {
+      color: colors.text2,
+      marginBottom: SPACING.lg,
+      lineHeight: 22,
+    },
+    popupBtn: {
+      flex: 1,
+    },
+  });
 
 const styles = StyleSheet.create({
   overlay: {

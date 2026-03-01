@@ -223,12 +223,12 @@ export default function AllTasksScreen() {
       <ScrollableContent
         respectHeader={true}
         respectNavBar={true}
-        extraTopPadding={SPACING.sm}
+        extraTopPadding={SPACING.lg}
         scrollKey="alltasks"
         contentContainerStyle={styles.content}
-        extraBottomPadding={SPACING.xlg * 6}
+        extraBottomPadding={SPACING.xlg * 3}
       >
-        {/* Filter chips */}
+        {/* Filter & Sort chips */}
         <View style={styles.ChipsRow}>
           {FILTER_OPTIONS.map((opt) => (
             <TouchableOpacity
@@ -242,10 +242,7 @@ export default function AllTasksScreen() {
               </AppText>
             </TouchableOpacity>
           ))}
-        </View>
 
-        {/* Sort controls */}
-        <View style={styles.ChipsRow}>
           {SORT_OPTIONS.map((opt) => (
             <TouchableOpacity
               key={opt.key}
@@ -325,7 +322,6 @@ const getStyles = (colors: ReturnType<typeof useColors>) =>
       flex: 1,
     },
     content: {
-      paddingHorizontal: SPACING.sm,
       paddingBottom: SPACING.xlg * 6,
     },
     ChipsRow: {

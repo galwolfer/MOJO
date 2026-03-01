@@ -117,10 +117,10 @@ export default function CalendarScreen() {
     <ScrollableContent
       respectHeader={true}
       respectNavBar={true}
-      extraTopPadding={SPACING.md}
+      extraTopPadding={SPACING.lg}
       scrollKey="calendar"
       contentContainerStyle={styles.contentContainer}
-      extraBottomPadding={SPACING.xlg * 6}
+      extraBottomPadding={SPACING.xlg * 3}
     >
       {isLoading ? (
         <View style={styles.loadingContainer}>
@@ -174,8 +174,8 @@ export default function CalendarScreen() {
 const styles = StyleSheet.create({
   contentContainer: {
     alignItems: "center",
-    paddingHorizontal: SPACING.sm,
-    paddingBottom: SPACING.xlg * 2,
+    gap: SPACING.lg,
+    paddingBottom: SPACING.xlg * 6,
   },
   loadingContainer: {
     justifyContent: "center",
