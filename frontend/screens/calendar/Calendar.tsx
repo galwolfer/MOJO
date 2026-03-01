@@ -15,39 +15,69 @@
  * <CalendarScreen />
  * ```
  */
-import React, { useEffect, useState } from "react";
-import { View, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { View, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from "react-native";
 import AppText from "../../components/common/AppText";
 import AppButton from "../../components/common/AppButton";
-import { COLORS, SPACING } from "../../theme";
+import { COLORS, SPACING, ICON_SIZES } from "../../theme";
 import { ICONS } from "../../components/icons/icons";
 import { useNavigation } from "../../context/NavigationContext";
+import { useLayout } from "../../context/LayoutContext";
 import { useTaskContext } from "../../context/TaskContext";
-import CalendarHeader from "./components/CalendarHeader";
+import DateSelector from "../../components/layout/DateSelector";
+import CalendarPicker from "../../components/inputs/CalendarPicker";
+import { getLocalDateString } from "../../utils/dateUtils";
 import EmptyState from "./components/EmptyState";
 import TaskGroup from "./components/TaskGroup";
 import FloatingButton from "../../components/common/FloatingButton";
 import { useCalendarTasks } from "./hooks/useCalendarTasks";
 import { Task } from "./types";
-import { stripTime } from "../../utils/dateUtils";
 
 export default function CalendarScreen() {
-  const { setHeaderConfig, setActiveTab, setActiveTabWithParams } = useNavigation();
+  const { setHeaderConfig, setActiveTab, setActiveTabWithParams, calendarSelectedDate, setCalendarSelectedDate } =
+    useNavigation();
+  const { dimensions } = useLayout();
   const { notifyTaskUpdate, subscribeToTaskUpdates } = useTaskContext();
 
-  const [selectedDate, setSelectedDate] = useState<Date>(() => stripTime(new Date()));
+  // Use context-persisted date so the selection survives tab switches
+  const selectedDate = calendarSelectedDate;
+  const setSelectedDate = setCalendarSelectedDate;
+
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [showCalendarPicker, setShowCalendarPicker] = useState<boolean>(false);
 
   useEffect(() => {
-    setSelectedDate(stripTime(new Date()));
-  }, []);
+    const bottomElement = showCalendarPicker ? (
+      <CalendarPicker
+        onDateSelect={(dateString) => {
+          setSelectedDate(new Date(dateString));
+          setShowCalendarPicker(false);
+        }}
+        selectedDate={getLocalDateString(selectedDate)}
+        allowPastDates={true}
+        allowPreviousMonths={true}
+        lighterPastDates={true}
+      />
+    ) : (
+      <DateSelector selectedDate={selectedDate} setSelectedDate={setSelectedDate} />
+    );
 
-  useEffect(() => {
     setHeaderConfig({
-      show: false,
+      show: true,
+      title: "MY TASKS",
+      leftElement: (
+        <TouchableOpacity onPress={() => setShowCalendarPicker((prev) => !prev)} activeOpacity={0.7}>
+          <ICONS.calendar size={ICON_SIZES.md} color={COLORS.primary1} />
+        </TouchableOpacity>
+      ),
+      rightElement: (
+        <TouchableOpacity onPress={() => setActiveTab("alltasks")} activeOpacity={0.7}>
+          <ICONS.list size={ICON_SIZES.md} color={COLORS.primary1} />
+        </TouchableOpacity>
+      ),
+      element: bottomElement,
     });
-  }, [setHeaderConfig]);
+  }, [selectedDate, showCalendarPicker]);
 
   // Use custom hook for task management
   const {
@@ -65,45 +95,46 @@ export default function CalendarScreen() {
 
   const filteredTaskGroups = getFilteredTaskGroups();
 
-  const handleAddTask = () => {
+  const handleAddTask = useCallback(() => {
     setActiveTab("create");
-  };
+  }, [setActiveTab]);
 
-  const handleEditTask = (taskToEdit: Task) => {
-    // taskToEdit.id is the session ID; taskToEdit.taskId is the actual task _id
-    const actualTaskId = taskToEdit.taskId || taskToEdit.id;
-    setActiveTabWithParams("edit" as any, { taskId: actualTaskId });
-  };
+  const handleEditTask = useCallback(
+    (taskToEdit: Task) => {
+      // taskToEdit.id is the session ID; taskToEdit.taskId is the actual task _id
+      const actualTaskId = taskToEdit.taskId || taskToEdit.id;
+      setActiveTabWithParams("edit" as any, { taskId: actualTaskId });
+    },
+    [setActiveTabWithParams],
+  );
 
-  const handleTaskPress = (taskId: string) => {
-    setExpandedTaskId(expandedTaskId === taskId ? null : taskId);
-  };
+  const handleTaskPress = useCallback((taskId: string) => {
+    setExpandedTaskId((prev) => (prev === taskId ? null : taskId));
+  }, []);
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <CalendarHeader
-        selectedDate={selectedDate}
-        setSelectedDate={setSelectedDate}
-        showCalendarPicker={showCalendarPicker}
-        setShowCalendarPicker={setShowCalendarPicker}
-      />
-
       {/* Tasks List */}
       <ScrollView
         style={styles.tasksList}
-        contentContainerStyle={styles.tasksListContent}
+        contentContainerStyle={[styles.tasksListContent, { paddingTop: dimensions.headerHeight + SPACING.md }]}
         showsVerticalScrollIndicator={false}
       >
         {isLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={COLORS.primary1} />
-            <AppText variant="bodyText" style={{ color: COLORS.lightGray }}>Loading tasks...</AppText>
+            <AppText variant="bodyText" style={{ color: COLORS.lightGray }}>
+              Loading tasks...
+            </AppText>
           </View>
         ) : error ? (
           <View style={styles.errorContainer}>
-            <AppText variant="boldText" style={{ color: COLORS.primary1, textAlign: "center" }}>Unable to Load Tasks</AppText>
-            <AppText variant="bodyText" style={{ color: COLORS.darkGray, textAlign: "center" }}>{error}</AppText>
+            <AppText variant="boldText" style={{ color: COLORS.primary1, textAlign: "center" }}>
+              Unable to Load Tasks
+            </AppText>
+            <AppText variant="bodyText" style={{ color: COLORS.darkGray, textAlign: "center" }}>
+              {error}
+            </AppText>
             <AppButton
               title="Retry"
               onPress={() => fetchTasksForDate(selectedDate)}
@@ -133,8 +164,8 @@ export default function CalendarScreen() {
         )}
       </ScrollView>
 
-      {/* Floating ADD Button */}
-      {filteredTaskGroups.length > 0 && <FloatingButton onPress={handleAddTask} text="" Icon={ICONS.plus} style={styles.fab} />}
+      {/* Floating ADD Button - Always visible */}
+      <FloatingButton onPress={handleAddTask} text="Add Task" Icon={ICONS.plus} />
     </View>
   );
 }
@@ -149,16 +180,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.white3,
   },
-  fab: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-  },
+
   tasksListContent: {
     paddingHorizontal: SPACING.sm,
-    paddingTop: SPACING.md + SPACING.sm + SPACING.xs,
     paddingBottom: SPACING.xlg * 6,
   },
   loadingContainer: {

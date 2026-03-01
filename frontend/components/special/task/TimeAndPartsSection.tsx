@@ -1,7 +1,7 @@
 /**
- * AdditionalDetailsSection
+ * TimeAndPartsSection
  *
- * Renders the "ADDITIONAL DETAILS" box:
+ * Renders the "TIME & PARTS" box:
  *   - Estimated minutes input
  *   - Split-into-parts counter (+/− stepper)
  *   - Per-subtask cards (title, description, estimated minutes) when count ≥ 2
@@ -30,7 +30,7 @@ interface Props {
   boxContentStyle?: object;
 }
 
-const AdditionalDetailsSection: React.FC<Props> = ({
+const TimeAndPartsSection: React.FC<Props> = ({
   estimatedMinutes,
   numSubtasks,
   subtasks,
@@ -161,4 +161,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default AdditionalDetailsSection;
+export default TimeAndPartsSection;

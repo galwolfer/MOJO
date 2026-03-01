@@ -13,11 +13,12 @@ import { useLayout } from "../../context/LayoutContext";
 import Header from "../common/Header";
 import NavBar from "../common/NavBar";
 import ChatScreen from "../../screens/chat/Chat";
-import CalendarScreen from "../../screens/calander/Calendar";
+import CalendarScreen from "../../screens/calendar/Calendar";
 import UserProfileScreen from "../../screens/user/UserProfile";
-import CreateTaskScreen from "../../screens/CreateTask";
-import EditTaskScreen from "../../screens/EditTask";
-import OverdueTasksScreen from "../../screens/OverdueTasks";
+import CreateTaskScreen from "../../screens/createEditTasks/CreateTask";
+import EditTaskScreen from "../../screens/createEditTasks/EditTask";
+import OverdueTasksModal from "../../screens/OverdueTasks";
+import AllTasksScreen from "../../screens/calendar/AllTasksScreen";
 import { getOverdueTasks } from "../../services/taskService";
 import { COLORS, SPACING } from "../../theme";
 import { useKeyboard } from "../../hooks";
@@ -35,15 +36,16 @@ export default function MainLayout() {
   const [localHeaderHeight, setLocalHeaderHeight] = useState(0);
   const [localNavBarHeight, setLocalNavBarHeight] = useState(0);
 
-  // On mount: check for overdue tasks and redirect if any exist.
+  // On mount: check for overdue tasks and show modal if any exist.
   // Using a ref to guarantee this runs only once even in StrictMode.
   const overdueChecked = useRef(false);
+  const [showOverdueModal, setShowOverdueModal] = useState(false);
   useEffect(() => {
     if (overdueChecked.current) return;
     overdueChecked.current = true;
     getOverdueTasks().then((tasks) => {
       if (tasks.length > 0) {
-        setActiveTab("overdue");
+        setShowOverdueModal(true);
       }
     });
   }, []);
@@ -80,8 +82,8 @@ export default function MainLayout() {
         return <CreateTaskScreen />;
       case "edit":
         return <EditTaskScreen taskId={navigationParams?.taskId || ""} />;
-      case "overdue":
-        return <OverdueTasksScreen />;
+      case "alltasks":
+        return <AllTasksScreen />;
       default:
         return <ChatScreen />;
     }
@@ -101,6 +103,9 @@ export default function MainLayout() {
       <View style={deviceStyle}>
         {/* Main Content Area - Full screen */}
         <View style={styles.contentArea}>{renderScreen()}</View>
+
+        {/* Overdue Tasks Modal – shown on top of chat on app open */}
+        <OverdueTasksModal visible={showOverdueModal} onClose={() => setShowOverdueModal(false)} />
 
         {/* Floating Header */}
         <View style={styles.headerContainer} onLayout={onHeaderLayout}>

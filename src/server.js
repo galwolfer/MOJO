@@ -12,6 +12,7 @@ import { startExpiredTaskChecker } from "./services/taskService.js";
 import { startStreakChecker } from "./services/streakService.js";
 import { startNotificationSchedulers } from "./services/notificationScheduler.js";
 import { initializeOjoTypes } from "./utils/ojoTypeUtils.js";
+import { seedDefaultSubcategories } from "./services/subcategoryService.js";
 
 const server = createServer(app);
 const port = Number(env.PORT ?? 3000);
@@ -20,6 +21,14 @@ connectDatabase()
   .then(async () => {
     // Initialize OjoTypes in the database
     await initializeOjoTypes();
+
+    // Seed a default "General [Category]" subcategory for every category
+    try {
+      const seeded = await seedDefaultSubcategories();
+      logger.info(`Default subcategories seeded (${seeded} categories ensured)`);
+    } catch (err) {
+      logger.warn("Failed to seed default subcategories:", err.message);
+    }
 
     server.listen(port, "0.0.0.0", () => {
       logger.info(`HTTP server listening on 0.0.0.0:${port}`);

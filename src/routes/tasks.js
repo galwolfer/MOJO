@@ -14,13 +14,9 @@ import { Subcategory } from "../models/Subcategory.js";
 import { logger } from "../utils/logger.js";
 import { isValidCategory, getDisplayName } from "../config/categories.js";
 import { BusyBlock } from "../models/BusyBlock.js";
-import {
-  computeSessionHash,
-  withUserScheduleLock,
-} from "../services/schedulingService.js";
+import { computeSessionHash, withUserScheduleLock } from "../services/schedulingService.js";
 import {
   addSubcategoryToUser,
-  ensureGeneralSubcategory,
   findOrCreateSubcategory,
   findSubcategoryByName,
 } from "../services/subcategoryService.js";
@@ -70,8 +66,7 @@ const router = Router();
     GET    /expired             List all expired tasks
     GET    /expired/check       Quick check (boolean)
     PATCH  /expired/:id/extend  Extend deadline
-    DELETE /expired/:id/forfeit Delete expired task
-    POST   /expired/:id/handle  Combined extend/forfeit
+    POST   /expired/:id/handle  Extend deadline
 
  ───────────────────────────────────────────────────────────────────────────
 */
@@ -364,7 +359,13 @@ router.delete("/subcategories/:id", async (req, res, next) => {
     }
 
     const parentCategory = subcategoryDoc.parent;
-    const generalSub = await ensureGeneralSubcategory({ userId, parent: parentCategory });
+    // Look up the system-level general subcategory (never create under user's ID)
+    const systemUserId = "000000000000000000000000";
+    const generalSub = await Subcategory.findOne({
+      userId: systemUserId,
+      parent: parentCategory,
+      source: "category-default",
+    }).lean();
     const generalId = generalSub?._id || null;
 
     if (generalId) {
@@ -492,6 +493,9 @@ router.get("/upcoming/:days?", taskController.getUpcomingTasks);
 // Get all overdue tasks (past deadline + not completed)
 router.get("/overdue", taskController.getOverdueTasks);
 
+// Decline overdue tasks – increments the per-task dismiss counter (3 declines = task hidden)
+router.post("/overdue/decline", taskController.declineOverdueTasks);
+
 /* ─────────────────────────────────────────────────────────────────────────
    EXPIRED TASK MANAGEMENT
    Routes for handling tasks that have passed their deadline
@@ -597,86 +601,40 @@ router.patch("/expired/:id/extend", async (req, res, next) => {
 });
 
 /**
- * Forfeit (permanently delete) an expired task
- * Also removes any scheduled sessions for this task
- */
-router.delete("/expired/:id/forfeit", async (req, res, next) => {
-  try {
-    const { id: taskId } = req.params;
-    const userId = req.user.userId;
-
-    const task = await Task.findOne({ _id: taskId, userId });
-    if (!task) {
-      return res.status(404).json({ success: false, error: "Task not found" });
-    }
-
-    const taskName = task.taskname;
-
-    await Task.deleteOne({ _id: taskId, userId });
-    await TaskSchedule.deleteMany({ taskId }).catch(() => {});
-
-    logger.info(`Task "${taskName}" (${taskId}) forfeited and deleted`);
-    res.json({ success: true, message: `Task "${taskName}" has been deleted`, deletedTaskId: taskId });
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * Handle an expired task with a single request
- * Body: { action: "extend" | "forfeit", newDeadline?: "ISO date" }
+ * Handle an expired task – extend its deadline
+ * Body: { newDeadline: "ISO date" }
  */
 router.post("/expired/:id/handle", async (req, res, next) => {
   try {
     const { id: taskId } = req.params;
-    const { action, newDeadline } = req.body;
+    const { newDeadline } = req.body;
     const userId = req.user.userId;
 
-    if (!["extend", "forfeit"].includes(action)) {
-      return res.status(400).json({ success: false, error: "Action must be 'extend' or 'forfeit'" });
+    if (!newDeadline) {
+      return res.status(400).json({ success: false, error: "New deadline is required" });
     }
 
-    // Handle EXTEND action
-    if (action === "extend") {
-      if (!newDeadline) {
-        return res.status(400).json({ success: false, error: "New deadline is required for extend action" });
-      }
-
-      const newDate = new Date(newDeadline);
-      if (isNaN(newDate.getTime()) || newDate <= new Date()) {
-        return res.status(400).json({ success: false, error: "New deadline must be a valid future date" });
-      }
-
-      const task = await Task.findOneAndUpdate(
-        { _id: taskId, userId, status: { $ne: "done" } },
-        { $set: { dueDate: newDate } },
-        { new: true },
-      );
-
-      if (!task) {
-        return res.status(404).json({ success: false, error: "Task not found" });
-      }
-
-      logger.info(`Task ${taskId} deadline extended to ${newDate.toISOString()}`);
-      return res.json({
-        success: true,
-        action: "extended",
-        task: { _id: task._id, taskname: task.taskname, dueDate: task.dueDate },
-      });
+    const newDate = new Date(newDeadline);
+    if (isNaN(newDate.getTime()) || newDate <= new Date()) {
+      return res.status(400).json({ success: false, error: "New deadline must be a valid future date" });
     }
 
-    // Handle FORFEIT action
-    const task = await Task.findOne({ _id: taskId, userId });
+    const task = await Task.findOneAndUpdate(
+      { _id: taskId, userId, status: { $ne: "done" } },
+      { $set: { dueDate: newDate } },
+      { new: true },
+    );
+
     if (!task) {
       return res.status(404).json({ success: false, error: "Task not found" });
     }
 
-    const taskName = task.taskname;
-    await Task.deleteOne({ _id: taskId, userId });
-    await TaskSchedule.deleteMany({ taskId }).catch(() => {});
-
-    logger.info(`Task "${taskName}" (${taskId}) forfeited and deleted`);
-    return res.json({ success: true, action: "forfeited", deletedTaskId: taskId, taskname: taskName });
+    logger.info(`Task ${taskId} deadline extended to ${newDate.toISOString()}`);
+    return res.json({
+      success: true,
+      action: "extended",
+      task: { _id: task._id, taskname: task.taskname, dueDate: task.dueDate },
+    });
   } catch (error) {
     next(error);
   }
@@ -800,7 +758,9 @@ router.get("/schedule/sessions", requireAuth, async (req, res, next) => {
       .populate({
         path: "taskId",
         match: { userId }, // Only include sessions for tasks owned by this user
-        select: "taskname description category tags dueDate subTasks",
+        select:
+          "taskname description category tags dueDate importance effort subCategory estimatedDuration earliestStart progressPercentage subTasks",
+        populate: { path: "subCategory" },
       })
       .sort({ start: 1 })
       .lean();
@@ -901,9 +861,7 @@ router.get("/:id/sessions", requireAuth, async (req, res, next) => {
       return res.status(404).json({ success: false, error: "Task not found" });
     }
 
-    const sessions = await TaskSchedule.find({ taskId })
-      .sort({ start: 1 })
-      .lean();
+    const sessions = await TaskSchedule.find({ taskId }).sort({ start: 1 }).lean();
 
     return res.json({
       success: true,
@@ -961,7 +919,7 @@ router.patch("/:id/sessions", requireAuth, async (req, res, next) => {
 
     // Get user minGapMinutes
     const user = await User.findById(userId).select("schedulingPreferences").lean();
-    const minGapMs = ((user?.schedulingPreferences?.minGapMinutes ?? 10)) * 60_000;
+    const minGapMs = (user?.schedulingPreferences?.minGapMinutes ?? 10) * 60_000;
 
     // Parse and validate each session
     const parsed = [];

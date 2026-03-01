@@ -566,9 +566,9 @@ export async function getPreferences(req, res, next) {
       : null;
 
     const schedPrefs = user.schedulingPreferences
-      ? (typeof user.schedulingPreferences.toObject === "function"
-          ? user.schedulingPreferences.toObject()
-          : JSON.parse(JSON.stringify(user.schedulingPreferences)))
+      ? typeof user.schedulingPreferences.toObject === "function"
+        ? user.schedulingPreferences.toObject()
+        : JSON.parse(JSON.stringify(user.schedulingPreferences))
       : { minGapMinutes: 10 };
 
     res.json({
@@ -611,9 +611,10 @@ export async function updateSchedulingPreferences(req, res, next) {
     user.schedulingPreferences.minGapMinutes = gap;
     await user.save();
 
-    const saved = typeof user.schedulingPreferences.toObject === "function"
-      ? user.schedulingPreferences.toObject()
-      : JSON.parse(JSON.stringify(user.schedulingPreferences));
+    const saved =
+      typeof user.schedulingPreferences.toObject === "function"
+        ? user.schedulingPreferences.toObject()
+        : JSON.parse(JSON.stringify(user.schedulingPreferences));
 
     res.json({ success: true, schedulingPreferences: saved });
   } catch (error) {

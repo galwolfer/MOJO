@@ -127,19 +127,12 @@ Filtered & expired management:
 - `PATCH /api/tasks/expired/:id/extend`
   - Body: `{ newDeadline: 'ISO DATE' }` — Extend deadline for expired task
 
-- `DELETE /api/tasks/expired/:id/forfeit`
-  - Permanently delete an expired task
-
-- `POST /api/tasks/expired/:id/handle`
-  - Body: `{ action: 'extend'|'forfeit', newDeadline?: 'ISO DATE' }`
-  - Combined handler for expired task flow
-
 Notes:
 - Date inputs should be ISO 8601 strings (e.g., `2025-12-31T23:59:59Z`).
 - Validation errors return `4xx` with a descriptive message.
 
 Middleware note:
-- The server includes an `expiredTaskBlocker` middleware that may block access to non-user-management routes when the user has expired tasks. The endpoints under `/api/tasks/expired/*` are whitelisted to allow resolution flows (extend/forfeit/handle).
+- The server includes an `expiredTaskBlocker` middleware that may block access to non-user-management routes when the user has expired tasks. The endpoints under `/api/tasks/expired/*` are whitelisted to allow resolution flows (extend).
 
 ---
 

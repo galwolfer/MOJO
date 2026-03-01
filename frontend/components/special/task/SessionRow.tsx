@@ -3,6 +3,7 @@ import { View, Pressable } from "react-native";
 import AppText from "../../common/AppText";
 import { Checkbox } from "../../icons/Checkbox";
 import { getTimeParts, getSubtaskIdFromSession, ScheduledSession, Subtask } from "../../widgets/taskHelpers";
+import { SessionTime } from "./SessionTime";
 import { StyleSheet } from "react-native";
 import { ICON_SIZES, SPACING, COLORS } from "../../../theme";
 
@@ -22,6 +23,7 @@ export const SessionRow: React.FC<{
   canToggle?: boolean;
   hideTaskTitle?: boolean;
   showTaskDate?: boolean;
+  lightTitle?: boolean;
 }> = ({
   session,
   taskId,
@@ -36,6 +38,7 @@ export const SessionRow: React.FC<{
   canToggle = false,
   hideTaskTitle = false,
   showTaskDate = false,
+  lightTitle = false,
 }) => {
   const checkboxHandler = checkboxOnToggle ?? rowOnPress ?? undefined;
   const rowPressHandler = rowOnPress ?? (canToggle ? (checkboxOnToggle ?? undefined) : undefined);
@@ -49,7 +52,6 @@ export const SessionRow: React.FC<{
   };
 
   const startParts = getTimeParts(session.start);
-  const endParts = getTimeParts(session.end);
   const subtaskTitle = session.subtaskTitle || `Part ${session.subtaskIndex ?? sessionIndex + 1}`;
 
   // Avoid making the row a Pressable when it contains interactive children (checkbox)
@@ -63,43 +65,11 @@ export const SessionRow: React.FC<{
       )}
       <Container
         onPress={rowPressHandler && !isLoading ? rowPressHandler : undefined}
-        accessibilityRole={rowPressHandler ? "button" : undefined}
-        accessibilityState={rowPressHandler ? { disabled: !canToggle, busy: isLoading } : undefined}
+        accessibilityRole={rowPressHandler && !canToggle ? "button" : undefined}
+        accessibilityState={rowPressHandler && !canToggle ? { disabled: !canToggle, busy: isLoading } : undefined}
         style={styles.sessionRow}
       >
-        <View style={styles.sessionTimeBlock}>
-          <View style={[styles.sessionTimeLine, { backgroundColor: categoryColor || COLORS.primary1 }]} />
-          <View style={styles.sessionTimeColumn}>
-            <AppText variant="notes" style={styles.sessionHourText}>
-              {session.start ? (
-                <>
-                  {startParts.time || "Time"}
-                  {startParts.ampm ? (
-                    <AppText variant="notes" style={styles.sessionAmPm}>
-                      {" " + startParts.ampm}
-                    </AppText>
-                  ) : null}
-                </>
-              ) : (
-                "Time"
-              )}
-            </AppText>
-            <AppText variant="notes" style={styles.sessionHourText}>
-              {session.end ? (
-                <>
-                  {endParts.time || ""}
-                  {endParts.ampm ? (
-                    <AppText variant="notes" style={styles.sessionAmPm}>
-                      {" " + endParts.ampm}
-                    </AppText>
-                  ) : null}
-                </>
-              ) : (
-                ""
-              )}
-            </AppText>
-          </View>
-        </View>
+        <SessionTime timeStart={session.start} timeEnd={session.end} categoryColor={categoryColor} />
 
         <View style={styles.sessionCheckbox}>
           {canToggle ? (
@@ -110,7 +80,7 @@ export const SessionRow: React.FC<{
         </View>
         <View style={styles.sessionTitleRow}>
           <AppText variant="bodyText" style={[styles.sessionLabel, isDone && styles.sessionLabelDone]}>
-            <AppText variant="boldText" style={styles.sessionSubtask}>
+            <AppText variant={lightTitle ? "notes" : "boldText"} style={styles.sessionSubtask}>
               {subtaskTitle}
             </AppText>
             {!hideTaskTitle && taskTitle ? (
@@ -133,6 +103,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: SPACING.sm,
     paddingVertical: 4,
+    alignSelf: "stretch",
     width: "100%",
     minHeight: 2 * SPACING.xlg,
     marginBottom: -SPACING.sm,
@@ -140,32 +111,12 @@ const styles = StyleSheet.create({
   sessionRoot: {
     flex: 1,
     minWidth: 0,
+    alignSelf: "stretch",
     width: "100%",
   },
   sessionDateText: {
     fontWeight: "600",
     marginBottom: SPACING.xs,
-  },
-  sessionTimeBlock: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.xs,
-  },
-  sessionTimeColumn: {
-    alignItems: "flex-end",
-    gap: SPACING.xs,
-  },
-  sessionHourText: {
-    color: COLORS.lightGray,
-  },
-  sessionAmPm: {
-    fontSize: 10,
-    color: COLORS.lightGray,
-  },
-  sessionTimeLine: {
-    width: SPACING.xs,
-    alignSelf: "stretch",
-    borderRadius: 999,
   },
   sessionCheckbox: {
     width: SPACING.lg,
@@ -188,9 +139,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   sessionLabel: {
-    flexGrow: 1,
-    flexShrink: 1,
-    width: 0,
+    flex: 1,
     flexWrap: "wrap",
   },
   sessionLabelDone: {

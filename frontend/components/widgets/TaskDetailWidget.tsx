@@ -219,6 +219,7 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
         estimatedDuration={task.estimatedDuration || task.duration}
         progressPercentage={task.progressPercentage ?? null}
         sessionHeaderMode="date"
+        hideTaskTitle={true}
         dividerColor={COLORS.white}
         taskStatus={task.status}
       />

@@ -19,10 +19,11 @@
  * />
  * ```
  */
-import React from "react";
-import { View, StyleSheet } from "react-native";
-import AppText from "../../../components/common/AppText";
-import { COLORS, SPACING, FONT_SIZES, FONTS, SHADOWS } from "../../../theme";
+import React, { memo } from "react";
+import { StyleSheet } from "react-native";
+import Box from "../../../components/layout/Box";
+import List from "../../../components/layout/List";
+import { COLORS, SPACING } from "../../../theme";
 import { TaskGroup as TaskGroupType, Task } from "../types";
 import TaskCard from "./TaskCard";
 
@@ -39,7 +40,7 @@ interface TaskGroupProps {
   onSubtaskDelete: (taskId: string, subtaskId: string) => void;
 }
 
-export default function TaskGroup({
+function TaskGroup({
   group,
   expandedTaskId,
   completedTasks,
@@ -52,61 +53,36 @@ export default function TaskGroup({
   onSubtaskDelete,
 }: TaskGroupProps) {
   return (
-    <View style={styles.dayGroupContainer}>
-      <View style={styles.tasksGroupWrapper}>
-        <View style={styles.dateHeaderInWrapper}>
-          <AppText style={styles.dateHeaderTextInWrapper}>{group.date}</AppText>
-        </View>
-
-        <View style={styles.tasksInner}>
-          {group.tasks.map((task) => (
+    <Box title={group.date} style={styles.boxContainer} innerPadding={false}>
+      <List
+        data={group.tasks.map((task) => ({
+          id: task.id,
+          divider: false,
+          content: (
             <TaskCard
-              key={task.id}
               task={task}
               isExpanded={expandedTaskId === task.id}
               isCompleted={completedTasks.has(task.taskId || task.id)}
               completedSubtasks={completedSubtasks}
               onPress={onTaskPress}
-              onToggleCompletion={onTaskToggle}
               onEdit={onTaskEdit}
               onDelete={onTaskDelete}
               onSubtaskToggle={onSubtaskToggle}
               onSubtaskDelete={onSubtaskDelete}
             />
-          ))}
-        </View>
-      </View>
-    </View>
+          ),
+        }))}
+      />
+    </Box>
   );
 }
 
 const styles = StyleSheet.create({
-  dayGroupContainer: {
-    marginBottom: SPACING.md,
-  },
-  tasksGroupWrapper: {
-    backgroundColor: COLORS.colorWhite,
-    borderRadius: SPACING.lg,
-    overflow: "hidden",
+  boxContainer: {
     marginLeft: SPACING.sm,
     marginRight: SPACING.sm,
-    ...(SHADOWS.card as object),
-  },
-  dateHeaderInWrapper: {
-    backgroundColor: COLORS.primary1,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.md,
-    borderTopLeftRadius: SPACING.lg,
-    borderTopRightRadius: SPACING.lg,
-  },
-  dateHeaderTextInWrapper: {
-    fontFamily: FONTS.fredokaSemiBold,
-    fontSize: FONT_SIZES.base,
-    color: COLORS.colorWhite,
-    textAlign: "center",
-    letterSpacing: 0.4,
-  },
-  tasksInner: {
-    padding: 0,
+    marginBottom: SPACING.md,
   },
 });
+
+export default memo(TaskGroup);

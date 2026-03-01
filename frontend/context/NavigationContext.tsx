@@ -6,7 +6,7 @@ import React, { createContext, useState, useContext, ReactNode } from "react";
  * Centralized navigation and header/navbar configuration for the app.
  */
 
-export type TabName = "chat" | "calendar" | "user" | "create" | "edit" | "overdue";
+export type TabName = "chat" | "calendar" | "user" | "create" | "edit" | "alltasks";
 
 export type HeaderConfig = {
   title?: string;
@@ -47,6 +47,9 @@ type NavigationContextType = {
   setChatScrollState: (state: ChatScrollState) => void;
   scrollPositions: ScrollPositions;
   setScrollPosition: (key: string, offset: number) => void;
+  /** Persists the calendar's selected date across tab switches. */
+  calendarSelectedDate: Date;
+  setCalendarSelectedDate: (date: Date) => void;
 };
 
 const NavigationContext = createContext<NavigationContextType>({} as NavigationContextType);
@@ -79,6 +82,12 @@ export const NavigationProvider = ({ children }: { children: ReactNode }) => {
     setScrollPositions((prev) => ({ ...prev, [key]: offset }));
   };
 
+  const [calendarSelectedDate, setCalendarSelectedDate] = useState<Date>(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
+
   return (
     <NavigationContext.Provider
       value={{
@@ -94,6 +103,8 @@ export const NavigationProvider = ({ children }: { children: ReactNode }) => {
         setChatScrollState,
         scrollPositions,
         setScrollPosition,
+        calendarSelectedDate,
+        setCalendarSelectedDate,
       }}
     >
       {children}

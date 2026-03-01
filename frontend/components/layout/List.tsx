@@ -118,24 +118,34 @@ const List: React.FC<ListProps> = ({ data, renderCell, gap = SPACING.sm, style, 
       {data.map((cell, index) => {
         const baseKey = keyExtractor ? keyExtractor(cell) : cell.id;
         const uniqueKey = `${baseKey}-${index}`;
-        return <View key={uniqueKey}>{renderCell ? renderCell(cell) : defaultRenderCell(cell, index, uniqueKey)}</View>;
+        return (
+          <View key={uniqueKey} style={styles.cellWrapper}>
+            {renderCell ? renderCell(cell) : defaultRenderCell(cell, index, uniqueKey)}
+          </View>
+        );
       })}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  cellWrapper: {
+    alignSelf: "stretch",
+    width: "100%",
+  },
   container: {
     display: "flex",
     flexDirection: "column",
     alignSelf: "stretch",
+    width: "100%",
   },
   row: {
     alignSelf: "stretch",
+    width: "100%",
   },
   rowInner: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "stretch",
     alignSelf: "stretch",
     width: "100%",
   },
@@ -144,18 +154,18 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   dividerLine: {
-    width: "100%",
     height: 1,
     backgroundColor: COLORS.white,
     marginVertical: SPACING.xs,
     alignSelf: "stretch",
+    width: "100%",
   },
   contentContainer: {
-    flexDirection: "row",
-    alignItems: "flex-start",
+    flexDirection: "column",
+    alignItems: "stretch",
     alignSelf: "stretch",
+    flex: 1,
     width: "100%",
-    flexShrink: 1,
   },
   disabled: {
     opacity: 0.6,

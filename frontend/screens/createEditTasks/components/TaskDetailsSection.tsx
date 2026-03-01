@@ -6,24 +6,24 @@
  *   - Due date picker (inline CalendarPicker dropdown)
  *   - Effort + Importance sliders (side-by-side)
  *   - Category picker
- *   - Tags editor + TagsBelow chip list
+ *   - Subcategory picker (shows options for selected category)
  *   - Description textarea
  *
  * All state lives in the parent; this component is purely presentational + layout.
  */
 
 import React from "react";
-import { View, StyleSheet, Pressable } from "react-native";
-import { COLORS, SPACING, FONT_SIZES, SHADOWS } from "../../../theme";
-import AppText from "../../common/AppText";
-import Input from "../../inputs/Input";
-import SliderComponent from "../../inputs/Slider";
-import CalendarPicker from "../../inputs/CalendarPicker";
-import TagsBelow from "../../inputs/TagsBelow";
-import Box from "../../layout/Box";
-import { ICONS } from "../../icons/icons";
-import CategoryPicker from "../CategoryPicker";
-import { getImportanceColor } from "../../widgets/taskHelpers";
+import { View, StyleSheet } from "react-native";
+import { COLORS, SPACING, SHADOWS } from "../../../theme";
+import Input from "../../../components/inputs/Input";
+import SliderComponent from "../../../components/inputs/Slider";
+import CalendarPicker from "../../../components/inputs/CalendarPicker";
+import Box from "../../../components/layout/Box";
+import { ICONS } from "../../../components/icons/icons";
+import CategoryPicker from "../../../components/special/CategoryPicker";
+import SubcategoryPicker from "../../../components/special/SubcategoryPicker";
+import { getImportanceColor } from "../../../components/widgets/taskHelpers";
+import type { Subcategory } from "../../../services/subcategoryService";
 
 interface Props {
   // values
@@ -32,9 +32,9 @@ interface Props {
   effort: number;
   importance: number;
   category: string;
-  tags: string[];
+  subCategoryId: string | null;
+  subcategories: Subcategory[];
   description: string;
-  tagInput: string;
   isCalendarVisible: boolean;
 
   // callbacks
@@ -45,9 +45,8 @@ interface Props {
   onEffortChange: (v: number) => void;
   onImportanceChange: (v: number) => void;
   onCategorySelect: (key: string) => void;
-  onTagInputChange: (v: string) => void;
-  onAddTag: () => void;
-  onRemoveTag: (tag: string) => void;
+  onSubCategorySelect: (id: string | null) => void;
+  onSubcategoryCreated?: (newSub: Subcategory) => void;
   onDescriptionChange: (v: string) => void;
 
   /** Optional extra style applied to the inner box content wrapper */
@@ -60,9 +59,9 @@ const TaskDetailsSection: React.FC<Props> = ({
   effort,
   importance,
   category,
-  tags,
+  subCategoryId,
+  subcategories,
   description,
-  tagInput,
   isCalendarVisible,
   onTaskNameChange,
   onTimeToCompleteChange,
@@ -71,9 +70,8 @@ const TaskDetailsSection: React.FC<Props> = ({
   onEffortChange,
   onImportanceChange,
   onCategorySelect,
-  onTagInputChange,
-  onAddTag,
-  onRemoveTag,
+  onSubCategorySelect,
+  onSubcategoryCreated,
   onDescriptionChange,
   boxContentStyle,
 }) => {
@@ -81,37 +79,31 @@ const TaskDetailsSection: React.FC<Props> = ({
     <Box title="TASK DETAILS" style={[styles.boxContent, boxContentStyle]}>
       {/* Task Name */}
       <View style={styles.formField}>
-        <AppText style={styles.label}>Task Name</AppText>
-        <Input
-          placeholder="Your Task"
-          value={taskName}
-          onChangeText={onTaskNameChange}
-          type="text"
-        />
+        <Input label="Task Name" placeholder="Your Task" value={taskName} onChangeText={onTaskNameChange} type="text" />
       </View>
 
       {/* Due Date / Time to Complete */}
       <View style={styles.formField}>
-        <AppText style={styles.label}>Time to Complete</AppText>
         <View style={styles.timeToCompleteWrapper}>
-          <View style={styles.timeToCompleteInputContainer}>
-            <Input
-              placeholder="YYYY-MM-DD"
-              value={timeToComplete}
-              onChangeText={onTimeToCompleteChange}
-              type="text"
-              editable={false}
-            />
-            <Pressable style={styles.calendarButton} onPress={onCalendarToggle}>
-              {ICONS.calendar &&
-                React.createElement(ICONS.calendar, { size: 24, color: COLORS.primary1 })}
-            </Pressable>
-          </View>
+          <Input
+            label="Time to Complete"
+            placeholder="YYYY-MM-DD"
+            value={timeToComplete}
+            onChangeText={onTimeToCompleteChange}
+            type="text"
+            editable={false}
+            onPress={onCalendarToggle}
+            rightElement={
+              ICONS.calendar ? React.createElement(ICONS.calendar, { size: 24, color: COLORS.primary1 }) : null
+            }
+          />
 
           {isCalendarVisible && (
             <View style={styles.inlineCalendarContainer}>
               <CalendarPicker
-                onDateSelect={(d: string) => { onDateSelect(d); }}
+                onDateSelect={(d: string) => {
+                  onDateSelect(d);
+                }}
                 selectedDate={timeToComplete}
               />
             </View>
@@ -151,31 +143,25 @@ const TaskDetailsSection: React.FC<Props> = ({
 
       {/* Category */}
       <View style={styles.formField}>
-        <AppText style={styles.label}>Task Category</AppText>
-        <CategoryPicker value={category as any} onChange={onCategorySelect} />
+        <CategoryPicker label="Task Category" value={category as any} onChange={onCategorySelect} />
       </View>
 
-      {/* Tags */}
+      {/* Subcategory */}
       <View style={styles.formField}>
-        <AppText style={styles.label}>Task Tags</AppText>
-        <View style={styles.tagInputContainer}>
-          <Input
-            placeholder="Add a tag"
-            value={tagInput}
-            onChangeText={onTagInputChange}
-            type="text"
-          />
-          <Pressable style={styles.addTagButton} onPress={onAddTag}>
-            <AppText variant="title3" style={styles.addTagButtonText}>+</AppText>
-          </Pressable>
-        </View>
-        <TagsBelow selected={tags} onRemove={onRemoveTag} />
+        <SubcategoryPicker
+          label="Subcategory"
+          subcategories={subcategories}
+          value={subCategoryId}
+          onSelect={onSubCategorySelect}
+          onSubcategoryCreated={onSubcategoryCreated}
+          category={category}
+        />
       </View>
 
       {/* Description */}
       <View style={styles.formField}>
-        <AppText style={styles.label}>Task Description</AppText>
         <Input
+          label="Task Description"
           placeholder="Your Task"
           value={description}
           onChangeText={onDescriptionChange}
@@ -198,11 +184,6 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
     overflow: "visible",
   },
-  label: {
-    fontWeight: "400",
-    color: COLORS.darkGray,
-    marginBottom: 4,
-  },
   slidersContainer: {
     flexDirection: "row",
     marginBottom: SPACING.sm,
@@ -214,52 +195,13 @@ const styles = StyleSheet.create({
   timeToCompleteWrapper: {
     overflow: "visible",
   },
-  timeToCompleteInputContainer: {
-    position: "relative",
-    marginBottom: 3,
-  },
-  calendarButton: {
-    position: "absolute",
-    right: SPACING.sm,
-    top: "50%",
-    transform: [{ translateY: -22 }],
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: "transparent",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 10,
-  },
   inlineCalendarContainer: {
     backgroundColor: COLORS.white,
-    borderRadius: 12,
+    borderRadius: SPACING.lg,
     marginTop: SPACING.sm,
     marginBottom: SPACING.sm,
     overflow: "hidden",
     ...SHADOWS.card,
-  },
-  tagInputContainer: {
-    position: "relative",
-    marginBottom: 3,
-  },
-  addTagButton: {
-    position: "absolute",
-    right: SPACING.sm,
-    top: "50%",
-    transform: [{ translateY: -22 }],
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: "transparent",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 10,
-  },
-  addTagButtonText: {
-    color: COLORS.primary1,
-    fontSize: FONT_SIZES.md,
-    fontWeight: "bold",
   },
 });
 

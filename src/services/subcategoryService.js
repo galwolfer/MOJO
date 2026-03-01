@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { Subcategory } from "../models/Subcategory.js";
 import { User } from "../models/User.js";
 import { CATEGORY_STRING_VALUES, getDisplayName, isValidCategory } from "../config/categories.js";
@@ -13,9 +14,15 @@ function normalizeName(name) {
   return String(name || "").trim();
 }
 
+const SYSTEM_USER_ID = "000000000000000000000000";
+
 export async function findSubcategoryById({ userId, subcategoryId }) {
   if (!userId || !subcategoryId) return null;
-  return Subcategory.findOne({ _id: subcategoryId, userId }).lean();
+  // Also accept system-wide (general) subcategories shared across all users
+  return Subcategory.findOne({
+    _id: subcategoryId,
+    userId: { $in: [userId, SYSTEM_USER_ID] },
+  }).lean();
 }
 
 export async function addSubcategoryToUser(userId, subcategoryId) {
@@ -96,7 +103,11 @@ export async function resolveSubcategoryId({
   }
 
   if (candidateId) {
-    const found = await Subcategory.findOne({ _id: candidateId, userId }).lean();
+    // Accept subcategories owned by the user OR the system-wide general ones
+    const found = await Subcategory.findOne({
+      _id: candidateId,
+      userId: { $in: [userId, SYSTEM_USER_ID] },
+    }).lean();
     return found ? found._id : null;
   }
 
@@ -110,17 +121,17 @@ export async function resolveSubcategoryId({
 }
 
 export async function ensureGeneralSubcategory({ userId, parent } = {}) {
-  if (!userId || !parent || !isValidCategory(parent)) return null;
+  if (!parent || !isValidCategory(parent)) return null;
 
-  // Use a system-wide general subcategory (userId = "system")
-  const systemUserId = "000000000000000000000000"; // Special system user ID
+  // System-wide general subcategory shared across all users
+  const systemUserId = SYSTEM_USER_ID;
   const displayName = getDisplayName(parent) || parent;
-  const generalName = `General`;
+  const generalName = `General ${displayName}`;
 
   let sub = await Subcategory.findOne({
     userId: systemUserId,
     parent,
-    nameLower: generalName.toLowerCase(),
+    source: "category-default",
   });
 
   if (!sub) {
@@ -128,14 +139,47 @@ export async function ensureGeneralSubcategory({ userId, parent } = {}) {
       userId: systemUserId,
       name: generalName,
       parent,
-      icon: null, // Will use category icon in frontend
+      icon: null,
       color: null,
       source: "category-default",
       confidence: 1,
     });
+  } else if (sub.name !== generalName) {
+    // Fix legacy records that were created with just "General"
+    sub.name = generalName;
+    sub.nameLower = generalName.toLowerCase();
+    await sub.save();
   }
 
   return sub.toObject ? sub.toObject() : sub;
+}
+
+/**
+ * Seed default "General [Category]" subcategories for all 18 categories.
+ * Safe to call on every server start — fully idempotent.
+ * Also migrates old records: deletes user-owned category-defaults and renames
+ * legacy "General" records (no display name suffix) to the correct naming.
+ */
+export async function seedDefaultSubcategories() {
+  const SYSTEM_USER_ID = "000000000000000000000000";
+
+  // 1. Delete any category-default records that were incorrectly created under real user IDs
+  const systemObjId = new mongoose.Types.ObjectId(SYSTEM_USER_ID);
+  const { deletedCount } = await Subcategory.deleteMany({
+    source: "category-default",
+    userId: { $ne: systemObjId },
+  }).catch(() => ({ deletedCount: 0 }));
+
+  if (deletedCount > 0) {
+    console.log(`[seedDefaultSubcategories] Removed ${deletedCount} mis-owned category-default subcategories`);
+  }
+
+  // 2. Ensure every category has a system-level general subcategory
+  const results = await Promise.allSettled(
+    CATEGORY_STRING_VALUES.map((cat) => ensureGeneralSubcategory({ parent: cat })),
+  );
+  const ok = results.filter((r) => r.status === "fulfilled" && r.value).length;
+  return ok;
 }
 
 export function getSubcategoryLabel(subCategory) {
