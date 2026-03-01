@@ -915,6 +915,29 @@ export async function getOverdueTasks(req, res) {
 }
 
 /**
+ * Decline overdue tasks – increment the decline count for given task IDs.
+ * After 3 declines a task no longer appears in the overdue list.
+ * POST /api/tasks/overdue/decline
+ */
+export async function declineOverdueTasks(req, res) {
+  try {
+    const userId = req.user.userId;
+    const { taskIds } = req.body;
+
+    if (!Array.isArray(taskIds) || taskIds.length === 0) {
+      return res.status(400).json({ success: false, error: "taskIds must be a non-empty array" });
+    }
+
+    await Task.updateMany({ _id: { $in: taskIds }, userId }, { $inc: { overdueDeclineCount: 1 } });
+
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    logger.error("Error in declineOverdueTasks controller:", error);
+    return res.status(500).json({ success: false, error: "Failed to register decline" });
+  }
+}
+
+/**
  * Toggle task completion
  * POST /api/tasks/:id/toggle
  */

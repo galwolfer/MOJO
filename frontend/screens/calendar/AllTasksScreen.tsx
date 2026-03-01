@@ -180,7 +180,7 @@ export default function AllTasksScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Filter chips */}
-        <View style={styles.filterRow}>
+        <View style={styles.ChipsRow}>
           {FILTER_OPTIONS.map((opt) => (
             <TouchableOpacity
               key={opt.key}
@@ -196,15 +196,15 @@ export default function AllTasksScreen() {
         </View>
 
         {/* Sort controls */}
-        <View style={styles.sortRow}>
+        <View style={styles.ChipsRow}>
           {SORT_OPTIONS.map((opt) => (
             <TouchableOpacity
               key={opt.key}
               onPress={() => setSortBy(opt.key)}
-              style={[styles.sortChip, sortBy === opt.key && styles.sortChipActive]}
+              style={[styles.chip, sortBy === opt.key && styles.chipActive]}
               activeOpacity={0.7}
             >
-              <AppText variant="notes" style={[styles.sortChipText, sortBy === opt.key && styles.sortChipTextActive]}>
+              <AppText variant="notes" style={[styles.chipText, sortBy === opt.key && styles.chipTextActive]}>
                 {opt.label}
               </AppText>
             </TouchableOpacity>
@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.sm,
     paddingBottom: SPACING.xlg * 6,
   },
-  filterRow: {
+  ChipsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: SPACING.sm,
@@ -305,37 +305,9 @@ const styles = StyleSheet.create({
     color: COLORS.colorWhite,
     fontFamily: FONTS.fredokaSemiBold,
   },
-  sortRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.xs,
-    marginBottom: SPACING.sm,
-    paddingHorizontal: SPACING.xs,
-    flexWrap: "wrap",
-  },
   sortLabel: {
     color: COLORS.lightGray,
     marginRight: SPACING.xs,
-  },
-  sortChip: {
-    paddingHorizontal: SPACING.sm + 2,
-    paddingVertical: SPACING.xs,
-    borderRadius: SPACING.md,
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.white2,
-  },
-  sortChipActive: {
-    backgroundColor: COLORS.primary1,
-  },
-  sortChipText: {
-    fontFamily: FONTS.fredokaRegular,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.darkGray,
-  },
-  sortChipTextActive: {
-    color: COLORS.white,
-    fontFamily: FONTS.fredokaSemiBold,
   },
   sortDirBtn: {
     padding: SPACING.xs,

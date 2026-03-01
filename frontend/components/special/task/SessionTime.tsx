@@ -2,7 +2,7 @@ import React from "react";
 import { View, StyleSheet } from "react-native";
 import AppText from "../../common/AppText";
 import { getTimeParts } from "../../widgets/taskHelpers";
-import { SPACING, COLORS } from "../../../theme";
+import { SPACING, COLORS, FONT_SIZES } from "../../../theme";
 
 interface SessionTimeProps {
   /** ISO datetime string – parsed automatically into time + AM/PM parts. */
@@ -90,9 +90,10 @@ const styles = StyleSheet.create({
     color: COLORS.lightGray,
   },
   sessionAmPm: {
-    fontSize: 10,
+    fontSize: FONT_SIZES.sm * 0.8,
     color: COLORS.lightGray,
   },
+
   sessionTimeLine: {
     width: SPACING.xs,
     alignSelf: "stretch",

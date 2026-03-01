@@ -68,6 +68,9 @@ const taskSchema = new mongoose.Schema(
     /** True when this task's schedule is managed manually via the schedule editor.
      *  The auto-scheduler will skip this task to avoid overwriting manual sessions. */
     manualSchedule: { type: Boolean, default: false },
+    /** Number of times the user has dismissed the overdue popup for this task.
+     *  Once this reaches 3 the task no longer appears in the overdue modal. */
+    overdueDeclineCount: { type: Number, default: 0 },
   },
   { timestamps: true, toJSON: { virtuals: true } },
 );
@@ -455,6 +458,9 @@ taskSchema.statics.findOverdue = function (userId) {
     userId,
     dueDate: { $lt: now },
     status: { $ne: "done" },
+    // Allow tasks that either don't have the field yet (pre-migration docs)
+    // or have been declined fewer than 3 times
+    $or: [{ overdueDeclineCount: { $exists: false } }, { overdueDeclineCount: { $lt: 3 } }],
   }).sort({ dueDate: 1 });
 };
 

@@ -204,6 +204,21 @@ export async function getTaskById(id: string): Promise<Task | null> {
 }
 
 /**
+ * Decline overdue tasks – increments the dismiss counter for each task.
+ * After 3 declines a task will no longer appear in the overdue popup.
+ * POST /api/tasks/overdue/decline
+ */
+export async function declineOverdueTasks(taskIds: string[]): Promise<boolean> {
+  try {
+    await post<{ success: boolean }>(`/tasks/overdue/decline`, { taskIds });
+    return true;
+  } catch (error) {
+    console.warn("Failed to register overdue decline:", error);
+    return false;
+  }
+}
+
+/**
  * Get overdue tasks
  * GET /api/tasks/overdue
  */
@@ -233,20 +248,6 @@ export async function extendTaskDeadline(id: string, newDeadline: string): Promi
     return true;
   } catch (error) {
     console.warn("Failed to extend task deadline:", error);
-    return false;
-  }
-}
-
-/**
- * Forfeit (permanently delete) an overdue task and its scheduled sessions
- * DELETE /api/tasks/expired/:id/forfeit
- */
-export async function forfeitTask(id: string): Promise<boolean> {
-  try {
-    await del<{ success: boolean }>(`/tasks/expired/${id}/forfeit`);
-    return true;
-  } catch (error) {
-    console.warn("Failed to forfeit task:", error);
     return false;
   }
 }
@@ -939,6 +940,7 @@ export default {
   getTasks,
   getTaskById,
   getOverdueTasks,
+  declineOverdueTasks,
   getTaskProgress,
   getScheduledTasksByDay,
   calculateTaskProgress,

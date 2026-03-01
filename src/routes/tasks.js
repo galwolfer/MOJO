@@ -66,8 +66,7 @@ const router = Router();
     GET    /expired             List all expired tasks
     GET    /expired/check       Quick check (boolean)
     PATCH  /expired/:id/extend  Extend deadline
-    DELETE /expired/:id/forfeit Delete expired task
-    POST   /expired/:id/handle  Combined extend/forfeit
+    POST   /expired/:id/handle  Extend deadline
 
  ───────────────────────────────────────────────────────────────────────────
 */
@@ -494,6 +493,9 @@ router.get("/upcoming/:days?", taskController.getUpcomingTasks);
 // Get all overdue tasks (past deadline + not completed)
 router.get("/overdue", taskController.getOverdueTasks);
 
+// Decline overdue tasks – increments the per-task dismiss counter (3 declines = task hidden)
+router.post("/overdue/decline", taskController.declineOverdueTasks);
+
 /* ─────────────────────────────────────────────────────────────────────────
    EXPIRED TASK MANAGEMENT
    Routes for handling tasks that have passed their deadline
@@ -599,86 +601,40 @@ router.patch("/expired/:id/extend", async (req, res, next) => {
 });
 
 /**
- * Forfeit (permanently delete) an expired task
- * Also removes any scheduled sessions for this task
- */
-router.delete("/expired/:id/forfeit", async (req, res, next) => {
-  try {
-    const { id: taskId } = req.params;
-    const userId = req.user.userId;
-
-    const task = await Task.findOne({ _id: taskId, userId });
-    if (!task) {
-      return res.status(404).json({ success: false, error: "Task not found" });
-    }
-
-    const taskName = task.taskname;
-
-    await Task.deleteOne({ _id: taskId, userId });
-    await TaskSchedule.deleteMany({ taskId }).catch(() => {});
-
-    logger.info(`Task "${taskName}" (${taskId}) forfeited and deleted`);
-    res.json({ success: true, message: `Task "${taskName}" has been deleted`, deletedTaskId: taskId });
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * Handle an expired task with a single request
- * Body: { action: "extend" | "forfeit", newDeadline?: "ISO date" }
+ * Handle an expired task – extend its deadline
+ * Body: { newDeadline: "ISO date" }
  */
 router.post("/expired/:id/handle", async (req, res, next) => {
   try {
     const { id: taskId } = req.params;
-    const { action, newDeadline } = req.body;
+    const { newDeadline } = req.body;
     const userId = req.user.userId;
 
-    if (!["extend", "forfeit"].includes(action)) {
-      return res.status(400).json({ success: false, error: "Action must be 'extend' or 'forfeit'" });
+    if (!newDeadline) {
+      return res.status(400).json({ success: false, error: "New deadline is required" });
     }
 
-    // Handle EXTEND action
-    if (action === "extend") {
-      if (!newDeadline) {
-        return res.status(400).json({ success: false, error: "New deadline is required for extend action" });
-      }
-
-      const newDate = new Date(newDeadline);
-      if (isNaN(newDate.getTime()) || newDate <= new Date()) {
-        return res.status(400).json({ success: false, error: "New deadline must be a valid future date" });
-      }
-
-      const task = await Task.findOneAndUpdate(
-        { _id: taskId, userId, status: { $ne: "done" } },
-        { $set: { dueDate: newDate } },
-        { new: true },
-      );
-
-      if (!task) {
-        return res.status(404).json({ success: false, error: "Task not found" });
-      }
-
-      logger.info(`Task ${taskId} deadline extended to ${newDate.toISOString()}`);
-      return res.json({
-        success: true,
-        action: "extended",
-        task: { _id: task._id, taskname: task.taskname, dueDate: task.dueDate },
-      });
+    const newDate = new Date(newDeadline);
+    if (isNaN(newDate.getTime()) || newDate <= new Date()) {
+      return res.status(400).json({ success: false, error: "New deadline must be a valid future date" });
     }
 
-    // Handle FORFEIT action
-    const task = await Task.findOne({ _id: taskId, userId });
+    const task = await Task.findOneAndUpdate(
+      { _id: taskId, userId, status: { $ne: "done" } },
+      { $set: { dueDate: newDate } },
+      { new: true },
+    );
+
     if (!task) {
       return res.status(404).json({ success: false, error: "Task not found" });
     }
 
-    const taskName = task.taskname;
-    await Task.deleteOne({ _id: taskId, userId });
-    await TaskSchedule.deleteMany({ taskId }).catch(() => {});
-
-    logger.info(`Task "${taskName}" (${taskId}) forfeited and deleted`);
-    return res.json({ success: true, action: "forfeited", deletedTaskId: taskId, taskname: taskName });
+    logger.info(`Task ${taskId} deadline extended to ${newDate.toISOString()}`);
+    return res.json({
+      success: true,
+      action: "extended",
+      task: { _id: task._id, taskname: task.taskname, dueDate: task.dueDate },
+    });
   } catch (error) {
     next(error);
   }

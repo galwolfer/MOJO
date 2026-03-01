@@ -34,25 +34,23 @@ function TaskListItem({ task, onPress }: TaskListItemProps) {
       onPress={() => onPress(task)}
       activeOpacity={0.7}
     >
-      {/* Category icon */}
-      <View style={[styles.iconBadge, { backgroundColor: categoryMeta.color + "18" }]}>
-        <Icon name={categoryMeta.icon as string} size={ICON_SIZES.sm} color={categoryMeta.color} />
+      <View style={styles.titleContainer}>
+        {/* Category icon */}
+        <ProgressIcon value={progress} size={ICON_SIZES.sm} />
+
+        {/* Task name */}
+        <AppText variant="bodyText" numberOfLines={1} style={[styles.taskName, isDone && styles.taskNameDone]}>
+          {task.taskname || (task as any).title || "Untitled"}
+        </AppText>
       </View>
 
       {/* Subcategory icon (if available and different from category icon) */}
       {subIcon && subIcon !== categoryMeta.icon ? (
-        <View style={styles.subIconWrap}>
-          <Icon name={subIcon} size={ICON_SIZES.xs} color={COLORS.lightGray} />
-        </View>
+        <Icon name={subIcon} size={ICON_SIZES.xs} color={COLORS.lightGray} />
       ) : null}
 
-      {/* Task name */}
-      <AppText variant="bodyText" numberOfLines={1} style={[styles.taskName, isDone && styles.taskNameDone]}>
-        {task.taskname || (task as any).title || "Untitled"}
-      </AppText>
-
       {/* Progress indicator */}
-      <ProgressIcon value={progress} size={ICON_SIZES.sm} />
+      <Icon name={categoryMeta.icon as string} size={ICON_SIZES.sm} color={categoryMeta.color} />
     </TouchableOpacity>
   );
 }
@@ -63,30 +61,28 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     gap: SPACING.sm,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.md,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.white2,
   },
+
+  titleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+  },
   containerDone: {
     opacity: 0.6,
   },
-  iconBadge: {
-    width: ICON_SIZES.md + SPACING.sm * 2,
-    height: ICON_SIZES.md + SPACING.sm * 2,
-    borderRadius: (ICON_SIZES.md + SPACING.sm * 2) / 2,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  subIconWrap: {
-    marginLeft: -SPACING.xs,
-  },
+
   taskName: {
-    flex: 1,
     fontFamily: FONTS.fredokaRegular,
     fontSize: FONT_SIZES.base,
     color: COLORS.black,
+    alignContent: "flex-start",
   },
   taskNameDone: {
     textDecorationLine: "line-through",
