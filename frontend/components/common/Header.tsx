@@ -130,10 +130,11 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   leftSection: {
-    width: "100%",
+    flex: 1,
     flexDirection: "row",
     justifyContent: "flex-start",
     alignItems: "center",
+    gap: SPACING.sm,
     flexShrink: 1,
   },
   centerSection: {

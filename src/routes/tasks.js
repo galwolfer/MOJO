@@ -13,9 +13,10 @@ import { User } from "../models/User.js";
 import { Subcategory } from "../models/Subcategory.js";
 import { logger } from "../utils/logger.js";
 import { isValidCategory, getDisplayName } from "../config/categories.js";
+import { BusyBlock } from "../models/BusyBlock.js";
+import { computeSessionHash, withUserScheduleLock } from "../services/schedulingService.js";
 import {
   addSubcategoryToUser,
-  ensureGeneralSubcategory,
   findOrCreateSubcategory,
   findSubcategoryByName,
 } from "../services/subcategoryService.js";
@@ -65,8 +66,7 @@ const router = Router();
     GET    /expired             List all expired tasks
     GET    /expired/check       Quick check (boolean)
     PATCH  /expired/:id/extend  Extend deadline
-    DELETE /expired/:id/forfeit Delete expired task
-    POST   /expired/:id/handle  Combined extend/forfeit
+    POST   /expired/:id/handle  Extend deadline
 
  ───────────────────────────────────────────────────────────────────────────
 */
@@ -359,7 +359,13 @@ router.delete("/subcategories/:id", async (req, res, next) => {
     }
 
     const parentCategory = subcategoryDoc.parent;
-    const generalSub = await ensureGeneralSubcategory({ userId, parent: parentCategory });
+    // Look up the system-level general subcategory (never create under user's ID)
+    const systemUserId = "000000000000000000000000";
+    const generalSub = await Subcategory.findOne({
+      userId: systemUserId,
+      parent: parentCategory,
+      source: "category-default",
+    }).lean();
     const generalId = generalSub?._id || null;
 
     if (generalId) {
@@ -487,6 +493,9 @@ router.get("/upcoming/:days?", taskController.getUpcomingTasks);
 // Get all overdue tasks (past deadline + not completed)
 router.get("/overdue", taskController.getOverdueTasks);
 
+// Decline overdue tasks – increments the per-task dismiss counter (3 declines = task hidden)
+router.post("/overdue/decline", taskController.declineOverdueTasks);
+
 /* ─────────────────────────────────────────────────────────────────────────
    EXPIRED TASK MANAGEMENT
    Routes for handling tasks that have passed their deadline
@@ -592,86 +601,40 @@ router.patch("/expired/:id/extend", async (req, res, next) => {
 });
 
 /**
- * Forfeit (permanently delete) an expired task
- * Also removes any scheduled sessions for this task
- */
-router.delete("/expired/:id/forfeit", async (req, res, next) => {
-  try {
-    const { id: taskId } = req.params;
-    const userId = req.user.userId;
-
-    const task = await Task.findOne({ _id: taskId, userId });
-    if (!task) {
-      return res.status(404).json({ success: false, error: "Task not found" });
-    }
-
-    const taskName = task.taskname;
-
-    await Task.deleteOne({ _id: taskId, userId });
-    await TaskSchedule.deleteMany({ taskId }).catch(() => {});
-
-    logger.info(`Task "${taskName}" (${taskId}) forfeited and deleted`);
-    res.json({ success: true, message: `Task "${taskName}" has been deleted`, deletedTaskId: taskId });
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * Handle an expired task with a single request
- * Body: { action: "extend" | "forfeit", newDeadline?: "ISO date" }
+ * Handle an expired task – extend its deadline
+ * Body: { newDeadline: "ISO date" }
  */
 router.post("/expired/:id/handle", async (req, res, next) => {
   try {
     const { id: taskId } = req.params;
-    const { action, newDeadline } = req.body;
+    const { newDeadline } = req.body;
     const userId = req.user.userId;
 
-    if (!["extend", "forfeit"].includes(action)) {
-      return res.status(400).json({ success: false, error: "Action must be 'extend' or 'forfeit'" });
+    if (!newDeadline) {
+      return res.status(400).json({ success: false, error: "New deadline is required" });
     }
 
-    // Handle EXTEND action
-    if (action === "extend") {
-      if (!newDeadline) {
-        return res.status(400).json({ success: false, error: "New deadline is required for extend action" });
-      }
-
-      const newDate = new Date(newDeadline);
-      if (isNaN(newDate.getTime()) || newDate <= new Date()) {
-        return res.status(400).json({ success: false, error: "New deadline must be a valid future date" });
-      }
-
-      const task = await Task.findOneAndUpdate(
-        { _id: taskId, userId, status: { $ne: "done" } },
-        { $set: { dueDate: newDate } },
-        { new: true },
-      );
-
-      if (!task) {
-        return res.status(404).json({ success: false, error: "Task not found" });
-      }
-
-      logger.info(`Task ${taskId} deadline extended to ${newDate.toISOString()}`);
-      return res.json({
-        success: true,
-        action: "extended",
-        task: { _id: task._id, taskname: task.taskname, dueDate: task.dueDate },
-      });
+    const newDate = new Date(newDeadline);
+    if (isNaN(newDate.getTime()) || newDate <= new Date()) {
+      return res.status(400).json({ success: false, error: "New deadline must be a valid future date" });
     }
 
-    // Handle FORFEIT action
-    const task = await Task.findOne({ _id: taskId, userId });
+    const task = await Task.findOneAndUpdate(
+      { _id: taskId, userId, status: { $ne: "done" } },
+      { $set: { dueDate: newDate } },
+      { new: true },
+    );
+
     if (!task) {
       return res.status(404).json({ success: false, error: "Task not found" });
     }
 
-    const taskName = task.taskname;
-    await Task.deleteOne({ _id: taskId, userId });
-    await TaskSchedule.deleteMany({ taskId }).catch(() => {});
-
-    logger.info(`Task "${taskName}" (${taskId}) forfeited and deleted`);
-    return res.json({ success: true, action: "forfeited", deletedTaskId: taskId, taskname: taskName });
+    logger.info(`Task ${taskId} deadline extended to ${newDate.toISOString()}`);
+    return res.json({
+      success: true,
+      action: "extended",
+      task: { _id: task._id, taskname: task.taskname, dueDate: task.dueDate },
+    });
   } catch (error) {
     next(error);
   }
@@ -708,6 +671,37 @@ router.post("/:taskId/subtasks/:subId/todo", taskController.markSubTaskTodo);
 
 // Update subtask status directly
 router.patch("/:taskId/subtasks/:subId/status", taskController.updateSubTaskStatus);
+
+/**
+ * Delete a single subtask and its corresponding TaskSchedule entries
+ * DELETE /api/tasks/:taskId/subtasks/:subId
+ */
+router.delete("/:taskId/subtasks/:subId", requireAuth, async (req, res, next) => {
+  try {
+    const { taskId, subId } = req.params;
+    const userId = req.user.userId;
+
+    // Find the subtask first so we can get its index
+    const subtask = await SubTask.findOne({ _id: subId, taskId, userId });
+    if (!subtask) {
+      return res.status(404).json({ success: false, message: "Subtask not found" });
+    }
+
+    const subtaskIndex = subtask.index;
+
+    // Delete the SubTask document
+    await SubTask.deleteOne({ _id: subId });
+
+    // Delete all TaskSchedule entries that belong to this subtask
+    if (subtaskIndex !== undefined && subtaskIndex !== null) {
+      await TaskSchedule.deleteMany({ taskId, subtaskIndex });
+    }
+
+    return res.json({ success: true, deletedSubtaskIndex: subtaskIndex });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // Bulk update task with subtasks in one call
 router.patch("/:id/full", taskController.bulkUpdateTaskWithSubtasks);
@@ -764,7 +758,9 @@ router.get("/schedule/sessions", requireAuth, async (req, res, next) => {
       .populate({
         path: "taskId",
         match: { userId }, // Only include sessions for tasks owned by this user
-        select: "taskname description category tags dueDate subTasks",
+        select:
+          "taskname description category tags dueDate importance effort subCategory estimatedDuration earliestStart progressPercentage subTasks",
+        populate: { path: "subCategory" },
       })
       .sort({ start: 1 })
       .lean();
@@ -842,6 +838,256 @@ router.get("/schedule/sessions", requireAuth, async (req, res, next) => {
   }
 });
 
+/* ─────────────────────────────────────────────────────────────────────────
+   MANUAL SCHEDULE MANAGEMENT
+   Read and write the raw TaskSchedule entries for a specific task.
+   These routes let the Edit-Task screen show/edit sessions directly.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Get raw scheduled sessions for a specific task (all statuses).
+ * GET /api/tasks/:id/sessions
+ *
+ * Response: { success, sessions: [{ _id, start, end, minutes, subtaskIndex, subtaskTitle, status, manuallyScheduled }] }
+ */
+router.get("/:id/sessions", requireAuth, async (req, res, next) => {
+  try {
+    const { id: taskId } = req.params;
+    const userId = req.user.userId;
+
+    // Verify task belongs to user
+    const task = await Task.findOne({ _id: taskId, userId });
+    if (!task) {
+      return res.status(404).json({ success: false, error: "Task not found" });
+    }
+
+    const sessions = await TaskSchedule.find({ taskId }).sort({ start: 1 }).lean();
+
+    return res.json({
+      success: true,
+      manualSchedule: task.manualSchedule ?? false,
+      sessions: sessions.map((s) => ({
+        _id: s._id,
+        start: s.start,
+        end: s.end,
+        minutes: s.minutes,
+        subtaskIndex: s.subtaskIndex ?? null,
+        subtaskTitle: s.subtaskTitle ?? null,
+        status: s.status,
+        manuallyScheduled: s.manuallyScheduled ?? false,
+      })),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Replace a task's planned sessions with a manually-defined set.
+ * PATCH /api/tasks/:id/sessions
+ *
+ * Body: { sessions: [{ id?, start (ISO), end (ISO), subtaskIndex? }] }
+ *
+ * Validation:
+ *  - end > start for each session
+ *  - No overlap between sessions (respects user's minGapMinutes)
+ *  - No overlap with user BusyBlocks (with minGapMinutes gap)
+ *  - No overlap with OTHER tasks' planned sessions (with minGapMinutes gap)
+ *
+ * On success:
+ *  - Deletes existing non-completed planned/skipped sessions for the task
+ *  - Inserts new sessions marked manuallyScheduled: true
+ *  - Sets task.manualSchedule = true  →  auto-scheduler will skip this task
+ *
+ * Response: { success, sessions: [...] }
+ */
+router.patch("/:id/sessions", requireAuth, async (req, res, next) => {
+  try {
+    const { id: taskId } = req.params;
+    const userId = req.user.userId;
+    const { sessions } = req.body;
+
+    if (!Array.isArray(sessions)) {
+      return res.status(400).json({ success: false, error: "sessions must be an array" });
+    }
+
+    // Verify task belongs to user
+    const task = await Task.findOne({ _id: taskId, userId });
+    if (!task) {
+      return res.status(404).json({ success: false, error: "Task not found" });
+    }
+
+    // Get user minGapMinutes
+    const user = await User.findById(userId).select("schedulingPreferences").lean();
+    const minGapMs = (user?.schedulingPreferences?.minGapMinutes ?? 10) * 60_000;
+
+    // Parse and validate each session
+    const parsed = [];
+    for (let i = 0; i < sessions.length; i++) {
+      const s = sessions[i];
+      const start = new Date(s.start);
+      const end = new Date(s.end);
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ success: false, error: `Session ${i + 1}: invalid date format` });
+      }
+      if (end <= start) {
+        return res.status(400).json({ success: false, error: `Session ${i + 1}: end time must be after start time` });
+      }
+      parsed.push({
+        id: s.id,
+        start,
+        end,
+        subtaskIndex: s.subtaskIndex ?? null,
+        minutes: Math.round((end.getTime() - start.getTime()) / 60_000),
+      });
+    }
+
+    // Check no overlap between the submitted sessions themselves
+    const sortedParsed = [...parsed].sort((a, b) => a.start.getTime() - b.start.getTime());
+    for (let i = 0; i < sortedParsed.length - 1; i++) {
+      const curr = sortedParsed[i];
+      const next = sortedParsed[i + 1];
+      if (curr.end.getTime() + minGapMs > next.start.getTime()) {
+        return res.status(409).json({
+          success: false,
+          error: `Sessions ${i + 1} and ${i + 2} are overlapping or too close together (minimum ${user?.schedulingPreferences?.minGapMinutes ?? 10} min gap required)`,
+          conflicts: [{ type: "self_overlap", indices: [i, i + 1] }],
+        });
+      }
+    }
+
+    if (parsed.length > 0) {
+      // Check against BusyBlocks
+      const globalStart = sortedParsed[0].start;
+      const globalEnd = sortedParsed[sortedParsed.length - 1].end;
+
+      const busyBlocks = await BusyBlock.find({
+        userId,
+        $or: [
+          { isRecurring: { $ne: true }, start: { $lt: globalEnd }, end: { $gt: globalStart } },
+          { isRecurring: true },
+        ],
+      }).lean();
+
+      for (const session of parsed) {
+        for (const block of busyBlocks) {
+          let blockStart, blockEnd;
+          if (block.isRecurring && block.recurrence?.daysOfWeek?.length) {
+            const sessionDow = session.start.getUTCDay();
+            if (!block.recurrence.daysOfWeek.includes(sessionDow)) continue;
+            // Re-anchor recurring block times to the session's date (UTC)
+            const refStart = new Date(block.start);
+            const refEnd = new Date(block.end);
+            const sessionMidnight = new Date(session.start);
+            sessionMidnight.setUTCHours(0, 0, 0, 0);
+            blockStart = new Date(sessionMidnight.getTime());
+            blockStart.setUTCHours(refStart.getUTCHours(), refStart.getUTCMinutes(), 0, 0);
+            blockEnd = new Date(sessionMidnight.getTime());
+            blockEnd.setUTCHours(refEnd.getUTCHours(), refEnd.getUTCMinutes(), 0, 0);
+          } else {
+            blockStart = new Date(block.start);
+            blockEnd = new Date(block.end);
+          }
+          const buffStart = blockStart.getTime() - minGapMs;
+          const buffEnd = blockEnd.getTime() + minGapMs;
+          if (session.start.getTime() < buffEnd && session.end.getTime() > buffStart) {
+            return res.status(409).json({
+              success: false,
+              error: `Session starting at ${session.start.toLocaleString()} conflicts with busy block "${block.title || "Busy"}"`,
+              conflicts: [{ type: "busy_block", sessionStart: session.start, blockTitle: block.title }],
+            });
+          }
+        }
+      }
+
+      // Check against other tasks' planned sessions (not for this task)
+      const otherSessionConflicts = await TaskSchedule.find({
+        userId,
+        taskId: { $ne: taskId },
+        status: "planned",
+        start: { $lt: new Date(globalEnd.getTime() + minGapMs) },
+        end: { $gt: new Date(globalStart.getTime() - minGapMs) },
+      }).lean();
+
+      for (const session of parsed) {
+        for (const other of otherSessionConflicts) {
+          const buffStart = other.start.getTime() - minGapMs;
+          const buffEnd = other.end.getTime() + minGapMs;
+          if (session.start.getTime() < buffEnd && session.end.getTime() > buffStart) {
+            return res.status(409).json({
+              success: false,
+              error: `Session starting at ${session.start.toLocaleString()} overlaps with another scheduled task`,
+              conflicts: [{ type: "other_task_overlap", sessionStart: session.start }],
+            });
+          }
+        }
+      }
+    }
+
+    // Get subtask title/description map for this task
+    const subTaskDocs = await SubTask.find({ taskId }).lean();
+    const subTaskMap = new Map(subTaskDocs.map((st) => [st.index, st]));
+
+    // Wrap the delete→insert in a per-user lock to prevent concurrent saves from
+    // doubling the sessions (same race condition the auto-scheduler guards against).
+    const inserted = await withUserScheduleLock(userId, async () => {
+      // Replace existing non-completed sessions for this task
+      await TaskSchedule.deleteMany({ taskId, status: { $nin: ["completed"] } });
+
+      const newDocs = parsed.map((s) => {
+        const subtask = s.subtaskIndex != null ? subTaskMap.get(s.subtaskIndex) : null;
+        return {
+          userId,
+          taskId,
+          subtaskIndex: s.subtaskIndex,
+          subtaskTitle: subtask?.title ?? null,
+          description: subtask?.description ?? null,
+          start: s.start,
+          end: s.end,
+          minutes: s.minutes,
+          status: "planned",
+          manuallyScheduled: true,
+          // Give manual sessions the same DB-level dedup protection as auto-scheduled ones.
+          sessionHash: computeSessionHash(userId, taskId, s.start, s.end, s.subtaskIndex ?? null),
+        };
+      });
+
+      if (newDocs.length === 0) return [];
+
+      try {
+        return await TaskSchedule.insertMany(newDocs, { ordered: false });
+      } catch (err) {
+        if (err.code === 11000 || err.name === "MongoBulkWriteError") {
+          // Duplicate-key: a concurrent save already inserted these sessions.
+          // Return what was actually inserted (the write errors tell us the others).
+          return err.insertedDocs ?? [];
+        }
+        throw err;
+      }
+    });
+
+    // Mark task as manually scheduled so auto-scheduler skips it
+    await Task.updateOne({ _id: taskId }, { $set: { manualSchedule: true } });
+
+    return res.json({
+      success: true,
+      message: `Manual schedule saved: ${inserted.length} session(s)`,
+      sessions: inserted.map((s) => ({
+        _id: s._id,
+        start: s.start,
+        end: s.end,
+        minutes: s.minutes,
+        subtaskIndex: s.subtaskIndex ?? null,
+        subtaskTitle: s.subtaskTitle ?? null,
+        status: s.status,
+        manuallyScheduled: s.manuallyScheduled,
+      })),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Get a single task by ID
 router.get("/:id", taskController.getTaskById);
 
@@ -915,8 +1161,13 @@ router.post("/:id/schedule", async (req, res, next) => {
       });
     }
 
+    // Clear manual-schedule flag so the auto-scheduler will include this task
+    // and delete any existing manual sessions for it
+    await Task.updateOne({ _id: taskId }, { $set: { manualSchedule: false } });
+    await TaskSchedule.deleteMany({ taskId, status: { $nin: ["completed"] } });
+
     // Get user profile for scheduling preferences
-    const user = await User.findById(userId).select("profile subCategories").lean();
+    const user = await User.findById(userId).select("profile subCategories schedulingPreferences").lean();
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -924,10 +1175,16 @@ router.post("/:id/schedule", async (req, res, next) => {
       });
     }
 
+    // Merge schedulingPreferences into profile for the scheduler
+    const profileWithGap = {
+      ...(user.profile || {}),
+      minGapMinutes: user.schedulingPreferences?.minGapMinutes ?? 10,
+    };
+
     // Generate plan
     const { plan, unscheduled } = await generatePlan({
       userId,
-      profile: user.profile,
+      profile: profileWithGap,
       planningHorizonDays,
     });
 
@@ -947,6 +1204,65 @@ router.post("/:id/schedule", async (req, res, next) => {
     res.status(201).json({
       success: true,
       message: `Schedule created successfully. ${plan.length} session(s) scheduled.`,
+      scheduledCount: plan.length,
+      unscheduledCount: unscheduled.length,
+      plan: plan.map((p) => ({
+        start: p.start,
+        end: p.end,
+        minutes: p.minutes,
+        taskId: p.taskId,
+        subtaskIndex: p.subtaskIndex || null,
+      })),
+      unscheduled,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/tasks/reschedule-all
+ * Force-regenerate the full scheduling plan for the authenticated user.
+ * Useful for testing scheduling fixes without creating/editing a task.
+ *
+ * Response:
+ * {
+ *   success: boolean,
+ *   message: string,
+ *   scheduledCount: number,
+ *   unscheduledCount: number,
+ *   plan: Array<{ start, end, minutes, taskId, subtaskIndex }>
+ * }
+ */
+router.post("/reschedule-all", async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+
+    const { generatePlan, savePlan } = await import("../services/schedulingService.js");
+
+    const user = await User.findById(userId).select("profile subCategories schedulingPreferences").lean();
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+
+    const profileWithGap = {
+      ...(user.profile || {}),
+      minGapMinutes: user.schedulingPreferences?.minGapMinutes ?? 10,
+    };
+
+    const { plan, unscheduled } = await generatePlan({
+      userId,
+      profile: profileWithGap,
+      planningHorizonDays: 14,
+    });
+
+    await savePlan({ userId, plan, unscheduled });
+
+    logger.info(`Force-rescheduled all tasks for user ${userId}: ${plan.length} sessions`);
+
+    res.status(200).json({
+      success: true,
+      message: `Rescheduled successfully. ${plan.length} session(s) planned.`,
       scheduledCount: plan.length,
       unscheduledCount: unscheduled.length,
       plan: plan.map((p) => ({

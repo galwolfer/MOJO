@@ -141,4 +141,21 @@ export function getCategoryMeta(categoryKey?: string | null): CategoryMeta {
   return CATEGORY_META[key] || CATEGORY_META.uncategorized;
 }
 
+/**
+ * Resolves a raw category input to a valid category key.
+ * Handles: exact key match (case-insensitive), display-name match.
+ * Used when the model returns a display name (e.g. "Social Activity") instead of a key.
+ */
+export function resolveCategoryKey(input?: string | null): string {
+  if (!input) return "uncategorized";
+  const lower = input.toLowerCase().trim();
+  // 1. Direct key match
+  if (CATEGORY_META[lower]) return lower;
+  // 2. Display name match (case-insensitive)
+  const found = CATEGORY_KEYS.find(
+    (k) => (CATEGORY_META[k]?.displayName || "").toLowerCase() === lower,
+  );
+  return found ?? "uncategorized";
+}
+
 export default CATEGORY_META;

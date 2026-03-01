@@ -51,7 +51,7 @@ export const TaskTagsRow: React.FC<{
     <View style={styles.tagRow}>
       {category && (
         <Tag
-          label={categoryDisplay || category}
+          label={categoryDisplay || categoryMeta.displayName || category}
           leftIcon={categoryMeta.icon}
           colorIndex={categoryMeta.colorIndex}
           style={styles.tagItem}
@@ -114,7 +114,17 @@ export const TaskTagsRow: React.FC<{
         />
       ) : null}
 
-      {tags && tags.map((t, idx) => <Tag key={idx} label={t} style={styles.tagItem} />)}
+      {tags && tags.length > 0
+        ? tags.map((tag) => (
+            <Tag
+              key={tag}
+              label={tag}
+              leftIcon={categoryMeta.icon}
+              colorIndex={categoryMeta.colorIndex}
+              style={styles.tagItem}
+            />
+          ))
+        : null}
     </View>
   );
 };

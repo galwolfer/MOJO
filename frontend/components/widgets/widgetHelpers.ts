@@ -2,8 +2,8 @@ import { COLORS } from "../../theme";
 import { SVG_DATA_URIS } from "../icons/svg-data-uris";
 import { ScheduledSession, Subtask } from "./taskHelpers";
 
-// Re-export types only from taskHelpers (functions are defined locally in this file)
-export { Subtask, ScheduledSession } from "./taskHelpers";
+// Re-export from taskHelpers so existing imports from this file continue to work
+export { Subtask, ScheduledSession, computeTaskProgress } from "./taskHelpers";
 
 export type WidgetEntranceProps = {
   entranceEnabled?: boolean;
@@ -370,47 +370,6 @@ export const getCategoryDisplay = (category?: string | null, categoryDisplay?: s
   if (categoryDisplay && typeof categoryDisplay === "string" && categoryDisplay.trim() !== "") return categoryDisplay;
   const meta = getCategoryMeta(category || undefined);
   return meta?.displayName || category || "";
-};
-
-/**
- * computeTaskProgress
- * Derives a task's progress percentage (0-100) from explicit progress, subtasks, or scheduled sessions
- */
-export const computeTaskProgress = (task: any, completedParts: Set<string>): number => {
-  const _taskId = task?.id || (task && task._id) || "(unknown)";
-
-  // Subtasks take precedence when available (and consider optimistic completedParts)
-  const subtasks = (task as any).subtasks as Subtask[] | undefined;
-  if (subtasks && subtasks.length > 0) {
-    const total = subtasks.length;
-    const completed = subtasks.filter(
-      (st) => st.status === "done" || st.completed || (st.id && completedParts.has(st.id)),
-    ).length;
-    const v = total === 0 ? 0 : Math.round((completed / total) * 100);
-    return v;
-  }
-
-  // Next, use scheduled sessions when available
-  const sessions = (task as any).scheduledSessions as ScheduledSession[] | undefined;
-  if (sessions && sessions.length > 0) {
-    let completed = 0;
-    sessions.forEach((s, idx) => {
-      const key = getSessionKey(task.id, s, idx, subtasks);
-      const isDone = (s as any).subtaskStatus === "done" || s.status === "completed" || completedParts.has(key);
-      if (isDone) completed += 1;
-    });
-    const v = Math.round((completed / sessions.length) * 100);
-    return v;
-  }
-
-  // Fallback to explicit progressPercentage if provided
-  if (typeof task?.progressPercentage === "number") {
-    const v = Math.max(0, Math.min(100, task.progressPercentage));
-    return v;
-  }
-
-  // No progress information available
-  return 0;
 };
 
 /**

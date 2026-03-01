@@ -266,6 +266,7 @@ export const SHADOWS = {
     shadowRadius: 1,
     elevation: 4,
   },
+
   glowingMessage: {
     // use COLORS.primary1 at 50% opacity via helper (keeps the source color variable-driven)
     boxShadow: `0 0 15px 0 rgba(0, 0, 0, 0.05) inset, 0px 1px 2px ${hexToRgba(COLORS.primary1, 0.1)}`,

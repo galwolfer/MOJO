@@ -43,7 +43,6 @@ export const FIELD_DEFINITIONS: Record<
   },
   minMinutes: { label: "Min Session", icon: "clock", formatter: (v) => formatDuration(v ?? undefined) },
   maxMinutes: { label: "Max Session", icon: "clock", formatter: (v) => formatDuration(v ?? undefined) },
-  tags: { label: "Tags", icon: "tag", formatter: (v) => (Array.isArray(v) ? v.join(", ") : "-") },
   status: { label: "Status", icon: "check" },
   startDate: { label: "Start Date", icon: "calendar", formatter: (v) => formatDate(v) },
   recurrence: {
@@ -79,9 +78,7 @@ export const renderTaskField = (task: any, key: string) => {
   // Get raw value, with special handling for subcategory
   const rawValue =
     task[key] ??
-    (key === "subcategory"
-      ? task.subcategoryDisplay || task.subCategory?.label || task.subCategory?.name
-      : undefined);
+    (key === "subcategory" ? task.subcategoryDisplay || task.subCategory?.label || task.subCategory?.name : undefined);
   // Apply formatter if defined
   const rendered = def.formatter ? def.formatter(rawValue, task) : rawValue;
 

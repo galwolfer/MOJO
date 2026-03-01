@@ -24,6 +24,8 @@ import { setAuthToken } from "../../../services/httpClient";
 import { useAuth } from "../../../context/AuthContext";
 import { ScrollableContent } from "../../../components";
 import ErrorText from "../../../components/common/ErrorText";
+import BusyBlocksSection from "../../../components/special/BusyBlocksSection";
+import PopupBox from "../../../components/common/PopupBox";
 
 type EditPreferencesScreenProps = {
   onBack: () => void;
@@ -40,6 +42,7 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
 
   // Priorities state
   const [priorities, setPriorities] = useState<Record<string, number>>({});
@@ -98,13 +101,13 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
       show: true,
       icon: ICONS.prefrences,
       leftElement: (
-        <TouchableOpacity onPress={handleBackPress} style={styles.headerRightTouchable}>
-          <LeftIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
+        <TouchableOpacity onPress={handleBackPress} >
+          <LeftIcon size={ICON_SIZES.md} color={COLORS.primary1} />
         </TouchableOpacity>
       ),
       rightElement: (
         <View style={styles.headerLeft}>
-          <PrefIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
+          <PrefIcon size={ICON_SIZES.md} color={COLORS.primary1} />
         </View>
       ),
     });
@@ -135,7 +138,7 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
       setOriginalPriorities({ ...priorities });
 
       onSave?.();
-      onBack();
+      setShowSaveSuccess(true);
     } catch (err: any) {
       console.error("Failed to save preferences:", err);
       setError(err?.message || "Failed to save preferences");
@@ -224,6 +227,28 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
           </View>
         </View>
       </Box>
+
+      {/* Busy Blocks + Gap preference */}
+      <BusyBlocksSection style={{ marginTop: SPACING.xlg }} />
+
+      {/* Save success popup */}
+      <PopupBox
+        visible={showSaveSuccess}
+        onClose={() => { setShowSaveSuccess(false); onBack(); }}
+        title="Goals & Priorities Saved"
+        titleColor={COLORS.primary1}
+      >
+        <AppText variant="bodyText" style={styles.popupText}>
+          Your goals and priorities have been updated successfully.
+        </AppText>
+        <AppButton
+          title="Done"
+          onPress={() => { setShowSaveSuccess(false); onBack(); }}
+          mode="filled"
+          color="primary1"
+          style={styles.popupButton}
+        />
+      </PopupBox>
     </ScrollableContent>
   );
 }
@@ -310,6 +335,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
+  popupText: {
+    color: COLORS.lightGray,
+    fontSize: FONT_SIZES.sm,
+    textAlign: "center" as const,
+    marginBottom: SPACING.lg,
+    lineHeight: FONT_SIZES.base * 1.4,
+  },
+  popupButton: {
+    width: "100%",
+    marginTop: SPACING.sm,
+  },
   // Buttons
   buttonRow: {
     flexDirection: "row",

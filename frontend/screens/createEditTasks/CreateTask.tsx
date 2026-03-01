@@ -21,9 +21,8 @@ import ErrorBanner from "../../components/common/ErrorBanner";
 import PopupBox from "../../components/common/PopupBox";
 import ScrollableContent from "../../components/layout/ScrollableContent";
 import { ICONS } from "../../components/icons/icons";
-import TaskDetailsSection from "./components/TaskDetailsSection";
-import TimeAndPartsSection from "./components/TimeAndPartsSection";
-import type { TaskFormState, Subtask } from "./components/taskFormTypes";
+import { TaskDetailsSection, TimeAndPartsSection } from "../../components/special/task";
+import type { TaskFormState, Subtask } from "../../components/special/task";
 import { CATEGORY_KEYS } from "../../config/categoryMeta";
 import { createTask, createTaskSchedule } from "../../services/taskService";
 import { fetchSubcategoriesForCategory, type Subcategory } from "../../services/subcategoryService";
@@ -131,8 +130,9 @@ const CreateTask: React.FC = () => {
     setFormState((p) => ({ ...p, subCategoryId: id }));
   }, []);
   const handleSubcategoryCreated = useCallback(
-    (id: string) => {
-      // Updated subcategory created; reload list for the current category
+    (newSub: Subcategory) => {
+      // append and reload if necessary
+      setSubcategories((prev) => [...prev, newSub]);
       if (formState.category) {
         fetchSubcategoriesForCategory(formState.category).then(setSubcategories);
       }
@@ -144,6 +144,7 @@ const CreateTask: React.FC = () => {
   const handleEstimatedMinutesChange = useCallback((v: string) => {
     const numericOnly = v.replace(/[^0-9]/g, "");
     setFormState((p) => ({ ...p, estimatedMinutes: numericOnly }));
+    // Clear errors when user starts correcting
     setFormErrors([]);
   }, []);
 
@@ -260,7 +261,9 @@ const CreateTask: React.FC = () => {
 
       let taskType: "perfect" | "in_parts" | "leaky" = "perfect";
       if (formState.numSubtasks > 1) {
-        const mins = formState.subtasks.map((st) => (st.minutes ? parseInt(st.minutes, 10) : 0)).filter((m) => m > 0);
+        const mins = formState.subtasks
+          .map((st) => (st.minutes ? parseInt(st.minutes, 10) : 0))
+          .filter((m) => m > 0);
         taskType = mins.length >= 2 && !mins.every((m) => m === mins[0]) ? "leaky" : "in_parts";
       }
 
@@ -272,8 +275,10 @@ const CreateTask: React.FC = () => {
         effort: formState.effort,
         deadline: formState.timeToComplete,
         estimatedMinutes: formState.estimatedMinutes ? parseInt(formState.estimatedMinutes, 10) : undefined,
-        tags: formState.subCategoryId ? [formState.subCategoryId] : undefined,
+        subcategoryId: formState.subCategoryId ?? undefined,
         subtasks: subtasksData.length > 0 ? subtasksData : undefined,
+        taskType,
+        chunkCount: formState.numSubtasks > 1 ? formState.numSubtasks : undefined,
       });
 
       if (result) {
@@ -308,7 +313,7 @@ const CreateTask: React.FC = () => {
       extraBottomPadding={SPACING.xlg * 3}
     >
       {/* Error banner at top */}
-      <ErrorBanner errors={formErrors} />
+      <ErrorBanner message={formErrors.join("\n")} />
 
       <TaskDetailsSection
         taskName={formState.taskName}
@@ -355,7 +360,7 @@ const CreateTask: React.FC = () => {
       </View>
 
       {/* Error banner below button */}
-      <ErrorBanner errors={formErrors} />
+      <ErrorBanner message={formErrors.join("\n")} />
 
       <PopupBox visible={!!popupInfo} onClose={closePopup} title={popupInfo?.title ?? ""} titleColor={COLORS.primary1}>
         <AppText style={[styles.popupMessage, { color: colors.gray2 }]}>{popupInfo?.message}</AppText>

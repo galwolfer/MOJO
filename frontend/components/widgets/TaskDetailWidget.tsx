@@ -221,6 +221,7 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
         estimatedDuration={task.estimatedDuration || task.duration}
         progressPercentage={task.progressPercentage ?? null}
         sessionHeaderMode="date"
+        hideTaskTitle={true}
         dividerColor={colors.bg1}
         taskStatus={task.status}
       />
@@ -317,7 +318,6 @@ const styles = StyleSheet.create({
   },
   subtaskCard: {
     padding: SPACING.sm,
-    borderLeftWidth: SPACING.xs,
     borderLeftWidth: SPACING.xs,
   },
   subtaskTitle: {

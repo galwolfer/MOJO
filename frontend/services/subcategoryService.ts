@@ -26,7 +26,12 @@ export async function fetchSubcategoriesForCategory(category: string): Promise<S
   return response.subcategories || [];
 }
 
-export async function createSubcategory(params: { name: string; category: string; icon?: string | null; color?: string | null }) {
+export async function createSubcategory(params: {
+  name: string;
+  category: string;
+  icon?: string | null;
+  color?: string | null;
+}) {
   const response = await post<{ success: boolean; subcategory?: Subcategory }>("/tasks/subcategories", {
     name: params.name,
     category: params.category,
@@ -36,7 +41,10 @@ export async function createSubcategory(params: { name: string; category: string
   return response.subcategory || null;
 }
 
-export async function updateSubcategory(id: string, updates: { name?: string; icon?: string | null; color?: string | null }) {
+export async function updateSubcategory(
+  id: string,
+  updates: { name?: string; icon?: string | null; color?: string | null },
+) {
   const response = await patch<{ success: boolean; subcategory?: Subcategory }>(`/tasks/subcategories/${id}`, updates);
   return response.subcategory || null;
 }

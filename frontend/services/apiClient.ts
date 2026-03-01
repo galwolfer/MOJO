@@ -1,4 +1,4 @@
-// Authentication API service for frontend
+﻿// Authentication API service for frontend
 // Handles user authentication (login, register)
 
 import { post, setAuthToken } from "./httpClient";
@@ -101,12 +101,14 @@ export async function getUserPreferences(): Promise<{
   priorities: Record<string, number>;
   ojoType: { name: string; displayName: string } | null;
   appSettings: Record<string, any>;
+  schedulingPreferences: SchedulingPreferences;
 }> {
   const { get } = await import("./httpClient");
   return get<{
     priorities: Record<string, number>;
     ojoType: { name: string; displayName: string } | null;
     appSettings: Record<string, any>;
+    schedulingPreferences: SchedulingPreferences;
   }>("/auth/preferences");
 }
 
@@ -186,6 +188,28 @@ export async function deleteAccount(): Promise<any> {
   return del<any>("/auth/account");
 }
 
+export type SchedulingPreferences = { minGapMinutes: number };
+
+/**
+ * Get scheduling preferences (minGapMinutes)
+ * — already returned by GET /api/auth/preferences, but available standalone too
+ */
+export async function getSchedulingPreferences(): Promise<SchedulingPreferences> {
+  const { get } = await import("./httpClient");
+  const data = await get<{ schedulingPreferences: SchedulingPreferences }>("/auth/preferences");
+  return data.schedulingPreferences ?? { minGapMinutes: 10 };
+}
+
+/**
+ * Update scheduling preferences
+ * PATCH /api/auth/scheduling-preferences
+ */
+export async function updateSchedulingPreferences(prefs: SchedulingPreferences): Promise<SchedulingPreferences> {
+  const { patch } = await import("./httpClient");
+  const data = await patch<{ schedulingPreferences: SchedulingPreferences }>("/auth/scheduling-preferences", prefs);
+  return data.schedulingPreferences;
+}
+
 export default {
   setApiBase,
   setAuthToken,
@@ -197,4 +221,6 @@ export default {
   updateProfile,
   updateAppSettings,
   deleteAccount,
+  getSchedulingPreferences,
+  updateSchedulingPreferences,
 };

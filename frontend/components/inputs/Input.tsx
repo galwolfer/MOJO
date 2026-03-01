@@ -11,6 +11,8 @@ import {
   Easing,
   // Changed to Pressable for better handling of simultaneous gestures
   Pressable,
+  ScrollView,
+  useWindowDimensions,
 } from "react-native";
 import {
   COLORS,
@@ -54,6 +56,10 @@ interface InputProps<T = any> extends Omit<TextInputProps, "style"> {
   iconSize?: IconSizeKey;
   // explicit disabled prop for clarity
   disabled?: boolean;
+  // Optional element to render on the right side of the input (inside the box)
+  rightElement?: React.ReactNode;
+  // Optional callback fired when the whole input box is pressed
+  onPress?: () => void;
 }
 
 /**
@@ -132,11 +138,13 @@ function Input<T = any>({
   multiSelect = false,
   iconSize = "md",
   disabled = false,
+  rightElement,
+  onPress,
   ...rest
 }: InputProps<T>) {
   const colors = useColors();
   const borderColorAnim = useRef(new Animated.Value(0)).current;
-  const webNativeID = useWebCaret("input", colors.gray1, colors.primary1);
+  const webNativeID = useWebCaret();
   const {
     onChangeText: onChangeTextProp,
     onFocus: onFocusProp,
@@ -330,6 +338,9 @@ function Input<T = any>({
           // Don't allow interaction if disabled
           if (disabled) return;
 
+          // Fire optional onPress callback (e.g. to open a date picker)
+          onPress?.();
+
           // Always focus the input when the wrapper is tapped to improve tap responsiveness
           inputRef.current?.focus();
 
@@ -373,7 +384,13 @@ function Input<T = any>({
         >
           {/* Display selected option's icon for single-select dropdowns */}
           {selectedOption?.icon && (
-            <View style={styles.selectedIconWrapper}>
+            <View
+              style={[
+                styles.selectedIconWrapper,
+                selectedOption.iconBackground ? styles.selectedIconBox : undefined,
+                selectedOption.iconBackground ? { backgroundColor: selectedOption.iconBackground } : undefined,
+              ]}
+            >
               {React.createElement(selectedOption.icon, {
                 size: ICON_SIZES[iconSize],
                 color: selectedOption.iconColor || colors.primary1,
@@ -420,6 +437,8 @@ function Input<T = any>({
             cursorColor={cursorColor}
             {...((Platform as any).OS === "web" && webNativeID ? { nativeID: webNativeID } : {})}
           />
+
+          {rightElement && <View style={styles.rightElementWrapper}>{rightElement}</View>}
 
           {options && (
             <View style={{ marginRight: 8 }}>
@@ -470,8 +489,8 @@ function Input<T = any>({
                 const optionValue = option.value;
                 const optionLabel = option.label;
                 const optionIcon = option.icon;
-                const optionIconColor = option.iconColor || colors.text2;
-                const optionIconBackground = option.iconBackground || colors.bg2;
+                const optionIconColor = option.iconColor || COLORS.white;
+                const optionIconBackground = option.iconBackground || COLORS.white2;
                 const isSelected = selected.includes(optionValue);
                 return (
                   <React.Fragment key={optionValue}>
@@ -500,6 +519,7 @@ function Input<T = any>({
                           onSelect?.(newSelected);
                         }
                       }}
+                      style={styles.option}
                     >
                       <View style={styles.optionContent}>
                         {optionIcon && (
@@ -624,6 +644,16 @@ const styles = StyleSheet.create({
     marginLeft: SPACING.md,
     alignItems: "center",
     justifyContent: "center",
+  },
+  selectedIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+  },
+  rightElementWrapper: {
+    marginRight: SPACING.sm,
+    justifyContent: "center",
+    alignItems: "center",
   },
   inputWrapperDisabled: {
     opacity: 0.7,

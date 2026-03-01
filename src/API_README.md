@@ -85,8 +85,24 @@ CRUD & helpers:
   - Response: `{ success: true, task }`
 
 - `PATCH /api/tasks/:id`
-  - Update a task (body fields: `name`, `tag`, `completed`, `deadline`)
-  - Response: `{ success: true, task }`
+  - Update a task with comprehensive fields
+  - Body: `{ name?, taskname?, description?, category?, subcategory?, deadline?, dueDate?, importance?, effort?, estimatedDuration?, estimatedMinutes?, tags?, subtasks?, taskType?, chunkCount?, status?, completed? }`
+  - Supported fields:
+    - `name` or `taskname`: Task title (string, max 200 chars)
+    - `description`: Task description (string, no angle brackets)
+    - `category`: Task category (string, one of 18 standard categories)
+    - `subcategory`: Task subcategory (string, auto-saved to user profile)
+    - `deadline` or `dueDate`: Task deadline (ISO 8601 date string or null)
+    - `importance`: Importance level (integer 1-5)
+    - `effort`: Effort level (integer 1-5)
+    - `estimatedDuration` or `estimatedMinutes`: Time estimate in minutes (number, minimum 15)
+    - `tags`: Array of tag strings (e.g., `["work", "urgent"]`)
+    - `subtasks`: Array of subtask objects with `id?, title, description?, minutes?, index?`
+    - `taskType`: Task type (string: "perfect", "in_parts", or "leaky")
+    - `chunkCount`: Number of chunks for split tasks (integer >= 1)
+    - `status`: Task status (string: "todo", "in_progress", or "done")
+    - `completed`: Boolean (sets status to "done" if true, "todo" if false)
+  - Response: `{ success: true, task, gamification?, message }`
 
 - `DELETE /api/tasks/:id`
   - Delete a task
@@ -111,19 +127,12 @@ Filtered & expired management:
 - `PATCH /api/tasks/expired/:id/extend`
   - Body: `{ newDeadline: 'ISO DATE' }` — Extend deadline for expired task
 
-- `DELETE /api/tasks/expired/:id/forfeit`
-  - Permanently delete an expired task
-
-- `POST /api/tasks/expired/:id/handle`
-  - Body: `{ action: 'extend'|'forfeit', newDeadline?: 'ISO DATE' }`
-  - Combined handler for expired task flow
-
 Notes:
 - Date inputs should be ISO 8601 strings (e.g., `2025-12-31T23:59:59Z`).
 - Validation errors return `4xx` with a descriptive message.
 
 Middleware note:
-- The server includes an `expiredTaskBlocker` middleware that may block access to non-user-management routes when the user has expired tasks. The endpoints under `/api/tasks/expired/*` are whitelisted to allow resolution flows (extend/forfeit/handle).
+- The server includes an `expiredTaskBlocker` middleware that may block access to non-user-management routes when the user has expired tasks. The endpoints under `/api/tasks/expired/*` are whitelisted to allow resolution flows (extend).
 
 ---
 

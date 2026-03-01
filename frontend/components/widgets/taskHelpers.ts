@@ -161,6 +161,19 @@ export const getEffortLabel = (effort?: number) => {
 };
 
 /**
+ * getImportanceColor
+ * Maps an importance/effort numeric value (1-5) to a display color.
+ * Used by sliders in CreateTask and EditTask screens.
+ */
+export const getImportanceColor = (value: number): string => {
+  if (value === 1) return COLORS.primary6; // Green - Low
+  if (value === 2) return COLORS.primary1; // Blue - Below Avg
+  if (value === 3) return COLORS.primary5; // Orange - Average
+  if (value === 4) return COLORS.primary4; // Pink - Above Avg
+  return "#D32F2F"; // Red - Critical
+};
+
+/**
  * formatDuration
  * Formats a duration in minutes to a human-readable time string.
  * Converts to hours and minutes format for durations over 60 minutes.

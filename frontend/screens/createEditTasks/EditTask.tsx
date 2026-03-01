@@ -27,15 +27,9 @@ import PopupBox from "../../components/common/PopupBox";
 import ScrollableContent from "../../components/layout/ScrollableContent";
 
 // ── Shared task-form section components ───────────────────────────────────────
-import TaskDetailsSection from "./components/TaskDetailsSection";
-import TimeAndPartsSection from "./components/TimeAndPartsSection";
-import {
-  toLocalDateStr,
-  toLocalTimeStr,
-  combineLocalDateTime,
-  validateEditableSessions,
-} from "./components/TaskScheduleEditor";
-import type { TaskFormState, Subtask, EditableSession } from "./components/taskFormTypes";
+import { TaskDetailsSection, TimeAndPartsSection } from "../../components/special/task";
+import { toLocalDateStr, toLocalTimeStr } from "../../components/special/task/TaskScheduleEditor";
+import type { TaskFormState, Subtask, EditableSession } from "../../components/special/task";
 import type { SingleTaskSchedule } from "./components/TimeAndPartsSection";
 
 // ── Icons and context ─────────────────────────────────────────────────────────
@@ -53,6 +47,7 @@ import {
   createTaskSchedule,
 } from "../../services/taskService";
 import { fetchSubcategoriesForCategory, type Subcategory } from "../../services/subcategoryService";
+import { combineLocalDateTime, validateEditableSessions } from "../../components/special/task/TaskScheduleEditor";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
@@ -579,6 +574,7 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
   if (isFetching) {
     return (
       <SafeAreaView style={[styles.loadingWrapper, { backgroundColor: colors.bg3 }]}>
+        \
         <ActivityIndicator size="large" color={COLORS.primary1} />
         <AppText style={[styles.loadingText, { color: colors.gray2 }]}>Loading task...</AppText>
       </SafeAreaView>
@@ -613,7 +609,7 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
       extraBottomPadding={SPACING.xlg * 3}
     >
       {/* Error banner at top */}
-      <ErrorBanner errors={formErrors} />
+      <ErrorBanner message={formErrors.join("\n")} />
 
       <TaskDetailsSection
         taskName={formState.taskName}
@@ -683,7 +679,7 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
       </View>
 
       {/* Error banner below buttons */}
-      <ErrorBanner errors={formErrors} />
+      <ErrorBanner message={formErrors.join("\n")} />
 
       {/* Popup / Alert */}
       <PopupBox

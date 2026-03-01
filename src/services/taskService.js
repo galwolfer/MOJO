@@ -140,7 +140,6 @@ export async function createTask({
   category = "",
   subCategory = null,
   recurrence = null,
-  tags = [],
   subtasks = [],
 }) {
   const illegalFields = getIllegalDisplayFields({
@@ -190,7 +189,6 @@ export async function createTask({
     category,
     subCategory: resolvedSubCategoryId,
     recurrence,
-    tags: tags || [],
     _pendingSubtasks: subtasks && subtasks.length > 0 ? subtasks : undefined,
   });
 
@@ -398,6 +396,10 @@ export async function getTaskById(taskId, userId) {
   if (!taskId) return null;
   const query = userId ? { _id: taskId, userId } : { _id: taskId };
   const task = await Task.findOne(query).populate("subCategory").lean();
+  if (!task) return null;
+  // Attach subtasks so the EditTask screen can pre-populate the parts form
+  const subTasks = await SubTask.find({ taskId: task._id }).sort({ index: 1 }).lean();
+  task.subTasks = subTasks;
   return attachSubcategoryLabel(task);
 }
 
@@ -672,7 +674,6 @@ export async function updateTask({ userId, taskId, updates }) {
     "category",
     "subCategory",
     "actualCompletionMinutes",
-    "tags",
     "subtasks",
   ];
 
@@ -1516,25 +1517,80 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
 
 /**
  * Create a busy block for a user.
+ *
+ * @param {object}       params
+ * @param {string}       params.userId
+ * @param {string}       [params.title]
+ * @param {Date}         params.start       - One-time: absolute start datetime.
+ *                                           Recurring: reference date + daily start time.
+ * @param {Date}         params.end         - One-time: absolute end datetime.
+ *                                           Recurring: reference date + daily end time.
+ * @param {boolean}      [params.isRecurring=false]
+ * @param {object|null}  [params.recurrence] - Required when isRecurring=true.
+ *                                            Shape: { daysOfWeek: number[], endDate: Date|null }
  */
-export async function createBusyBlock({ userId, title = "", start, end }) {
-  if (end <= start) {
-    throw new Error("End time must be after start time.");
+export async function createBusyBlock({ userId, title = "", start, end, isRecurring = false, recurrence = null }) {
+  if (!isRecurring) {
+    if (end <= start) throw new Error("End time must be after start time.");
+  } else {
+    const startMin = start.getHours() * 60 + start.getMinutes();
+    const endMin = end.getHours() * 60 + end.getMinutes();
+    if (endMin <= startMin) throw new Error("End time must be after start time.");
+    if (!recurrence?.daysOfWeek?.length) throw new Error("Recurring blocks require at least one day of week.");
   }
-  return BusyBlock.create({ userId, title, start, end });
+  return BusyBlock.create({ userId, title, start, end, isRecurring, recurrence });
 }
 
 /**
- * Fetch upcoming busy blocks for a user.
+ * Fetch all currently active busy blocks for a user:
+ *  - One-time  blocks whose end is still in the future.
+ *  - Recurring blocks that have not reached their endDate (or have no endDate).
  */
 export async function getUpcomingBusyBlocks(userId) {
-  const now = startOfDay(new Date());
+  const now = new Date();
   return BusyBlock.find({
     userId,
-    end: { $gte: now },
+    $or: [
+      // One-time: not yet ended (isRecurring absent/false both match $ne:true)
+      { isRecurring: { $ne: true }, end: { $gte: now } },
+      // Recurring: not expired
+      {
+        isRecurring: true,
+        $or: [{ "recurrence.endDate": null }, { "recurrence.endDate": { $gte: now } }],
+      },
+    ],
   })
-    .sort({ start: 1 })
+    .sort({ isRecurring: -1, start: 1 }) // recurring rules first, then by start
     .lean();
+}
+
+/**
+ * Update a busy block's fields.  All parameters except blockId/userId are optional.
+ * Accepts the same fields as createBusyBlock.
+ */
+export async function updateBusyBlock({ blockId, userId, title, start, end, isRecurring, recurrence }) {
+  const update = {};
+  if (title !== undefined) update.title = title;
+  if (start !== undefined) update.start = start;
+  if (end !== undefined) update.end = end;
+  if (isRecurring !== undefined) update.isRecurring = isRecurring;
+  if (recurrence !== undefined) update.recurrence = recurrence;
+
+  // Validate time ordering when both ends of the range are present in the update
+  if (update.start !== undefined && update.end !== undefined) {
+    const effectiveRecurring = update.isRecurring !== undefined ? update.isRecurring : isRecurring;
+    if (effectiveRecurring) {
+      const sm = update.start.getHours() * 60 + update.start.getMinutes();
+      const em = update.end.getHours() * 60 + update.end.getMinutes();
+      if (em <= sm) throw new Error("End time must be after start time.");
+    } else {
+      if (update.end <= update.start) throw new Error("End time must be after start time.");
+    }
+  }
+
+  const block = await BusyBlock.findOneAndUpdate({ _id: blockId, userId }, { $set: update }, { new: true });
+  if (!block) throw new Error("Busy block not found or access denied.");
+  return block;
 }
 
 /**

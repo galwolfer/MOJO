@@ -1,5 +1,5 @@
 import React from "react";
-import { View } from "react-native";
+import { View, StyleProp, ViewStyle, TextStyle } from "react-native";
 import AppText from "../../common/AppText";
 import { getCategoryMeta } from "../../../config/categoryMeta";
 import { StyleSheet } from "react-native";
@@ -11,26 +11,44 @@ export const TaskTitle: React.FC<{
   taskname?: string;
   category?: string;
   size?: "sm" | "md" | "lg";
+  /** When true, the category icon is never rendered regardless of category value */
   hideIcon?: boolean;
-  style?: any;
-  textStyle?: any;
-  iconStyle?: any;
+  /** Rendered before the category icon — use for Checkbox or other leading controls */
   leadingNode?: React.ReactNode;
+  /** Merged with the default row container style */
+  style?: StyleProp<ViewStyle>;
+  /** Merged with the default title text style */
+  textStyle?: StyleProp<TextStyle>;
+  /** Merged with the default icon style */
+  iconStyle?: StyleProp<ViewStyle>;
   reversed?: boolean;
-}> = ({ title, taskname, category, size = "lg", hideIcon, style, textStyle, iconStyle, leadingNode, reversed }) => {
+}> = ({
+  title,
+  taskname,
+  category,
+  hideIcon = false,
+  size = "lg",
+  reversed = false,
+  leadingNode,
+  style,
+  textStyle,
+  iconStyle,
+}) => {
   const meta = getCategoryMeta(category);
   const iconSize = size === "sm" ? ICON_SIZES.sm : size === "md" ? ICON_SIZES.md : ICON_SIZES.big;
   const titleVariant = size === "sm" ? "bodyText" : size === "md" ? "boldText" : "title3";
 
   return (
-    <View style={[styles.titleRow, style, reversed ? { flexDirection: "row-reverse" } : undefined]}>
+    <View style={[styles.titleRow, style, reversed ? styles.reversedRow : null]}>
       {!hideIcon && meta?.icon ? (
         <Icon name={meta.icon} size={iconSize} color={meta.color} style={[styles.icon, iconStyle]} />
       ) : null}
-      {leadingNode}
-      <AppText variant={titleVariant} style={[styles.titleText, textStyle]} numberOfLines={3}>
-        {title || taskname}
-      </AppText>
+      <View style={styles.rightTitle}>
+        {leadingNode}
+        <AppText variant={titleVariant} numberOfLines={2} style={{ flex: 1 }}>
+          {title || taskname}
+        </AppText>
+      </View>
     </View>
   );
 };
@@ -40,15 +58,22 @@ export default TaskTitle;
 const styles = StyleSheet.create({
   titleRow: {
     flexDirection: "row",
-    alignItems: "center",
+    justifyContent: "space-between",
+    alignContent: "center",
     gap: SPACING.sm,
     marginBottom: SPACING.sm,
   },
-  titleText: {
-    fontWeight: "600",
-    flex: 1,
-    textAlign: "left",
+
+  reversedRow: {
+    flexDirection: "row-reverse",
   },
+
+  rightTitle: {
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    alignContent: "center",
+  },
+
   icon: {
     marginLeft: SPACING.sm,
     marginBottom: -SPACING.xs,

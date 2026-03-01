@@ -1,33 +1,16 @@
-import React from "react";
-import { View, StyleSheet } from "react-native";
-import AppText from "./AppText";
-import { COLORS, SPACING } from "../../theme";
+import React from 'react';
 
-interface Props {
-  errors: string[];
+interface ErrorBannerProps {
+  message: string;
 }
 
-const ErrorBanner: React.FC<Props> = ({ errors }) => {
-  if (!errors || errors.length === 0) return null;
+const ErrorBanner: React.FC<ErrorBannerProps> = ({ message }) => {
+  if (!message) return null;
   return (
-    <View style={styles.container}>
-      {errors.map((e, idx) => (
-        <AppText key={idx} style={styles.text}>
-          {e}
-        </AppText>
-      ))}
-    </View>
+	<div className="error-banner">
+	  <p>{message}</p>
+	</div>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: COLORS.primary7,
-    padding: SPACING.md,
-  },
-  text: {
-    color: COLORS.white1,
-  },
-});
 
 export default ErrorBanner;

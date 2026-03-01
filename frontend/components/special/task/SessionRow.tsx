@@ -24,6 +24,7 @@ export const SessionRow: React.FC<{
   canToggle?: boolean;
   hideTaskTitle?: boolean;
   showTaskDate?: boolean;
+  lightTitle?: boolean;
 }> = ({
   session,
   taskId,
@@ -38,6 +39,7 @@ export const SessionRow: React.FC<{
   canToggle = false,
   hideTaskTitle = false,
   showTaskDate = false,
+  lightTitle = false,
 }) => {
   const { preferences } = useAccessibilityPreferences();
   const colors = useColors();
@@ -67,8 +69,8 @@ export const SessionRow: React.FC<{
       )}
       <Container
         onPress={rowPressHandler && !isLoading ? rowPressHandler : undefined}
-        accessibilityRole={rowPressHandler ? "button" : undefined}
-        accessibilityState={rowPressHandler ? { disabled: !canToggle, busy: isLoading } : undefined}
+        accessibilityRole={rowPressHandler && !canToggle ? "button" : undefined}
+        accessibilityState={rowPressHandler && !canToggle ? { disabled: !canToggle, busy: isLoading } : undefined}
         style={styles.sessionRow}
       >
         <View style={styles.sessionTimeBlock}>
@@ -114,7 +116,7 @@ export const SessionRow: React.FC<{
         </View>
         <View style={styles.sessionTitleRow}>
           <AppText variant="bodyText" style={[styles.sessionLabel, isDone && styles.sessionLabelDone]}>
-            <AppText variant="boldText" style={styles.sessionSubtask}>
+            <AppText variant={lightTitle ? "notes" : "boldText"} style={styles.sessionSubtask}>
               {subtaskTitle}
             </AppText>
             {!hideTaskTitle && taskTitle ? (
@@ -137,6 +139,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: SPACING.sm,
     paddingVertical: 4,
+    alignSelf: "stretch",
     width: "100%",
     minHeight: 2 * SPACING.xlg,
     marginBottom: -SPACING.sm,
@@ -144,6 +147,7 @@ const styles = StyleSheet.create({
   sessionRoot: {
     flex: 1,
     minWidth: 0,
+    alignSelf: "stretch",
     width: "100%",
   },
   sessionDateText: {
@@ -190,9 +194,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   sessionLabel: {
-    flexGrow: 1,
-    flexShrink: 1,
-    width: 0,
+    flex: 1,
     flexWrap: "wrap",
   },
   sessionLabelDone: {

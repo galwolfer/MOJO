@@ -181,7 +181,7 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({
     const hasScheduledSessions = (task.scheduledSessions || []).length > 0;
 
     const content = (
-      <View style={{ width: "100%", paddingStart: SPACING.md }}>
+      <View style={{ alignSelf: "stretch", width: "100%" }}>
         {hasScheduledSessions ? (
           <ScheduledSessionsSection
             taskId={task.id}
@@ -300,11 +300,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
+    alignSelf: "stretch",
     width: "100%",
     gap: SPACING.md,
   },
   headerTitle: {
     fontWeight: "700",
+    alignSelf: "stretch",
     width: "100%",
   },
   headerSubtitle: {},
@@ -321,14 +323,16 @@ const styles = StyleSheet.create({
     height: ICON_SIZES.md,
   },
   dayGroup: {
-    alignItems: "flex-start",
+    alignItems: "stretch",
     gap: SPACING.sm,
+    alignSelf: "stretch",
     width: "100%",
   },
   dayHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    alignSelf: "stretch",
     width: "100%",
     marginTop: SPACING.xs,
     marginBottom: SPACING.md,
@@ -339,7 +343,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: SPACING.sm,
-    marginStart: -SPACING.xs,
   },
   sectionTitle: {
     color: COLORS.primary1,
@@ -347,10 +350,10 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   listContainer: {
+    alignSelf: "stretch",
     width: "100%",
     marginTop: -SPACING.md,
     marginBottom: SPACING.sm,
-    marginStart: -SPACING.sm,
   },
   sectionCount: {},
 

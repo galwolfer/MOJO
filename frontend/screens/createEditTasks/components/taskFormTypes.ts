@@ -1,15 +1,29 @@
+﻿/**
+ * Shared types for task create/edit forms.
+ * Consumed by EditTask, CreateTask, and the extracted section components.
+ */
+
 // Shared types used by create/edit task screens
 
 export interface Subtask {
   id: string;
   title: string;
-  description?: string;
-  minutes?: string;
+  description: string;
+  /** Estimated minutes as a string (matches controlled <Input type="number"> value) */
+  minutes: string;
+  /** 1-based order within the parent task */
   index?: number;
+
+  // ── Schedule fields (populated in edit mode) ──────────────────────────────
+  /** "auto" = scheduler decides the time; "manual" = user picks date/time */
   scheduleMode?: "auto" | "manual";
+  /** Backend session _id when a session already exists */
   sessionId?: string;
+  /** YYYY-MM-DD in user local time */
   sessionDate?: string;
+  /** HH:MM (24-hour) in user local time */
   sessionStartTime?: string;
+  /** HH:MM (24-hour) in user local time */
   sessionEndTime?: string;
 }
 
@@ -19,6 +33,7 @@ export interface TaskFormState {
   effort: number;
   importance: number;
   category: string;
+  /** Selected subcategory ID (MongoDB ObjectId string) or null if none selected */
   subCategoryId: string | null;
   description: string;
   estimatedMinutes: string;
@@ -26,11 +41,15 @@ export interface TaskFormState {
   subtasks: Subtask[];
 }
 
-// Editable session used in EditTask when editing schedules
+/** One row in the manual schedule editor */
 export interface EditableSession {
+  /** Backend _id when the session already exists in the DB */
   id?: string;
-  date?: string;
-  startTime?: string;
-  endTime?: string;
-  // extend as needed
+  /** YYYY-MM-DD in user local time */
+  date: string;
+  /** HH:MM in user local time (24-hour) */
+  startTime: string;
+  /** HH:MM in user local time (24-hour) */
+  endTime: string;
+  subtaskIndex?: number | null;
 }

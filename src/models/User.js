@@ -279,6 +279,17 @@ const userSchema = new mongoose.Schema(
         lastTaskReminder: null,
       },
     },
+
+    // Scheduling preferences (gap between sessions, etc.)
+    schedulingPreferences: {
+      type: new mongoose.Schema(
+        {
+          minGapMinutes: { type: Number, default: 10, min: 0, max: 120 },
+        },
+        { _id: false }
+      ),
+      default: { minGapMinutes: 10 },
+    },
   },
   { timestamps: true },
 );
