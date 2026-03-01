@@ -21,7 +21,7 @@ export default function ListItem({ title, subtitle, logo, style, rightElement }:
     <View style={[styles.container, style]}>
       {logo ? <View style={styles.logo}>{logo}</View> : null}
       <View style={styles.textWrap}>
-        <AppText variant="bodyText" style={[styles.title, { color: colors.text1 }]}>
+        <AppText variant="bodyText" style={[{ color: colors.text1 }]}>
           {title}
         </AppText>
         {subtitle ? (
@@ -74,9 +74,7 @@ const styles = StyleSheet.create({
   textWrap: {
     flex: 1,
   },
-  title: {
-    color: COLORS.black,
-  },
+
   subtitle: {
     color: COLORS.lightGray,
     marginTop: 2,

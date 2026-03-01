@@ -120,7 +120,6 @@ const styles = StyleSheet.create({
   },
 
   label: {
-    color: COLORS.black,
     marginBottom: SPACING.xs,
   },
 

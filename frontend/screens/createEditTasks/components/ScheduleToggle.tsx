@@ -20,9 +20,9 @@ import { ICONS } from "../../../components/icons/icons";
 
 export interface ScheduleToggleData {
   mode: "auto" | "manual";
-  date: string;
-  startTime: string;
-  endTime: string;
+  date?: string;
+  startTime?: string;
+  endTime?: string;
 }
 
 interface Props {
@@ -111,7 +111,7 @@ const ScheduleToggle: React.FC<Props> = ({ schedule, onChange }) => {
         <View style={styles.autoBadge}>
           {schedule.date && (
             <AppText variant="notes" style={styles.autoCurrentTime}>
-              Current: {schedule.date} {schedule.startTime}–{schedule.endTime}
+              Current: {schedule.date} {schedule.startTime}-{schedule.endTime}
             </AppText>
           )}
         </View>

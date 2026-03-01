@@ -1,4 +1,4 @@
-/**
+﻿/**
  * AllTasksScreen
  *
  * Full-screen view showing all user tasks in a filterable, sortable list.
@@ -11,19 +11,24 @@
  * - Tap a row to open a detail modal (reuses TaskDetailWidget components)
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { View, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from "react-native";
+import { View, StyleSheet, ActivityIndicator, TouchableOpacity } from "react-native";
+import { useColors } from "../../context/ThemeContext";
+import ScrollableContent from "../../components/layout/ScrollableContent";
 import AppText from "../../components/common/AppText";
 import AppButton from "../../components/common/AppButton";
-import { COLORS, SPACING, ICON_SIZES, FONTS, FONT_SIZES } from "../../theme";
+import { SPACING, ICON_SIZES, FONTS, FONT_SIZES } from "../../theme";
 import { ICONS } from "../../components/icons/icons";
 import { Chevron } from "../../components/icons/Chevron";
 import { useNavigation } from "../../context/NavigationContext";
-import { useLayout } from "../../context/LayoutContext";
 import { useTaskContext } from "../../context/TaskContext";
 import { getTasks, TaskWithSubtasks } from "../../services/taskService";
-import TaskListItem from "../calendar/components/TaskListItem";
 import TaskDetailModal from "../calendar/components/TaskDetailModal";
 import Tag from "../../components/inputs/tag";
+import { Box } from "../../components";
+import List, { ListCellProps } from "../../components/layout/List";
+import Icon from "../../components/icons/Icon";
+import { ProgressIcon } from "../../components/icons/ProgressIcon.native";
+import { getCategoryMeta } from "../../config/categoryMeta";
 
 // ─── Filter / sort types ─────────────────────────────────────────────────────
 
@@ -49,7 +54,8 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
 
 export default function AllTasksScreen() {
   const { setHeaderConfig, setActiveTab, setActiveTabWithParams } = useNavigation();
-  const { dimensions } = useLayout();
+  const colors = useColors();
+  const styles = getStyles(colors);
   const { subscribeToTaskUpdates } = useTaskContext();
 
   const [tasks, setTasks] = useState<TaskWithSubtasks[]>([]);
@@ -70,11 +76,11 @@ export default function AllTasksScreen() {
       title: "ALL TASKS",
       leftElement: (
         <TouchableOpacity onPress={() => setActiveTab("calendar")} activeOpacity={0.7}>
-          <ICONS.left size={ICON_SIZES.md} color={COLORS.primary1} />
+          <ICONS.left size={ICON_SIZES.md} color={colors.primary1} />
         </TouchableOpacity>
       ),
     });
-  }, []);
+  }, [colors.primary1]);
 
   // ── Fetch tasks ──────────────────────────────────────────────────────────
   const fetchAllTasks = useCallback(async () => {
@@ -171,13 +177,56 @@ export default function AllTasksScreen() {
     setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
   }, []);
 
+  // ── Build list cells from tasks ──────────────────────────────────────────
+  const buildTaskListCell = (
+    task: TaskWithSubtasks,
+    onPress: (task: TaskWithSubtasks) => void,
+    colors: ReturnType<typeof useColors>,
+  ): ListCellProps => {
+    const categoryMeta = getCategoryMeta(task.category);
+    const subCat = task.subCategory;
+    const subIcon = subCat?.icon;
+    const progress =
+      typeof task.progressPercentage === "number" ? Math.max(0, Math.min(1, task.progressPercentage / 100)) : 0;
+    const isDone = task.status === "done" || task.completed;
+
+    return {
+      id: task._id,
+      onPress: () => onPress(task),
+      divider: true,
+      content: (
+        <View style={[listStyles.taskRow, isDone && listStyles.taskRowDone]}>
+          <View style={listStyles.taskContent}>
+            <ProgressIcon value={progress} size={ICON_SIZES.sm} />
+            <AppText
+              variant="bodyText"
+              numberOfLines={1}
+              style={[listStyles.taskName, isDone && listStyles.taskNameDone]}
+            >
+              {task.taskname || (task as any).title || "Untitled"}
+            </AppText>
+          </View>
+          <View style={listStyles.taskIcons}>
+            {subIcon && subIcon !== categoryMeta.icon ? (
+              <Icon name={subIcon} size={ICON_SIZES.xs} color={colors.gray1} />
+            ) : null}
+            <Icon name={categoryMeta.icon as string} size={ICON_SIZES.sm} color={categoryMeta.color} />
+          </View>
+        </View>
+      ),
+    };
+  };
+
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <View style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.content, { paddingTop: dimensions.headerHeight + SPACING.sm }]}
-        showsVerticalScrollIndicator={false}
+    <>
+      <ScrollableContent
+        respectHeader={true}
+        respectNavBar={true}
+        extraTopPadding={SPACING.sm}
+        scrollKey="alltasks"
+        contentContainerStyle={styles.content}
+        extraBottomPadding={SPACING.xlg * 6}
       >
         {/* Filter chips */}
         <View style={styles.ChipsRow}>
@@ -210,7 +259,7 @@ export default function AllTasksScreen() {
             </TouchableOpacity>
           ))}
           <TouchableOpacity onPress={toggleSortDir} style={styles.sortDirBtn} activeOpacity={0.7}>
-            <Chevron isOpen={sortDir === "asc"} size={ICON_SIZES.xs} color={COLORS.primary1} />
+            <Chevron isOpen={sortDir === "asc"} size={ICON_SIZES.xs} color={colors.primary1} />
           </TouchableOpacity>
         </View>
 
@@ -221,36 +270,37 @@ export default function AllTasksScreen() {
 
         {/* List body */}
         {isLoading ? (
-          <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color={COLORS.primary1} />
-            <AppText variant="bodyText" style={styles.loadingText}>
+          <Box>
+            <ActivityIndicator size="large" color={colors.primary1} />
+            <AppText variant="bodyText" style={[styles.loadingText, { color: colors.gray1 }]}>
               Loading tasks…
             </AppText>
-          </View>
+          </Box>
         ) : error ? (
-          <View style={styles.centerContainer}>
-            <AppText variant="boldText" style={styles.errorTitle}>
+          <Box>
+            <AppText variant="boldText" style={[styles.errorTitle, { color: colors.primary7 }]}>
               Unable to Load Tasks
             </AppText>
-            <AppText variant="bodyText" style={styles.errorMessage}>
+            <AppText variant="bodyText" style={[styles.errorMessage, { color: colors.gray2 }]}>
               {error}
             </AppText>
             <AppButton title="Retry" onPress={fetchAllTasks} mode="filled" color="primary1" />
-          </View>
+          </Box>
         ) : sortedTasks.length === 0 ? (
-          <View style={styles.centerContainer}>
-            <AppText variant="bodyText" style={styles.emptyText}>
+          <Box>
+            <AppText variant="bodyText" style={[styles.emptyText, { color: colors.gray1 }]}>
               {filter === "all" ? "No tasks yet — create one!" : `No ${filter} tasks`}
             </AppText>
-          </View>
+          </Box>
         ) : (
-          <View style={styles.listContainer}>
-            {sortedTasks.map((task) => (
-              <TaskListItem key={task._id} task={task} onPress={handleTaskPress} />
-            ))}
-          </View>
+          <Box>
+            <List
+              data={sortedTasks.map((task) => buildTaskListCell(task, handleTaskPress, colors))}
+              keyExtractor={(cell) => cell.id}
+            />
+          </Box>
         )}
-      </ScrollView>
+      </ScrollableContent>
 
       {/* Task detail modal */}
       <TaskDetailModal
@@ -259,89 +309,122 @@ export default function AllTasksScreen() {
         onClose={handleCloseDetail}
         onEdit={handleEditTask}
       />
-    </View>
+    </>
   );
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.white3,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: SPACING.sm,
-    paddingBottom: SPACING.xlg * 6,
-  },
-  ChipsRow: {
+// Styles generator using dynamic theme colors
+const getStyles = (colors: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    content: {
+      paddingHorizontal: SPACING.sm,
+      paddingBottom: SPACING.xlg * 6,
+    },
+    ChipsRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: SPACING.sm,
+      marginBottom: SPACING.sm,
+      paddingHorizontal: SPACING.xs,
+    },
+    chip: {
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.xs + 1,
+      borderRadius: SPACING.lg,
+      backgroundColor: colors.bg1,
+    },
+    chipActive: {
+      backgroundColor: colors.primary1,
+      borderColor: colors.primary1,
+    },
+    chipText: {
+      fontFamily: FONTS.fredokaRegular,
+      fontSize: FONT_SIZES.sm,
+      color: colors.gray2,
+    },
+    chipTextActive: {
+      color: colors.text2,
+      fontFamily: FONTS.fredokaSemiBold,
+    },
+    sortLabel: {
+      color: colors.gray1,
+      marginRight: SPACING.xs,
+    },
+    sortDirBtn: {
+      padding: SPACING.xs,
+      marginLeft: SPACING.xs,
+    },
+    countText: {
+      color: colors.gray1,
+      paddingHorizontal: SPACING.xs,
+      marginBottom: SPACING.sm,
+    },
+    listContainer: {
+      backgroundColor: colors.text2,
+      borderRadius: SPACING.lg,
+      overflow: "hidden",
+    },
+    centerContainer: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: SPACING.xlg * 2,
+      gap: SPACING.md,
+    },
+    loadingText: {
+      // color applied inline
+    },
+    errorTitle: {
+      // color applied inline
+      textAlign: "center",
+    },
+    errorMessage: {
+      // color applied inline
+      textAlign: "center",
+    },
+    emptyText: {
+      // color applied inline
+      textAlign: "center",
+    },
+  });
+
+// Task list item styles (for task rows within List component)
+const listStyles = StyleSheet.create({
+  taskRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: SPACING.sm,
-    marginBottom: SPACING.sm,
-    paddingHorizontal: SPACING.xs,
-  },
-  chip: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs + 1,
-    borderRadius: SPACING.lg,
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.white2,
-  },
-  chipActive: {
-    backgroundColor: COLORS.primary1,
-    borderColor: COLORS.primary1,
-  },
-  chipText: {
-    fontFamily: FONTS.fredokaRegular,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.darkGray,
-  },
-  chipTextActive: {
-    color: COLORS.colorWhite,
-    fontFamily: FONTS.fredokaSemiBold,
-  },
-  sortLabel: {
-    color: COLORS.lightGray,
-    marginRight: SPACING.xs,
-  },
-  sortDirBtn: {
-    padding: SPACING.xs,
-    marginLeft: SPACING.xs,
-  },
-  countText: {
-    color: COLORS.lightGray,
-    paddingHorizontal: SPACING.xs,
-    marginBottom: SPACING.sm,
-  },
-  listContainer: {
-    backgroundColor: COLORS.colorWhite,
-    borderRadius: SPACING.lg,
-    overflow: "hidden",
-  },
-  centerContainer: {
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: SPACING.xlg * 2,
-    gap: SPACING.md,
+    justifyContent: "space-between",
+    gap: SPACING.sm,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.md,
   },
-  loadingText: {
-    color: COLORS.lightGray,
+  taskRowDone: {
+    opacity: 0.6,
   },
-  errorTitle: {
-    color: COLORS.primary7,
-    textAlign: "center",
+  taskContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+    flex: 1,
   },
-  errorMessage: {
-    color: COLORS.darkGray,
-    textAlign: "center",
+  taskIcons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.xs,
   },
-  emptyText: {
-    color: COLORS.lightGray,
-    textAlign: "center",
+  taskName: {
+    fontFamily: FONTS.fredokaRegular,
+    fontSize: FONT_SIZES.base,
+    flex: 1,
+  },
+  taskNameDone: {
+    textDecorationLine: "line-through",
   },
 });

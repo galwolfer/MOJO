@@ -46,7 +46,6 @@ const styles = StyleSheet.create({
   text: {
     fontFamily: TYPOGRAPHY.bodyText.fontFamily,
     fontSize: TYPOGRAPHY.bodyText.fontSize,
-    color: COLORS.black,
     flex: 1,
   },
   dragHandle: {

@@ -119,7 +119,6 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   messageText: {
-    color: COLORS.black,
     textAlign: "center",
   },
   sliderBox: {

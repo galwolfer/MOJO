@@ -809,7 +809,6 @@ const styles = StyleSheet.create({
   },
 
   text: {
-    color: COLORS.black,
   },
 
   spacer: {

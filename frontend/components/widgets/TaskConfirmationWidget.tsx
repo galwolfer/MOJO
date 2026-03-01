@@ -27,7 +27,7 @@ import { getCategoryMeta, resolveCategoryKey } from "../../config/categoryMeta";
 import { getCategoryDisplay } from "./taskHelpers";
 
 /**
- * Normalises the raw widget data payload coming from the model.
+ * Normalizes the raw widget data payload coming from the model.
  * The model may output:
  *  - snake_case field names  (task_name, can_split, estimated_duration …)
  *  - category as a display name ("Social Activity") instead of a key ("social_activity")
@@ -69,7 +69,7 @@ function normalizeConfirmationData(raw: Record<string, any>): TaskData {
     minMinutes: raw.minMinutes ?? raw.min_minutes,
     maxMinutes: raw.maxMinutes ?? raw.max_minutes,
     earliestStart: raw.earliestStart ?? raw.earliest_start,
-    // Normalised recurrence object
+    // Normalized recurrence object
     recurrence,
   } as TaskData;
 }

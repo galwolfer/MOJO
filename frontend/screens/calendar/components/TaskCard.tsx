@@ -251,7 +251,6 @@ const styles = StyleSheet.create({
   },
   titleText: {
     fontSize: FONT_SIZES.base,
-    color: COLORS.black,
     flex: 1,
     minWidth: 0,
   },
@@ -309,7 +308,6 @@ const styles = StyleSheet.create({
   subtaskText: {
     fontFamily: FONTS.fredokaRegular,
     fontSize: FONT_SIZES.sm,
-    color: COLORS.black,
     flex: 1,
   },
   completedText: {

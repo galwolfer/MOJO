@@ -99,7 +99,6 @@ const styles = StyleSheet.create({
   subtaskText: {
     fontFamily: FONTS.fredokaRegular,
     fontSize: FONT_SIZES.base,
-    color: COLORS.black,
   },
   timeRangeRow: {
     flexDirection: "row",

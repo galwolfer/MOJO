@@ -16,16 +16,17 @@
  * ```
  */
 import React, { useCallback, useEffect, useState } from "react";
-import { View, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from "react-native";
+import { View, StyleSheet, ActivityIndicator, TouchableOpacity } from "react-native";
 import AppText from "../../components/common/AppText";
 import AppButton from "../../components/common/AppButton";
 import { COLORS, SPACING, ICON_SIZES } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 import { ICONS } from "../../components/icons/icons";
 import { useNavigation } from "../../context/NavigationContext";
-import { useLayout } from "../../context/LayoutContext";
 import { useTaskContext } from "../../context/TaskContext";
 import DateSelector from "../../components/layout/DateSelector";
 import CalendarPicker from "../../components/inputs/CalendarPicker";
+import ScrollableContent from "../../components/layout/ScrollableContent";
 import { getLocalDateString } from "../../utils/dateUtils";
 import EmptyState from "./components/EmptyState";
 import TaskGroup from "./components/TaskGroup";
@@ -36,7 +37,7 @@ import { Task } from "./types";
 export default function CalendarScreen() {
   const { setHeaderConfig, setActiveTab, setActiveTabWithParams, calendarSelectedDate, setCalendarSelectedDate } =
     useNavigation();
-  const { dimensions } = useLayout();
+  const colors = useColors();
   const { notifyTaskUpdate, subscribeToTaskUpdates } = useTaskContext();
 
   // Use context-persisted date so the selection survives tab switches
@@ -67,12 +68,12 @@ export default function CalendarScreen() {
       title: "MY TASKS",
       leftElement: (
         <TouchableOpacity onPress={() => setShowCalendarPicker((prev) => !prev)} activeOpacity={0.7}>
-          <ICONS.calendar size={ICON_SIZES.md} color={COLORS.primary1} />
+          <ICONS.calendar size={ICON_SIZES.md} color={colors.primary1} />
         </TouchableOpacity>
       ),
       rightElement: (
         <TouchableOpacity onPress={() => setActiveTab("alltasks")} activeOpacity={0.7}>
-          <ICONS.list size={ICON_SIZES.md} color={COLORS.primary1} />
+          <ICONS.list size={ICON_SIZES.md} color={colors.primary1} />
         </TouchableOpacity>
       ),
       element: bottomElement,
@@ -113,87 +114,76 @@ export default function CalendarScreen() {
   }, []);
 
   return (
-    <View style={styles.container}>
-      {/* Tasks List */}
-      <ScrollView
-        style={styles.tasksList}
-        contentContainerStyle={[styles.tasksListContent, { paddingTop: dimensions.headerHeight + SPACING.md }]}
-        showsVerticalScrollIndicator={false}
-      >
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={COLORS.primary1} />
-            <AppText variant="bodyText" style={{ color: COLORS.lightGray }}>
-              Loading tasks...
-            </AppText>
-          </View>
-        ) : error ? (
-          <View style={styles.errorContainer}>
-            <AppText variant="boldText" style={{ color: COLORS.primary1, textAlign: "center" }}>
-              Unable to Load Tasks
-            </AppText>
-            <AppText variant="bodyText" style={{ color: COLORS.darkGray, textAlign: "center" }}>
-              {error}
-            </AppText>
-            <AppButton
-              title="Retry"
-              onPress={() => fetchTasksForDate(selectedDate)}
-              mode="filled"
-              color="primary1"
-              style={styles.retryButton}
-            />
-          </View>
-        ) : filteredTaskGroups.length === 0 ? (
-          <EmptyState showCalendarPicker={showCalendarPicker} onAddTask={handleAddTask} />
-        ) : (
-          filteredTaskGroups.map((group, groupIdx) => (
-            <TaskGroup
-              key={groupIdx}
-              group={group}
-              expandedTaskId={expandedTaskId}
-              completedTasks={completedTasks}
-              completedSubtasks={completedSubtasks}
-              onTaskPress={handleTaskPress}
-              onTaskToggle={handleTaskCompletionToggle}
-              onTaskEdit={handleEditTask}
-              onTaskDelete={handleDeleteTask}
-              onSubtaskToggle={handleSubtaskCompletionToggle}
-              onSubtaskDelete={handleDeleteSubtask}
-            />
-          ))
-        )}
-      </ScrollView>
+    <ScrollableContent
+      respectHeader={true}
+      respectNavBar={true}
+      extraTopPadding={SPACING.md}
+      scrollKey="calendar"
+      contentContainerStyle={styles.contentContainer}
+      extraBottomPadding={SPACING.xlg * 6}
+    >
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary1} />
+          <AppText variant="bodyText" style={{ color: colors.gray1 }}>
+            Loading tasks...
+          </AppText>
+        </View>
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <AppText variant="boldText" style={{ color: colors.primary1, textAlign: "center" }}>
+            Unable to Load Tasks
+          </AppText>
+          <AppText variant="bodyText" style={{ color: colors.gray2, textAlign: "center" }}>
+            {error}
+          </AppText>
+          <AppButton
+            title="Retry"
+            onPress={() => fetchTasksForDate(selectedDate)}
+            mode="filled"
+            color="primary1" // button component uses dynamic color internally based on theme
+            style={styles.retryButton}
+          />
+        </View>
+      ) : filteredTaskGroups.length === 0 ? (
+        <EmptyState showCalendarPicker={showCalendarPicker} onAddTask={handleAddTask} />
+      ) : (
+        filteredTaskGroups.map((group, groupIdx) => (
+          <TaskGroup
+            key={groupIdx}
+            group={group}
+            expandedTaskId={expandedTaskId}
+            completedTasks={completedTasks}
+            completedSubtasks={completedSubtasks}
+            onTaskPress={handleTaskPress}
+            onTaskToggle={handleTaskCompletionToggle}
+            onTaskEdit={handleEditTask}
+            onTaskDelete={handleDeleteTask}
+            onSubtaskToggle={handleSubtaskCompletionToggle}
+            onSubtaskDelete={handleDeleteSubtask}
+          />
+        ))
+      )}
 
       {/* Floating ADD Button - Always visible */}
       <FloatingButton onPress={handleAddTask} text="Add Task" Icon={ICONS.plus} />
-    </View>
+    </ScrollableContent>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.white3,
-    position: "relative",
-  },
-  tasksList: {
-    flex: 1,
-    backgroundColor: COLORS.white3,
-  },
-
-  tasksListContent: {
+  contentContainer: {
+    alignItems: "center",
     paddingHorizontal: SPACING.sm,
-    paddingBottom: SPACING.xlg * 6,
+    paddingBottom: SPACING.xlg * 2,
   },
   loadingContainer: {
-    flex: 1,
     justifyContent: "center",
     alignItems: "center",
     paddingVertical: SPACING.xlg,
     gap: SPACING.md,
   },
   errorContainer: {
-    flex: 1,
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: SPACING.md,

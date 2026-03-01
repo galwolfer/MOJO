@@ -81,7 +81,6 @@ const styles = StyleSheet.create({
   taskName: {
     fontFamily: FONTS.fredokaRegular,
     fontSize: FONT_SIZES.base,
-    color: COLORS.black,
     alignContent: "flex-start",
   },
   taskNameDone: {

@@ -312,7 +312,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: FONTS.fredokaRegular,
     fontSize: FONT_SIZES.base,
-    color: COLORS.black,
   },
   subtaskDone: {
     textDecorationLine: "line-through",

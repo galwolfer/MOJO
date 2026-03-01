@@ -428,9 +428,7 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
                   return (
                     <View key={subcategory.id} style={[styles.subcategoryRow, { borderBottomColor: colors.bg2 }]}>
                       <View style={styles.subcategoryInfo}>
-                        <View style={[styles.subcategoryIcon, { backgroundColor: displayColor }]}>
-                          <Icon size={ICON_SIZES.xs} color={COLORS.white} />
-                        </View>
+                        <Icon size={ICON_SIZES.xs} color={displayColor} />
                         <View style={styles.subcategoryNameContainer}>
                           <AppText style={[styles.subcategoryName, { color: colors.text1 }]}>
                             {subcategory.name}
@@ -443,17 +441,14 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
                       <View style={styles.subcategoryActions}>
                         {!isDefault && (
                           <>
-                            <TouchableOpacity
-                              onPress={() => handleEdit(subcategory)}
-                              style={[styles.actionButton, { backgroundColor: colors.bg2 }]}
-                            >
-                              <EditIcon size={ICON_SIZES.xs} color={COLORS.primary2} />
+                            <TouchableOpacity onPress={() => handleEdit(subcategory)} style={[styles.actionButton]}>
+                              <EditIcon size={ICON_SIZES.xs} color={colors.gray1} />
                             </TouchableOpacity>
                             <TouchableOpacity
                               onPress={() => handleStageDelete(subcategory)}
-                              style={[styles.actionButton, { backgroundColor: colors.bg2 }]}
+                              style={[styles.actionButton]}
                             >
-                              <TrashIcon size={ICON_SIZES.xs} color={COLORS.primary6} />
+                              <TrashIcon size={ICON_SIZES.xs} color={colors.gray1} />
                             </TouchableOpacity>
                           </>
                         )}

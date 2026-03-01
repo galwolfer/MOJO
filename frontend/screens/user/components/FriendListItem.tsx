@@ -141,7 +141,6 @@ const styles = StyleSheet.create({
     marginLeft: SPACING.sm,
   },
   name: {
-    color: COLORS.black,
     fontSize: moderateScale(16),
     fontWeight: "600",
   },

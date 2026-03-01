@@ -85,7 +85,7 @@ export default function Header({ title, Icon, show = true, rightElement, leftEle
                 variant="title3"
                 numberOfLines={titleLines}
                 ellipsizeMode="tail"
-                style={[{ color: colors.primary1, width: "100%" }]}
+                style={[{ color: COLORS.primary1, flex: 1 }]}
               >
                 {displayTitle}
               </AppText>

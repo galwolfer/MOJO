@@ -38,6 +38,7 @@ import {
   ChatSettingsScreen,
   NotificationSettingsScreen,
   AccessibilitySettingsScreen,
+  SubcategoryManager,
 } from "../settings";
 import { useStatsContext } from "../../context/StatsContext";
 
@@ -329,6 +330,7 @@ export default function UserProfileScreen() {
         onChatSettings={() => setCurrentScreen("chat-settings")}
         onNotificationSettings={() => setCurrentScreen("notification-settings")}
         onAccessibilitySettings={() => setCurrentScreen("accessibility-settings")}
+        onSubcategoryManager={() => setCurrentScreen("subcategory-manager")}
       />
     );
   }
@@ -367,6 +369,11 @@ export default function UserProfileScreen() {
   // If on Accessibility Settings screen, render AccessibilitySettingsScreen
   if (currentScreen === "accessibility-settings") {
     return <AccessibilitySettingsScreen onBack={() => setCurrentScreen("settings")} />;
+  }
+
+  // If on Subcategory Manager screen, render SubcategoryManager
+  if (currentScreen === "subcategory-manager") {
+    return <SubcategoryManager onBack={() => setCurrentScreen("settings")} />;
   }
 
   return (

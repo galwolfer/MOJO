@@ -148,11 +148,11 @@ const styles = StyleSheet.create({
   },
   dayItemSelected: {
     backgroundColor: COLORS.primary1,
-    width: undefined,                    // allow pill to expand only when selected
-    minWidth: SPACING.xlg * 2,         // wide enough for "Sat 21" but not huge
-    height: SPACING.xlg * 1.8,           // keep same vertical rhythm as other items
-    paddingVertical: SPACING.sm,         // compact vertical padding
-    paddingHorizontal: SPACING.md,       // modest horizontal padding
+    width: undefined, // allow pill to expand only when selected
+    minWidth: SPACING.xlg * 2, // wide enough for "Sat 21" but not huge
+    height: SPACING.xlg * 1.8, // keep same vertical rhythm as other items
+    paddingVertical: SPACING.sm, // compact vertical padding
+    paddingHorizontal: SPACING.md, // modest horizontal padding
     borderRadius: SPACING.xlg,
   },
   dayName: {
@@ -165,7 +165,6 @@ const styles = StyleSheet.create({
   dayDate: {
     fontFamily: FONTS.fredokaSemiBold,
     fontSize: FONT_SIZES.md,
-    color: COLORS.black,
     fontWeight: "600",
   },
   dayTextOnPill: {
@@ -174,8 +173,8 @@ const styles = StyleSheet.create({
   },
   todayDot: {
     marginTop: SPACING.xs,
-    width: SPACING.lg * 0.9,   // short underline width
-    height: 4,                // underline thickness
+    width: SPACING.lg * 0.9, // short underline width
+    height: 4, // underline thickness
     borderRadius: 2,
     backgroundColor: COLORS.primary1,
     alignSelf: "center",

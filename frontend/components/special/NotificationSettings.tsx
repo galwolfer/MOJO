@@ -574,7 +574,6 @@ const styles = StyleSheet.create({
   },
   settingLabel: {
     fontSize: FONT_SIZES.base,
-    color: COLORS.black,
     marginBottom: 2,
   },
   settingDescription: {
@@ -592,7 +591,6 @@ const styles = StyleSheet.create({
   },
   timePickerLabel: {
     fontSize: FONT_SIZES.sm,
-    color: COLORS.black,
     marginBottom: SPACING.sm,
   },
   timeInputGroup: {
@@ -629,13 +627,11 @@ const styles = StyleSheet.create({
   },
   timeDisplay: {
     fontSize: moderateScale(32),
-    color: COLORS.black,
     minWidth: moderateScale(50),
     textAlign: "center",
   },
   timeSeparator: {
     fontSize: moderateScale(28),
-    color: COLORS.black,
     marginHorizontal: SPACING.sm,
   },
   timePickerHint: {

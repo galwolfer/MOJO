@@ -284,7 +284,6 @@ const styles = StyleSheet.create({
   },
   swatchLabel: {
     marginTop: 6,
-    color: COLORS.black,
   },
   hexLabel: {
     color: COLORS.lightGray,
