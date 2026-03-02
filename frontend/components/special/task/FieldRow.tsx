@@ -6,6 +6,8 @@ import { StyleSheet } from "react-native";
 import { SPACING, ICON_SIZES } from "../../../theme";
 import { useColors } from "../../../context/ThemeContext";
 
+const BREAKPOINT_WIDTH = 640;
+
 export const FieldRow: React.FC<{
   icon?: string;
   label: string;
@@ -16,8 +18,8 @@ export const FieldRow: React.FC<{
 }> = ({ icon, label, value, formatter, children, horizontal = false }) => {
   const colors = useColors();
   const { width } = useWindowDimensions();
-  const isTwoColumn = width >= 600;
-  const isLabelInline = width < 600;
+  const isTwoColumn = width >= BREAKPOINT_WIDTH;
+  const isLabelInline = width < BREAKPOINT_WIDTH;
 
   let containerStyle;
   let valueStyle;

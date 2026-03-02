@@ -1,6 +1,7 @@
 import React from "react";
 import { View, StyleSheet } from "react-native";
 import AppText from "../../common/AppText";
+import TimeRangeDisplay from "../../common/TimeRangeDisplay";
 import SessionRow from "./SessionRow";
 import { SessionTime } from "./SessionTime";
 import List from "../../layout/List";
@@ -11,13 +12,6 @@ import SubtaskItem from "../../../screens/calendar/components/SubtaskItem";
 import { Subtask as CalendarSubtask } from "../../../screens/calendar/types";
 import { useTaskUpdateSubscription } from "../../../context/TaskContext";
 import { TaskTitle } from "./TaskTitle";
-
-// Format ISO string → "9:00 AM"
-const formatTime = (iso?: string): string => {
-  if (!iso) return "";
-  const { time, ampm } = getTimeParts(iso);
-  return time ? `${time} ${ampm}`.trim() : "";
-};
 
 export const ScheduledSessionsSection: React.FC<{
   taskId: string;
@@ -150,19 +144,24 @@ export const ScheduledSessionsSection: React.FC<{
                   : taskStatus === "done" || completedParts?.has(key);
                 const isLoading = loadingParts?.has(key);
                 const label = session.subtaskTitle || `Part ${session.subtaskIndex ?? index + 1}`;
-                const timeRange =
-                  formatTime(session.start) && formatTime(session.end)
-                    ? `${formatTime(session.start)} - ${formatTime(session.end)}`
-                    : formatTime(session.start) || undefined;
+
+                // Build time range element (not a string) using TimeRangeDisplay
+                const timeRangeElement =
+                  session.start && session.end ? (
+                    <TimeRangeDisplay startIsoString={session.start} endIsoString={session.end} />
+                  ) : session.start ? (
+                    <TimeRangeDisplay startIsoString={session.start} />
+                  ) : undefined;
 
                 return (
                   <SubtaskItem
                     key={key}
-                    subtask={{ id: key, title: label, timeRange, completed: isDone ?? false } as CalendarSubtask}
+                    subtask={{ id: key, title: label, completed: isDone ?? false } as CalendarSubtask}
                     parentTaskId={taskId}
                     isCompleted={isDone ?? false}
                     categoryColor={categoryColor}
-                    showTime={!!timeRange}
+                    showTime={!!timeRangeElement}
+                    timeRangeElement={timeRangeElement}
                     onToggle={(_parentId: string, _subtaskId: string, _checked: boolean) => {
                       if (!isLoading) onToggleSession?.(taskId, session, index, subtasks);
                     }}

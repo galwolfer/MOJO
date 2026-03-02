@@ -15,7 +15,7 @@
  * ```
  */
 import React, { useCallback } from "react";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
+import { View, StyleSheet, TouchableOpacity, useWindowDimensions } from "react-native";
 import AppText from "../../../components/common/AppText";
 import { COLORS, SPACING, FONT_SIZES, FONTS, ICON_SIZES } from "../../../theme";
 import { Checkbox } from "../../../components/icons/Checkbox.native";
@@ -29,6 +29,8 @@ interface SubtaskItemProps {
   isCompleted: boolean;
   categoryColor?: string;
   showTime?: boolean;
+  /** Optional formatted time range element (e.g., <TimeRangeDisplay />) that takes precedence over subtask.timeRange string */
+  timeRangeElement?: React.ReactNode;
   onToggle: (parentTaskId: string, subtaskId: string, checked: boolean) => void;
   onDelete?: (parentTaskId: string, subtaskId: string) => void;
 }
@@ -39,8 +41,10 @@ export default function SubtaskItem({
   isCompleted,
   categoryColor,
   showTime = true,
+  timeRangeElement,
   onToggle,
 }: SubtaskItemProps) {
+  const { width } = useWindowDimensions();
   const handlePress = useCallback(() => {
     onToggle(parentTaskId, subtask.id, !isCompleted);
   }, [onToggle, parentTaskId, subtask.id, isCompleted]);
@@ -56,15 +60,21 @@ export default function SubtaskItem({
           <AppText variant="notes" style={[styles.subtaskText, isCompleted && styles.subtaskTextCompleted]}>
             {subtask.title}
           </AppText>
-          {showTime && subtask.timeRange && (
+          {showTime && (timeRangeElement || subtask.timeRange) && (
             <View style={styles.timeRangeRow}>
-              <AppText style={[styles.subtaskTimeRange, isCompleted && styles.subtaskTimeRangeCompleted]}>
-                {subtask.timeRange}
-              </AppText>
-              <ICONS.clock
-                size={ICON_SIZES.xs}
-                color={isCompleted ? COLORS.lightGray : (categoryColor ?? COLORS.darkGray)}
-              />
+              {timeRangeElement ? (
+                timeRangeElement
+              ) : (
+                <AppText style={[styles.subtaskTimeRange, isCompleted && styles.subtaskTimeRangeCompleted]}>
+                  {subtask.timeRange}
+                </AppText>
+              )}
+              {width >= 850 && (
+                <ICONS.clock
+                  size={ICON_SIZES.xs}
+                  color={isCompleted ? COLORS.lightGray : (categoryColor ?? COLORS.darkGray)}
+                />
+              )}
             </View>
           )}
         </View>

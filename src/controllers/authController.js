@@ -358,15 +358,20 @@ export async function updateProfile(req, res, next) {
     }
     if (settings) {
       // Merge incoming settings with existing settings instead of replacing entirely, to preserve other keys
+      console.debug("[updateProfile] received settings:", settings);
       const currentSettings =
         user.profile.settings && typeof user.profile.settings.toObject === "function"
           ? user.profile.settings.toObject()
           : JSON.parse(JSON.stringify(user.profile.settings || {}));
+      console.debug("[updateProfile] currentSettings:", currentSettings);
       const merged = { ...currentSettings, ...settings };
+      console.debug("[updateProfile] merged settings:", merged);
       user.profile.settings = new Map(Object.entries(merged));
+      console.debug("[updateProfile] settings Map created:", user.profile.settings);
     }
 
     await user.save();
+    console.debug("[updateProfile] saved user, checking settings:", user.profile.settings);
 
     // Populate the OjoType and return the richer profile object
     await user.populate("profile.ojoTypeId", "name displayName persona tone");
@@ -377,6 +382,8 @@ export async function updateProfile(req, res, next) {
         : JSON.parse(JSON.stringify(user.profile || {}));
 
     profileObj.ojoType = user.profile && user.profile.ojoTypeId ? user.profile.ojoTypeId : null;
+
+    console.debug("[updateProfile] returning profile with settings:", profileObj.settings);
 
     res.json({
       success: true,
@@ -572,15 +579,23 @@ export async function getPreferences(req, res, next) {
         }
       : null;
 
-    // Convert settings Map to plain object
-    const settingsMap = user.profile.settings;
-    const settings =
-      settingsMap && typeof settingsMap.toObject === "function"
-        ? settingsMap.toObject()
-        : JSON.parse(JSON.stringify(settingsMap || {}));
+    // Convert settings Map to plain object.
+    // Use direct Map iteration - the most reliable approach regardless of Mongoose version.
+    const settings = {};
+    if (user.profile.settings) {
+      for (const [key, value] of user.profile.settings) {
+        settings[key] = value;
+      }
+    }
+    console.debug("[getPreferences] converted settings via Map iteration:", JSON.stringify(settings));
 
     // Ensure accessibility defaults exist server-side for consistency
-    settings.accessibility = settings.accessibility || { timeFormat: "12h" };
+    if (!settings.accessibility || typeof settings.accessibility !== "object") {
+      console.debug("[getPreferences] accessibility missing, adding defaults");
+      settings.accessibility = { timeFormat: "12h", theme: "system" };
+    }
+
+    console.debug("[getPreferences] final settings.accessibility:", JSON.stringify(settings.accessibility));
 
     // Scheduling preferences (added in main branch)
     const schedPrefs = user.schedulingPreferences

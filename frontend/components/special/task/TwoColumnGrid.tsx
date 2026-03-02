@@ -4,7 +4,7 @@ import AppText from "../../common/AppText";
 import { StyleSheet } from "react-native";
 import { SPACING } from "../../../theme";
 
-const BREAKPOINT_WIDTH = 500;
+const BREAKPOINT_WIDTH = 640;
 
 export const TwoColumnGrid: React.FC<{ items: React.ReactNode[] }> = ({ items }) => {
   const { width } = useWindowDimensions();

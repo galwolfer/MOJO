@@ -104,12 +104,15 @@ export async function getUserPreferences(): Promise<{
   schedulingPreferences: SchedulingPreferences;
 }> {
   const { get } = await import("./httpClient");
-  return get<{
+  console.debug("[apiClient] getUserPreferences calling /auth/preferences");
+  const response = await get<{
     priorities: Record<string, number>;
     ojoType: { name: string; displayName: string } | null;
     appSettings: Record<string, any>;
     schedulingPreferences: SchedulingPreferences;
   }>("/auth/preferences");
+  console.debug("[apiClient] getUserPreferences response:", response);
+  return response;
 }
 
 /**
@@ -133,7 +136,10 @@ export async function updateProfile(payload: {
  */
 export async function updateAppSettings(settings: Record<string, any>): Promise<any> {
   const { patch } = await import("./httpClient");
-  return patch<any>("/auth/profile", { settings });
+  console.debug("[apiClient] updateAppSettings sending:", { settings });
+  const response = await patch<any>("/auth/profile", { settings });
+  console.debug("[apiClient] updateAppSettings response:", response);
+  return response;
 }
 
 /**

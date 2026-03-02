@@ -9,6 +9,7 @@ import AuthScreen from "./screens/auth/Auth";
 import { COLORS } from "./theme";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider, useColors, useTheme } from "./context/ThemeContext";
+import { AccessibilityProvider } from "./context/AccessibilityContext";
 import { NavigationProvider } from "./context/NavigationContext";
 import { LayoutProvider } from "./context/LayoutContext";
 import { TaskProvider } from "./context/TaskContext";
@@ -100,21 +101,23 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <ThemeProvider>
-        <NotificationProvider>
-          <NavigationProvider>
-            <LayoutProvider>
-              <OjoProvider>
-                <TaskProvider>
-                  <StatsProvider>
-                    <AppContent />
-                  </StatsProvider>
-                </TaskProvider>
-              </OjoProvider>
-            </LayoutProvider>
-          </NavigationProvider>
-        </NotificationProvider>
-      </ThemeProvider>
+      <AccessibilityProvider>
+        <ThemeProvider>
+          <NotificationProvider>
+            <NavigationProvider>
+              <LayoutProvider>
+                <OjoProvider>
+                  <TaskProvider>
+                    <StatsProvider>
+                      <AppContent />
+                    </StatsProvider>
+                  </TaskProvider>
+                </OjoProvider>
+              </LayoutProvider>
+            </NavigationProvider>
+          </NotificationProvider>
+        </ThemeProvider>
+      </AccessibilityProvider>
     </AuthProvider>
   );
 }

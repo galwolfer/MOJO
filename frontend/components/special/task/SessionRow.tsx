@@ -1,9 +1,9 @@
 import React from "react";
 import { View, Pressable } from "react-native";
 import AppText from "../../common/AppText";
+import TimeDisplay from "../../common/TimeDisplay";
 import { Checkbox } from "../../icons/Checkbox";
 import { getTimeParts, getSubtaskIdFromSession, ScheduledSession, Subtask } from "../../widgets/taskHelpers";
-import { useAccessibilityPreferences } from "../../../hooks/useAccessibilityPreferences";
 import { StyleSheet } from "react-native";
 import { ICON_SIZES, SPACING, COLORS } from "../../../theme";
 import { useColors } from "../../../context/ThemeContext";
@@ -41,7 +41,6 @@ export const SessionRow: React.FC<{
   showTaskDate = false,
   lightTitle = false,
 }) => {
-  const { preferences } = useAccessibilityPreferences();
   const colors = useColors();
   const checkboxHandler = checkboxOnToggle ?? rowOnPress ?? undefined;
   const rowPressHandler = rowOnPress ?? (canToggle ? (checkboxOnToggle ?? undefined) : undefined);
@@ -54,8 +53,8 @@ export const SessionRow: React.FC<{
     await checkboxHandler?.();
   };
 
-  const startParts = getTimeParts(session.start, preferences.timeFormat);
-  const endParts = getTimeParts(session.end, preferences.timeFormat);
+  // Only used for date display
+  const sessionDate = session.start ? getTimeParts(session.start).date : "Date";
   const subtaskTitle = session.subtaskTitle || `Part ${session.subtaskIndex ?? sessionIndex + 1}`;
 
   // Avoid making the row a Pressable when it contains interactive children (checkbox)
@@ -64,7 +63,7 @@ export const SessionRow: React.FC<{
     <View style={styles.sessionRoot}>
       {showTaskDate && (
         <AppText variant="notes" style={[styles.sessionDateText, { color: categoryColor || COLORS.primary1 }]}>
-          {session.start ? startParts.date : "Date"}
+          {sessionDate}
         </AppText>
       )}
       <Container
@@ -76,34 +75,8 @@ export const SessionRow: React.FC<{
         <View style={styles.sessionTimeBlock}>
           <View style={[styles.sessionTimeLine, { backgroundColor: categoryColor || COLORS.primary1 }]} />
           <View style={styles.sessionTimeColumn}>
-            <AppText variant="notes" style={[styles.sessionHourText, { color: colors.gray1 }]}>
-              {session.start ? (
-                <>
-                  {startParts.time || "Time"}
-                  {startParts.ampm ? (
-                    <AppText variant="notes" style={[styles.sessionAmPm, { color: colors.gray1 }]}>
-                      {" " + startParts.ampm}
-                    </AppText>
-                  ) : null}
-                </>
-              ) : (
-                "Time"
-              )}
-            </AppText>
-            <AppText variant="notes" style={[styles.sessionHourText, { color: colors.gray1 }]}>
-              {session.end ? (
-                <>
-                  {endParts.time || ""}
-                  {endParts.ampm ? (
-                    <AppText variant="notes" style={[styles.sessionAmPm, { color: colors.gray1 }]}>
-                      {" " + endParts.ampm}
-                    </AppText>
-                  ) : null}
-                </>
-              ) : (
-                ""
-              )}
-            </AppText>
+            <TimeDisplay isoString={session.start} />
+            {session.end ? <TimeDisplay isoString={session.end} /> : null}
           </View>
         </View>
 
@@ -163,11 +136,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     gap: SPACING.xs,
   },
-  sessionHourText: {},
 
-  sessionAmPm: {
-    fontSize: 10,
-  },
   sessionTimeLine: {
     width: SPACING.xs,
     alignSelf: "stretch",
