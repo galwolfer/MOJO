@@ -23,7 +23,7 @@ SplashScreen.preventAutoHideAsync();
 function AppContent() {
   const { user, isLoading } = useAuth();
   const colors = useColors();
-  const { theme } = useTheme();
+  const { resolvedTheme } = useTheme();
   const [showLoadingScreen, setShowLoadingScreen] = useState(true);
   const [fontsLoaded, fontError] = useFonts({
     "Fredoka-Bold": require("./assets/fonts/Fredoka-Bold.ttf"),
@@ -91,7 +91,7 @@ function AppContent() {
           </View>
         )}
 
-        <StatusBar style={theme === "dark" ? "light" : "dark"} />
+        <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
       </View>
     </GestureHandlerRootView>
   );

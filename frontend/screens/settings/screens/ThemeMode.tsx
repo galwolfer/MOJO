@@ -27,7 +27,7 @@ export default function ThemeModeScreen({ onBack }: ThemeModeScreenProps) {
   const { preferences, isLoading, error } = useAccessibilityPreferences();
   const { setTheme } = useTheme();
   const colors = useColors();
-  const [selectedTheme, setSelectedTheme] = useState<ThemeMode>(preferences.theme || "light");
+  const [selectedTheme, setSelectedTheme] = useState<ThemeMode>(preferences.theme || "system");
   const [isSaving, setIsSaving] = useState(false);
 
   const LeftIcon = ICONS.left;
@@ -69,17 +69,26 @@ export default function ThemeModeScreen({ onBack }: ThemeModeScreenProps) {
     } catch (err) {
       console.error("[ThemeModeScreen] Failed to apply theme:", err);
       // Revert selection on error
-      setSelectedTheme(preferences.theme || "light");
+      setSelectedTheme(preferences.theme || "system");
     } finally {
       setIsSaving(false);
     }
   };
 
-  const SunIcon = ICONS.day; // Replace with actual sun/light icon
-  const MoonIcon = ICONS.night; // Replace with actual moon/dark icon
+  const SunIcon = ICONS.day;
+  const MoonIcon = ICONS.night;
   const CheckIcon = ICONS.check;
+  const SystemIcon = ICONS.settings; // fallback; replace with a device/auto icon if available
 
   const themeItems: ListCellProps[] = [
+    makeListCell("system", {
+      title: "System Default",
+      subtitle: "Follows your device setting",
+      logo: <SystemIcon size={ICON_SIZES.sm} color={COLORS.primary3} />,
+      onPress: () => handleThemeSelect("system"),
+      divider: true,
+      rightElement: selectedTheme === "system" ? <CheckIcon size={ICON_SIZES.sm} color={COLORS.primary6} /> : null,
+    }),
     makeListCell("light", {
       title: "Light Mode",
       subtitle: "Bright, clean interface",

@@ -29,11 +29,11 @@ type GlassSurfaceProps = {
 };
 
 export default function GlassSurface({ children, style, intensity = 50, pointerEvents }: GlassSurfaceProps) {
-  const { theme } = useTheme();
+  const { resolvedTheme } = useTheme();
   const colors = useColors();
   const useNativeBlur = canUseNativeBlur();
 
-  const isDark = theme === "dark";
+  const isDark = resolvedTheme === "dark";
 
   // Create dynamic glass colors based on the current theme mode
   const dynamicGlass = {

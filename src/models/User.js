@@ -134,7 +134,7 @@ const userSchema = new mongoose.Schema(
         type: Map,
         of: mongoose.Schema.Types.Mixed,
         // Default settings includes accessibility preferences so new users have a defined value
-        default: { accessibility: { timeFormat: "12h", theme: "light" } },
+        default: { accessibility: { timeFormat: "12h", theme: "system" } },
       },
       priorities: {
         study_and_education: { type: Number, min: 1, max: 5, default: 3 },
@@ -286,7 +286,7 @@ const userSchema = new mongoose.Schema(
         {
           minGapMinutes: { type: Number, default: 10, min: 0, max: 120 },
         },
-        { _id: false }
+        { _id: false },
       ),
       default: { minGapMinutes: 10 },
     },

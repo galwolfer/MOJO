@@ -14,7 +14,7 @@ import { useAuth } from "../context/AuthContext";
 const ACCESSIBILITY_PREFS_KEY = "@mojo/accessibility-preferences";
 
 export type TimeFormat = "12h" | "24h";
-export type ThemeMode = "light" | "dark";
+export type ThemeMode = "light" | "dark" | "system";
 
 export interface AccessibilityPreferences {
   timeFormat: TimeFormat;
@@ -23,7 +23,7 @@ export interface AccessibilityPreferences {
 
 const DEFAULT_PREFERENCES: AccessibilityPreferences = {
   timeFormat: "12h",
-  theme: "light",
+  theme: "system",
 };
 
 export function useAccessibilityPreferences() {
@@ -32,37 +32,33 @@ export function useAccessibilityPreferences() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load preferences from backend (or AsyncStorage as fallback)
+  // Load preferences — AsyncStorage first (fast/offline), then update from backend
   const loadPreferences = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
 
+      // Step 1: Apply cached preferences immediately so theme doesn't flash
+      const stored = await AsyncStorage.getItem(ACCESSIBILITY_PREFS_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored) as AccessibilityPreferences;
+        setPreferences(parsed);
+      }
+
+      // Step 2: Fetch from backend and update if we have a token
       if (token) {
-        // Try to fetch from backend first
         try {
           const response = await getUserPreferences();
           const accessibilitySettings = response.appSettings?.accessibility as AccessibilityPreferences | undefined;
 
           if (accessibilitySettings) {
             setPreferences(accessibilitySettings);
-            // Cache in AsyncStorage for offline support
+            // Keep local cache in sync with backend
             await AsyncStorage.setItem(ACCESSIBILITY_PREFS_KEY, JSON.stringify(accessibilitySettings));
-            return;
           }
         } catch (backendError) {
-          console.warn(
-            "[useAccessibilityPreferences] Failed to fetch from backend, falling back to local cache:",
-            backendError,
-          );
+          console.warn("[useAccessibilityPreferences] Failed to fetch from backend, using local cache:", backendError);
         }
-      }
-
-      // Fallback to AsyncStorage
-      const stored = await AsyncStorage.getItem(ACCESSIBILITY_PREFS_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored) as AccessibilityPreferences;
-        setPreferences(parsed);
       }
     } catch (err) {
       console.error("[useAccessibilityPreferences] Failed to load preferences:", err);

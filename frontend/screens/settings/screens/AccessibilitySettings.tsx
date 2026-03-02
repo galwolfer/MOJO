@@ -75,7 +75,8 @@ export default function AccessibilitySettingsScreen({ onBack }: AccessibilitySet
   const accessibilityItems: ListCellProps[] = [
     makeListCell("theme-mode", {
       title: "Theme Mode",
-      subtitle: preferences.theme === "dark" ? "Dark Mode" : "Light Mode",
+      subtitle:
+        preferences.theme === "dark" ? "Dark Mode" : preferences.theme === "light" ? "Light Mode" : "System Default",
       logo: <PaletteIcon size={ICON_SIZES.sm} color={COLORS.primary3} />,
       onPress: () => setCurrentScreen("theme-mode"),
       divider: true,

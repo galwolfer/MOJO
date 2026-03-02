@@ -8,12 +8,21 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from "react";
+import { Appearance, ColorSchemeName } from "react-native";
 import { useAccessibilityPreferences, ThemeMode } from "../hooks/useAccessibilityPreferences";
 import { getDynamicColors, ThemeColors } from "../theme";
+
+/** Resolves 'system' to the actual device color scheme. */
+function resolveTheme(theme: ThemeMode, systemScheme: ColorSchemeName): "light" | "dark" {
+  if (theme === "system") return systemScheme === "dark" ? "dark" : "light";
+  return theme;
+}
 
 interface ThemeContextValue {
   theme: ThemeMode;
   setTheme: (theme: ThemeMode) => Promise<void>;
+  /** The actual resolved theme ("light" or "dark"), after applying system default if needed. */
+  resolvedTheme: "light" | "dark";
   /** Pre-computed dynamic color tokens for the current theme. */
   colors: ThemeColors;
   isLoading: boolean;
@@ -23,9 +32,18 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { preferences, savePreferences, isLoading } = useAccessibilityPreferences();
-  const [theme, setThemeState] = useState<ThemeMode>(preferences.theme || "light");
+  const [theme, setThemeState] = useState<ThemeMode>(preferences.theme);
+  const [systemScheme, setSystemScheme] = useState<ColorSchemeName>(Appearance.getColorScheme());
 
-  // Update theme when preferences change
+  // Track device color scheme changes (matters when theme === 'system')
+  useEffect(() => {
+    const sub = Appearance.addChangeListener(({ colorScheme }) => {
+      setSystemScheme(colorScheme);
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Update theme when preferences load from AsyncStorage/backend
   useEffect(() => {
     if (preferences.theme) {
       setThemeState(preferences.theme);
@@ -44,10 +62,16 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   };
 
-  // Memoize the dynamic color object so consumers don't re-render unless theme truly changes
-  const colors = useMemo(() => getDynamicColors(theme), [theme]);
+  const resolvedTheme = resolveTheme(theme, systemScheme);
 
-  return <ThemeContext.Provider value={{ theme, setTheme, colors, isLoading }}>{children}</ThemeContext.Provider>;
+  // Memoize the dynamic color object — recomputes when resolved theme changes
+  const colors = useMemo(() => getDynamicColors(resolvedTheme), [resolvedTheme]);
+
+  return (
+    <ThemeContext.Provider value={{ theme, setTheme, resolvedTheme, colors, isLoading }}>
+      {children}
+    </ThemeContext.Provider>
+  );
 };
 
 /**
