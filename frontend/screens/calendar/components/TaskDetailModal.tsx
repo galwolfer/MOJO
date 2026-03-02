@@ -50,7 +50,7 @@ function TaskDetailContent({
   const [completedParts, setCompletedParts] = useState<Set<string>>(new Set());
   const [loadingParts, setLoadingParts] = useState<Set<string>>(new Set());
 
-  // Initialise checkbox state from task data whenever the task changes
+  // Initialize checkbox state from task data whenever the task changes
   useEffect(() => {
     const done = new Set<string>();
     const rawSubtasks: any[] = task.subtasks || (task as any).subTasks || [];
@@ -88,7 +88,7 @@ function TaskDetailContent({
     estimatedDuration: task.estimatedDuration,
   };
 
-  const normalisedSubtasks: Subtask[] = (task.subtasks || (task as any).subTasks || []).map((st: any) => ({
+  const normalizedSubtasks: Subtask[] = (task.subtasks || (task as any).subTasks || []).map((st: any) => ({
     id: st._id || st.id || String(st.index ?? ""),
     title: st.title,
     description: st.description,
@@ -99,7 +99,7 @@ function TaskDetailContent({
     order: st.index ?? st.order,
   }));
 
-  const normalisedSessions: ScheduledSession[] = (task.scheduledSessions || []).map((s: any) => ({
+  const normalizedSessions: ScheduledSession[] = (task.scheduledSessions || []).map((s: any) => ({
     ...s,
     id: s.id || s._id,
   }));
@@ -127,7 +127,7 @@ function TaskDetailContent({
         taskId: taskIdParam,
         session,
         index,
-        subtasks: subtasksParam || normalisedSubtasks,
+        subtasks: subtasksParam || normalizedSubtasks,
         completedParts,
         setCompletedParts,
         loadingParts,
@@ -136,7 +136,7 @@ function TaskDetailContent({
         notifyStatsChange,
       });
     },
-    [normalisedSubtasks, completedParts, loadingParts, notifyTaskUpdate, notifyStatsChange],
+    [normalizedSubtasks, completedParts, loadingParts, notifyTaskUpdate, notifyStatsChange],
   );
 
   return (
@@ -185,13 +185,13 @@ function TaskDetailContent({
       ) : null}
 
       {/* Scheduled sessions with live checkboxes */}
-      {normalisedSessions.length > 0 && (
+      {normalizedSessions.length > 0 && (
         <View style={styles.sessionsWrap}>
           <ScheduledSessionsSection
             taskId={task._id}
             taskTitle={task.taskname || "Untitled"}
-            scheduledSessions={normalisedSessions}
-            subtasks={normalisedSubtasks}
+            scheduledSessions={normalizedSessions}
+            subtasks={normalizedSubtasks}
             category={task.category}
             categoryColor={categoryMeta.color}
             completedParts={completedParts}
@@ -208,12 +208,12 @@ function TaskDetailContent({
       )}
 
       {/* Subtask list with live checkboxes (when no sessions) */}
-      {normalisedSubtasks.length > 0 && normalisedSessions.length === 0 && (
+      {normalizedSubtasks.length > 0 && normalizedSessions.length === 0 && (
         <View style={styles.section}>
           <AppText variant="boldText" style={styles.sectionTitle}>
             Subtasks
           </AppText>
-          {normalisedSubtasks.map((st) => {
+          {normalizedSubtasks.map((st) => {
             const id = st.id || "";
             const isChecked = completedParts.has(id);
             const isLoading = loadingParts.has(id);

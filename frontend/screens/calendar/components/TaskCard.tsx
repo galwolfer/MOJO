@@ -20,7 +20,7 @@ import { TaskTitle } from "../../../components/special/task/TaskTitle";
 import { TaskTagsRow } from "../../../components/special/task/TaskTagsRow";
 import { TwoColumnGrid, renderTaskField } from "../../../components/special/task";
 import { SessionTime } from "../../../components/special/task/SessionTime";
-import SubtaskItem from "./SubtaskItem";
+import { CompletionItem } from "../../../components/special/task/CompletionItem";
 import List from "../../../components/layout/List";
 import { Task } from "../types";
 
@@ -178,10 +178,11 @@ function TaskCard({
                     data={task.subtasks.map((subtask) => ({
                       id: subtask.id,
                       content: (
-                        <SubtaskItem
+                        <CompletionItem
+                          type="subtask"
                           subtask={subtask}
                           parentTaskId={effectiveId}
-                          isCompleted={localSubtasks.has(subtask.id)}
+                          isCompleted={localSubtasks.has(subtask.id || "")}
                           categoryColor={categoryColor}
                           showTime={(task.subtasks?.length ?? 0) > 1}
                           onToggle={handleSubtaskToggle}
@@ -201,7 +202,8 @@ function TaskCard({
                 data={task.subtasks!.map((subtask) => ({
                   id: subtask.id,
                   content: (
-                    <SubtaskItem
+                    <CompletionItem
+                      type="subtask"
                       subtask={subtask}
                       parentTaskId={effectiveId}
                       isCompleted={localSubtasks.has(subtask.id)}

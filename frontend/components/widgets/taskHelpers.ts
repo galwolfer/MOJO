@@ -11,6 +11,11 @@ export interface Subtask {
   completed?: boolean;
   order?: number;
   duration?: number;
+  /**
+   * Optional time range text for display (e.g. "2:00 PM - 3:00 PM").
+   * This field is computed by parent components when scheduling subtasks.
+   */
+  timeRange?: string;
 }
 
 export interface ScheduledSession {

@@ -2,13 +2,12 @@ import React from "react";
 import { View, StyleSheet } from "react-native";
 import AppText from "../../common/AppText";
 import TimeRangeDisplay from "../../common/TimeRangeDisplay";
-import SessionRow from "./SessionRow";
+import { CompletionItem } from "./CompletionItem";
 import { SessionTime } from "./SessionTime";
 import List from "../../layout/List";
 import { COLORS, ICON_SIZES, SPACING } from "../../../theme";
 import { useColors } from "../../../context/ThemeContext";
 import { ScheduledSession, Subtask as WidgetSubtask, getSessionKey, getTimeParts } from "../../widgets/taskHelpers";
-import SubtaskItem from "../../../screens/calendar/components/SubtaskItem";
 import { Subtask as CalendarSubtask } from "../../../screens/calendar/types";
 import { useTaskUpdateSubscription } from "../../../context/TaskContext";
 import { TaskTitle } from "./TaskTitle";
@@ -92,7 +91,8 @@ export const ScheduledSessionsSection: React.FC<{
           id: key,
           divider: true,
           content: (
-            <SessionRow
+            <CompletionItem
+              type="session"
               session={session}
               taskId={taskId}
               categoryColor={categoryColor}
@@ -154,8 +154,9 @@ export const ScheduledSessionsSection: React.FC<{
                   ) : undefined;
 
                 return (
-                  <SubtaskItem
+                  <CompletionItem
                     key={key}
+                    type="subtask"
                     subtask={{ id: key, title: label, completed: isDone ?? false } as CalendarSubtask}
                     parentTaskId={taskId}
                     isCompleted={isDone ?? false}

@@ -24,7 +24,7 @@ export interface TimeRangeDisplayProps {
 
 const TimeRangeDisplay: React.FC<TimeRangeDisplayProps> = ({ startIsoString, endIsoString, style }) => {
   const { width } = useWindowDimensions();
-  const twoLine = width < 790;
+  const twoLine = width < 500;
 
   if (twoLine) {
     return (
