@@ -165,9 +165,10 @@ export default function CalendarScreen() {
         ))
       )}
 
-      {/* Floating ADD Button - Always visible */}
-      <FloatingButton onPress={handleAddTask} text="Add Task" Icon={ICONS.plus} />
     </ScrollableContent>
+
+    {/* Floating ADD Button - absolute overlay */}
+    <FloatingButton onPress={handleAddTask} text="Add Task" Icon={ICONS.plus} />
   );
 }
 
