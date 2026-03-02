@@ -192,8 +192,12 @@ export default function ChatScreen() {
     [contentInsets],
   );
 
+  // Prevent firing loadMoreSessions on every scroll event while a load is in-flight
+  const isLoadingMoreRef = useRef(false);
+
   /**
    * Tracks list scroll offset for keyboard adjustments.
+   * Also triggers loading of older sessions when the user scrolls near the top.
    */
   const handleListScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -205,8 +209,22 @@ export default function ChatScreen() {
       const bottomThreshold = SPACING.lg * 10;
       const reachedBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - bottomThreshold;
       setIsAtBottom(reachedBottom);
+
+      // Load older sessions when the user scrolls near the top of the list
+      const LOAD_MORE_OFFSET = SPACING.lg * 20;
+      if (
+        contentOffset.y < LOAD_MORE_OFFSET &&
+        hasMoreSessions &&
+        !isLoadingMoreSessions &&
+        !isLoadingMoreRef.current
+      ) {
+        isLoadingMoreRef.current = true;
+        loadMoreSessions().finally(() => {
+          isLoadingMoreRef.current = false;
+        });
+      }
     },
-    [setScrollPosition],
+    [setScrollPosition, hasMoreSessions, isLoadingMoreSessions, loadMoreSessions],
   );
 
   /**
@@ -345,6 +363,15 @@ export default function ChatScreen() {
         onScroll={handleListScroll}
         onContentSizeChange={handleListContentSizeChange}
         onLayout={handleLayout}
+        // Keep the visible content stable when older sessions are prepended at the top
+        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+        ListHeaderComponent={
+          isLoadingMoreSessions ? (
+            <View style={{ paddingVertical: SPACING.md, alignItems: "center" }}>
+              <ActivityIndicator size="small" color={colors.gray1} />
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <AppText variant="bodyText" style={[styles.emptyText, { color: colors.gray2 }]}>

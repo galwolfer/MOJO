@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
   },
   ampmText: {
     // Slightly smaller than the time number so it reads as a suffix
-    fontSize: FONT_SIZES.sm * 0.75,
+    fontSize: FONT_SIZES.sm * 0.5,
     fontFamily: FONTS.fredokaLight,
   },
 });

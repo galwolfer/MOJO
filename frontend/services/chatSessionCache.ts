@@ -46,7 +46,7 @@ export async function loadCachedSessions(userId: string): Promise<ChatSessionSum
 export async function saveCachedSessions(userId: string, sessions: ChatSessionSummary[]): Promise<void> {
   const key = storageKey(userId);
 
-  // Keep only the most recent 10 sessions
+  // Keep only the most recent 30 sessions (covers ~5 days of typical activity)
   const dedup = new Map<string, ChatSessionSummary>();
   for (const s of sessions) {
     if (s && s.sessionId) dedup.set(s.sessionId, s);
@@ -54,7 +54,7 @@ export async function saveCachedSessions(userId: string, sessions: ChatSessionSu
 
   const trimmed = Array.from(dedup.values())
     .sort((a, b) => new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime())
-    .slice(0, 10);
+    .slice(0, 30);
 
   const payload: CachedSessionsPayload = {
     version: 1,
