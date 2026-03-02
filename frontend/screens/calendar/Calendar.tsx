@@ -114,61 +114,62 @@ export default function CalendarScreen() {
   }, []);
 
   return (
-    <ScrollableContent
-      respectHeader={true}
-      respectNavBar={true}
-      extraTopPadding={SPACING.lg}
-      scrollKey="calendar"
-      contentContainerStyle={styles.contentContainer}
-      extraBottomPadding={SPACING.xlg * 3}
-    >
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary1} />
-          <AppText variant="bodyText" style={{ color: colors.gray1 }}>
-            Loading tasks...
-          </AppText>
-        </View>
-      ) : error ? (
-        <View style={styles.errorContainer}>
-          <AppText variant="boldText" style={{ color: colors.primary1, textAlign: "center" }}>
-            Unable to Load Tasks
-          </AppText>
-          <AppText variant="bodyText" style={{ color: colors.gray2, textAlign: "center" }}>
-            {error}
-          </AppText>
-          <AppButton
-            title="Retry"
-            onPress={() => fetchTasksForDate(selectedDate)}
-            mode="filled"
-            color="primary1" // button component uses dynamic color internally based on theme
-            style={styles.retryButton}
-          />
-        </View>
-      ) : filteredTaskGroups.length === 0 ? (
-        <EmptyState showCalendarPicker={showCalendarPicker} onAddTask={handleAddTask} />
-      ) : (
-        filteredTaskGroups.map((group, groupIdx) => (
-          <TaskGroup
-            key={groupIdx}
-            group={group}
-            expandedTaskId={expandedTaskId}
-            completedTasks={completedTasks}
-            completedSubtasks={completedSubtasks}
-            onTaskPress={handleTaskPress}
-            onTaskToggle={handleTaskCompletionToggle}
-            onTaskEdit={handleEditTask}
-            onTaskDelete={handleDeleteTask}
-            onSubtaskToggle={handleSubtaskCompletionToggle}
-            onSubtaskDelete={handleDeleteSubtask}
-          />
-        ))
-      )}
+    <View style={{ flex: 1 }}>
+      <ScrollableContent
+        respectHeader={true}
+        respectNavBar={true}
+        extraTopPadding={SPACING.lg}
+        scrollKey="calendar"
+        contentContainerStyle={styles.contentContainer}
+        extraBottomPadding={SPACING.xlg * 3}
+      >
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary1} />
+            <AppText variant="bodyText" style={{ color: colors.gray1 }}>
+              Loading tasks...
+            </AppText>
+          </View>
+        ) : error ? (
+          <View style={styles.errorContainer}>
+            <AppText variant="boldText" style={{ color: colors.primary1, textAlign: "center" }}>
+              Unable to Load Tasks
+            </AppText>
+            <AppText variant="bodyText" style={{ color: colors.gray2, textAlign: "center" }}>
+              {error}
+            </AppText>
+            <AppButton
+              title="Retry"
+              onPress={() => fetchTasksForDate(selectedDate)}
+              mode="filled"
+              color="primary1" // button component uses dynamic color internally based on theme
+              style={styles.retryButton}
+            />
+          </View>
+        ) : filteredTaskGroups.length === 0 ? (
+          <EmptyState showCalendarPicker={showCalendarPicker} onAddTask={handleAddTask} />
+        ) : (
+          filteredTaskGroups.map((group, groupIdx) => (
+            <TaskGroup
+              key={groupIdx}
+              group={group}
+              expandedTaskId={expandedTaskId}
+              completedTasks={completedTasks}
+              completedSubtasks={completedSubtasks}
+              onTaskPress={handleTaskPress}
+              onTaskToggle={handleTaskCompletionToggle}
+              onTaskEdit={handleEditTask}
+              onTaskDelete={handleDeleteTask}
+              onSubtaskToggle={handleSubtaskCompletionToggle}
+              onSubtaskDelete={handleDeleteSubtask}
+            />
+          ))
+        )}
+      </ScrollableContent>
 
-    </ScrollableContent>
-
-    {/* Floating ADD Button - absolute overlay */}
-    <FloatingButton onPress={handleAddTask} text="Add Task" Icon={ICONS.plus} />
+      {/* Floating ADD Button - absolute overlay */}
+      <FloatingButton onPress={handleAddTask} text="Add Task" Icon={ICONS.plus} />
+    </View>
   );
 }
 
