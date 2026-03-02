@@ -245,16 +245,18 @@ const styles = StyleSheet.create({
   },
   titleRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: SPACING.sm,
     flex: 1,
-    flexWrap: "nowrap",
+    flexWrap: "nowrap", // keep icon and text on same line
     minWidth: 0,
   },
   titleText: {
     fontSize: FONT_SIZES.base,
     flex: 1,
     minWidth: 0,
+    flexWrap: "wrap", // allow title to wrap within its space
+    flexShrink: 1,
   },
   titleRowExpanded: {
     // Reserve space so title text doesn't bleed under the absolute-positioned edit/delete buttons

@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ViewStyle, StyleProp } from "react-native";
-import { COLORS, SPACING, TYPOGRAPHY, ICON_SIZES, getPalettePair } from "../../theme";
+import { SPACING, TYPOGRAPHY, ICON_SIZES, getPalettePair } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 import { ICONS } from "../icons/icons";
 
 interface TagProps {
@@ -27,17 +28,18 @@ interface TagProps {
  * @param style - Optional custom styles.
  */
 const Tag = ({ label, editable = false, onRemove, leftIcon, colorIndex, bgColor, textColor, style }: TagProps) => {
+  const colors = useColors();
   const pair = getPalettePair(typeof colorIndex === "number" ? colorIndex : undefined);
   const paletteIndex = pair.index;
 
-  // Always use the raw static palette: dark variant for background, bright variant for text/icon.
-  // We intentionally bypass the dynamic theme tokens here because getDynamicColors swaps
-  // darkP↔lightP in dark mode, which would invert the tag colors undesirably.
-  const darkKey = `darkP${paletteIndex}` as keyof typeof COLORS;
-  const brightKey = `brightP${paletteIndex}` as keyof typeof COLORS;
+  // Use the themed colors which already account for light/dark mode:
+  // - lightP for background (bright in light mode, dark in dark mode)
+  // - darkP for text/elements (dark in light mode, bright in dark mode)
+  const lightKey = `lightP${paletteIndex}` as keyof typeof colors;
+  const darkKey = `darkP${paletteIndex}` as keyof typeof colors;
 
-  const bg = bgColor || (COLORS[darkKey] as string);
-  const text = textColor || (COLORS[brightKey] as string);
+  const bg = bgColor || (colors[lightKey] as string);
+  const text = textColor || (colors[darkKey] as string);
 
   return (
     <View style={[styles.root, { backgroundColor: bg }, style]}>

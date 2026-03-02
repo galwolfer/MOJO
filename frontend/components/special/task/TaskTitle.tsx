@@ -38,6 +38,12 @@ export const TaskTitle: React.FC<{
   const iconSize = size === "sm" ? ICON_SIZES.sm : size === "md" ? ICON_SIZES.md : ICON_SIZES.big;
   const titleVariant = size === "sm" ? "bodyText" : size === "md" ? "boldText" : "title3";
 
+  // Insert zero‑width spaces between characters so extremely long words (or
+  // languages without spaces) can wrap anywhere. The invisible characters do
+  // not affect rendering but give the layout engine valid breakpoints.
+  const rawText = title || taskname || "";
+  const breakableText = rawText.split("").join("\u200B");
+
   return (
     <View style={[styles.titleRow, style, reversed ? styles.reversedRow : null]}>
       {!hideIcon && meta?.icon ? (
@@ -45,8 +51,8 @@ export const TaskTitle: React.FC<{
       ) : null}
       <View style={styles.rightTitle}>
         {leadingNode}
-        <AppText variant={titleVariant} numberOfLines={2} style={{ flex: 1 }}>
-          {title || taskname}
+        <AppText variant={titleVariant} style={{ flex: 1, flexWrap: "wrap", flexShrink: 1 }}>
+          {breakableText}
         </AppText>
       </View>
     </View>
@@ -72,6 +78,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "flex-start",
     alignContent: "center",
+    flexWrap: "wrap",
+    flex: 1,
   },
 
   icon: {
