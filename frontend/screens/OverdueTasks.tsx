@@ -21,7 +21,16 @@ import { ProgressIcon } from "../components/icons/ProgressIcon.native";
 import List, { ListCellProps } from "../components/layout/List";
 import { COLORS, SPACING, FONT_SIZES, ICON_SIZES } from "../theme";
 import { getCategoryMeta } from "../config/categoryMeta";
-import { getOverdueTasks, extendTaskDeadline, completeTask, declineOverdueTasks, Task } from "../services/taskService";
+import {
+  getOverdueTasks,
+  getTaskById,
+  extendTaskDeadline,
+  completeTask,
+  declineOverdueTasks,
+  Task,
+  TaskWithSubtasks,
+} from "../services/taskService";
+import TaskDetailModal from "./calendar/components/TaskDetailModal";
 
 // Extends the base Task type with fields added by the overdue endpoint
 type OverdueTask = Task & {
@@ -67,6 +76,17 @@ export default function OverdueTasksModal({ visible, onClose }: OverdueTasksModa
   } | null>(null);
 
   const [errorMsg, setErrorMsg] = useState("");
+
+  const [detailTask, setDetailTask] = useState<TaskWithSubtasks | null>(null);
+  const [detailVisible, setDetailVisible] = useState(false);
+
+  const handleOpenDetail = useCallback(async (taskId: string) => {
+    const task = await getTaskById(taskId);
+    if (task) {
+      setDetailTask(task as TaskWithSubtasks);
+      setDetailVisible(true);
+    }
+  }, []);
 
   // Load overdue tasks when modal becomes visible
   useEffect(() => {
@@ -194,8 +214,8 @@ export default function OverdueTasksModal({ visible, onClose }: OverdueTasksModa
       id: task._id,
       content: (
         <View>
-          {/* Task info row */}
-          <View style={[overdueListStyles.taskRow]}>
+          {/* Task info row — tappable to open detail modal */}
+          <Pressable onPress={() => handleOpenDetail(task._id)} style={[overdueListStyles.taskRow]}>
             <View style={overdueListStyles.taskContent}>
               <ProgressIcon value={progress} size={ICON_SIZES.sm} />
               <AppText variant="bodyText" numberOfLines={1} style={overdueListStyles.taskName}>
@@ -208,7 +228,7 @@ export default function OverdueTasksModal({ visible, onClose }: OverdueTasksModa
               ) : null}
               <Icon name={categoryMeta.icon as string} size={ICON_SIZES.sm} color={categoryMeta.color} />
             </View>
-          </View>
+          </Pressable>
 
           {/* Action buttons */}
           <View style={overdueListStyles.taskActionSection}>
@@ -262,6 +282,8 @@ export default function OverdueTasksModal({ visible, onClose }: OverdueTasksModa
       ),
     };
   };
+
+  // ── Task detail modal open/close ───────────────────────────────────────────
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -346,6 +368,9 @@ export default function OverdueTasksModal({ visible, onClose }: OverdueTasksModa
           style={dynamicStyles.popupBtn}
         />
       </PopupBox>
+
+      {/* Task detail modal */}
+      <TaskDetailModal visible={detailVisible} task={detailTask} onClose={() => setDetailVisible(false)} />
     </Modal>
   );
 }

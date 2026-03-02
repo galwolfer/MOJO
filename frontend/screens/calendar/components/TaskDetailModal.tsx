@@ -6,12 +6,11 @@
  * TwoColumnGrid, ScheduledSessionsSection) for consistency.
  */
 import React, { useCallback, useEffect, useState } from "react";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
+import { View, StyleSheet } from "react-native";
 import AppText from "../../../components/common/AppText";
 import AppButton from "../../../components/common/AppButton";
 import PopupBox from "../../../components/common/PopupBox";
-import { Checkbox } from "../../../components/icons/Checkbox";
-import { COLORS, SPACING, FONTS, FONT_SIZES, ICON_SIZES } from "../../../theme";
+import { COLORS, SPACING, ICON_SIZES } from "../../../theme";
 import { getCategoryMeta } from "../../../config/categoryMeta";
 import Icon from "../../../components/icons/Icon";
 import {
@@ -23,7 +22,7 @@ import {
 import { TaskWithSubtasks } from "../../../services/taskService";
 import { useTaskContext } from "../../../context/TaskContext";
 import { useOptionalStatsContext } from "../../../context/StatsContext";
-import { formatDuration, getCategoryDisplay, ScheduledSession, Subtask } from "../../../components/widgets/taskHelpers";
+import { getCategoryDisplay, ScheduledSession, Subtask } from "../../../components/widgets/taskHelpers";
 import { toggleSubtask, toggleSessionSmart } from "../../../components/widgets/widgetHelpers";
 
 interface TaskDetailModalProps {
@@ -185,64 +184,25 @@ function TaskDetailContent({
       ) : null}
 
       {/* Scheduled sessions with live checkboxes */}
-      {normalizedSessions.length > 0 && (
-        <View style={styles.sessionsWrap}>
-          <ScheduledSessionsSection
-            taskId={task._id}
-            taskTitle={task.taskname || "Untitled"}
-            scheduledSessions={normalizedSessions}
-            subtasks={normalizedSubtasks}
-            category={task.category}
-            categoryColor={categoryMeta.color}
-            completedParts={completedParts}
-            loadingParts={loadingParts}
-            onToggleSession={handleToggleSession}
-            estimatedDuration={task.estimatedDuration}
-            progressPercentage={task.progressPercentage ?? null}
-            sessionHeaderMode="date"
-            hideTaskTitle
-            dividerColor={COLORS.white}
-            taskStatus={task.status}
-          />
-        </View>
-      )}
-
-      {/* Subtask list with live checkboxes (when no sessions) */}
-      {normalizedSubtasks.length > 0 && normalizedSessions.length === 0 && (
-        <View style={styles.section}>
-          <AppText variant="boldText" style={styles.sectionTitle}>
-            Subtasks
-          </AppText>
-          {normalizedSubtasks.map((st) => {
-            const id = st.id || "";
-            const isChecked = completedParts.has(id);
-            const isLoading = loadingParts.has(id);
-            return (
-              <TouchableOpacity
-                key={id}
-                style={[styles.subtaskRow, isLoading && styles.subtaskLoading]}
-                onPress={() => handleToggleSubtask(id)}
-                activeOpacity={0.7}
-                disabled={isLoading}
-              >
-                <Checkbox checked={isChecked} onChange={() => handleToggleSubtask(id)} size={18} />
-                <AppText
-                  variant="bodyText"
-                  style={[styles.subtaskText, isChecked && styles.subtaskDone]}
-                  numberOfLines={2}
-                >
-                  {st.title}
-                </AppText>
-                {st.duration ? (
-                  <AppText variant="notes" style={styles.subtaskDuration}>
-                    {formatDuration(st.duration)}
-                  </AppText>
-                ) : null}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
+      <View style={styles.ScheduledSessionsSectionContainer}>
+        <ScheduledSessionsSection
+          taskId={task._id}
+          taskTitle={task.taskname || "Untitled"}
+          scheduledSessions={normalizedSessions}
+          subtasks={normalizedSubtasks}
+          category={task.category}
+          categoryColor={categoryMeta.color}
+          completedParts={completedParts}
+          loadingParts={loadingParts}
+          onToggleSession={handleToggleSession}
+          estimatedDuration={task.estimatedDuration}
+          progressPercentage={task.progressPercentage ?? null}
+          sessionHeaderMode="date"
+          hideTaskTitle
+          dividerColor={COLORS.white}
+          taskStatus={task.status}
+        />
+      </View>
     </>
   );
 }
@@ -285,39 +245,11 @@ const styles = StyleSheet.create({
   editButton: {
     alignSelf: "flex-start",
   },
-  section: {
-    gap: SPACING.xs,
-  },
-  sectionTitle: {
-    color: COLORS.darkGray,
-    marginBottom: SPACING.xs,
-  },
   description: {
     color: COLORS.darkGray,
     lineHeight: 20,
   },
-  sessionsWrap: {
+  ScheduledSessionsSectionContainer: {
     marginStart: SPACING.sm,
-  },
-  subtaskRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.sm,
-    paddingVertical: SPACING.xs,
-  },
-  subtaskLoading: {
-    opacity: 0.5,
-  },
-  subtaskText: {
-    flex: 1,
-    fontFamily: FONTS.fredokaRegular,
-    fontSize: FONT_SIZES.base,
-  },
-  subtaskDone: {
-    textDecorationLine: "line-through",
-    color: COLORS.lightGray,
-  },
-  subtaskDuration: {
-    color: COLORS.primary1,
   },
 });
