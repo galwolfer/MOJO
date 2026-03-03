@@ -106,12 +106,6 @@ export const ProgressIcon = memo(function ProgressIcon({ value, size = 18 }: Pro
     outputRange: [0, 1],
   });
 
-  // Subtle checkmark scale to avoid jumpiness on native
-  const checkScale = completionProgress.interpolate({
-    inputRange: [0, 0.52, 0.77, 1],
-    outputRange: [0.9, 1.02, 0.99, 1],
-  });
-
   const getColor = (progress: number) => {
     if (progress < 0.52) return colors.primary7; // Red (theme)
     if (progress < 0.82) return colors.primary5; // Yellow (theme)
@@ -174,8 +168,6 @@ export const ProgressIcon = memo(function ProgressIcon({ value, size = 18 }: Pro
           strokeDasharray={[10, 10]}
           strokeDashoffset={checkDashoffset}
           opacity={checkOpacity}
-          transform={[{ scale: checkScale }]}
-          origin="9, 9"
         />
       </Svg>
     </View>

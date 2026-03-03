@@ -78,7 +78,9 @@ function TaskDetailContent({
 
   const categoryMeta = getCategoryMeta(task.category);
   const categoryDisplay = getCategoryDisplay(task.category);
-  const subLabel = task.subCategory?.label || task.subCategory?.name || "";
+  // Guard: subCategory may arrive as a raw ObjectId string when the API doesn't populate it.
+  const subCat = task.subCategory && typeof task.subCategory === "object" ? task.subCategory : null;
+  const subLabel = subCat?.label || subCat?.name || "";
 
   const taskForFields = {
     dueDate: task.dueDate,
@@ -161,7 +163,7 @@ function TaskDetailContent({
         category={task.category}
         categoryDisplay={categoryDisplay}
         subcategoryDisplay={subLabel}
-        subCategory={task.subCategory as any}
+        subCategory={subCat}
         importance={task.importance}
         effort={task.effort}
       />

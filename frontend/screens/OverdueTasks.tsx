@@ -17,7 +17,7 @@ import PopupBox from "../components/common/PopupBox";
 import Box from "../components/layout/Box";
 import CalendarPicker from "../components/inputs/CalendarPicker";
 import Icon from "../components/icons/Icon";
-import { ProgressIcon } from "../components/icons/ProgressIcon.native";
+import { ProgressIcon } from "../components/icons/ProgressIcon";
 import List, { ListCellProps } from "../components/layout/List";
 import { COLORS, SPACING, FONT_SIZES, ICON_SIZES } from "../theme";
 import { getCategoryMeta } from "../config/categoryMeta";

@@ -115,15 +115,18 @@ export const TaskTagsRow: React.FC<{
       ) : null}
 
       {tags && tags.length > 0
-        ? tags.map((tag) => (
-            <Tag
-              key={tag}
-              label={tag}
-              leftIcon={categoryMeta.icon}
-              colorIndex={categoryMeta.colorIndex}
-              style={styles.tagItem}
-            />
-          ))
+        ? tags
+            // Filter out raw MongoDB ObjectIds (24-char hex) that should never be shown as tags
+            .filter((tag) => !/^[0-9a-f]{24}$/i.test(tag))
+            .map((tag) => (
+              <Tag
+                key={tag}
+                label={tag}
+                leftIcon={categoryMeta.icon}
+                colorIndex={categoryMeta.colorIndex}
+                style={styles.tagItem}
+              />
+            ))
         : null}
     </View>
   );

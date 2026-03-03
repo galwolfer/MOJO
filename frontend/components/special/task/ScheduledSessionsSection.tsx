@@ -58,7 +58,39 @@ export const ScheduledSessionsSection: React.FC<{
   });
 
   const sessions = scheduledSessions || [];
-  if (sessions.length === 0) return null;
+
+  // Fallback: when there are no sessions but there are subtasks, render subtasks directly
+  if (sessions.length === 0) {
+    if (!subtasks || subtasks.length === 0) return null;
+    return (
+      <View style={{ gap: SPACING.sm, alignSelf: "stretch" }}>
+        {!hideTitle && sessionHeaderMode === "taskTitle" ? (
+          <TaskTitle title={taskTitle} category={category} size="md" />
+        ) : null}
+        <List
+          dividerColor={resolvedDividerColor}
+          data={subtasks.map((st, i) => {
+            const id = st.id || String(i);
+            const isDone = st.completed || completedParts?.has(id);
+            return {
+              id,
+              divider: i < subtasks.length - 1,
+              content: (
+                <CompletionItem
+                  type="subtask"
+                  subtask={{ id, title: st.title, completed: isDone ?? false } as any}
+                  parentTaskId={taskId}
+                  isCompleted={isDone ?? false}
+                  categoryColor={categoryColor}
+                  onToggle={() => {}}
+                />
+              ),
+            };
+          })}
+        />
+      </View>
+    );
+  }
 
   const titleMode = sessionHeaderMode === "taskTitle";
 
