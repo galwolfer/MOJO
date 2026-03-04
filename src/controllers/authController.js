@@ -655,3 +655,130 @@ export async function updateSchedulingPreferences(req, res, next) {
     next(error);
   }
 }
+
+// ─── Memory management ──────────────────────────────────────────────────────
+
+/**
+ * List the user's primary memories.
+ * GET /api/auth/memories
+ */
+export async function getMemories(req, res, next) {
+  try {
+    const userId = req.user.userId;
+    const user = await User.findById(userId).lean();
+    if (!user) return res.status(404).json({ success: false, error: "User not found" });
+
+    const memories = (user.memories || [])
+      .filter((m) => m.category === "primary")
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .map((m) => ({
+        id: m._id.toString(),
+        text: m.text,
+        type: m.type,
+        importance: m.importance,
+        createdAt: m.createdAt,
+      }));
+
+    res.json({ success: true, memories });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Add a new primary memory.
+ * POST /api/auth/memories
+ * Body: { text: string, type?: string, importance?: number }
+ */
+export async function addMemory(req, res, next) {
+  try {
+    const userId = req.user.userId;
+    const { text, type = "user_fact", importance = 7 } = req.body;
+
+    if (!text || !String(text).trim()) {
+      return res.status(400).json({ success: false, error: "Memory text is required" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, error: "User not found" });
+
+    const newMemory = { text: String(text).trim(), type, category: "primary", importance: Number(importance) || 7 };
+    user.memories.push(newMemory);
+    await user.save();
+
+    const saved = user.memories[user.memories.length - 1];
+    res.status(201).json({
+      success: true,
+      memory: {
+        id: saved._id.toString(),
+        text: saved.text,
+        type: saved.type,
+        importance: saved.importance,
+        createdAt: saved.createdAt,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Edit an existing primary memory's text.
+ * PATCH /api/auth/memories/:memoryId
+ * Body: { text: string }
+ */
+export async function updateMemory(req, res, next) {
+  try {
+    const userId = req.user.userId;
+    const { memoryId } = req.params;
+    const { text } = req.body;
+
+    if (!text || !String(text).trim()) {
+      return res.status(400).json({ success: false, error: "Memory text is required" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, error: "User not found" });
+
+    const memory = user.memories.id(memoryId);
+    if (!memory || memory.category !== "primary") {
+      return res.status(404).json({ success: false, error: "Memory not found" });
+    }
+
+    memory.text = String(text).trim();
+    await user.save();
+
+    res.json({
+      success: true,
+      memory: { id: memory._id.toString(), text: memory.text, type: memory.type, importance: memory.importance },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Delete a primary memory.
+ * DELETE /api/auth/memories/:memoryId
+ */
+export async function deleteMemory(req, res, next) {
+  try {
+    const userId = req.user.userId;
+    const { memoryId } = req.params;
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, error: "User not found" });
+
+    const memory = user.memories.id(memoryId);
+    if (!memory || memory.category !== "primary") {
+      return res.status(404).json({ success: false, error: "Memory not found" });
+    }
+
+    memory.deleteOne();
+    await user.save();
+
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+}

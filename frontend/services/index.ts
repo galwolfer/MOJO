@@ -18,3 +18,6 @@ export * from "./taskService";
 
 // Notification services
 export * from "./notificationService";
+
+// Memory services
+export * from "./memoryService";
