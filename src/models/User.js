@@ -260,6 +260,17 @@ const userSchema = new mongoose.Schema(
             // Use ML predictions for smart reminders
             useSmartReminders: { type: Boolean, default: true },
           },
+          // Ojo-powered personalized notifications
+          ojoNotifications: {
+            // Whether Ojo-styled notifications are enabled (only applies when smartReminders is OFF)
+            enabled: { type: Boolean, default: false },
+            // Selected Ojo type for notifications (when smartReminders is OFF)
+            selectedOjoType: { 
+              type: String, 
+              enum: ["mentorjo", "brojo", "bestojo", "strictojo", null], 
+              default: null 
+            },
+          },
           // Timezone for scheduling (IANA format, e.g., 'America/New_York')
           timezone: { type: String, default: "UTC" },
           // Last notification sent timestamps
@@ -274,6 +285,7 @@ const userSchema = new mongoose.Schema(
         enabled: true,
         morningDigest: { enabled: true, hour: 8, minute: 0 },
         taskReminders: { enabled: true, defaultReminderMinutes: 60, useSmartReminders: true },
+        ojoNotifications: { enabled: false, selectedOjoType: null },
         timezone: "UTC",
         lastMorningDigest: null,
         lastTaskReminder: null,

@@ -124,6 +124,10 @@ router.get("/preferences", async (req, res) => {
  *     defaultReminderMinutes?: number,
  *     useSmartReminders?: boolean
  *   },
+ *   ojoNotifications?: {
+ *     enabled?: boolean,
+ *     selectedOjoType?: string (mentorjo|brojo|bestojo|strictojo)
+ *   },
  *   timezone?: string (IANA timezone)
  * }
  */
@@ -161,6 +165,20 @@ router.put("/preferences", async (req, res) => {
           success: false, 
           error: "Default reminder minutes must be between 5 and 1440" 
         });
+      }
+    }
+
+    // Validate ojoNotifications settings if provided
+    if (preferences.ojoNotifications) {
+      const validOjoTypes = ["mentorjo", "brojo", "bestojo", "strictojo", null];
+      if (preferences.ojoNotifications.selectedOjoType !== undefined) {
+        const ojoType = preferences.ojoNotifications.selectedOjoType;
+        if (!validOjoTypes.includes(ojoType)) {
+          return res.status(400).json({ 
+            success: false, 
+            error: "Invalid Ojo type. Must be one of: mentorjo, brojo, bestojo, strictojo" 
+          });
+        }
       }
     }
 
@@ -299,6 +317,31 @@ router.post("/test/task-reminder", async (req, res) => {
 });
 
 /**
+ * POST /api/notifications/test/subtask-reminder
+ * Test subtask reminder notification for the authenticated user
+ * 
+ * Body: { 
+ *   useSmartReminders?: boolean (default: true)
+ * }
+ */
+router.post("/test/subtask-reminder", async (req, res) => {
+  try {
+    const { useSmartReminders = true } = req.body;
+    const { testSubtaskReminderNotification } = await import("../services/notificationService.js");
+    
+    const result = await testSubtaskReminderNotification(req.user.userId, { useSmartReminders });
+    
+    return res.json(result);
+  } catch (error) {
+    console.error("Error testing subtask reminder:", error);
+    return res.status(500).json({ 
+      success: false, 
+      error: "Failed to test subtask reminder" 
+    });
+  }
+});
+
+/**
  * POST /api/notifications/test/smart-reminder
  * Test smart reminder calculation (shows ML prediction without sending notification)
  * 
@@ -319,6 +362,44 @@ router.post("/test/smart-reminder", async (req, res) => {
     return res.status(500).json({ 
       success: false, 
       error: "Failed to test smart reminder calculation" 
+    });
+  }
+});
+
+/**
+ * POST /api/notifications/test/ojo-reminder
+ * Test Ojo-powered notification with AI-generated content
+ * 
+ * Body: { 
+ *   ojoType?: string (optional - mentorjo|brojo|bestojo|strictojo)
+ *                    If not provided and smart reminders enabled, auto-selects based on ML prediction
+ *                    If not provided and smart reminders disabled, uses user's selected Ojo or mentorjo
+ * }
+ */
+router.post("/test/ojo-reminder", async (req, res) => {
+  try {
+    const { ojoType } = req.body;
+    const { testOjoReminderNotification } = await import("../services/notificationService.js");
+    
+    // Validate ojoType if provided
+    if (ojoType) {
+      const validOjoTypes = ["mentorjo", "brojo", "bestojo", "strictojo"];
+      if (!validOjoTypes.includes(ojoType)) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Invalid Ojo type. Must be one of: mentorjo, brojo, bestojo, strictojo" 
+        });
+      }
+    }
+    
+    const result = await testOjoReminderNotification(req.user.userId, { ojoType });
+    
+    return res.json(result);
+  } catch (error) {
+    console.error("Error testing Ojo reminder:", error);
+    return res.status(500).json({ 
+      success: false, 
+      error: "Failed to test Ojo reminder notification" 
     });
   }
 });
