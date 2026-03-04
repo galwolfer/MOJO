@@ -7,11 +7,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { COLORS, SPACING, FONT_SIZES, SHADOWS, ICON_SIZES } from "../../../theme";
-import { useNavigation } from "../../../context/NavigationContext";
-import { useLayout } from "../../../context/LayoutContext";
 import { ICONS } from "../../../components/icons/icons";
 import { moderateScale } from "react-native-size-matters";
-import ScrollableContent from "../../../components/layout/ScrollableContent";
+import SettingsSubScreen from "./components/SettingsSubScreen";
 import AppText from "../../../components/common/AppText";
 import AppButton from "../../../components/common/AppButton";
 import Box from "../../../components/layout/Box";
@@ -28,8 +26,6 @@ type OjoTypeSettingsScreenProps = {
 };
 
 export default function OjoTypeSettingsScreen({ onBack }: OjoTypeSettingsScreenProps) {
-  const { setHeaderConfig } = useNavigation();
-  const { dimensions } = useLayout();
   const { token } = useAuth();
   const { ojoName, refresh: refreshOjo } = useOjo();
 
@@ -46,27 +42,6 @@ export default function OjoTypeSettingsScreen({ onBack }: OjoTypeSettingsScreenP
   // Derive icon + color from currently selected ojo for the header
   const currentOjoCfg = getOjoType(selectedOjo);
   const CurrentOjoIcon = ICONS[currentOjoCfg.icon as keyof typeof ICONS] ?? ICONS.ojo;
-
-  const LeftIcon = ICONS.left;
-
-  // Set header on mount, update when selectedOjo changes so the icon reflects the current selection
-  useEffect(() => {
-    setHeaderConfig({
-      title: "OjoType",
-      show: true,
-      icon: ICONS.ojo,
-      leftElement: (
-        <TouchableOpacity onPress={onBack} style={styles.headerTouchable}>
-          <LeftIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
-        </TouchableOpacity>
-      ),
-      rightElement: (
-        <View style={styles.headerIcon}>
-          <CurrentOjoIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
-        </View>
-      ),
-    });
-  }, [selectedOjo]);
 
   // Fetch current preference on mount
   useEffect(() => {
@@ -115,13 +90,12 @@ export default function OjoTypeSettingsScreen({ onBack }: OjoTypeSettingsScreenP
   };
 
   return (
-    <ScrollableContent
-      respectHeader={true}
-      respectNavBar={true}
-      extraTopPadding={SPACING.lg}
+    <SettingsSubScreen
+      title="OjoType"
+      iconName={currentOjoCfg.icon as keyof typeof ICONS}
+      iconDeps={[selectedOjo]}
       scrollKey="ojotype-settings"
-      contentContainerStyle={styles.contentContainer}
-      extraBottomPadding={SPACING.xlg * 3}
+      onBack={onBack}
     >
       {error && <ErrorText>{error}</ErrorText>}
 
@@ -212,20 +186,11 @@ export default function OjoTypeSettingsScreen({ onBack }: OjoTypeSettingsScreenP
           </View>
         </Box>
       )}
-    </ScrollableContent>
+    </SettingsSubScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  contentContainer: {
-    paddingHorizontal: SPACING.md,
-  },
-  headerTouchable: {
-    padding: SPACING.xs,
-  },
-  headerIcon: {
-    padding: SPACING.xs,
-  },
   loadingContainer: {
     padding: SPACING.xlg,
     alignItems: "center",

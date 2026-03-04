@@ -10,7 +10,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PanResponder, Platform, StyleProp, StyleSheet, View, ViewStyle } from "react-native";
 import AppText from "../common/AppText";
-import { COLORS, SPACING, ICON_SIZES } from "../../theme";
+import { COLORS, SPACING, ICON_SIZES, FONT_SIZES } from "../../theme";
 import { useColors } from "../../context/ThemeContext";
 
 // Size tokens derived from theme for consistency
@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   valueLabel: {
-    fontSize: 12,
+    fontSize: FONT_SIZES.sm,
     color: COLORS.lightGray,
     fontWeight: "500",
   },

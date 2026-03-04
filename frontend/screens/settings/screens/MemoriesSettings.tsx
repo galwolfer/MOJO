@@ -8,10 +8,9 @@ import React, { useState, useEffect } from "react";
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator, TextInput, Alert } from "react-native";
 import { COLORS, SPACING, FONT_SIZES, ICON_SIZES } from "../../../theme";
 import { useColors } from "../../../context/ThemeContext";
-import { useNavigation } from "../../../context/NavigationContext";
 import { ICONS } from "../../../components/icons/icons";
 import { moderateScale } from "react-native-size-matters";
-import ScrollableContent from "../../../components/layout/ScrollableContent";
+import SettingsSubScreen from "./components/SettingsSubScreen";
 import AppText from "../../../components/common/AppText";
 import AppButton from "../../../components/common/AppButton";
 import Box from "../../../components/layout/Box";
@@ -25,7 +24,6 @@ type MemoriesSettingsScreenProps = {
 };
 
 export default function MemoriesSettingsScreen({ onBack }: MemoriesSettingsScreenProps) {
-  const { setHeaderConfig } = useNavigation();
   const colors = useColors();
 
   const [memories, setMemories] = useState<Memory[]>([]);
@@ -38,27 +36,6 @@ export default function MemoriesSettingsScreen({ onBack }: MemoriesSettingsScree
 
   const [addingNew, setAddingNew] = useState(false);
   const [newMemoryText, setNewMemoryText] = useState("");
-
-  const LeftIcon = ICONS.left;
-  const MemoryIcon = ICONS.reflection;
-
-  useEffect(() => {
-    setHeaderConfig({
-      title: "Your Memories",
-      show: true,
-      icon: ICONS.reflection,
-      leftElement: (
-        <TouchableOpacity onPress={onBack} style={styles.headerTouchable}>
-          <LeftIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
-        </TouchableOpacity>
-      ),
-      rightElement: (
-        <View style={styles.headerIcon}>
-          <MemoryIcon size={ICON_SIZES.sm} color={colors.primary1} />
-        </View>
-      ),
-    });
-  }, []);
 
   useEffect(() => {
     async function load() {
@@ -219,14 +196,7 @@ export default function MemoriesSettingsScreen({ onBack }: MemoriesSettingsScree
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <ScrollableContent
-      respectHeader={true}
-      respectNavBar={true}
-      extraTopPadding={SPACING.lg}
-      scrollKey="memories-settings"
-      contentContainerStyle={styles.contentContainer}
-      extraBottomPadding={SPACING.xlg * 3}
-    >
+    <SettingsSubScreen title="Your Memories" iconName="reflection" scrollKey="memories-settings" onBack={onBack}>
       {error && <ErrorText>{error}</ErrorText>}
 
       {loading ? (
@@ -294,20 +264,11 @@ export default function MemoriesSettingsScreen({ onBack }: MemoriesSettingsScree
           </View>
         </Box>
       )}
-    </ScrollableContent>
+    </SettingsSubScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  contentContainer: {
-    paddingHorizontal: SPACING.md,
-  },
-  headerTouchable: {
-    padding: SPACING.xs,
-  },
-  headerIcon: {
-    padding: SPACING.xs,
-  },
   loadingContainer: {
     padding: SPACING.xlg,
     alignItems: "center",

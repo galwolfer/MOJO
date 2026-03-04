@@ -12,7 +12,7 @@ import {
 
 import AppText from "../../components/common/AppText";
 import AppButton from "../../components/common/AppButton";
-import { COLORS, SPACING, SHADOWS, ICON_SIZES } from "../../theme";
+import { COLORS, SPACING, SHADOWS, ICON_SIZES, FONT_SIZES } from "../../theme";
 import { useColors } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigation } from "../../context/NavigationContext";
@@ -97,7 +97,13 @@ export default function UserProfileScreen() {
 
   // Screen navigation state
   const [currentScreen, setCurrentScreen] = useState<
-    "profile" | "settings" | "edit-preferences" | "chat-settings" | "notification-settings" | "accessibility-settings"
+    | "profile"
+    | "settings"
+    | "edit-preferences"
+    | "chat-settings"
+    | "notification-settings"
+    | "accessibility-settings"
+    | "subcategory-manager"
   >("profile");
 
   const [loading, setLoading] = useState(true);
@@ -619,16 +625,16 @@ const styles = StyleSheet.create({
   },
   progressSummaryValue: {
     color: COLORS.primary1,
-    fontSize: moderateScale(18),
+    fontSize: FONT_SIZES.md,
   },
   progressSummaryLabel: {
     color: COLORS.lightGray,
-    fontSize: moderateScale(10),
+    fontSize: FONT_SIZES.sm,
     marginTop: 2,
   },
   progressSummaryDivider: {
     width: 1,
-    height: moderateScale(30),
+    height: FONT_SIZES.lg,
     backgroundColor: COLORS.lightGray,
     opacity: 0.3,
   },
