@@ -1471,7 +1471,10 @@ export async function getScheduledSessionsForDate(date: Date): Promise<CalendarT
         // For multi-day tasks, description should show the actual subtask description; otherwise show task/subtask description
         description: isMultiDay ? actualSubtaskDescription || "" : subtaskDescription || task.description || "",
         mainTaskDescription: isMultiDay ? task.description || "" : "",
-        completed: false,
+        // reflect the actual session status so the calendar can mark it done
+        completed: session.status === "completed" || session.status === "done" || task.status === "done",
+        // preserve status too in case other logic needs it
+        status: session.status || task.status || "",
         color: categoryMeta.color || "#3498db",
         category: task.category,
         // For multi-day tasks, use session data; for single-day tasks, use task.subTasks
