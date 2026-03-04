@@ -9,6 +9,7 @@ import React, { useState, useEffect } from "react";
 import { View, StyleSheet, Switch, TouchableOpacity, Text } from "react-native";
 import { moderateScale } from "react-native-size-matters";
 import { useNotifications } from "../../context/NotificationContext";
+import { useColors } from "../../context/ThemeContext";
 import { COLORS, SPACING, FONT_SIZES } from "../../theme";
 import { post, get } from "../../services/httpClient";
 import { OjoType, OjoTypeOption } from "../../services/notificationService";

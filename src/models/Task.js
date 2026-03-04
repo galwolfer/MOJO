@@ -452,11 +452,14 @@ taskSchema.statics.findUpcoming = function (userId, days = 7) {
 };
 
 taskSchema.statics.findOverdue = function (userId) {
-  const now = new Date();
+  // A task is overdue only when its due date is strictly before today (i.e. yesterday or earlier).
+  // Tasks due today are still considered active.
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
 
   return this.find({
     userId,
-    dueDate: { $lt: now },
+    dueDate: { $lt: startOfToday },
     status: { $ne: "done" },
     // Allow tasks that either don't have the field yet (pre-migration docs)
     // or have been declined fewer than 3 times
