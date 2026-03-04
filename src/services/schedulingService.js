@@ -500,7 +500,21 @@ async function _persistPlanLocked(userId, plan) {
     );
   }
 
-  // Clean up orphan schedules (taskId references deleted tasks)
+  // ── Step 1: wipe ALL planned/non-manual sessions for every task that appears in
+  // the new plan, regardless of start time.  This prevents a stale session whose
+  // start time is just before `now` from surviving (the time-gated delete below
+  // would miss it, causing two sessions for the same subtaskIndex).
+  const planTaskIds = Array.from(new Set(dedupedPlan.map((p) => p.taskId.toString())));
+  if (planTaskIds.length > 0) {
+    await TaskSchedule.deleteMany({
+      userId,
+      taskId: { $in: planTaskIds },
+      status: { $nin: ["completed"] },
+      manuallyScheduled: { $ne: true },
+    });
+  }
+
+  // ── Step 2: clean up orphan schedules (taskId references deleted tasks)
   const existingTaskIds = await Task.find({ userId }).distinct("_id");
   const existingTaskIdSet = new Set(existingTaskIds.map((id) => id.toString()));
   const allSchedules = await TaskSchedule.find({ userId, start: { $gte: now } }).lean();
@@ -509,7 +523,8 @@ async function _persistPlanLocked(userId, plan) {
     await TaskSchedule.deleteMany({ _id: { $in: orphanIds } });
   }
 
-  // Clear future planned/skipped sessions (not completed ones, not manually-set ones)
+  // ── Step 3: clear remaining future planned sessions for tasks NOT in this plan
+  // (handles tasks that were previously scheduled but are now complete/removed).
   await TaskSchedule.deleteMany({
     userId,
     start: { $gte: now },

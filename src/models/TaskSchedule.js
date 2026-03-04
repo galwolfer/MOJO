@@ -20,9 +20,10 @@ const taskScheduleSchema = new mongoose.Schema(
     /**
      * Deterministic SHA-256 fingerprint: SHA256("userId|taskId|start.iso|end.iso|subtaskIndex")
      * Used as a DB-level unique guard against duplicate sessions.
-     * Sparse so that legacy documents without the field are not affected.
+     * NOT sparse — every session must carry a hash so the unique constraint covers all rows.
+     * Run the migration script (scripts/migrate-session-hashes.js) once to backfill legacy rows.
      */
-    sessionHash: { type: String, index: { unique: true, sparse: true } },
+    sessionHash: { type: String, index: { unique: true, sparse: false } },
   },
   { timestamps: true }
 );
