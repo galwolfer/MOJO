@@ -265,9 +265,13 @@ def generate_variables(tasks: List[dict], horizon_end: datetime, rng: Optional[r
 
         # Check if task has explicit subtasks with durations
         subtasks = task.get("subTasks") or task.get("subtasks") or []
+        # Always sort by the subtask's own `index` field so that chunk_0 → subtaskIndex=1
+        # regardless of the order the JS caller serialised the array.
+        subtasks = sorted(subtasks, key=lambda s: s.get("index", 0))
         log_debug(f"  Found {len(subtasks)} subtasks")
         if subtasks and len(subtasks) > 0:
-            # Use subtask durations directly
+            # Use subtask durations directly, preserving each subtask's original index
+            # so that chunkIndex i always maps to the subtask at position i (1-based index i+1).
             for idx, subtask in enumerate(subtasks):
                 # Get duration from subtask (could be "minutes", "estimatedMinutes", or "duration")
                 duration = subtask.get("minutes") or subtask.get("estimatedMinutes") or subtask.get("duration") or 0

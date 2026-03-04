@@ -522,13 +522,26 @@ async function _persistPlanLocked(userId, plan) {
   // Fetch all tasks to get subtask titles and descriptions for the schedule
   const taskIds = Array.from(new Set(dedupedPlan.map((p) => p.taskId.toString())));
   const tasks = await Task.find({ _id: { $in: taskIds } }).populate('subTasks');
-  const taskMap = new Map(tasks.map((t) => [t._id.toString(), t]));
+  // Build taskMap with subTasks sorted by index so that array-position lookup
+  // (subTasks[subtaskIndex - 1]) always maps to the correct subtask regardless
+  // of the order MongoDB returns them from the virtual populate.
+  const taskMap = new Map(tasks.map((t) => [
+    t._id.toString(),
+    {
+      ...t.toObject ? t.toObject({ virtuals: true }) : t,
+      subTasks: Array.isArray(t.subTasks)
+        ? [...t.subTasks].sort((a, b) => (a.index || 0) - (b.index || 0))
+        : [],
+    },
+  ]));
 
   const docs = dedupedPlan.map((slot) => {
     let subtaskTitle = null;
     let description = null;
-    
-    // If this slot has a subtaskIndex, get the subtask title and description
+
+    // If this slot has a subtaskIndex, get the subtask title and description.
+    // subTasks is already sorted ascending by index, so position (subtaskIndex-1)
+    // correctly maps to the subtask with index === subtaskIndex.
     if (slot.subtaskIndex !== null && slot.subtaskIndex !== undefined) {
       const task = taskMap.get(slot.taskId.toString());
       if (task && task.subTasks && task.subTasks[slot.subtaskIndex - 1]) {
@@ -693,7 +706,14 @@ export async function generatePlan({ userId, profile = {}, planningHorizonDays =
   const tasksForPlanning = tasksWithOrderedSubtasks
     .map((task) => {
       const remaining = remainingByTaskId.get(task._id.toString());
-      return { ...task, estimatedDuration: remaining };
+
+      // Strip out already-completed subtasks so Python doesn't schedule ghost slots
+      // for work that is already done.
+      const pendingSubTasks = Array.isArray(task.subTasks)
+        ? task.subTasks.filter((st) => st.status !== "done")
+        : task.subTasks;
+
+      return { ...task, estimatedDuration: remaining, subTasks: pendingSubTasks };
     })
     .filter((task) => (task.estimatedDuration || 0) > 0);
 
