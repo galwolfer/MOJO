@@ -7,22 +7,25 @@
  */
 import React, { useState, useEffect, useRef } from "react";
 import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
-import AppText from "../../components/common/AppText";
-import AppButton from "../../components/common/AppButton";
-import Box from "../../components/layout/Box";
-import CategoryGrid from "../auth/components/CategoryGrid";
-import { ICONS } from "../../components/icons/icons";
-import { COLORS, SPACING, FONT_SIZES, SHADOWS, ICON_SIZES } from "../../theme";
+import AppText from "../../../components/common/AppText";
+import AppButton from "../../../components/common/AppButton";
+import Box from "../../../components/layout/Box";
+import CategoryGrid from "../../auth/components/CategoryGrid";
+import { ICONS } from "../../../components/icons/icons";
+import { COLORS, SPACING, FONT_SIZES, SHADOWS, ICON_SIZES } from "../../../theme";
+import { useColors } from "../../../context/ThemeContext";
 import { moderateScale } from "react-native-size-matters";
-import { CATEGORY_KEYS, type CategoryKey } from "../../config/categoryMeta";
-import { useNavigation } from "../../context/NavigationContext";
-import { useLayout } from "../../context/LayoutContext";
-import { useKeyboard } from "../../hooks";
-import { getUserPreferences, updateCategoryPriorities } from "../../services/apiClient";
-import { setAuthToken } from "../../services/httpClient";
-import { useAuth } from "../../context/AuthContext";
-import { ScrollableContent } from "../../components";
-import ErrorText from "../../components/common/ErrorText";
+import { CATEGORY_KEYS, type CategoryKey } from "../../../config/categoryMeta";
+import { useNavigation } from "../../../context/NavigationContext";
+import { useLayout } from "../../../context/LayoutContext";
+import { useKeyboard } from "../../../hooks";
+import { getUserPreferences, updateCategoryPriorities } from "../../../services/apiClient";
+import { setAuthToken } from "../../../services/httpClient";
+import { useAuth } from "../../../context/AuthContext";
+import { ScrollableContent } from "../../../components";
+import ErrorText from "../../../components/common/ErrorText";
+import BusyBlocksSection from "../../../components/special/BusyBlocksSection";
+import PopupBox from "../../../components/common/PopupBox";
 
 type EditPreferencesScreenProps = {
   onBack: () => void;
@@ -30,6 +33,7 @@ type EditPreferencesScreenProps = {
 };
 
 export default function EditPreferencesScreen({ onBack, onSave }: EditPreferencesScreenProps) {
+  const colors = useColors();
   const { setHeaderConfig } = useNavigation();
   const { token } = useAuth();
   const { visible: keyboardVisible, height: keyboardHeight } = useKeyboard();
@@ -38,6 +42,7 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
 
   // Priorities state
   const [priorities, setPriorities] = useState<Record<string, number>>({});
@@ -96,13 +101,13 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
       show: true,
       icon: ICONS.prefrences,
       leftElement: (
-        <TouchableOpacity onPress={handleBackPress} style={styles.headerRightTouchable}>
-          <LeftIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
+        <TouchableOpacity onPress={handleBackPress} >
+          <LeftIcon size={ICON_SIZES.md} color={COLORS.primary1} />
         </TouchableOpacity>
       ),
       rightElement: (
         <View style={styles.headerLeft}>
-          <PrefIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
+          <PrefIcon size={ICON_SIZES.md} color={COLORS.primary1} />
         </View>
       ),
     });
@@ -133,7 +138,7 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
       setOriginalPriorities({ ...priorities });
 
       onSave?.();
-      onBack();
+      setShowSaveSuccess(true);
     } catch (err: any) {
       console.error("Failed to save preferences:", err);
       setError(err?.message || "Failed to save preferences");
@@ -146,9 +151,9 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.bg3 }]}>
         <ActivityIndicator size="large" color={COLORS.primary1} />
-        <AppText variant="bodyText" style={styles.loadingText}>
+        <AppText variant="bodyText" style={[styles.loadingText, { color: colors.gray1 }]}>
           Loading preferences...
         </AppText>
       </View>
@@ -157,7 +162,7 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
 
   return (
     <ScrollableContent
-      style={styles.scroll}
+      style={[styles.scroll, { backgroundColor: colors.bg3 }]}
       extraTopPadding={SPACING.lg}
       contentContainerStyle={[
         styles.contentContainer,
@@ -222,6 +227,28 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
           </View>
         </View>
       </Box>
+
+      {/* Busy Blocks + Gap preference */}
+      <BusyBlocksSection style={{ marginTop: SPACING.xlg }} />
+
+      {/* Save success popup */}
+      <PopupBox
+        visible={showSaveSuccess}
+        onClose={() => { setShowSaveSuccess(false); onBack(); }}
+        title="Goals & Priorities Saved"
+        titleColor={COLORS.primary1}
+      >
+        <AppText variant="bodyText" style={styles.popupText}>
+          Your goals and priorities have been updated successfully.
+        </AppText>
+        <AppButton
+          title="Done"
+          onPress={() => { setShowSaveSuccess(false); onBack(); }}
+          mode="filled"
+          color="primary1"
+          style={styles.popupButton}
+        />
+      </PopupBox>
     </ScrollableContent>
   );
 }
@@ -229,7 +256,6 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
 const styles = StyleSheet.create({
   scroll: {
     flex: 1,
-    backgroundColor: COLORS.white3,
   },
   contentContainer: {
     flexGrow: 1,
@@ -239,12 +265,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: COLORS.white3,
     gap: SPACING.md,
   },
-  loadingText: {
-    color: COLORS.lightGray,
-  },
+  loadingText: {},
   titleSection: {
     flexDirection: "row",
     alignItems: "center",
@@ -312,6 +335,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
+  popupText: {
+    color: COLORS.lightGray,
+    fontSize: FONT_SIZES.sm,
+    textAlign: "center" as const,
+    marginBottom: SPACING.lg,
+    lineHeight: FONT_SIZES.base * 1.4,
+  },
+  popupButton: {
+    width: "100%",
+    marginTop: SPACING.sm,
+  },
   // Buttons
   buttonRow: {
     flexDirection: "row",

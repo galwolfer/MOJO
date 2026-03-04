@@ -24,17 +24,23 @@ import cron from "node-cron";
  * Purpose: Business logic for task persistence and expired checks
  */
 import { Task } from "../models/Task.js";
-import { User } from "../models/User.js";
 import { TaskSchedule } from "../models/TaskSchedule.js";
 import { SubTask } from "../models/SubTask.js";
 import { BusyBlock } from "../models/BusyBlock.js";
-import { CATEGORIES, getCategoryIndex } from "../config/categories.js";
+import { CATEGORIES } from "../config/categories.js";
 import { logEvent, recordSubCategoryGeneration, recordSubCategoryOverride } from "./telemetryService.js";
 import { mapCategoryToLifecycle } from "../algorithms/priority/categorizing.js";
 import { trainTask } from "./mlPredictionService.js";
 import { logger } from "../utils/logger.js";
 import { addDays, formatLocalDate, startOfDay } from "../utils/dateUtils.js";
 import { getIllegalDisplayFields, getIllegalCharsErrorMessage } from "../utils/illegalChars.js";
+import {
+  addSubcategoryToUser,
+  findOrCreateSubcategory,
+  findSubcategoryById,
+  getSubcategoryLabel,
+  resolveSubcategoryId,
+} from "./subcategoryService.js";
 
 // =============================================================================
 // INTERNAL HELPERS
@@ -49,31 +55,25 @@ import { getIllegalDisplayFields, getIllegalCharsErrorMessage } from "../utils/i
 async function _saveUserSubCategory(userId, categoryName, subCategory) {
   if (!userId || !categoryName || !subCategory) return;
 
+  if (typeof subCategory === "string" && /^[a-fA-F0-9]{ICON_SIZES.sm}$/.test(subCategory)) {
+    return;
+  }
+
   const subName = typeof subCategory === "string" ? subCategory : subCategory.label || subCategory.name;
   if (!subName) return;
 
   try {
-    const idx = getCategoryIndex(categoryName);
-    // Add to user's subCategories set if not exists
-    await User.updateOne(
-      { _id: userId },
-      {
-        $addToSet: {
-          subCategories: { name: subName, category: idx },
-        },
-      },
-    );
+    await findOrCreateSubcategory({
+      userId,
+      name: subName,
+      parent: categoryName,
+      source: "user",
+      confidence: 1,
+    });
   } catch (err) {
     // Silent fail if category invalid or user not found, just log warning
     logger.warn(`Failed to sync subcategory "${subName}" for user ${userId}: ${err.message}`);
   }
-}
-
-function getSubCategoryLabel(subCategory) {
-  if (!subCategory) return "";
-  if (typeof subCategory === "string") return subCategory;
-  if (typeof subCategory === "object") return subCategory.label || subCategory.name || "";
-  return "";
 }
 
 function buildIllegalCharsError(fields) {
@@ -140,17 +140,36 @@ export async function createTask({
   category = "",
   subCategory = null,
   recurrence = null,
-  tags = [],
   subtasks = [],
 }) {
   const illegalFields = getIllegalDisplayFields({
     taskname,
     description,
-    subcategory: getSubCategoryLabel(subCategory),
+    subcategory: getSubcategoryLabel(subCategory),
   });
   if (illegalFields.length > 0) {
     throw new Error(buildIllegalCharsError(illegalFields));
   }
+
+  const isSubcategoryIdString = typeof subCategory === "string" && /^[a-fA-F0-9]{ICON_SIZES.sm}$/.test(subCategory);
+  const resolvedSubCategoryId = subCategory
+    ? await resolveSubcategoryId({
+        userId,
+        subcategory: subCategory,
+        subcategoryName: typeof subCategory === "string" && !isSubcategoryIdString ? subCategory : undefined,
+        parent: category,
+        icon: typeof subCategory === "object" ? subCategory.icon : null,
+        source: typeof subCategory === "object" ? subCategory.source || "user" : "user",
+        confidence: typeof subCategory === "object" ? (subCategory.confidence ?? 1) : 1,
+      })
+    : null;
+
+  const subCategoryForLog =
+    typeof subCategory === "string" && !isSubcategoryIdString
+      ? { label: subCategory, source: "user", confidence: 1 }
+      : typeof subCategory === "object"
+        ? subCategory
+        : null;
 
   const created = await Task.create({
     userId,
@@ -168,14 +187,17 @@ export async function createTask({
     maxMinutes,
     dueDate,
     category,
-    subCategory,
+    subCategory: resolvedSubCategoryId,
     recurrence,
-    tags: tags || [],
     _pendingSubtasks: subtasks && subtasks.length > 0 ? subtasks : undefined,
   });
 
   // Note: SubTask documents are automatically created by the Task model's post-save hook
   // based on taskType and chunkCount. No need to create them manually here.
+
+  if (resolvedSubCategoryId) {
+    await addSubcategoryToUser(userId, resolvedSubCategoryId);
+  }
 
   if (category && subCategory) {
     await _saveUserSubCategory(userId, category, subCategory);
@@ -188,7 +210,7 @@ export async function createTask({
       taskId: created._id.toString(),
       taskname: created.taskname,
       category: created.category || "",
-      subCategory: created.subCategory || null,
+      subCategory: subCategoryForLog,
       importance: created.importance,
       effort: created.effort,
       estimatedDuration: created.estimatedDuration,
@@ -201,7 +223,7 @@ export async function createTask({
     userId,
     taskId: created._id.toString(),
     category: created.category || "",
-    subCategory: created.subCategory || null,
+    subCategory: subCategoryForLog,
     context: "service_create",
   });
 
@@ -237,7 +259,20 @@ export async function checkSuggestionFollowed({ userId, task, lastSuggestion, wi
  * Fetch all tasks for a user.
  */
 export async function getTasksForUser(userId, filter = {}) {
-  return Task.find({ userId, ...filter }).lean();
+  const tasks = await Task.find({ userId, ...filter })
+    .populate("subCategory")
+    .lean();
+  tasks.forEach(attachSubcategoryLabel);
+  return tasks;
+}
+
+function attachSubcategoryLabel(task) {
+  if (task && task.subCategory && typeof task.subCategory === "object") {
+    if (!task.subCategory.label && task.subCategory.name) {
+      task.subCategory.label = task.subCategory.name;
+    }
+  }
+  return task;
 }
 
 /**
@@ -252,52 +287,53 @@ export async function getTasks(userId, filters = {}) {
   if (filters.dueBefore) q.dueDate = { ...q.dueDate, $lte: new Date(filters.dueBefore) };
   if (filters.dueAfter) q.dueDate = { ...q.dueDate, $gte: new Date(filters.dueAfter) };
   if (filters.search) q.taskname = { $regex: filters.search, $options: "i" };
-  
-  const tasks = await Task.find(q).lean();
+
+  const tasks = await Task.find(q).populate("subCategory").lean();
+  tasks.forEach(attachSubcategoryLabel);
   console.log(`[getTasks] Query: ${JSON.stringify(q)}`);
   console.log(`[getTasks] Found ${tasks.length} tasks matching filters`);
-  tasks.forEach(t => {
+  tasks.forEach((t) => {
     console.log(`  - ${t._id} (${t.taskname}) taskType: ${t.taskType}`);
   });
-  
+
   // For ALL tasks, fetch their subtasks (not just split tasks)
   // This ensures we always have subtask data when needed
-  const taskIds = tasks.map(task => task._id);
+  const taskIds = tasks.map((task) => task._id);
   if (taskIds.length > 0) {
     const subtasks = await SubTask.find({ userId, taskId: { $in: taskIds } }).lean();
     console.log(`[getTasks] Query subtasks: { userId: ${userId}, taskId: { $in: [${taskIds.length} ids] } }`);
     console.log(`[getTasks] Found ${subtasks.length} subtasks for ${taskIds.length} tasks`);
     if (subtasks.length > 0) {
-      subtasks.forEach(st => {
+      subtasks.forEach((st) => {
         console.log(`  - SubTask ${st._id} for Task ${st.taskId} (title: ${st.title}) status: ${st.status}`);
       });
     }
-    
+
     // Fetch scheduled sessions for all tasks (last 14 days + future)
     const fourteenDaysAgo = new Date();
     fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
     fourteenDaysAgo.setHours(0, 0, 0, 0);
-    
+
     const schedules = await TaskSchedule.find({
       userId,
       taskId: { $in: taskIds },
-      start: { $gte: fourteenDaysAgo }
+      start: { $gte: fourteenDaysAgo },
     }).lean();
     console.log(`[getTasks] Found ${schedules.length} scheduled sessions for tasks`);
-    
+
     // Group subtasks by taskId
     const subtasksByTaskId = {};
-    subtasks.forEach(subtask => {
+    subtasks.forEach((subtask) => {
       if (!subtasksByTaskId[subtask.taskId]) {
         subtasksByTaskId[subtask.taskId] = [];
       }
       subtasksByTaskId[subtask.taskId].push(subtask);
     });
-    
+
     // Group schedules by taskId (and also track subtask schedules)
     const schedulesByTaskId = {};
     const schedulesBySubtaskKey = {}; // key: "taskId:subtaskIndex"
-    schedules.forEach(sched => {
+    schedules.forEach((sched) => {
       const taskIdStr = sched.taskId.toString();
       if (!schedulesByTaskId[taskIdStr]) {
         schedulesByTaskId[taskIdStr] = [];
@@ -311,7 +347,7 @@ export async function getTasks(userId, filters = {}) {
         subtaskIndex: sched.subtaskIndex,
         subtaskTitle: sched.subtaskTitle,
       });
-      
+
       // Also track by subtask key for attaching to subtasks
       if (sched.subtaskIndex !== undefined && sched.subtaskIndex !== null) {
         const key = `${taskIdStr}:${sched.subtaskIndex}`;
@@ -327,44 +363,93 @@ export async function getTasks(userId, filters = {}) {
         });
       }
     });
-    
+
     // Attach subtasks and schedules to tasks
-    tasks.forEach(task => {
+    tasks.forEach((task) => {
       const taskIdStr = task._id.toString();
-      
+
       // Attach subtasks
       if (subtasksByTaskId[task._id]) {
-        task.subTasks = subtasksByTaskId[task._id].map(st => ({
+        task.subTasks = subtasksByTaskId[task._id].map((st) => ({
           ...st,
           // Attach scheduled sessions to each subtask
-          scheduledSessions: schedulesBySubtaskKey[`${taskIdStr}:${st.index}`] || []
+          scheduledSessions: schedulesBySubtaskKey[`${taskIdStr}:${st.index}`] || [],
         }));
         console.log(`[getTasks] Task ${task._id} (${task.taskname}) has ${task.subTasks.length} subtasks`);
       } else {
         task.subTasks = []; // Ensure empty array if no subtasks
         console.log(`[getTasks] Task ${task._id} (${task.taskname}) has NO subtasks`);
       }
-      
+
       // Attach scheduled sessions to task (for tasks without subtasks or for task-level view)
       task.scheduledSessions = schedulesByTaskId[taskIdStr] || [];
     });
   }
-  
+
   return tasks;
+}
+
+/**
+ * Fetch a single task by ID (with subcategory populated).
+ */
+export async function getTaskById(taskId, userId) {
+  if (!taskId) return null;
+  const query = userId ? { _id: taskId, userId } : { _id: taskId };
+  const task = await Task.findOne(query).populate("subCategory").lean();
+  if (!task) return null;
+  // Attach subtasks so the EditTask screen can pre-populate the parts form
+  const subTasks = await SubTask.find({ taskId: task._id }).sort({ index: 1 }).lean();
+  task.subTasks = subTasks;
+
+  // Attach scheduled sessions to match what getTasks returns
+  const schedules = await TaskSchedule.find({ taskId: task._id }).sort({ start: 1 }).lean();
+
+  // Build a map of subtask indexes to subtask details for quick lookup
+  const subtaskMap = new Map();
+  subTasks.forEach((st) => {
+    subtaskMap.set(st.index, { id: st._id, title: st.title, status: st.status });
+  });
+
+  task.scheduledSessions = schedules.map((sched) => {
+    const stInfo =
+      sched.subtaskIndex !== undefined && sched.subtaskIndex !== null ? subtaskMap.get(sched.subtaskIndex) : null;
+
+    return {
+      id: sched._id.toString(),
+      _id: sched._id.toString(),
+      ...sched,
+      subtaskId: stInfo ? stInfo.id : undefined,
+      subtaskTitle: sched.subtaskTitle || (stInfo ? stInfo.title : undefined),
+      subtaskStatus: stInfo ? stInfo.status : undefined,
+    };
+  });
+
+  attachSubcategoryLabel(task);
+  // Attach a flat display string for clients that don't chase the populated ref
+  task.subcategoryDisplay = task.subCategory ? task.subCategory.label || task.subCategory.name || null : null;
+  return task;
 }
 
 /**
  * Fetch upcoming tasks for a user.
  */
 export async function getUpcomingTasks(userId, days = 7) {
-  return Task.findUpcoming(userId, days).lean();
+  const tasks = await Task.findUpcoming(userId, days).populate("subCategory").lean();
+  tasks.forEach(attachSubcategoryLabel);
+  return tasks;
 }
 
 /**
  * Fetch overdue tasks for a user.
  */
 export async function getOverdueTasks(userId) {
-  return Task.findOverdue(userId).lean();
+  const tasks = await Task.findOverdue(userId).populate("subCategory").lean();
+  tasks.forEach((task) => {
+    attachSubcategoryLabel(task);
+    // Attach a flat display string so the frontend doesn't need to chase the ref
+    task.subcategoryDisplay = task.subCategory ? task.subCategory.label || task.subCategory.name || null : null;
+  });
+  return tasks;
 }
 
 /**
@@ -388,7 +473,10 @@ export async function getScheduledTasksByDay(userId, days = 7) {
   }
 
   const taskIds = Array.from(new Set(sessions.map((s) => toId(s.taskId)).filter(Boolean)));
-  const tasks = await Task.find({ userId, _id: { $in: taskIds } }).lean();
+  const tasks = await Task.find({ userId, _id: { $in: taskIds } })
+    .populate("subCategory")
+    .lean();
+  tasks.forEach(attachSubcategoryLabel);
   const taskMap = new Map(tasks.map((t) => [toId(t._id), t]));
 
   const subtasks = await SubTask.find({ taskId: { $in: taskIds } })
@@ -421,7 +509,7 @@ export async function getScheduledTasksByDay(userId, days = 7) {
         progressPercentage: task.progressPercentage ?? 0,
         taskType: task.taskType || null,
         subCategory: task.subCategory || null,
-        subcategory: task.subCategory ? task.subCategory.label : null,
+        subcategory: task.subCategory ? task.subCategory.label || task.subCategory.name : null,
         category: task.category || null,
         description: task.description,
         estimatedDuration: task.estimatedDuration,
@@ -473,7 +561,11 @@ export async function getTaskProgress(userId, taskId) {
   const task = await Task.findOne({
     _id: taskId,
     userId,
-  }).lean();
+  })
+    .populate("subCategory")
+    .lean();
+
+  attachSubcategoryLabel(task);
 
   if (!task) {
     return null;
@@ -613,7 +705,6 @@ export async function updateTask({ userId, taskId, updates }) {
     "category",
     "subCategory",
     "actualCompletionMinutes",
-    "tags",
     "subtasks",
   ];
 
@@ -637,7 +728,7 @@ export async function updateTask({ userId, taskId, updates }) {
   const illegalFields = getIllegalDisplayFields({
     taskname: sanitizedUpdates.taskname,
     description: sanitizedUpdates.description,
-    subcategory: getSubCategoryLabel(sanitizedUpdates.subCategory),
+    subcategory: getSubcategoryLabel(sanitizedUpdates.subCategory),
   });
   if (illegalFields.length > 0) {
     return { success: false, error: buildIllegalCharsError(illegalFields) };
@@ -662,24 +753,58 @@ export async function updateTask({ userId, taskId, updates }) {
   const existing = await Task.findOne({ _id: taskId, userId }).lean();
   const cat = sanitizedUpdates.category || existing?.category || "";
 
-  // If user provided a subCategory, save it to the user profile and record generation/override telemetry
+  // If user provided a subCategory, resolve to ID and record telemetry
   if (sanitizedUpdates.subCategory) {
-    const newSub = sanitizedUpdates.subCategory;
+    const rawSub = sanitizedUpdates.subCategory;
+    const isSubIdString = typeof rawSub === "string" && /^[a-fA-F0-9]{ICON_SIZES.sm}$/.test(rawSub);
 
-    // Persist to user profile
-    try {
-      await _saveUserSubCategory(userId, cat, newSub);
-    } catch (err) {
-      logger.warn(`Failed to persist subcategory during update: ${err.message}`);
+    const resolvedSubCategoryId = await resolveSubcategoryId({
+      userId,
+      subcategory: rawSub,
+      subcategoryName: typeof rawSub === "string" && !isSubIdString ? rawSub : undefined,
+      parent: cat,
+      icon: typeof rawSub === "object" ? rawSub.icon : null,
+      source: typeof rawSub === "object" ? rawSub.source || "user" : "user",
+      confidence: typeof rawSub === "object" ? (rawSub.confidence ?? 1) : 1,
+    });
+
+    if (!resolvedSubCategoryId) {
+      return { success: false, error: "Invalid subcategory selection." };
     }
 
-    if (existing && existing.subCategory && existing.subCategory.label && existing.subCategory.label !== newSub.label) {
+    sanitizedUpdates.subCategory = resolvedSubCategoryId;
+
+    await addSubcategoryToUser(userId, resolvedSubCategoryId);
+
+    // Persist to user profile only when a name is provided
+    if (!isSubIdString || typeof rawSub === "object") {
+      try {
+        await _saveUserSubCategory(userId, cat, rawSub);
+      } catch (err) {
+        logger.warn(`Failed to persist subcategory during update: ${err.message}`);
+      }
+    }
+
+    const existingSub = existing?.subCategory
+      ? await findSubcategoryById({ userId, subcategoryId: existing.subCategory })
+      : null;
+    const existingLabel = existingSub?.name || existingSub?.label || "";
+
+    const subCategoryForLog =
+      typeof rawSub === "string" && !isSubIdString
+        ? { label: rawSub, source: "user", confidence: 1 }
+        : typeof rawSub === "object"
+          ? rawSub
+          : await findSubcategoryById({ userId, subcategoryId: resolvedSubCategoryId });
+    const newLabel = subCategoryForLog?.label || subCategoryForLog?.name || "";
+
+    if (existingLabel && newLabel && existingLabel !== newLabel) {
       // User replaced an existing subcategory
       await recordSubCategoryOverride({
         userId,
         taskId: taskId.toString(),
-        previous: existing.subCategory,
-        replacement: newSub,
+        previous: existingSub || existing?.subCategory,
+        replacement: subCategoryForLog,
         context: "service_update",
       });
     } else {
@@ -688,13 +813,56 @@ export async function updateTask({ userId, taskId, updates }) {
         userId,
         taskId: taskId.toString(),
         categories: [sanitizedUpdates.category || existing?.category || ""],
-        subCategory: newSub,
+        subCategory: subCategoryForLog,
         context: "service_update",
       });
     }
   }
 
   const updated = await Task.findByIdAndUpdate(taskId, { $set: sanitizedUpdates }, { new: true }).lean();
+
+  // If subtasks were provided as part of the update, apply them to SubTask documents
+  if (sanitizedUpdates.subtasks !== undefined) {
+    try {
+      for (const s of sanitizedUpdates.subtasks) {
+        // If an id was provided, update the existing subtask
+        if (s.id) {
+          const updateFields = {};
+          if (s.title !== undefined) updateFields.title = String(s.title).trim();
+          if (s.description !== undefined) updateFields.description = String(s.description);
+          if (s.minutes !== undefined) updateFields.minutes = Number(s.minutes);
+          if (s.index !== undefined) updateFields.index = Number(s.index);
+
+          if (Object.keys(updateFields).length > 0) {
+            await SubTask.findOneAndUpdate({ _id: s.id, userId, taskId }, { $set: updateFields }, { new: true }).lean();
+          }
+        } else if (s.title && s.title.trim().length > 0) {
+          // Create a new subtask if no id provided
+          const count = await SubTask.countDocuments({ taskId });
+          const idx = s.index !== undefined ? Number(s.index) : count + 1;
+          await SubTask.create({
+            taskId,
+            userId,
+            index: idx,
+            title: s.title.trim(),
+            description: s.description || "",
+            minutes: s.minutes ? Number(s.minutes) : 0,
+          });
+        }
+      }
+
+      // Recompute progress percentage after modifying subtasks (avoid relying on local helper scope)
+      const updatedSubtasks = await SubTask.find({ taskId }).lean();
+      let progressPercentage = 0;
+      if (updatedSubtasks.length > 0) {
+        const completedCount = updatedSubtasks.filter((st) => st.status === "done").length;
+        progressPercentage = Math.round((completedCount / updatedSubtasks.length) * 100);
+      }
+      await Task.updateOne({ _id: taskId }, { $set: { progressPercentage } });
+    } catch (err) {
+      logger.warn("Failed to apply subtask updates:", err && err.message);
+    }
+  }
 
   await logEvent({
     type: "task_updated",
@@ -985,10 +1153,7 @@ export async function completeTask({ taskId, userId }) {
 
     // Mark all planned TaskSchedule sessions for this task as completed
     try {
-      await TaskSchedule.updateMany(
-        { taskId, status: "planned" },
-        { $set: { status: "completed" } }
-      );
+      await TaskSchedule.updateMany({ taskId, status: "planned" }, { $set: { status: "completed" } });
       console.log(`[completeTask] Marked TaskSchedule sessions as completed for task ${taskId}`);
     } catch (schedErr) {
       console.warn(`[completeTask] Failed to update TaskSchedule status:`, schedErr && schedErr.message);
@@ -1011,17 +1176,25 @@ export async function completeTask({ taskId, userId }) {
     try {
       // Structured log before training
       try {
-        console.log(JSON.stringify({
-          event: 'task_completed_training_start',
-          taskId: taskId.toString(),
-          userId,
-          taskname: task.taskname,
-          estimatedDuration: task.estimatedDuration,
-          actualCompletionMinutes,
-          sessionCount: completedSessions.length,
-        }));
+        console.log(
+          JSON.stringify({
+            event: "task_completed_training_start",
+            taskId: taskId.toString(),
+            userId,
+            taskname: task.taskname,
+            estimatedDuration: task.estimatedDuration,
+            actualCompletionMinutes,
+            sessionCount: completedSessions.length,
+          }),
+        );
       } catch (err) {
-        console.log('[task_completed_training_start] taskId=%s userId=%s estimated=%s actual=%s', taskId.toString(), userId, task.estimatedDuration, actualCompletionMinutes);
+        console.log(
+          "[task_completed_training_start] taskId=%s userId=%s estimated=%s actual=%s",
+          taskId.toString(),
+          userId,
+          task.estimatedDuration,
+          actualCompletionMinutes,
+        );
       }
 
       const trainingResult = await trainTask(updated);
@@ -1073,7 +1246,7 @@ export async function toggleTaskCompletion(taskId, userId) {
   const nextStatus = task.status === "done" ? "todo" : "done";
 
   const updatePayload = { status: nextStatus };
-  if (nextStatus === 'done') {
+  if (nextStatus === "done") {
     updatePayload.completedAt = new Date();
   } else {
     updatePayload.completedAt = null;
@@ -1101,17 +1274,11 @@ export async function toggleTaskCompletion(taskId, userId) {
   try {
     if (nextStatus === "done") {
       // Mark all planned sessions for this task as completed
-      await TaskSchedule.updateMany(
-        { taskId, status: "planned" },
-        { $set: { status: "completed" } }
-      );
+      await TaskSchedule.updateMany({ taskId, status: "planned" }, { $set: { status: "completed" } });
       console.log(`[toggleTaskCompletion] Marked TaskSchedule sessions as completed for task ${taskId}`);
     } else {
       // Mark all completed sessions for this task as planned (reverting)
-      await TaskSchedule.updateMany(
-        { taskId, status: "completed" },
-        { $set: { status: "planned" } }
-      );
+      await TaskSchedule.updateMany({ taskId, status: "completed" }, { $set: { status: "planned" } });
       console.log(`[toggleTaskCompletion] Reverted TaskSchedule sessions to planned for task ${taskId}`);
     }
   } catch (schedErr) {
@@ -1129,8 +1296,8 @@ export async function toggleTaskCompletion(taskId, userId) {
   });
 
   // Return both the task and completion state flags
-  return { 
-    task: updated, 
+  return {
+    task: updated,
     wasNewCompletion: wasIncomplete && nextStatus === "done",
     wasNewUncompletion: wasCompleted && nextStatus === "todo",
   };
@@ -1200,14 +1367,20 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
   // Use find + save instead of findOneAndUpdate to trigger Mongoose hooks
   console.log(`[updateSubTask] Querying SubTask with:`, { _id: subTaskId, userId });
   const subtask = await SubTask.findOne({ _id: subTaskId, userId });
-  console.log(`[updateSubTask] Query result:`, { found: !!subtask, subtaskId: subtask?._id, subtaskUserId: subtask?.userId });
+  console.log(`[updateSubTask] Query result:`, {
+    found: !!subtask,
+    subtaskId: subtask?._id,
+    subtaskUserId: subtask?.userId,
+  });
 
   if (!subtask) {
     console.error(`[updateSubTask] SubTask not found! Queried with _id=${subTaskId}, userId=${userId}`);
     // Debug: try to find without userId to see if it exists for other users
     const anySubtask = await SubTask.findOne({ _id: subTaskId });
     if (anySubtask) {
-      console.error(`[updateSubTask] SubTask exists with different userId! Expected userId=${userId}, actual userId=${anySubtask.userId}`);
+      console.error(
+        `[updateSubTask] SubTask exists with different userId! Expected userId=${userId}, actual userId=${anySubtask.userId}`,
+      );
     } else {
       console.error(`[updateSubTask] SubTask with _id=${subTaskId} doesn't exist in database at all`);
     }
@@ -1240,16 +1413,20 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
       // Mark scheduled sessions for this subtask as completed
       await TaskSchedule.updateMany(
         { taskId: subtask.taskId, subtaskIndex: subtask.index, status: "planned" },
-        { $set: { status: "completed" } }
+        { $set: { status: "completed" } },
       );
-      console.log(`[updateSubTask] Marked TaskSchedule sessions as completed for subtask index ${subtask.index} of task ${subtask.taskId}`);
+      console.log(
+        `[updateSubTask] Marked TaskSchedule sessions as completed for subtask index ${subtask.index} of task ${subtask.taskId}`,
+      );
     } else if (isNewUncompletion) {
       // Mark scheduled sessions for this subtask as planned (reverting)
       await TaskSchedule.updateMany(
         { taskId: subtask.taskId, subtaskIndex: subtask.index, status: "completed" },
-        { $set: { status: "planned" } }
+        { $set: { status: "planned" } },
       );
-      console.log(`[updateSubTask] Reverted TaskSchedule sessions to planned for subtask index ${subtask.index} of task ${subtask.taskId}`);
+      console.log(
+        `[updateSubTask] Reverted TaskSchedule sessions to planned for subtask index ${subtask.index} of task ${subtask.taskId}`,
+      );
     }
   } catch (schedErr) {
     console.warn(`[updateSubTask] Failed to update TaskSchedule status:`, schedErr && schedErr.message);
@@ -1260,7 +1437,7 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
 
   // Save to trigger post-save hooks (which sync parent Task progress)
   await subtask.save();
-  
+
   const updated = subtask.toObject();
   // Attach previousEarnedPoints for reversal calculation
   updated.previousEarnedPoints = previousEarnedPoints;
@@ -1296,19 +1473,51 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
           parentTaskUncompleted = true;
         }
       }
-      
+
       const updatePayload = { status: newStatus };
       // If task is being uncompleted, reset its earnedPoints
       if (parentTaskUncompleted) {
         updatePayload.earnedPoints = 0;
         updatePayload.completedAt = null;
       }
-      // If task is being completed, set completedAt
+      // If task is being completed, set completedAt and calculate actualCompletionMinutes
       if (parentTaskCompleted && !parentTaskWasCompleted) {
         updatePayload.completedAt = new Date();
+
+        // Calculate actual completion time from all completed sessions
+        const completedSessions = await TaskSchedule.find({
+          taskId: updated.taskId,
+          status: "completed",
+        }).lean();
+        const actualCompletionMinutes = completedSessions.reduce((total, session) => total + (session.minutes || 0), 0);
+        updatePayload.actualCompletionMinutes = actualCompletionMinutes;
       }
-      
+
       await Task.updateOne({ _id: updated.taskId }, { $set: updatePayload });
+
+      // ========================================================================
+      // ML TRAINING: Train when parent task is auto-completed via subtasks
+      // ========================================================================
+      if (parentTaskCompleted && !parentTaskWasCompleted) {
+        try {
+          // Re-fetch the updated parent task with all fields for ML training
+          const updatedParentTask = await Task.findById(updated.taskId).lean();
+
+          if (updatedParentTask) {
+            console.log(`🤖 [ML Training] Parent task auto-completed via subtasks, training model...`);
+            const trainingResult = await trainTask(updatedParentTask);
+
+            if (trainingResult.success) {
+              console.log(`✅ [ML Training] Model trained successfully (reward: ${trainingResult.reward?.toFixed(3)})`);
+            } else {
+              console.error(`❌ [ML Training] Training failed:`, trainingResult.error);
+            }
+          }
+        } catch (mlError) {
+          // Don't fail subtask update if ML training fails
+          console.error(`❌ [ML Training] Error (subtask still updated):`, mlError.message);
+        }
+      }
     }
   } catch (err) {
     // Non-fatal
@@ -1339,25 +1548,80 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
 
 /**
  * Create a busy block for a user.
+ *
+ * @param {object}       params
+ * @param {string}       params.userId
+ * @param {string}       [params.title]
+ * @param {Date}         params.start       - One-time: absolute start datetime.
+ *                                           Recurring: reference date + daily start time.
+ * @param {Date}         params.end         - One-time: absolute end datetime.
+ *                                           Recurring: reference date + daily end time.
+ * @param {boolean}      [params.isRecurring=false]
+ * @param {object|null}  [params.recurrence] - Required when isRecurring=true.
+ *                                            Shape: { daysOfWeek: number[], endDate: Date|null }
  */
-export async function createBusyBlock({ userId, title = "", start, end }) {
-  if (end <= start) {
-    throw new Error("End time must be after start time.");
+export async function createBusyBlock({ userId, title = "", start, end, isRecurring = false, recurrence = null }) {
+  if (!isRecurring) {
+    if (end <= start) throw new Error("End time must be after start time.");
+  } else {
+    const startMin = start.getHours() * 60 + start.getMinutes();
+    const endMin = end.getHours() * 60 + end.getMinutes();
+    if (endMin <= startMin) throw new Error("End time must be after start time.");
+    if (!recurrence?.daysOfWeek?.length) throw new Error("Recurring blocks require at least one day of week.");
   }
-  return BusyBlock.create({ userId, title, start, end });
+  return BusyBlock.create({ userId, title, start, end, isRecurring, recurrence });
 }
 
 /**
- * Fetch upcoming busy blocks for a user.
+ * Fetch all currently active busy blocks for a user:
+ *  - One-time  blocks whose end is still in the future.
+ *  - Recurring blocks that have not reached their endDate (or have no endDate).
  */
 export async function getUpcomingBusyBlocks(userId) {
-  const now = startOfDay(new Date());
+  const now = new Date();
   return BusyBlock.find({
     userId,
-    end: { $gte: now },
+    $or: [
+      // One-time: not yet ended (isRecurring absent/false both match $ne:true)
+      { isRecurring: { $ne: true }, end: { $gte: now } },
+      // Recurring: not expired
+      {
+        isRecurring: true,
+        $or: [{ "recurrence.endDate": null }, { "recurrence.endDate": { $gte: now } }],
+      },
+    ],
   })
-    .sort({ start: 1 })
+    .sort({ isRecurring: -1, start: 1 }) // recurring rules first, then by start
     .lean();
+}
+
+/**
+ * Update a busy block's fields.  All parameters except blockId/userId are optional.
+ * Accepts the same fields as createBusyBlock.
+ */
+export async function updateBusyBlock({ blockId, userId, title, start, end, isRecurring, recurrence }) {
+  const update = {};
+  if (title !== undefined) update.title = title;
+  if (start !== undefined) update.start = start;
+  if (end !== undefined) update.end = end;
+  if (isRecurring !== undefined) update.isRecurring = isRecurring;
+  if (recurrence !== undefined) update.recurrence = recurrence;
+
+  // Validate time ordering when both ends of the range are present in the update
+  if (update.start !== undefined && update.end !== undefined) {
+    const effectiveRecurring = update.isRecurring !== undefined ? update.isRecurring : isRecurring;
+    if (effectiveRecurring) {
+      const sm = update.start.getHours() * 60 + update.start.getMinutes();
+      const em = update.end.getHours() * 60 + update.end.getMinutes();
+      if (em <= sm) throw new Error("End time must be after start time.");
+    } else {
+      if (update.end <= update.start) throw new Error("End time must be after start time.");
+    }
+  }
+
+  const block = await BusyBlock.findOneAndUpdate({ _id: blockId, userId }, { $set: update }, { new: true });
+  if (!block) throw new Error("Busy block not found or access denied.");
+  return block;
 }
 
 /**
@@ -1507,4 +1771,3 @@ export function stopExpiredTaskChecker() {
 export async function triggerExpiredTaskCheck() {
   return runExpiredTaskCheck();
 }
-

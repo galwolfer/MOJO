@@ -10,8 +10,10 @@ import { okFalse, okTrue } from "../lib/errorFormatter.js";
 const updateTaskMission = new GuidedMission({
   name: "update_task",
   group: "task",
-  description: "Update task properties (name, deadline, category, etc). CANNOT mark as done - use complete_task for that. Requires confirm=true.",
-  missionInfo: "Modify task properties. Write short confirmation (e.g., 'Task updated:'). Don't list all changes in text.",
+  description:
+    "Update task properties (name, deadline, category, etc). CANNOT mark as done - use complete_task for that. Requires confirm=true.",
+  missionInfo:
+    "Modify task properties. Write short confirmation (e.g., 'Task updated:'). Don't list all changes in text.",
   behavior: [
     "If changing category: call get_subcategories(category=<new>) first.",
     "Require confirm=true before applying updates.",
@@ -46,7 +48,10 @@ const updateTaskMission = new GuidedMission({
         count: z.number().optional(),
       })
       .optional(),
-    completed: z.boolean().optional().describe("DEPRECATED: Use complete_task tool instead to mark tasks as done (awards points)"),
+    completed: z
+      .boolean()
+      .optional()
+      .describe("DEPRECATED: Use complete_task tool instead to mark tasks as done (awards points)"),
     confirm: z.boolean().optional().describe("Must be true to perform the update"),
   }),
   execute: async ({ userId, args }) => {
@@ -79,8 +84,16 @@ const updateTaskMission = new GuidedMission({
 
       let resolvedTaskId = taskId;
       // Require explicit confirmation to avoid accidental changes
+      // However, when the user explicitly provides a direct edit (e.g., subcategory or subtasks),
+      // treat it as an implicit confirmation so the agent applies the change immediately.
       if (!confirm) {
-        return okFalse("confirmation_required");
+        // If explicit subcategory or subtasks are provided, assume user intended to confirm
+        if (subcategory !== undefined || args.subtasks !== undefined) {
+          // Treat as confirmed
+          // (Note: we still block completion operations which must use complete_task)
+        } else {
+          return okFalse("confirmation_required");
+        }
       }
 
       const illegalFields = getIllegalDisplayFields({

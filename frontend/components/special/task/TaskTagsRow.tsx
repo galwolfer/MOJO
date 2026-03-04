@@ -3,7 +3,7 @@ import { View } from "react-native";
 import Tag from "../../inputs/tag";
 import { getCategoryMeta } from "../../../config/categoryMeta";
 import { StyleSheet } from "react-native";
-import { SPACING } from "../../../theme";
+import { SPACING, paletteIndexFromColorToken } from "../../../theme";
 import { getImportanceLabel, getEffortLabel } from "../../widgets/taskHelpers";
 
 export const TaskTagsRow: React.FC<{
@@ -11,11 +11,22 @@ export const TaskTagsRow: React.FC<{
   categoryDisplay?: string;
   subcategory?: string;
   subcategoryDisplay?: string;
+  subCategory?: { icon?: string | null; color?: string | null; source?: string | null; parent?: string | null } | null;
   importance?: number | null;
   effort?: number | null;
-}> = ({ category, categoryDisplay, subcategory, subcategoryDisplay, importance, effort }) => {
+  tags?: string[] | null;
+}> = ({ category, categoryDisplay, subcategory, subcategoryDisplay, subCategory, importance, effort, tags }) => {
   const categoryMeta = getCategoryMeta(category);
   const subLabel = subcategoryDisplay || subcategory || "";
+
+  console.log(
+    "[TaskTagsRow] subcategoryDisplay:",
+    subcategoryDisplay,
+    "subCategory:",
+    subCategory,
+    "subLabel:",
+    subLabel,
+  );
 
   const importanceIcon = (imp?: number | null) => {
     if (!imp) return "list";
@@ -49,16 +60,51 @@ export const TaskTagsRow: React.FC<{
     <View style={styles.tagRow}>
       {category && (
         <Tag
-          label={categoryDisplay || category}
+          label={categoryDisplay || categoryMeta.displayName || category}
           leftIcon={categoryMeta.icon}
           colorIndex={categoryMeta.colorIndex}
           style={styles.tagItem}
         />
       )}
 
-      {subLabel ? (
-        <Tag label={subLabel} colorIndex={Math.max(0, Math.min(17, subLabel.length % 9))} style={styles.tagItem} />
-      ) : null}
+      {subLabel
+        ? (() => {
+            // If subcategory is a system 'General' subcategory, use category icon and color
+            if (subCategory && subCategory.source === "category-default") {
+              return (
+                <Tag
+                  label={subLabel}
+                  leftIcon={categoryMeta.icon}
+                  colorIndex={categoryMeta.colorIndex}
+                  style={styles.tagItem}
+                />
+              );
+            }
+
+            // If subcategory has its own color token (e.g., p1, p2), translate to color index
+            if (subCategory && subCategory.color) {
+              const colorIdx = paletteIndexFromColorToken(subCategory.color, categoryMeta.colorIndex);
+              return (
+                <Tag
+                  label={subLabel}
+                  leftIcon={subCategory.icon || undefined}
+                  colorIndex={colorIdx}
+                  style={styles.tagItem}
+                />
+              );
+            }
+
+            // Fallback: use generated color index
+            return (
+              <Tag
+                label={subLabel}
+                leftIcon={subCategory?.icon || undefined}
+                colorIndex={Math.max(0, Math.min(17, subLabel.length % 9))}
+                style={styles.tagItem}
+              />
+            );
+          })()
+        : null}
 
       {importance ? (
         <Tag
@@ -77,6 +123,21 @@ export const TaskTagsRow: React.FC<{
           style={styles.tagItem}
         />
       ) : null}
+
+      {tags && tags.length > 0
+        ? tags
+            // Filter out raw MongoDB ObjectIds (24-char hex) that should never be shown as tags
+            .filter((tag) => !/^[0-9a-f]{24}$/i.test(tag))
+            .map((tag) => (
+              <Tag
+                key={tag}
+                label={tag}
+                leftIcon={categoryMeta.icon}
+                colorIndex={categoryMeta.colorIndex}
+                style={styles.tagItem}
+              />
+            ))
+        : null}
     </View>
   );
 };

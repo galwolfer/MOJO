@@ -137,7 +137,7 @@ Update this file whenever you add, remove, or change a component.
 - `Icons` — `frontend/components/icons/icons.tsx`
    - Central icon registry. Imports all SVGs from `components/icons/icons-lib` and exports a lookup `ICONS` map and `ICON_NAMES` array.
    - Usage: import an icon component and render with `size` and `color` props.
-      - Example: `import { ICONS } from './components/icons/icons';` then `const Icon = ICONS.burger; <Icon size={24} color={COLORS.primary1} />` or `const Icon = ICONS['burger']; <Icon size={24} color={COLORS.primary1} />`.
+      - Example: `import { ICONS } from './components/icons/icons';` then `const Icon = ICONS.burger; <Icon size={ICON_SIZES.sm} color={COLORS.primary1} />` or `const Icon = ICONS['burger']; <Icon size={ICON_SIZES.sm} color={COLORS.primary1} />`.
    - Cross-platform behavior:
       - Native (iOS/Android): uses `react-native-svg` components via the svg transformer when available, and forwards `size` → width/height and `color` → fill/stroke.
       - Web: uses generated inline SVG data URIs (see `scripts/generate-svg-data-uris.js`) and injects the requested `color` into the SVG so theming works.
@@ -166,7 +166,7 @@ Update this file whenever you add, remove, or change a component.
    - The file path
 
 2. When updating a component, update this file with the change summary and date. Example:
-   - `2026-01-11` — Added `AnimatedButtonsContainer` (`common`) and `Widget` (`special`); refactored auth steps to use `AnimatedButtonsContainer` and added Welcome screen stagger behaviour.
+   - `2026-01-11` — Added `AnimatedButtonsContainer` (`common`) and `Widget` (`special`); refactored auth steps to use `AnimatedButtonsContainer` and added Welcome screen stagger behavior.
    - `2026-01-15` — Added `UserProfileScreen` with `StatBadge`, `ProgressGraph`, and `FriendListItem` components for the new profile page design.
 
 3. Keep `components/index.ts` in sync so imports across the app can use `import { Box } from './components'`.

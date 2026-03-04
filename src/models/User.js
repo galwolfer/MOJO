@@ -73,7 +73,7 @@ const memorySchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 const subCategorySchema = new mongoose.Schema(
@@ -81,7 +81,7 @@ const subCategorySchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     category: { type: Number, required: true }, // Index from CATEGORIES config (0-17)
   },
-  { _id: false }
+  { _id: false },
 );
 
 /**
@@ -133,7 +133,8 @@ const userSchema = new mongoose.Schema(
       settings: {
         type: Map,
         of: mongoose.Schema.Types.Mixed,
-        default: {},
+        // Default settings includes accessibility preferences so new users have a defined value
+        default: { accessibility: { timeFormat: "12h", theme: "system" } },
       },
       priorities: {
         study_and_education: { type: Number, min: 1, max: 5, default: 3 },
@@ -168,9 +169,9 @@ const userSchema = new mongoose.Schema(
       type: [memorySchema],
       default: [],
     },
-    // User specific subcategories
+    // User specific subcategories (IDs)
     subCategories: {
-      type: [subCategorySchema],
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Subcategory" }],
       default: [],
     },
     // Lightweight recent sessions summary for quick UI access (keeps last N sessions)
@@ -184,7 +185,7 @@ const userSchema = new mongoose.Schema(
             messageCount: { type: Number, default: 0 },
             preview: { type: String, default: "" },
           },
-          { _id: false }
+          { _id: false },
         ),
       ],
       default: [],
@@ -224,7 +225,7 @@ const userSchema = new mongoose.Schema(
           lastActiveDate: { type: Date, default: null },
           completedTasks: { type: Number, default: 0 },
         },
-        { _id: false }
+        { _id: false },
       ),
       default: {
         points: 0,
@@ -276,7 +277,7 @@ const userSchema = new mongoose.Schema(
           lastMorningDigest: { type: Date, default: null },
           lastTaskReminder: { type: Date, default: null },
         },
-        { _id: false }
+        { _id: false },
       ),
       default: {
         expoPushToken: null,
@@ -290,8 +291,19 @@ const userSchema = new mongoose.Schema(
         lastTaskReminder: null,
       },
     },
+
+    // Scheduling preferences (gap between sessions, etc.)
+    schedulingPreferences: {
+      type: new mongoose.Schema(
+        {
+          minGapMinutes: { type: Number, default: 10, min: 0, max: 120 },
+        },
+        { _id: false },
+      ),
+      default: { minGapMinutes: 10 },
+    },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Indexes for performance

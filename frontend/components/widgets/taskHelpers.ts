@@ -1,7 +1,7 @@
 import { COLORS } from "../../theme";
 import { SVG_DATA_URIS } from "../icons/svg-data-uris";
 import { getCategoryMeta } from "../../config/categoryMeta";
-import { updateSubTask } from "../../services/taskService";
+import { updateSubTask, GamificationResult } from "../../services/taskService";
 
 export interface Subtask {
   id?: string;
@@ -11,6 +11,11 @@ export interface Subtask {
   completed?: boolean;
   order?: number;
   duration?: number;
+  /**
+   * Optional time range text for display (e.g. "2:00 PM - 3:00 PM").
+   * This field is computed by parent components when scheduling subtasks.
+   */
+  timeRange?: string;
 }
 
 export interface ScheduledSession {
@@ -161,6 +166,19 @@ export const getEffortLabel = (effort?: number) => {
 };
 
 /**
+ * getImportanceColor
+ * Maps an importance/effort numeric value (1-5) to a display color.
+ * Used by sliders in CreateTask and EditTask screens.
+ */
+export const getImportanceColor = (value: number): string => {
+  if (value === 1) return COLORS.primary6; // Green - Low
+  if (value === 2) return COLORS.primary1; // Blue - Below Avg
+  if (value === 3) return COLORS.primary5; // Orange - Average
+  if (value === 4) return COLORS.primary4; // Pink - Above Avg
+  return "#D32F2F"; // Red - Critical
+};
+
+/**
  * formatDuration
  * Formats a duration in minutes to a human-readable time string.
  * Converts to hours and minutes format for durations over 60 minutes.
@@ -280,19 +298,34 @@ export const getSessionKey = (
 /**
  * getTimeParts
  * Extract hour:minute and AM/PM parts from an ISO date string.
- * Used for displaying time in 12-hour format with separate components.
+ * Supports both 12-hour and 24-hour format based on the format parameter.
  * @param dateStr - ISO date string
- * @returns Object with time (HH:MM), ampm (AM/PM), and date strings
+ * @param format - Time format: "12h" (default) or "24h"
+ * @returns Object with time (HH:MM), ampm (AM/PM or empty for 24h), and date strings
  */
-export const getTimeParts = (dateStr?: string): { time: string; ampm: string; date: string } => {
+export const getTimeParts = (
+  dateStr?: string,
+  format: "12h" | "24h" = "12h",
+): { time: string; ampm: string; date: string } => {
   if (!dateStr) return { time: "", ampm: "", date: "" };
   try {
     const date = new Date(dateStr);
     const minutes = date.getMinutes();
     const rawHours = date.getHours();
-    const ampm = rawHours >= 12 ? "PM" : "AM";
-    const hours12 = rawHours % 12 === 0 ? 12 : rawHours % 12;
-    const time = `${hours12}:${minutes.toString().padStart(2, "0")}`;
+
+    let time: string;
+    let ampm: string;
+
+    if (format === "24h") {
+      // 24-hour format: HH:MM (e.g., "14:30")
+      time = `${rawHours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+      ampm = "";
+    } else {
+      // 12-hour format: H:MM AM/PM (e.g., "2:30 PM")
+      ampm = rawHours >= 12 ? "PM" : "AM";
+      const hours12 = rawHours % 12 === 0 ? 12 : rawHours % 12;
+      time = `${hours12}:${minutes.toString().padStart(2, "0")}`;
+    }
 
     // Format date as "Mon, Jan 27"
     const dateFormatted = date.toLocaleDateString("en-US", {
@@ -460,6 +493,7 @@ export const toggleSubtask = async ({
   loadingParts,
   setLoadingParts,
   notifyTaskUpdate,
+  notifyStatsChange,
   onAction,
 }: {
   taskId: string;
@@ -469,6 +503,7 @@ export const toggleSubtask = async ({
   loadingParts: Set<string>;
   setLoadingParts: React.Dispatch<React.SetStateAction<Set<string>>>;
   notifyTaskUpdate: (params: { taskId: string }, delayMs?: number) => void;
+  notifyStatsChange?: (gamification?: GamificationResult) => void;
   onAction?: (action: string, data: any) => void;
 }) => {
   const isCompleted = completedParts.has(subtaskId);
@@ -487,16 +522,21 @@ export const toggleSubtask = async ({
 
   try {
     // Persist change to server
-    const success = await updateSubTask(taskId, subtaskId, { status: nextCompleted ? "done" : "todo" });
-    if (!success) throw new Error("Update failed");
+    const result = await updateSubTask(taskId, subtaskId, { status: nextCompleted ? "done" : "todo" });
+    if (!result.success) throw new Error("Update failed");
 
-    // Debug: log toggle
     // Notify other components of task update
     notifyTaskUpdate({ taskId });
     // Also schedule a delayed notify to give backend time to settle and ensure list widgets refresh
     notifyTaskUpdate({ taskId }, 300);
+
+    // If gamification data was returned, notify stats context
+    if (result.gamification && notifyStatsChange) {
+      notifyStatsChange(result.gamification);
+    }
+
     // Trigger action callback for widget interactions
-    onAction?.("subtask_toggled", { taskId, subtaskId, completed: nextCompleted });
+    onAction?.("subtask_toggled", { taskId, subtaskId, completed: nextCompleted, gamification: result.gamification });
   } catch (error) {
     // Revert optimistic update on failure
     setCompletedParts((prev) => {
@@ -532,6 +572,7 @@ export const toggleSession = async ({
   loadingParts,
   setLoadingParts,
   notifyTaskUpdate,
+  notifyStatsChange,
   onAction,
 }: {
   taskId: string;
@@ -543,6 +584,7 @@ export const toggleSession = async ({
   loadingParts: Set<string>;
   setLoadingParts: React.Dispatch<React.SetStateAction<Set<string>>>;
   notifyTaskUpdate: (params: { taskId: string }, delayMs?: number) => void;
+  notifyStatsChange?: (gamification?: GamificationResult) => void;
   onAction?: (action: string, data: any) => void;
 }) => {
   // Find the subtask ID associated with this session

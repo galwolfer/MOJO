@@ -2,8 +2,8 @@ import { COLORS } from "../../theme";
 import { SVG_DATA_URIS } from "../icons/svg-data-uris";
 import { ScheduledSession, Subtask } from "./taskHelpers";
 
-// Re-export types only from taskHelpers (functions are defined locally in this file)
-export { Subtask, ScheduledSession } from "./taskHelpers";
+// Re-export from taskHelpers so existing imports from this file continue to work
+export { Subtask, ScheduledSession, computeTaskProgress } from "./taskHelpers";
 
 export type WidgetEntranceProps = {
   entranceEnabled?: boolean;
@@ -279,19 +279,34 @@ export const getSessionKey = (
 /**
  * getTimeParts
  * Extract hour:minute and AM/PM parts from an ISO date string.
- * Used for displaying time in 12-hour format with separate components.
+ * Supports both 12-hour and 24-hour format based on the format parameter.
  * @param dateStr - ISO date string
- * @returns Object with time (HH:MM), ampm (AM/PM), and date strings
+ * @param format - Time format: "12h" (default) or "24h"
+ * @returns Object with time (HH:MM), ampm (AM/PM or empty for 24h), and date strings
  */
-export const getTimeParts = (dateStr?: string): { time: string; ampm: string; date: string } => {
+export const getTimeParts = (
+  dateStr?: string,
+  format: "12h" | "24h" = "12h",
+): { time: string; ampm: string; date: string } => {
   if (!dateStr) return { time: "", ampm: "", date: "" };
   try {
     const date = new Date(dateStr);
     const minutes = date.getMinutes();
     const rawHours = date.getHours();
-    const ampm = rawHours >= 12 ? "PM" : "AM";
-    const hours12 = rawHours % 12 === 0 ? 12 : rawHours % 12;
-    const time = `${hours12}:${minutes.toString().padStart(2, "0")}`;
+
+    let time: string;
+    let ampm: string;
+
+    if (format === "24h") {
+      // 24-hour format: HH:MM (e.g., "14:30")
+      time = `${rawHours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+      ampm = "";
+    } else {
+      // 12-hour format: H:MM AM/PM (e.g., "2:30 PM")
+      ampm = rawHours >= 12 ? "PM" : "AM";
+      const hours12 = rawHours % 12 === 0 ? 12 : rawHours % 12;
+      time = `${hours12}:${minutes.toString().padStart(2, "0")}`;
+    }
 
     // Format date as "Mon, Jan 27"
     const dateFormatted = date.toLocaleDateString("en-US", {
@@ -355,47 +370,6 @@ export const getCategoryDisplay = (category?: string | null, categoryDisplay?: s
   if (categoryDisplay && typeof categoryDisplay === "string" && categoryDisplay.trim() !== "") return categoryDisplay;
   const meta = getCategoryMeta(category || undefined);
   return meta?.displayName || category || "";
-};
-
-/**
- * computeTaskProgress
- * Derives a task's progress percentage (0-100) from explicit progress, subtasks, or scheduled sessions
- */
-export const computeTaskProgress = (task: any, completedParts: Set<string>): number => {
-  const _taskId = task?.id || (task && task._id) || "(unknown)";
-
-  // Subtasks take precedence when available (and consider optimistic completedParts)
-  const subtasks = (task as any).subtasks as Subtask[] | undefined;
-  if (subtasks && subtasks.length > 0) {
-    const total = subtasks.length;
-    const completed = subtasks.filter(
-      (st) => st.status === "done" || st.completed || (st.id && completedParts.has(st.id)),
-    ).length;
-    const v = total === 0 ? 0 : Math.round((completed / total) * 100);
-    return v;
-  }
-
-  // Next, use scheduled sessions when available
-  const sessions = (task as any).scheduledSessions as ScheduledSession[] | undefined;
-  if (sessions && sessions.length > 0) {
-    let completed = 0;
-    sessions.forEach((s, idx) => {
-      const key = getSessionKey(task.id, s, idx, subtasks);
-      const isDone = (s as any).subtaskStatus === "done" || s.status === "completed" || completedParts.has(key);
-      if (isDone) completed += 1;
-    });
-    const v = Math.round((completed / sessions.length) * 100);
-    return v;
-  }
-
-  // Fallback to explicit progressPercentage if provided
-  if (typeof task?.progressPercentage === "number") {
-    const v = Math.max(0, Math.min(100, task.progressPercentage));
-    return v;
-  }
-
-  // No progress information available
-  return 0;
 };
 
 /**
@@ -567,13 +541,13 @@ export const toggleSubtask = async ({
     notifyTaskUpdate({ taskId }, 300);
 
     // If gamification data was returned, notify stats context
-    console.log("[toggleSubtask] Result from API:", { 
-      success: result.success, 
+    console.log("[toggleSubtask] Result from API:", {
+      success: result.success,
       hasGamification: !!result.gamification,
       gamification: result.gamification,
-      notifyStatsChangeExists: !!notifyStatsChange 
+      notifyStatsChangeExists: !!notifyStatsChange,
     });
-    
+
     if (result.gamification && notifyStatsChange) {
       console.log("[toggleSubtask] Calling notifyStatsChange with:", result.gamification);
       notifyStatsChange(result.gamification);
@@ -680,7 +654,7 @@ export const toggleSession = async ({
         gamification: result.gamification,
         notifyStatsChangeExists: !!notifyStatsChange,
       });
-      
+
       if (result.gamification && notifyStatsChange) {
         console.log("[toggleSession] Calling notifyStatsChange with:", result.gamification);
         notifyStatsChange(result.gamification);

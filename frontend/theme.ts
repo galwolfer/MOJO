@@ -29,19 +29,167 @@ export const COLORS = {
   darkP5: "#D38911",
   darkP6: "#118826",
   darkP7: "#DA2727",
-  darkGray: "#30364b",
+  darkGray: "#4a567b",
 
-  // Neutrals
-  white: "#F2F5FF",
+  // Light theme colors
+  white1: "#F2F5FF",
   white2: "#E6E9F7",
   white3: "#D8DEF7",
-  colorWhite: "#FFFFFF",
+
+  // Dark theme colors
+  black1: "#141519",
+  black2: "#1A1D2A",
+  black3: "#202435",
+
+  // Legacy neutrals (kept for backward compatibility)
+  white: "#F2F5FF",
+  colorWhite: "#F2F5FF",
   black: "#141519",
 
   // Misc / special
   shadow15277c14: "rgba(21, 39, 124, 0.14)",
   transparentWhite: "rgba(255, 255, 255, 0)",
 };
+
+/**
+ * Dynamic theme colors based on light/dark mode.
+ * Every UI surface / text element should reference these tokens
+ * so the entire app can flip between light and dark with one toggle.
+ */
+export type ThemeMode = "light" | "dark";
+
+export interface ThemeColors {
+  // Backgrounds
+  bg1: string;
+  bg2: string;
+  bg3: string;
+
+  // Gray tones (swap in dark mode for contrast)
+  gray1: string;
+  gray2: string;
+
+  // Text
+  text1: string; // primary text (all body / heading text)
+  text2: string; // text on coloured buttons – always light
+
+  // Primary accent colors (unchanged between modes)
+  primary1: string;
+  primary2: string;
+  primary3: string;
+  primary4: string;
+  primary5: string;
+  primary6: string;
+  primary7: string;
+
+  // "Light" palette (bright in light mode, dark-tint in dark mode)
+  lightP1: string;
+  lightP2: string;
+  lightP3: string;
+  lightP4: string;
+  lightP5: string;
+  lightP6: string;
+  lightP7: string;
+
+  // "Dark" palette (dark-tint in light mode, bright in dark mode)
+  darkP1: string;
+  darkP2: string;
+  darkP3: string;
+  darkP4: string;
+  darkP5: string;
+  darkP6: string;
+  darkP7: string;
+
+  // Misc / derived
+  shadow: string;
+  divider: string;
+  inputBg: string;
+  inputBorder: string;
+}
+
+/**
+ * @deprecated Use `getDynamicColors` instead. Kept only for backwards-compat
+ * in files that haven't been migrated yet.
+ */
+export function getThemeColors(
+  mode: ThemeMode = "light",
+): Pick<ThemeColors, "bg1" | "bg2" | "bg3" | "text1" | "text2"> & { text3: string } {
+  const dc = getDynamicColors(mode);
+  return { bg1: dc.bg1, bg2: dc.bg2, bg3: dc.bg3, text1: dc.text1, text2: dc.text2, text3: dc.gray1 };
+}
+
+export function getDynamicColors(mode: ThemeMode = "light"): ThemeColors {
+  if (mode === "dark") {
+    return {
+      bg1: COLORS.black1,
+      bg2: COLORS.black2,
+      bg3: COLORS.black3,
+      gray1: COLORS.darkGray,
+      gray2: COLORS.lightGray,
+      text1: COLORS.white1,
+      text2: COLORS.white1,
+      primary1: COLORS.primary1,
+      primary2: COLORS.primary2,
+      primary3: COLORS.primary3,
+      primary4: COLORS.primary4,
+      primary5: COLORS.primary5,
+      primary6: COLORS.primary6,
+      primary7: COLORS.primary7,
+      lightP1: COLORS.darkP1,
+      lightP2: COLORS.darkP2,
+      lightP3: COLORS.darkP3,
+      lightP4: COLORS.darkP4,
+      lightP5: COLORS.darkP5,
+      lightP6: COLORS.darkP6,
+      lightP7: COLORS.darkP7,
+      darkP1: COLORS.brightP1,
+      darkP2: COLORS.brightP2,
+      darkP3: COLORS.brightP3,
+      darkP4: COLORS.brightP4,
+      darkP5: COLORS.brightP5,
+      darkP6: COLORS.brightP6,
+      darkP7: COLORS.brightP7,
+      shadow: "rgba(0, 0, 0, 0.3)",
+      divider: COLORS.black3,
+      inputBg: COLORS.black2,
+      inputBorder: COLORS.black3,
+    };
+  }
+  // Light mode (default)
+  return {
+    bg1: COLORS.white1,
+    bg2: COLORS.white2,
+    bg3: COLORS.white3,
+    gray1: COLORS.lightGray,
+    gray2: COLORS.darkGray,
+    text1: COLORS.black,
+    text2: COLORS.white1,
+    primary1: COLORS.primary1,
+    primary2: COLORS.primary2,
+    primary3: COLORS.primary3,
+    primary4: COLORS.primary4,
+    primary5: COLORS.primary5,
+    primary6: COLORS.primary6,
+    primary7: COLORS.primary7,
+    lightP1: COLORS.brightP1,
+    lightP2: COLORS.brightP2,
+    lightP3: COLORS.brightP3,
+    lightP4: COLORS.brightP4,
+    lightP5: COLORS.brightP5,
+    lightP6: COLORS.brightP6,
+    lightP7: COLORS.brightP7,
+    darkP1: COLORS.darkP1,
+    darkP2: COLORS.darkP2,
+    darkP3: COLORS.darkP3,
+    darkP4: COLORS.darkP4,
+    darkP5: COLORS.darkP5,
+    darkP6: COLORS.darkP6,
+    darkP7: COLORS.darkP7,
+    shadow: COLORS.shadow15277c14,
+    divider: COLORS.white3,
+    inputBg: COLORS.white,
+    inputBorder: COLORS.brightP1,
+  };
+}
 
 export const SPACING = {
   xs: moderateScale(3),
@@ -71,10 +219,11 @@ export const FONT_SIZES = {
 };
 
 // Icon size tokens used across the app
-export type IconSizeKey = "sm" | "md" | "big";
+export type IconSizeKey = "xs" | "sm" | "md" | "big";
 
 export const ICON_SIZES: Record<IconSizeKey, number> = {
-  sm: moderateScale(18),
+  xs: moderateScale(14),
+  sm: moderateScale(20),
   md: moderateScale(24),
   big: moderateScale(35),
 };
@@ -117,6 +266,7 @@ export const SHADOWS = {
     shadowRadius: 1,
     elevation: 4,
   },
+
   glowingMessage: {
     // use COLORS.primary1 at 50% opacity via helper (keeps the source color variable-driven)
     boxShadow: `0 0 15px 0 rgba(0, 0, 0, 0.05) inset, 0px 1px 2px ${hexToRgba(COLORS.primary1, 0.1)}`,
@@ -304,4 +454,49 @@ export function paletteIndexFromKey(key?: string): number {
   }
   const idx = Math.abs(hash) % COLORS_NUM;
   return idx + 1;
+}
+
+/**
+ * Translate a color token or string into a palette index (1..8).
+ * - If token looks like a palette token containing a digit (e.g., 'p1','primary2','brightP3'), return that digit.
+ * - Otherwise, deterministically map arbitrary strings to an index via `paletteIndexFromKey`.
+ * - If token appears to be a hex or rgba(...) color and `fallback` is provided, return `fallback` (usually category's colorIndex).
+ * - Returns a number between 1 and 8.
+ */
+export function paletteIndexFromColorToken(token?: string, fallback?: number): number {
+  if (!token) return fallback ?? paletteIndexFromKey(token);
+  const s = String(token).trim();
+
+  // If token is a hex color, try to find an exact match in our palette
+  if (/^#/.test(s)) {
+    const hex = s.toLowerCase();
+    for (const key in COLORS) {
+      const val = (COLORS as any)[key];
+      if (typeof val === "string" && val.toLowerCase() === hex) {
+        const mKey = key.match(/([1-8])\b/);
+        if (mKey) return Number(mKey[1]);
+      }
+    }
+    // Not found in palette: fall back to provided fallback or deterministic mapping
+    return fallback ?? paletteIndexFromKey(s);
+  }
+
+  // If token is rgba(...), try to exact-match a palette entry (rare) then fallback
+  if (/^rgba?\(/i.test(s)) {
+    for (const key in COLORS) {
+      const val = (COLORS as any)[key];
+      if (typeof val === "string" && val.toLowerCase() === s.toLowerCase()) {
+        const mKey = key.match(/([1-8])\b/);
+        if (mKey) return Number(mKey[1]);
+      }
+    }
+    return fallback ?? paletteIndexFromKey(s);
+  }
+
+  // Look for a palette digit 1..8 in the token (e.g., 'primary1', 'brightP2')
+  const m = s.toLowerCase().match(/([1-8])\b/);
+  if (m) return Number(m[1]);
+
+  // Fall back to deterministic mapping
+  return paletteIndexFromKey(s);
 }

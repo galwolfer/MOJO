@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useMemo } from "react";
 import {
   View,
   ViewStyle,
@@ -11,6 +11,8 @@ import {
   Easing,
   // Changed to Pressable for better handling of simultaneous gestures
   Pressable,
+  ScrollView,
+  useWindowDimensions,
 } from "react-native";
 import {
   COLORS,
@@ -27,8 +29,19 @@ import {
 import AppText from "../common/AppText";
 import { Checkbox } from "../icons/Checkbox";
 import { Chevron } from "../icons/Chevron";
+import { useColors } from "../../context/ThemeContext";
 
 type InputType = "text" | "email" | "password" | "number" | "longtext";
+
+type InputOption =
+  | string
+  | {
+      label: string;
+      value: string;
+      icon?: React.ComponentType<{ size?: number; color?: string }>;
+      iconColor?: string;
+      iconBackground?: string;
+    };
 
 interface InputProps<T = any> extends Omit<TextInputProps, "style"> {
   type?: InputType;
@@ -36,11 +49,17 @@ interface InputProps<T = any> extends Omit<TextInputProps, "style"> {
   error?: string;
   enterToSubmit?: boolean;
   // Optional props for dropdown functionality
-  options?: string[];
+  options?: InputOption[];
   onSelect?: (values: string[]) => void;
   multiSelect?: boolean;
   // optional icon size control (sm | md | big)
   iconSize?: IconSizeKey;
+  // explicit disabled prop for clarity
+  disabled?: boolean;
+  // Optional element to render on the right side of the input (inside the box)
+  rightElement?: React.ReactNode;
+  // Optional callback fired when the whole input box is pressed
+  onPress?: () => void;
 }
 
 /**
@@ -60,9 +79,10 @@ const hexToRgba = (hex: string, alpha = 1) => {
 /**
  * Custom hook for web-specific caret and selection styling.
  * @param idPrefix - Prefix for the unique ID.
+ * @param placeholderColor - Color for placeholder text.
  * @returns The unique ID for the input.
  */
-function useWebCaret(idPrefix = "input") {
+function useWebCaret(idPrefix = "input", placeholderColor?: string, caretColor?: string) {
   const idRef = useRef<string | null>(null);
   useEffect(() => {
     if ((Platform as any).OS !== "web") return;
@@ -70,21 +90,23 @@ function useWebCaret(idPrefix = "input") {
     idRef.current = id;
     const style = document.createElement("style");
     style.id = `style-${id}`;
-    const selectionColor = hexToRgba(COLORS.primary1, 0.28);
+    const finalCaretColor = caretColor || COLORS.primary1;
+    const selectionColor = hexToRgba(finalCaretColor, 0.28);
+    const placeholderColorToUse = placeholderColor || COLORS.lightGray;
     // Localized rules for this input plus broader rules so web text inputs
     // and textareas use the light placeholder font. We keep the ID-specific
     // rules to control caret and selection for this input only.
     style.textContent =
-      `#${id} { caret-color: ${COLORS.primary1} !important; } ` +
+      `#${id} { caret-color: ${finalCaretColor} !important; } ` +
       `#${id}::selection { background: ${selectionColor} !important; } ` +
-      `#${id}::placeholder { font-family: '${FONTS.fredokaLight}' !important; font-weight: 300 !important; color: ${COLORS.lightGray} !important; } ` +
-      `input::placeholder, textarea::placeholder { font-family: '${FONTS.fredokaLight}' !important; font-weight: 300 !important; color: ${COLORS.lightGray} !important; }`;
+      `#${id}::placeholder { font-family: '${FONTS.fredokaLight}' !important; font-weight: 300 !important; color: ${placeholderColorToUse} !important; } ` +
+      `input::placeholder, textarea::placeholder { font-family: '${FONTS.fredokaLight}' !important; font-weight: 300 !important; color: ${placeholderColorToUse} !important; }`;
     document.head.appendChild(style);
     return () => {
       const el = document.getElementById(`style-${id}`);
       if (el) el.remove();
     };
-  }, [idPrefix]);
+  }, [idPrefix, placeholderColor, caretColor]);
   return idRef.current;
 }
 
@@ -115,8 +137,12 @@ function Input<T = any>({
   onSelect,
   multiSelect = false,
   iconSize = "md",
+  disabled = false,
+  rightElement,
+  onPress,
   ...rest
 }: InputProps<T>) {
+  const colors = useColors();
   const borderColorAnim = useRef(new Animated.Value(0)).current;
   const webNativeID = useWebCaret();
   const {
@@ -136,6 +162,30 @@ function Input<T = any>({
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownLayout, setDropdownLayout] = useState({ top: 0, left: 0, width: 0 });
   const dropdownAnim = useRef(new Animated.Value(0)).current;
+
+  const normalizedOptions = useMemo(() => {
+    if (!options) return undefined;
+    return options.map((option) => (typeof option === "string" ? { label: option, value: option } : option));
+  }, [options]);
+
+  const optionLabelMap = useMemo(() => {
+    const map = new Map<string, string>();
+    (normalizedOptions || []).forEach((option) => {
+      map.set(option.value, option.label);
+    });
+    return map;
+  }, [normalizedOptions]);
+
+  const selectedLabels = useMemo(() => {
+    if (!options) return selected;
+    return selected.map((value) => optionLabelMap.get(value) ?? value);
+  }, [options, selected, optionLabelMap]);
+
+  // For single-select dropdowns, extract the selected option's icon and iconColor
+  const selectedOption = useMemo(() => {
+    if (!options || multiSelect || selected.length === 0) return undefined;
+    return normalizedOptions?.find((opt) => opt.value === selected[0]);
+  }, [options, multiSelect, selected, normalizedOptions]);
 
   const closeDropdown = () => {
     Animated.timing(dropdownAnim, {
@@ -172,9 +222,6 @@ function Input<T = any>({
     }
   }, [providedValue, hasValueProp]);
 
-  const hasSelected = selected.length > 0;
-  const isEmpty = !hasSelected && (!inputValue || inputValue.length === 0);
-
   // Compute display value and effective placeholder for the TextInput.
   // When using multiSelect and there are no selected items, we want the
   // input to *look* like a placeholder (gray text). To do this we leave the
@@ -189,16 +236,16 @@ function Input<T = any>({
 
   if (options) {
     if (multiSelect) {
-      if (selected.length === 0) {
+      if (selectedLabels.length === 0) {
         displayValue = ""; // show placeholder-style text
         // prefer explicitly provided non-empty value; fall back to placeholder
         effectivePlaceholder = nonEmpty(explicitValue) ?? nonEmpty(defaultValue) ?? placeholder;
       } else {
-        displayValue = placeholder;
+        displayValue = selectedLabels.join(", ");
         effectivePlaceholder = placeholder;
       }
     } else {
-      displayValue = selected.join("x ");
+      displayValue = selectedLabels.join(", ");
       effectivePlaceholder = placeholder;
     }
   } else {
@@ -210,8 +257,6 @@ function Input<T = any>({
     }
     effectivePlaceholder = placeholder;
   }
-
-  const iconSizeMap: Record<IconSizeKey, number> = { sm: 18, md: 30, big: 40 };
 
   // Sync selected with provided value for options
   useEffect(() => {
@@ -235,7 +280,7 @@ function Input<T = any>({
 
   const animatedBorderColor = borderColorAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [COLORS.primary1, COLORS.primary7],
+    outputRange: [colors.primary1, colors.primary7],
   });
 
   // dropdown-related rotation removed
@@ -257,8 +302,9 @@ function Input<T = any>({
   };
 
   const getSecureTextEntry = () => type === "password";
-  const selectionColor = Platform.OS === "android" ? hexToRgba(COLORS.primary1, 0.28) : COLORS.primary1;
-  const cursorColor = COLORS.primary1;
+  const selectionColor = Platform.OS === "android" ? hexToRgba(colors.primary1, 0.28) : colors.primary1;
+  const cursorColor = colors.primary1;
+  const placeholderColor = colors.gray1;
   const isMultiline = Boolean(restInputProps.multiline ?? type === "longtext");
   const handleKeyPress = (event: any) => {
     if (!enterToSubmit || (Platform as any).OS !== "web") {
@@ -289,6 +335,12 @@ function Input<T = any>({
 
       <Pressable
         onPress={() => {
+          // Don't allow interaction if disabled
+          if (disabled) return;
+
+          // Fire optional onPress callback (e.g. to open a date picker)
+          onPress?.();
+
           // Always focus the input when the wrapper is tapped to improve tap responsiveness
           inputRef.current?.focus();
 
@@ -324,21 +376,43 @@ function Input<T = any>({
         <Animated.View
           ref={wrapperRef}
           collapsable={false}
-          style={[styles.inputWrapper, { borderColor: animatedBorderColor }]}
+          style={[
+            styles.inputWrapper,
+            { borderColor: animatedBorderColor, backgroundColor: colors.inputBg },
+            disabled && styles.inputWrapperDisabled,
+          ]}
         >
+          {/* Display selected option's icon for single-select dropdowns */}
+          {selectedOption?.icon && (
+            <View
+              style={[
+                styles.selectedIconWrapper,
+                selectedOption.iconBackground ? styles.selectedIconBox : undefined,
+                selectedOption.iconBackground ? { backgroundColor: selectedOption.iconBackground } : undefined,
+              ]}
+            >
+              {React.createElement(selectedOption.icon, {
+                size: ICON_SIZES[iconSize],
+                color: selectedOption.iconColor || colors.primary1,
+              })}
+            </View>
+          )}
           <TextInput
             ref={inputRef}
             style={[
               styles.input,
               type === "longtext" ? styles.textarea : undefined,
               (Platform as any).OS === "web" ? ({ outlineWidth: 0 } as any) : undefined,
+              // Add left padding if there's a selected icon to prevent text overlap
+              selectedOption?.icon ? { paddingLeft: SPACING.xs } : undefined,
+              { color: colors.text1 },
             ]}
             // Use the native placeholder on all platforms so tapping it focuses the input reliably
             placeholder={effectivePlaceholder}
-            placeholderTextColor={COLORS.lightGray}
+            placeholderTextColor={placeholderColor}
             keyboardType={getKeyboardType()}
             secureTextEntry={getSecureTextEntry()}
-            editable={!options}
+            editable={!options && !disabled}
             multiline={isMultiline}
             numberOfLines={type === "longtext" ? 5 : undefined}
             blurOnSubmit={enterToSubmit && isMultiline}
@@ -363,6 +437,8 @@ function Input<T = any>({
             cursorColor={cursorColor}
             {...((Platform as any).OS === "web" && webNativeID ? { nativeID: webNativeID } : {})}
           />
+
+          {rightElement && <View style={styles.rightElementWrapper}>{rightElement}</View>}
 
           {options && (
             <View style={{ marginRight: 8 }}>
@@ -392,6 +468,8 @@ function Input<T = any>({
               style={[
                 styles.dropdown,
                 {
+                  backgroundColor: colors.bg1,
+                  borderColor: colors.inputBorder,
                   top: dropdownLayout.top,
                   left: dropdownLayout.left,
                   width: dropdownLayout.width,
@@ -407,43 +485,59 @@ function Input<T = any>({
                 },
               ]}
             >
-              {options.map((option, index) => (
-                <React.Fragment key={option}>
-                  <Pressable
-                    onPress={() => {
-                      if (!multiSelect) {
-                        const newSelected = [option];
-                        // update selection state immediately so UI updates
-                        setSelected(newSelected);
-                        // call onSelect immediately to be responsive
-                        onSelect?.(newSelected);
-                        // start closing animation but don't wait for it to complete
-                        Animated.timing(dropdownAnim, {
-                          toValue: 0,
-                          duration: 180,
-                          easing: Easing.bezier(0.2, 0.8, 0.2, 1),
-                          useNativeDriver: false,
-                        }).start(() => {
-                          setIsOpen(false);
-                        });
-                      } else {
-                        const newSelected = selected.includes(option)
-                          ? selected.filter((s) => s !== option)
-                          : [...selected, option];
-                        setSelected(newSelected);
-                        onSelect?.(newSelected);
-                      }
-                    }}
-                    style={styles.option}
-                  >
-                    <AppText style={{ flex: 1 }}>{option}</AppText>
-                    {multiSelect && (
-                      <Checkbox checked={selected.includes(option)} onChange={() => {}} size={ICON_SIZES[iconSize]} />
-                    )}
-                  </Pressable>
-                  {index < options.length - 1 && <View style={styles.optionDivider} />}
-                </React.Fragment>
-              ))}
+              {(normalizedOptions || []).map((option, index) => {
+                const optionValue = option.value;
+                const optionLabel = option.label;
+                const optionIcon = option.icon;
+                const optionIconColor = option.iconColor || COLORS.white;
+                const optionIconBackground = option.iconBackground || COLORS.white2;
+                const isSelected = selected.includes(optionValue);
+                return (
+                  <React.Fragment key={optionValue}>
+                    <Pressable
+                      onPress={() => {
+                        if (!multiSelect) {
+                          const newSelected = [optionValue];
+                          // update selection state immediately so UI updates
+                          setSelected(newSelected);
+                          // call onSelect immediately to be responsive
+                          onSelect?.(newSelected);
+                          // start closing animation but don't wait for it to complete
+                          Animated.timing(dropdownAnim, {
+                            toValue: 0,
+                            duration: 180,
+                            easing: Easing.bezier(0.2, 0.8, 0.2, 1),
+                            useNativeDriver: false,
+                          }).start(() => {
+                            setIsOpen(false);
+                          });
+                        } else {
+                          const newSelected = selected.includes(optionValue)
+                            ? selected.filter((s) => s !== optionValue)
+                            : [...selected, optionValue];
+                          setSelected(newSelected);
+                          onSelect?.(newSelected);
+                        }
+                      }}
+                      style={styles.option}
+                    >
+                      <View style={styles.optionContent}>
+                        {optionIcon && (
+                          <View style={[styles.optionIcon, { backgroundColor: optionIconBackground }]}>
+                            {React.createElement(optionIcon, {
+                              size: ICON_SIZES[iconSize],
+                              color: optionIconColor,
+                            })}
+                          </View>
+                        )}
+                        <AppText style={{ flex: 1 }}>{optionLabel}</AppText>
+                      </View>
+                      {multiSelect && <Checkbox checked={isSelected} onChange={() => {}} size={ICON_SIZES[iconSize]} />}
+                    </Pressable>
+                    {index < (normalizedOptions || []).length - 1 && <View style={styles.optionDivider} />}
+                  </React.Fragment>
+                );
+              })}
             </Animated.View>
           </Pressable>
         </Modal>
@@ -452,7 +546,7 @@ function Input<T = any>({
       {/* dropdown removed - use external picker component if needed */}
 
       {error && (
-        <AppText variant="notes" style={styles.errorText}>
+        <AppText variant="notes" style={[styles.errorText, { color: colors.primary7 }]}>
           {error}
         </AppText>
       )}
@@ -510,10 +604,8 @@ const styles = StyleSheet.create({
   },
   dropdown: {
     position: "absolute",
-    backgroundColor: COLORS.white,
     borderRadius: SPACING.lg,
     borderWidth: 0.15,
-    borderColor: COLORS.brightP1,
     ...(SHADOWS.card as any),
   },
   option: {
@@ -523,6 +615,19 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.md,
     gap: SPACING.sm,
+  },
+  optionContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+    flex: 1,
+  },
+  optionIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
   optionDivider: {
     height: DIVIDER.width,
@@ -534,6 +639,24 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.md,
     paddingBottom: SPACING.md,
     textAlignVertical: "top",
+  },
+  selectedIconWrapper: {
+    marginLeft: SPACING.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  selectedIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+  },
+  rightElementWrapper: {
+    marginRight: SPACING.sm,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  inputWrapperDisabled: {
+    opacity: 0.7,
   },
 });
 

@@ -107,7 +107,8 @@ export async function register(req, res, next) {
         profileImage: profileImage || null,
         ojoTypeId: defaultOjoType ? defaultOjoType._id : null,
         gender: gender ? String(gender) : "unspecified",
-        settings: {},
+        // Initialize settings with accessibility defaults so preference exists on new accounts
+        settings: { accessibility: { timeFormat: "12h" } },
       },
     });
 
@@ -356,10 +357,21 @@ export async function updateProfile(req, res, next) {
       user.profile.gender = canonical;
     }
     if (settings) {
-      user.profile.settings = new Map(Object.entries(settings));
+      // Merge incoming settings with existing settings instead of replacing entirely, to preserve other keys
+      console.debug("[updateProfile] received settings:", settings);
+      const currentSettings =
+        user.profile.settings && typeof user.profile.settings.toObject === "function"
+          ? user.profile.settings.toObject()
+          : JSON.parse(JSON.stringify(user.profile.settings || {}));
+      console.debug("[updateProfile] currentSettings:", currentSettings);
+      const merged = { ...currentSettings, ...settings };
+      console.debug("[updateProfile] merged settings:", merged);
+      user.profile.settings = new Map(Object.entries(merged));
+      console.debug("[updateProfile] settings Map created:", user.profile.settings);
     }
 
     await user.save();
+    console.debug("[updateProfile] saved user, checking settings:", user.profile.settings);
 
     // Populate the OjoType and return the richer profile object
     await user.populate("profile.ojoTypeId", "name displayName persona tone");
@@ -370,6 +382,8 @@ export async function updateProfile(req, res, next) {
         : JSON.parse(JSON.stringify(user.profile || {}));
 
     profileObj.ojoType = user.profile && user.profile.ojoTypeId ? user.profile.ojoTypeId : null;
+
+    console.debug("[updateProfile] returning profile with settings:", profileObj.settings);
 
     res.json({
       success: true,
@@ -393,40 +407,74 @@ export async function updateProfile(req, res, next) {
 export async function deleteAccount(req, res, next) {
   try {
     const userId = req.user.userId;
+    console.log(`🗑️  Delete account request for userId: ${userId}`);
 
-    // Delete user and all associated data
-    const user = await User.findByIdAndDelete(userId);
+    // First verify user exists before deleting data
+    const user = await User.findById(userId);
 
     if (!user) {
+      console.log(`❌ User not found: ${userId}`);
       return res.status(404).json({
         success: false,
         error: "User not found",
       });
     }
 
-    // Delete all tasks associated with the user
-    const Task = (await import("../models/index.js")).Task;
-    if (Task) {
-      await Task.deleteMany({ userId });
-    }
+    console.log(`📧 Deleting account for user: ${user.username} (${user.email})`);
 
-    // Delete all chat sessions associated with the user
-    const ChatSession = (await import("../models/index.js")).ChatSession;
-    if (ChatSession) {
-      await ChatSession.deleteMany({ userId });
-    }
+    // Import all models
+    const { Task, Session, Memory, TaskSchedule, SubTask, BusyBlock, EventLog, Subcategory } =
+      await import("../models/index.js");
 
-    // Delete all chat messages associated with the user
-    const ChatMessage = (await import("../models/index.js")).ChatMessage;
-    if (ChatMessage) {
-      await ChatMessage.deleteMany({ userId });
-    }
+    // Delete all user data from all collections
+    const deletionResults = await Promise.allSettled([
+      // Delete all tasks
+      Task?.deleteMany({ userId }),
+      // Delete all subtasks
+      SubTask?.deleteMany({ userId }),
+      // Delete all task schedules
+      TaskSchedule?.deleteMany({ userId }),
+      // Delete all sessions (chat history)
+      Session?.deleteMany({ userId }),
+      // Delete all memories (deprecated but may still have data)
+      Memory?.deleteMany({ userId }),
+      // Delete all busy blocks
+      BusyBlock?.deleteMany({ userId }),
+      // Delete all event logs
+      EventLog?.deleteMany({ userId }),
+      // Delete all user-created subcategories
+      Subcategory?.deleteMany({ userId }),
+    ]);
+
+    // Log deletion results
+    const collectionNames = [
+      "Task",
+      "SubTask",
+      "TaskSchedule",
+      "Session",
+      "Memory",
+      "BusyBlock",
+      "EventLog",
+      "Subcategory",
+    ];
+    deletionResults.forEach((result, index) => {
+      if (result.status === "fulfilled" && result.value) {
+        console.log(`  ✅ Deleted ${result.value.deletedCount || 0} ${collectionNames[index]}(s)`);
+      } else if (result.status === "rejected") {
+        console.error(`  ❌ Failed to delete ${collectionNames[index]}:`, result.reason);
+      }
+    });
+
+    // Finally delete the user
+    await User.findByIdAndDelete(userId);
+    console.log(`✅ Account deleted successfully for user: ${user.username}`);
 
     res.json({
       success: true,
       message: "Account and all associated data deleted successfully",
     });
   } catch (error) {
+    console.error(`❌ Error deleting account:`, error);
     next(error);
   }
 }
@@ -480,9 +528,10 @@ export async function updateCategoryPriorities(req, res, next) {
     await user.save();
 
     // Convert priorities to a plain JavaScript object for response
-    const savedPriorities = user.profile.priorities && typeof user.profile.priorities.toObject === "function"
-      ? user.profile.priorities.toObject()
-      : JSON.parse(JSON.stringify(user.profile.priorities || {}));
+    const savedPriorities =
+      user.profile.priorities && typeof user.profile.priorities.toObject === "function"
+        ? user.profile.priorities.toObject()
+        : JSON.parse(JSON.stringify(user.profile.priorities || {}));
 
     res.json({
       success: true,
@@ -516,10 +565,11 @@ export async function getPreferences(req, res, next) {
 
     // Convert priorities to a plain JavaScript object (Mongoose subdocument -> plain object)
     const prioritiesDoc = user.profile.priorities;
-    const priorities = prioritiesDoc && typeof prioritiesDoc.toObject === "function"
-      ? prioritiesDoc.toObject()
-      : JSON.parse(JSON.stringify(prioritiesDoc || {}));
-    
+    const priorities =
+      prioritiesDoc && typeof prioritiesDoc.toObject === "function"
+        ? prioritiesDoc.toObject()
+        : JSON.parse(JSON.stringify(prioritiesDoc || {}));
+
     const ojoType = user.profile.ojoTypeId
       ? {
           name: user.profile.ojoTypeId.name,
@@ -529,11 +579,78 @@ export async function getPreferences(req, res, next) {
         }
       : null;
 
+    // Convert settings Map to plain object.
+    // Use direct Map iteration - the most reliable approach regardless of Mongoose version.
+    const settings = {};
+    if (user.profile.settings) {
+      for (const [key, value] of user.profile.settings) {
+        settings[key] = value;
+      }
+    }
+    console.debug("[getPreferences] converted settings via Map iteration:", JSON.stringify(settings));
+
+    // Ensure accessibility defaults exist server-side for consistency
+    if (!settings.accessibility || typeof settings.accessibility !== "object") {
+      console.debug("[getPreferences] accessibility missing, adding defaults");
+      settings.accessibility = { timeFormat: "12h", theme: "system" };
+    }
+
+    console.debug("[getPreferences] final settings.accessibility:", JSON.stringify(settings.accessibility));
+
+    // Scheduling preferences (added in main branch)
+    const schedPrefs = user.schedulingPreferences
+      ? typeof user.schedulingPreferences.toObject === "function"
+        ? user.schedulingPreferences.toObject()
+        : JSON.parse(JSON.stringify(user.schedulingPreferences))
+      : { minGapMinutes: 10 };
+
     res.json({
       success: true,
       priorities,
       ojoType,
+      appSettings: settings,
+      schedulingPreferences: schedPrefs,
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Update scheduling preferences (minGapMinutes, etc.)
+ * PATCH /api/auth/scheduling-preferences
+ */
+export async function updateSchedulingPreferences(req, res, next) {
+  try {
+    const userId = req.user.userId;
+    const { minGapMinutes } = req.body;
+
+    if (minGapMinutes === undefined) {
+      return res.status(400).json({ success: false, error: "minGapMinutes is required" });
+    }
+
+    const gap = parseInt(minGapMinutes, 10);
+    if (isNaN(gap) || gap < 0 || gap > 120) {
+      return res.status(400).json({ success: false, error: "minGapMinutes must be a number between 0 and 120" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+
+    if (!user.schedulingPreferences) {
+      user.schedulingPreferences = {};
+    }
+    user.schedulingPreferences.minGapMinutes = gap;
+    await user.save();
+
+    const saved =
+      typeof user.schedulingPreferences.toObject === "function"
+        ? user.schedulingPreferences.toObject()
+        : JSON.parse(JSON.stringify(user.schedulingPreferences));
+
+    res.json({ success: true, schedulingPreferences: saved });
   } catch (error) {
     next(error);
   }

@@ -19,7 +19,8 @@
  */
 import React, { useEffect, useRef, useState } from "react";
 import { View, StyleSheet, Animated, Easing, StyleProp, ViewStyle, Text } from "react-native";
-import { COLORS, SPACING } from "../../theme";
+import { SPACING } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 
 type WidgetProps = {
   children?: React.ReactNode;
@@ -44,6 +45,7 @@ const Widget: React.FC<WidgetProps> = ({
   entranceDuration = 200,
   skipAnimation = false,
 }) => {
+  const colors = useColors();
   // Always mount - let parent control visibility via opacity (for chat) or use entrance animation (for auth)
   const [mounted, setMounted] = React.useState<boolean>(true);
   // Track if this is the first time the component is being shown
@@ -112,6 +114,7 @@ const Widget: React.FC<WidgetProps> = ({
     <Animated.View
       style={[
         styles.widget,
+        { backgroundColor: colors.bg3 },
         style,
         {
           opacity,
@@ -128,7 +131,6 @@ const styles = StyleSheet.create({
   widget: {
     minWidth: 250,
     width: "100%",
-    backgroundColor: COLORS.white3,
     borderRadius: SPACING.lg,
     padding: SPACING.lg,
   },

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 
 /**
  * MainLayout
@@ -13,15 +13,21 @@ import { useLayout } from "../../context/LayoutContext";
 import Header from "../common/Header";
 import NavBar from "../common/NavBar";
 import ChatScreen from "../../screens/chat/Chat";
-import CalendarScreen from "../../screens/Calendar";
+import CalendarScreen from "../../screens/calendar/Calendar";
 import UserProfileScreen from "../../screens/user/UserProfile";
-import CreateTaskScreen from "../../screens/CreateTask";
+import CreateTaskScreen from "../../screens/createEditTasks/CreateTask";
+import EditTaskScreen from "../../screens/createEditTasks/EditTask";
+import OverdueTasksModal from "../../screens/OverdueTasks";
+import AllTasksScreen from "../../screens/calendar/AllTasksScreen";
+import { getOverdueTasks } from "../../services/taskService";
 import { COLORS, SPACING } from "../../theme";
 import { useKeyboard } from "../../hooks";
+import { useColors } from "../../context/ThemeContext";
 
 export default function MainLayout() {
-  const { activeTab, headerConfig, navBarConfig } = useNavigation();
+  const { activeTab, headerConfig, navBarConfig, navigationParams, setActiveTab } = useNavigation();
   const { setHeaderHeight, setNavBarHeight } = useLayout();
+  const colors = useColors();
   const { width, height } = useWindowDimensions();
   const isDesktopLike = Platform.OS === "web" ? width >= 900 : width >= 900;
   const { visible: keyboardVisible, height: keyboardHeight } = useKeyboard();
@@ -32,13 +38,27 @@ export default function MainLayout() {
   const [localHeaderHeight, setLocalHeaderHeight] = useState(0);
   const [localNavBarHeight, setLocalNavBarHeight] = useState(0);
 
+  // On mount: check for overdue tasks and show modal if any exist.
+  // Using a ref to guarantee this runs only once even in StrictMode.
+  const overdueChecked = useRef(false);
+  const [showOverdueModal, setShowOverdueModal] = useState(false);
+  useEffect(() => {
+    if (overdueChecked.current) return;
+    overdueChecked.current = true;
+    getOverdueTasks().then((tasks) => {
+      if (tasks.length > 0) {
+        setShowOverdueModal(true);
+      }
+    });
+  }, []);
+
   const onHeaderLayout = useCallback(
     (event: LayoutChangeEvent) => {
       const { height } = event.nativeEvent.layout;
       setLocalHeaderHeight(height);
       setHeaderHeight(height);
     },
-    [setHeaderHeight]
+    [setHeaderHeight],
   );
 
   const onNavBarLayout = useCallback(
@@ -49,7 +69,7 @@ export default function MainLayout() {
       const effectiveHeight = height + SPACING.xlg;
       setNavBarHeight(height, effectiveHeight);
     },
-    [setNavBarHeight]
+    [setNavBarHeight],
   );
 
   const renderScreen = () => {
@@ -62,6 +82,10 @@ export default function MainLayout() {
         return <UserProfileScreen />;
       case "create":
         return <CreateTaskScreen />;
+      case "edit":
+        return <EditTaskScreen taskId={navigationParams?.taskId || ""} />;
+      case "alltasks":
+        return <AllTasksScreen />;
       default:
         return <ChatScreen />;
     }
@@ -78,9 +102,12 @@ export default function MainLayout() {
 
   return (
     <View style={outerStyle}>
-      <View style={deviceStyle}>
+      <View style={[deviceStyle, { backgroundColor: colors.bg3 }]}>
         {/* Main Content Area - Full screen */}
         <View style={styles.contentArea}>{renderScreen()}</View>
+
+        {/* Overdue Tasks Modal – shown on top of chat on app open */}
+        <OverdueTasksModal visible={showOverdueModal} onClose={() => setShowOverdueModal(false)} />
 
         {/* Floating Header */}
         <View style={styles.headerContainer} onLayout={onHeaderLayout}>
@@ -110,18 +137,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     width: "100%",
-    backgroundColor: COLORS.white3,
   },
   desktopOuter: {
     flex: 1,
-    backgroundColor: COLORS.black,
     alignItems: "center",
     justifyContent: "center",
   },
   deviceFrame: {
     borderRadius: 20,
     overflow: "hidden",
-    backgroundColor: COLORS.white3,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.12,

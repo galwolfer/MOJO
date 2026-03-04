@@ -1,4 +1,4 @@
-// Authentication API service for frontend
+﻿// Authentication API service for frontend
 // Handles user authentication (login, register)
 
 import { post, setAuthToken } from "./httpClient";
@@ -94,27 +94,52 @@ export async function updateCategoryPriorities(payload: CategoryPrioritiesReques
 }
 
 /**
- * Get user preferences (priorities and ojoType)
+ * Get user preferences (priorities, ojoType, and appSettings)
  * GET /api/auth/preferences
  */
 export async function getUserPreferences(): Promise<{
   priorities: Record<string, number>;
   ojoType: { name: string; displayName: string } | null;
+  appSettings: Record<string, any>;
+  schedulingPreferences: SchedulingPreferences;
 }> {
   const { get } = await import("./httpClient");
-  return get<{
+  console.debug("[apiClient] getUserPreferences calling /auth/preferences");
+  const response = await get<{
     priorities: Record<string, number>;
     ojoType: { name: string; displayName: string } | null;
+    appSettings: Record<string, any>;
+    schedulingPreferences: SchedulingPreferences;
   }>("/auth/preferences");
+  console.debug("[apiClient] getUserPreferences response:", response);
+  return response;
 }
 
 /**
  * Update user profile
  * PATCH /api/auth/profile
  */
-export async function updateProfile(payload: { name?: string; profileImage?: string; email?: string; username?: string }): Promise<any> {
+export async function updateProfile(payload: {
+  name?: string;
+  profileImage?: string;
+  email?: string;
+  username?: string;
+  settings?: Record<string, any>;
+}): Promise<any> {
   const { patch } = await import("./httpClient");
   return patch<any>("/auth/profile", payload);
+}
+
+/**
+ * Update user app settings
+ * PATCH /api/auth/profile
+ */
+export async function updateAppSettings(settings: Record<string, any>): Promise<any> {
+  const { patch } = await import("./httpClient");
+  console.debug("[apiClient] updateAppSettings sending:", { settings });
+  const response = await patch<any>("/auth/profile", { settings });
+  console.debug("[apiClient] updateAppSettings response:", response);
+  return response;
 }
 
 /**
@@ -169,4 +194,39 @@ export async function deleteAccount(): Promise<any> {
   return del<any>("/auth/account");
 }
 
-export default { setApiBase, setAuthToken, login, register, updateCategoryPriorities, getUserPreferences, uploadProfileImage, updateProfile, deleteAccount };
+export type SchedulingPreferences = { minGapMinutes: number };
+
+/**
+ * Get scheduling preferences (minGapMinutes)
+ * — already returned by GET /api/auth/preferences, but available standalone too
+ */
+export async function getSchedulingPreferences(): Promise<SchedulingPreferences> {
+  const { get } = await import("./httpClient");
+  const data = await get<{ schedulingPreferences: SchedulingPreferences }>("/auth/preferences");
+  return data.schedulingPreferences ?? { minGapMinutes: 10 };
+}
+
+/**
+ * Update scheduling preferences
+ * PATCH /api/auth/scheduling-preferences
+ */
+export async function updateSchedulingPreferences(prefs: SchedulingPreferences): Promise<SchedulingPreferences> {
+  const { patch } = await import("./httpClient");
+  const data = await patch<{ schedulingPreferences: SchedulingPreferences }>("/auth/scheduling-preferences", prefs);
+  return data.schedulingPreferences;
+}
+
+export default {
+  setApiBase,
+  setAuthToken,
+  login,
+  register,
+  updateCategoryPriorities,
+  getUserPreferences,
+  uploadProfileImage,
+  updateProfile,
+  updateAppSettings,
+  deleteAccount,
+  getSchedulingPreferences,
+  updateSchedulingPreferences,
+};

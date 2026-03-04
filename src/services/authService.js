@@ -1,17 +1,17 @@
 /**
  * @fileoverview Authentication & User Service
  * @module services/authService
- * 
+ *
  * Consolidated service for user authentication and profile management.
  * Handles registration, login, and user profile operations.
- * 
+ *
  * Key responsibilities:
  * - User registration with password hashing
  * - User login with credential verification
  * - Fetch and update user profiles
  * - Manage user priority preferences
  * - Update routine settings
- * 
+ *
  * @requires bcrypt - For secure password hashing
  * @requires models/User - User database model
  */

@@ -9,6 +9,7 @@ import AppText from "../common/AppText";
 import Tag from "../inputs/tag";
 import Icon from "../icons/Icon";
 import { COLORS, SPACING, ICON_SIZES } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 import Widget from "../special/Widget";
 import List, { ListCellProps } from "../layout/List";
 import { getCategoryMeta } from "../../config/categoryMeta";
@@ -64,6 +65,7 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({
   entranceDuration,
 }) => {
   const tasks: Task[] = data.tasks || [];
+  const colors = useColors();
   const [checkedTasks, setCheckedTasks] = useState<Set<string>>(new Set());
   const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
   const { notifyTaskUpdate } = useTaskContext();
@@ -179,7 +181,7 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({
       <Widget
         {...getWidgetEntranceProps({ entranceEnabled, entranceDelay, entranceDuration }, { skipAnimation: true })}
       >
-        <AppText variant="notes" style={styles.emptyText}>
+        <AppText variant="notes" style={[styles.emptyText, { color: colors.gray1 }]}>
           No tasks found
         </AppText>
       </Widget>
@@ -212,7 +214,10 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({
                 <AppText
                   variant="boldText"
                   numberOfLines={2}
-                  style={[styles.taskTitle, checkedTasks.has(task.id) && styles.taskTitleCompleted]}
+                  style={[
+                    styles.taskTitle,
+                    checkedTasks.has(task.id) && [styles.taskTitleCompleted, { color: colors.gray1 }],
+                  ]}
                 >
                   {task.title || (task as any).taskname || "Untitled task"}
                 </AppText>
@@ -242,6 +247,7 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({
               categoryDisplay={getCategoryDisplay(task.category, task.categoryDisplay)}
               subcategory={task.subcategory}
               subcategoryDisplay={task.subcategoryDisplay}
+              subCategory={(task as any).subCategory || null}
               importance={task.importance}
               effort={task.effort}
             />
@@ -270,7 +276,7 @@ const TaskListWidget: React.FC<BaseWidgetProps> = ({
     return {
       id: task.id,
       content,
-      dividerColor: COLORS.white,
+      dividerColor: colors.bg1,
     } as ListCellProps;
   });
 
@@ -290,9 +296,8 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     flex: 1,
   },
-  emptyText: {
-    color: COLORS.lightGray,
-  },
+  emptyText: {},
+
   taskItem: {
     flexDirection: "row",
     paddingVertical: SPACING.xs,
@@ -309,7 +314,6 @@ const styles = StyleSheet.create({
     height: SPACING.xlg,
     borderRadius: SPACING.sm,
     borderWidth: SPACING.xs,
-    borderColor: COLORS.darkGray,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -339,16 +343,14 @@ const styles = StyleSheet.create({
   },
   taskTitleCompleted: {
     textDecorationLine: "line-through",
-    color: COLORS.lightGray,
   },
   taskMeta: {
     flexDirection: "row",
     gap: SPACING.sm,
     alignItems: "center",
   },
-  metaText: {
-    color: COLORS.darkGray,
-  },
+  metaText: {},
+
   importanceBadge: {
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,

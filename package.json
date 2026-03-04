@@ -15,6 +15,7 @@
     "test:security": "node scripts/test_security_hardening.js",
     "test:security:integration": "node scripts/test_security_integration.js",
     "migrate:memories": "node scripts/migrate_memories_to_users.js",
+    "init:subcategories": "node src/scripts/initialize_general_subcategories.js",
     "test:no-premade-messages": "node scripts/check_no_premade_task_messages.cjs",
     "lint": "echo \"(add ESLint if you want)\"",
     "pytest": "pip install -r requirements.txt && pytest -q",

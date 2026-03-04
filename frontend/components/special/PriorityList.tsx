@@ -17,6 +17,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { COLORS, SPACING, SHADOWS, TYPOGRAPHY, COMPONENT_STYLES, DIVIDER, ICON_SIZES } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 import { ICONS } from "../icons/icons";
 
 export type PriorityListItem = {
@@ -35,6 +36,7 @@ interface PriorityListProps {
  * @param item - The item to render.
  */
 const SortableItem: React.FC<{ item: PriorityListItem }> = ({ item }) => {
+  const colors = useColors();
   const [hovered, setHovered] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
 
@@ -50,7 +52,7 @@ const SortableItem: React.FC<{ item: PriorityListItem }> = ({ item }) => {
   const cardStyle: CSSProperties = {
     padding: SPACING.sm,
     ...(COMPONENT_STYLES.listItem as any),
-    backgroundColor: isDragging ? COLORS.white3 : hovered ? COLORS.white2 : "transparent",
+    backgroundColor: isDragging ? colors.bg3 : hovered ? colors.bg2 : "transparent",
     display: "flex",
     flexDirection: "row",
     height: SPACING.lg * 2,
@@ -85,7 +87,7 @@ const SortableItem: React.FC<{ item: PriorityListItem }> = ({ item }) => {
         <span style={textStyle}>{item.label}</span>
       </div>
       <button type="button" aria-label={`Reorder ${item.label}`} style={handleStyle} {...listeners}>
-        <ICONS.move size={ICON_SIZES.sm} color={active ? COLORS.darkGray : COLORS.lightGray} />
+        <ICONS.move size={ICON_SIZES.sm} color={active ? colors.gray2 : colors.gray1} />
       </button>
     </div>
   );

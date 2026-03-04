@@ -23,6 +23,7 @@ type NotificationSettingsProps = {
 };
 
 export default function NotificationSettings({ style }: NotificationSettingsProps) {
+  const colors = useColors();
   const {
     isInitialized,
     isLoading,
@@ -75,7 +76,7 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
   const handleToggleMorningDigest = async (enabled: boolean) => {
     setIsSaving(true);
     await updatePreferences({
-      morningDigest: { 
+      morningDigest: {
         enabled,
         hour: preferences?.morningDigest?.hour ?? 8,
         minute: preferences?.morningDigest?.minute ?? 0,
@@ -87,7 +88,7 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
   const handleMorningDigestTimeChange = async (hour: number, minute: number) => {
     setIsSaving(true);
     await updatePreferences({
-      morningDigest: { 
+      morningDigest: {
         enabled: preferences?.morningDigest?.enabled ?? true,
         hour,
         minute,
@@ -99,7 +100,7 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
   const handleToggleTaskReminders = async (enabled: boolean) => {
     setIsSaving(true);
     await updatePreferences({
-      taskReminders: { 
+      taskReminders: {
         enabled,
         defaultReminderMinutes: preferences?.taskReminders?.defaultReminderMinutes ?? 60,
         useSmartReminders: preferences?.taskReminders?.useSmartReminders ?? true,
@@ -111,7 +112,7 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
   const handleToggleSmartReminders = async (useSmartReminders: boolean) => {
     setIsSaving(true);
     await updatePreferences({
-      taskReminders: { 
+      taskReminders: {
         enabled: preferences?.taskReminders?.enabled ?? true,
         defaultReminderMinutes: preferences?.taskReminders?.defaultReminderMinutes ?? 60,
         useSmartReminders,
@@ -164,9 +165,9 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
     setIsTestingMorningDigest(true);
     try {
       const result = await post("/notifications/test/morning-digest", {});
-      console.log('Morning digest test triggered:', result);
+      console.log("Morning digest test triggered:", result);
     } catch (error) {
-      console.error('Error testing morning digest:', error);
+      console.error("Error testing morning digest:", error);
     } finally {
       setIsTestingMorningDigest(false);
     }
@@ -179,7 +180,7 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
       const result = await post("/notifications/test/task-reminder", { useSmartReminders: true, useOjo: false });
       console.log('Smart reminder test triggered:', result);
     } catch (error) {
-      console.error('Error testing smart reminder:', error);
+      console.error("Error testing smart reminder:", error);
     } finally {
       setIsTestingSmartReminder(false);
     }
@@ -192,7 +193,7 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
       const result = await post("/notifications/test/task-reminder", { useSmartReminders: false, useOjo: false });
       console.log('Default reminder test triggered:', result);
     } catch (error) {
-      console.error('Error testing default reminder:', error);
+      console.error("Error testing default reminder:", error);
     } finally {
       setIsTestingDefaultReminder(false);
     }
@@ -201,10 +202,10 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
   const handleTestSmartCalculation = async () => {
     try {
       const result = await post("/notifications/test/smart-reminder", {});
-      console.log('Smart reminder calculation:', result);
+      console.log("Smart reminder calculation:", result);
       setSmartReminderResult(result);
     } catch (error) {
-      console.error('Error testing smart calculation:', error);
+      console.error("Error testing smart calculation:", error);
       setSmartReminderResult({ success: false, error: "Failed to calculate" });
     }
   };
@@ -238,7 +239,9 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
 
           {error && (
             <View style={styles.errorBox}>
-              <AppText variant="notes" style={styles.errorText}>{error}</AppText>
+              <AppText variant="notes" style={styles.errorText}>
+                {error}
+              </AppText>
             </View>
           )}
 
@@ -279,15 +282,17 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
       {/* Main Settings */}
       <Box title="Notification Preferences" titleColor={COLORS.primary1}>
         <View style={styles.boxContent}>
-          <AppText variant="bodyText" style={styles.description}>
+          <AppText variant="bodyText" style={[styles.description, { color: colors.gray2 }]}>
             Customize how and when you receive notifications from Mojo.
           </AppText>
 
           {/* Master toggle */}
-          <View style={styles.settingRow}>
+          <View style={[styles.settingRow, { borderBottomColor: colors.bg3 }]}>
             <View style={styles.settingInfo}>
-              <AppText variant="boldText" style={styles.settingLabel}>All Notifications</AppText>
-              <AppText variant="notes" style={styles.settingDescription}>
+              <AppText variant="boldText" style={[styles.settingLabel, { color: colors.text1 }]}>
+                All Notifications
+              </AppText>
+              <AppText variant="notes" style={[styles.settingDescription, { color: colors.gray1 }]}>
                 Enable or disable all push notifications
               </AppText>
             </View>
@@ -295,42 +300,48 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
               value={preferences?.enabled ?? false}
               onValueChange={handleToggleNotifications}
               disabled={isSaving}
-              trackColor={{ false: COLORS.white2, true: COLORS.primary1 }}
-              thumbColor={preferences?.enabled ? COLORS.colorWhite : COLORS.lightGray}
+              trackColor={{ false: colors.bg2, true: COLORS.primary1 }}
+              thumbColor={preferences?.enabled ? colors.text2 : colors.gray1}
             />
           </View>
 
           {preferences?.enabled && (
             <>
               {/* Morning Digest */}
-              <View style={styles.settingRow}>
+              <View style={[styles.settingRow, { borderBottomColor: colors.bg3 }]}>
                 <View style={styles.settingInfo}>
-                  <AppText variant="boldText" style={styles.settingLabel}>🌅 Morning Digest</AppText>
-                  <AppText variant="notes" style={styles.settingDescription}>
-                    Daily summary at {String(preferences?.morningDigest?.hour || 8).padStart(2, '0')}:{String(preferences?.morningDigest?.minute || 0).padStart(2, '0')}
+                  <AppText variant="boldText" style={[styles.settingLabel, { color: colors.text1 }]}>
+                    🌅 Morning Digest
+                  </AppText>
+                  <AppText variant="notes" style={[styles.settingDescription, { color: colors.gray1 }]}>
+                    Daily summary at {String(preferences?.morningDigest?.hour || 8).padStart(2, "0")}:
+                    {String(preferences?.morningDigest?.minute || 0).padStart(2, "0")}
                   </AppText>
                 </View>
                 <Switch
                   value={preferences?.morningDigest?.enabled ?? true}
                   onValueChange={handleToggleMorningDigest}
                   disabled={isSaving}
-                  trackColor={{ false: COLORS.white2, true: COLORS.primary1 }}
-                  thumbColor={preferences?.morningDigest?.enabled ? COLORS.colorWhite : COLORS.lightGray}
+                  trackColor={{ false: colors.bg2, true: COLORS.primary1 }}
+                  thumbColor={preferences?.morningDigest?.enabled ? colors.text2 : colors.gray1}
                 />
               </View>
 
               {/* Morning Digest Time Picker */}
               {preferences?.morningDigest?.enabled && (
                 <View style={styles.timePickerContainer}>
-                  <AppText variant="boldText" style={styles.timePickerLabel}>Set Digest Time</AppText>
+                  <AppText variant="boldText" style={styles.timePickerLabel}>
+                    Set Digest Time
+                  </AppText>
                   <View style={styles.timeInputGroup}>
                     {/* Hour Selector */}
                     <View style={styles.timeInputContainer}>
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         onPress={() => {
-                          const newHour = (preferences?.morningDigest?.hour || 8) > 0 
-                            ? (preferences?.morningDigest?.hour || 8) - 1 
-                            : 23;
+                          const newHour =
+                            (preferences?.morningDigest?.hour || 8) > 0
+                              ? (preferences?.morningDigest?.hour || 8) - 1
+                              : 23;
                           handleMorningDigestTimeChange(newHour, preferences?.morningDigest?.minute || 0);
                         }}
                         disabled={isSaving}
@@ -339,13 +350,14 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
                         <Text style={styles.timeButtonText}>−</Text>
                       </TouchableOpacity>
                       <AppText variant="title2" style={styles.timeDisplay}>
-                        {String(preferences?.morningDigest?.hour || 8).padStart(2, '0')}
+                        {String(preferences?.morningDigest?.hour || 8).padStart(2, "0")}
                       </AppText>
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         onPress={() => {
-                          const newHour = (preferences?.morningDigest?.hour || 8) < 23 
-                            ? (preferences?.morningDigest?.hour || 8) + 1 
-                            : 0;
+                          const newHour =
+                            (preferences?.morningDigest?.hour || 8) < 23
+                              ? (preferences?.morningDigest?.hour || 8) + 1
+                              : 0;
                           handleMorningDigestTimeChange(newHour, preferences?.morningDigest?.minute || 0);
                         }}
                         disabled={isSaving}
@@ -354,14 +366,17 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
                         <Text style={styles.timeButtonText}>+</Text>
                       </TouchableOpacity>
                     </View>
-                    <AppText variant="title2" style={styles.timeSeparator}>:</AppText>
+                    <AppText variant="title2" style={styles.timeSeparator}>
+                      :
+                    </AppText>
                     {/* Minute Selector */}
                     <View style={styles.timeInputContainer}>
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         onPress={() => {
-                          const newMinute = (preferences?.morningDigest?.minute || 0) > 0 
-                            ? (preferences?.morningDigest?.minute || 0) - 1 
-                            : 59;
+                          const newMinute =
+                            (preferences?.morningDigest?.minute || 0) > 0
+                              ? (preferences?.morningDigest?.minute || 0) - 1
+                              : 59;
                           handleMorningDigestTimeChange(preferences?.morningDigest?.hour || 8, newMinute);
                         }}
                         disabled={isSaving}
@@ -370,13 +385,14 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
                         <Text style={styles.timeButtonText}>−</Text>
                       </TouchableOpacity>
                       <AppText variant="title2" style={styles.timeDisplay}>
-                        {String(preferences?.morningDigest?.minute || 0).padStart(2, '0')}
+                        {String(preferences?.morningDigest?.minute || 0).padStart(2, "0")}
                       </AppText>
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         onPress={() => {
-                          const newMinute = (preferences?.morningDigest?.minute || 0) < 59 
-                            ? (preferences?.morningDigest?.minute || 0) + 1 
-                            : 0;
+                          const newMinute =
+                            (preferences?.morningDigest?.minute || 0) < 59
+                              ? (preferences?.morningDigest?.minute || 0) + 1
+                              : 0;
                           handleMorningDigestTimeChange(preferences?.morningDigest?.hour || 8, newMinute);
                         }}
                         disabled={isSaving}
@@ -386,15 +402,19 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
                       </TouchableOpacity>
                     </View>
                   </View>
-                  <AppText variant="notes" style={styles.timePickerHint}>Tap +/− to adjust the time</AppText>
+                  <AppText variant="notes" style={styles.timePickerHint}>
+                    Tap +/− to adjust the time
+                  </AppText>
                 </View>
               )}
 
               {/* Task Reminders */}
-              <View style={styles.settingRow}>
+              <View style={[styles.settingRow, { borderBottomColor: colors.bg3 }]}>
                 <View style={styles.settingInfo}>
-                  <AppText variant="boldText" style={styles.settingLabel}>⏰ Task Reminders</AppText>
-                  <AppText variant="notes" style={styles.settingDescription}>
+                  <AppText variant="boldText" style={[styles.settingLabel, { color: colors.text1 }]}>
+                    ⏰ Task Reminders
+                  </AppText>
+                  <AppText variant="notes" style={[styles.settingDescription, { color: colors.gray1 }]}>
                     Get reminded before task deadlines
                   </AppText>
                 </View>
@@ -402,17 +422,19 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
                   value={preferences?.taskReminders?.enabled ?? true}
                   onValueChange={handleToggleTaskReminders}
                   disabled={isSaving}
-                  trackColor={{ false: COLORS.white2, true: COLORS.primary1 }}
-                  thumbColor={preferences?.taskReminders?.enabled ? COLORS.colorWhite : COLORS.lightGray}
+                  trackColor={{ false: colors.bg2, true: COLORS.primary1 }}
+                  thumbColor={preferences?.taskReminders?.enabled ? colors.text2 : colors.gray1}
                 />
               </View>
 
               {/* Smart Reminders */}
               {preferences?.taskReminders?.enabled && (
-                <View style={[styles.settingRow, styles.nestedSetting]}>
+                <View style={[styles.settingRow, styles.nestedSetting, { borderBottomColor: colors.bg3 }]}>
                   <View style={styles.settingInfo}>
-                    <AppText variant="boldText" style={styles.settingLabel}>🧠 Smart Reminders</AppText>
-                    <AppText variant="notes" style={styles.settingDescription}>
+                    <AppText variant="boldText" style={[styles.settingLabel, { color: colors.text1 }]}>
+                      🧠 Smart Reminders
+                    </AppText>
+                    <AppText variant="notes" style={[styles.settingDescription, { color: colors.gray1 }]}>
                       Use AI to optimize reminder timing
                     </AppText>
                   </View>
@@ -420,8 +442,8 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
                     value={preferences?.taskReminders?.useSmartReminders ?? true}
                     onValueChange={handleToggleSmartReminders}
                     disabled={isSaving}
-                    trackColor={{ false: COLORS.white2, true: COLORS.primary1 }}
-                    thumbColor={preferences?.taskReminders?.useSmartReminders ? COLORS.colorWhite : COLORS.lightGray}
+                    trackColor={{ false: colors.bg2, true: COLORS.primary1 }}
+                    thumbColor={preferences?.taskReminders?.useSmartReminders ? colors.text2 : colors.gray1}
                   />
                 </View>
               )}
@@ -534,7 +556,7 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
       {preferences?.enabled && (
         <Box title="Test Notifications" titleColor={COLORS.primary5}>
           <View style={styles.boxContent}>
-            <AppText variant="bodyText" style={styles.description}>
+            <AppText variant="bodyText" style={[styles.description, { color: colors.gray2 }]}>
               Send test notifications to verify your setup is working correctly.
             </AppText>
 
@@ -560,7 +582,9 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
             {/* Task Reminder Tests */}
             {preferences?.taskReminders?.enabled && (
               <View style={styles.testModeSection}>
-                <AppText variant="boldText" style={styles.testModeTitle}>⏰ Task Reminder Tests</AppText>
+                <AppText variant="boldText" style={styles.testModeTitle}>
+                  ⏰ Task Reminder Tests
+                </AppText>
                 <AppText variant="notes" style={styles.testModeDescription}>
                   Test task reminders using your current tasks.
                 </AppText>
@@ -611,11 +635,14 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
                         </AppText>
                         {smartReminderResult.mlPrediction && (
                           <AppText variant="notes" style={styles.calculationText}>
-                            ML Category: {smartReminderResult.mlPrediction.category}/5 - {smartReminderResult.mlPrediction.interpretation}
+                            ML Category: {smartReminderResult.mlPrediction.category}/5 -{" "}
+                            {smartReminderResult.mlPrediction.interpretation}
                           </AppText>
                         )}
                         <AppText variant="notes" style={styles.calculationText}>
-                          Smart: {smartReminderResult.comparison?.smart?.timing?.minutesBefore}min before, {smartReminderResult.comparison?.smart?.timing?.remindCount}x reminders ({smartReminderResult.comparison?.smart?.timing?.urgency})
+                          Smart: {smartReminderResult.comparison?.smart?.timing?.minutesBefore}min before,{" "}
+                          {smartReminderResult.comparison?.smart?.timing?.remindCount}x reminders (
+                          {smartReminderResult.comparison?.smart?.timing?.urgency})
                         </AppText>
                         <AppText variant="notes" style={styles.calculationText}>
                           Default: {smartReminderResult.comparison?.default?.timing?.minutesBefore}min before
@@ -634,26 +661,24 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
             {/* Periodic Test Mode */}
             <View style={styles.testModeSection}>
               <View style={styles.testModeHeader}>
-                <AppText variant="boldText" style={styles.testModeTitle}>🔄 Periodic Test Mode</AppText>
+                <AppText variant="boldText" style={styles.testModeTitle}>
+                  🔄 Periodic Test Mode
+                </AppText>
                 {testModeActive && (
                   <View style={styles.activeIndicator}>
-                    <AppText variant="notes" style={styles.activeIndicatorText}>ACTIVE</AppText>
+                    <AppText variant="notes" style={styles.activeIndicatorText}>
+                      ACTIVE
+                    </AppText>
                   </View>
                 )}
               </View>
               <AppText variant="notes" style={styles.testModeDescription}>
-                {testModeActive 
-                  ? 'Notifications are being sent every minute. Stop to disable.'
-                  : 'Start to receive a test notification every 1 minute.'
-                }
+                {testModeActive
+                  ? "Notifications are being sent every minute. Stop to disable."
+                  : "Start to receive a test notification every 1 minute."}
               </AppText>
               <AppButton
-                title={isTogglingTestMode 
-                  ? "..." 
-                  : testModeActive 
-                    ? "⏹️ Stop Test Mode" 
-                    : "▶️ Start Test Mode"
-                }
+                title={isTogglingTestMode ? "..." : testModeActive ? "⏹️ Stop Test Mode" : "▶️ Start Test Mode"}
                 onPress={handleToggleTestMode}
                 mode="filled"
                 color={testModeActive ? "primary5" : "primary4"}
@@ -669,9 +694,15 @@ export default function NotificationSettings({ style }: NotificationSettingsProp
       {__DEV__ && (
         <Box title="Debug Info" titleColor={COLORS.lightGray}>
           <View style={styles.boxContent}>
-            <AppText variant="notes" style={styles.debugText}>Token: {pushToken?.substring(0, 40)}...</AppText>
-            <AppText variant="notes" style={styles.debugText}>Status: {permissionStatus}</AppText>
-            <AppText variant="notes" style={styles.debugText}>Timezone: {preferences?.timezone}</AppText>
+            <AppText variant="notes" style={styles.debugText}>
+              Token: {pushToken?.substring(0, 40)}...
+            </AppText>
+            <AppText variant="notes" style={styles.debugText}>
+              Status: {permissionStatus}
+            </AppText>
+            <AppText variant="notes" style={styles.debugText}>
+              Timezone: {preferences?.timezone}
+            </AppText>
           </View>
         </Box>
       )}
@@ -713,7 +744,6 @@ const styles = StyleSheet.create({
   },
   settingLabel: {
     fontSize: FONT_SIZES.base,
-    color: COLORS.black,
     marginBottom: 2,
   },
   settingDescription: {
@@ -731,7 +761,6 @@ const styles = StyleSheet.create({
   },
   timePickerLabel: {
     fontSize: FONT_SIZES.sm,
-    color: COLORS.black,
     marginBottom: SPACING.sm,
   },
   timeInputGroup: {
@@ -741,7 +770,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
     marginVertical: SPACING.md,
     width: "100%",
-    direction: "ltr",
+    writingDirection: "ltr",
   },
   timeInputContainer: {
     alignItems: "center",
@@ -768,13 +797,11 @@ const styles = StyleSheet.create({
   },
   timeDisplay: {
     fontSize: moderateScale(32),
-    color: COLORS.black,
     minWidth: moderateScale(50),
     textAlign: "center",
   },
   timeSeparator: {
     fontSize: moderateScale(28),
-    color: COLORS.black,
     marginHorizontal: SPACING.sm,
   },
   timePickerHint: {

@@ -102,7 +102,7 @@ export class AgentController {
 
       // STEP 3: LOAD USER PROFILE
       // Get user's preferences: name, ojoType
-      const user = await User.findById(userId).populate("profile.ojoTypeId");
+      const user = await User.findById(userId).populate("profile.ojoTypeId").populate("subCategories");
       console.log(`[AgentController] User found:`, user ? `${user.username} (${user._id})` : "NOT FOUND");
 
       const userProfile = user?.profile ? { ...user.profile } : {}; // Clone to avoid mutation issues

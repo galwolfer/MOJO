@@ -11,7 +11,8 @@
 import React from "react";
 import { View, StyleSheet, Platform, StyleProp, ViewStyle } from "react-native";
 import AppText from "../common/AppText";
-import { COLORS, SHADOWS, SPACING, FONT_SIZES } from "../../theme";
+import { COLORS, SHADOWS, SPACING, FONT_SIZES, getDynamicColors } from "../../theme";
+import { useTheme } from "../../context/ThemeContext";
 
 type BoxProps = {
   title?: string;
@@ -31,6 +32,7 @@ type BoxProps = {
    * Custom background color for the title bar. Defaults to `COLORS.primary1`.
    */
   titleColor?: string;
+  innerPadding?: boolean;
 };
 
 /**
@@ -46,12 +48,36 @@ const wrapStringChildren = (children?: React.ReactNode): React.ReactNode => {
  * Box - A styled container component with a title bar and content area.
  * @param title - The title to display in the header.
  * @param children - The content to display inside the box.
+ * @param widget - If true, uses a lighter surface color for embedding as a widget.
+ * @param style - Additional styles to apply to the content area.
+ * @param titleColor - Custom background color for the title bar.
+ * @param innerPadding - If true, applies default padding to the content area.
+ * @returns The Box component.
  */
-const Box: React.FC<BoxProps> = ({ title, titleIcon, children, widget = false, style, titleColor }) => {
+const Box: React.FC<BoxProps> = ({
+  title,
+  titleIcon,
+  children,
+  widget = false,
+  style,
+  titleColor,
+  innerPadding = true,
+}) => {
   const wrappedChildren = wrapStringChildren(children);
 
+  // Get theme colors (safely with fallback)
+  let colors;
+  try {
+    const { colors: c } = useTheme();
+    colors = c;
+  } catch {
+    colors = getDynamicColors("light");
+  }
+
   return (
-    <View style={[styles.box, widget ? { backgroundColor: COLORS.white3 } : SHADOWS.card]}>
+    <View
+      style={[styles.box, widget ? { backgroundColor: colors.bg3 } : SHADOWS.card, { backgroundColor: colors.bg2 }]}
+    >
       {title && (
         <View style={[styles.titleWrap, titleColor && { backgroundColor: titleColor }]}>
           {titleIcon ? <View style={styles.titleIcon}>{titleIcon}</View> : null}
@@ -60,7 +86,7 @@ const Box: React.FC<BoxProps> = ({ title, titleIcon, children, widget = false, s
           </AppText>
         </View>
       )}
-      <View style={[styles.content, style]}>{wrappedChildren}</View>
+      <View style={[styles.content, style, innerPadding ? { padding: SPACING.md } : {}]}>{wrappedChildren}</View>
     </View>
   );
 };
@@ -101,7 +127,6 @@ const styles = StyleSheet.create({
     color: COLORS.colorWhite,
   },
   content: {
-    padding: SPACING.md,
     alignSelf: "stretch",
     overflow: "hidden",
   },

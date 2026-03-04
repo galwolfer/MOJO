@@ -13,6 +13,7 @@ import {
 import AppText from "../../components/common/AppText";
 import AppButton from "../../components/common/AppButton";
 import { COLORS, SPACING, SHADOWS, ICON_SIZES } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigation } from "../../context/NavigationContext";
 import { useTaskContext } from "../../context/TaskContext";
@@ -23,9 +24,22 @@ import { StatBadge, ProgressGraph } from "./components";
 import FriendsList from "./components/FriendsList";
 import { moderateScale } from "react-native-size-matters";
 import { getUserStats } from "../../services/userService";
-import { getTasks, getScheduledTasksByDay, calculateTaskProgress, type Task, type TaskProgress } from "../../services/taskService";
+import {
+  getTasks,
+  getScheduledTasksByDay,
+  calculateTaskProgress,
+  type Task,
+  type TaskProgress,
+} from "../../services/taskService";
 import UserAvatar from "../../components/common/UserAvatar";
-import { SettingsScreen, EditPreferencesScreen, ChatSettingsScreen, NotificationSettingsScreen } from "../settings";
+import {
+  SettingsScreen,
+  EditPreferencesScreen,
+  ChatSettingsScreen,
+  NotificationSettingsScreen,
+  AccessibilitySettingsScreen,
+  SubcategoryManager,
+} from "../settings";
 import { useStatsContext } from "../../context/StatsContext";
 
 /**
@@ -66,7 +80,7 @@ const MOCK_FRIENDS = [
   },
   {
     id: "4",
-    name: "Gal Wolter",
+    name: "Gal Wolfer",
     avatar: null,
     isOnline: true,
     stats: { tasks: 28, streak: 456, points: 321 },
@@ -76,14 +90,15 @@ const MOCK_FRIENDS = [
 export default function UserProfileScreen() {
   const { user, signOut } = useAuth();
   const { setHeaderConfig } = useNavigation();
+  const colors = useColors();
   const { width } = useWindowDimensions();
   const { subscribeToTaskUpdates } = useTaskContext();
   const { stats, isLoading: statsLoading, refreshStats } = useStatsContext();
 
   // Screen navigation state
-  const [currentScreen, setCurrentScreen] = useState<"profile" | "settings" | "edit-preferences" | "chat-settings" | "notification-settings">(
-    "profile",
-  );
+  const [currentScreen, setCurrentScreen] = useState<
+    "profile" | "settings" | "edit-preferences" | "chat-settings" | "notification-settings" | "accessibility-settings"
+  >("profile");
 
   const [loading, setLoading] = useState(true);
   const [progressData, setProgressData] = useState<number[]>(DEFAULT_PROGRESS);
@@ -100,7 +115,7 @@ export default function UserProfileScreen() {
     () => (
       <View style={styles.headerProfileSection} pointerEvents="box-none">
         {/* Avatar */}
-        <View style={styles.headerAvatarWrapper}>
+        <View style={[styles.headerAvatarWrapper, { backgroundColor: colors.bg2 }]}>
           <UserAvatar size={moderateScale(110)} imageUri={user?.profileImage ?? null} />
         </View>
 
@@ -109,7 +124,7 @@ export default function UserProfileScreen() {
           {user?.displayName || user?.username || "User"}
         </AppText>
         {user?.username && (
-          <AppText variant="notes" style={styles.headerDisplayName}>
+          <AppText variant="notes" style={[styles.headerDisplayName, { color: colors.gray1 }]}>
             @{user.username}
           </AppText>
         )}
@@ -121,19 +136,19 @@ export default function UserProfileScreen() {
           ) : (
             <View style={styles.headerStatsRow}>
               <StatBadge
-                icon={<CheckIcon size={ICON_SIZES.md} color={COLORS.colorWhite} />}
+                icon={<CheckIcon size={ICON_SIZES.md} color={colors.text2} />}
                 value={stats.tasks}
                 label="Tasks"
                 color={COLORS.primary6}
               />
               <StatBadge
-                icon={<TrophyIcon size={ICON_SIZES.md} color={COLORS.colorWhite} />}
+                icon={<TrophyIcon size={ICON_SIZES.md} color={colors.text2} />}
                 value={stats.points}
                 label="Points"
                 color={COLORS.primary5}
               />
               <StatBadge
-                icon={<FlameIcon size={ICON_SIZES.md} color={COLORS.colorWhite} />}
+                icon={<FlameIcon size={ICON_SIZES.md} color={colors.text2} />}
                 value={stats.streak}
                 label="Days Streak"
                 color={COLORS.primary4}
@@ -143,7 +158,7 @@ export default function UserProfileScreen() {
         </View>
       </View>
     ),
-    [user?.profileImage, user?.displayName, user?.username, loading, statsLoading, stats],
+    [user?.profileImage, user?.displayName, user?.username, loading, statsLoading, stats, colors],
   );
 
   const headerRight = useMemo(
@@ -168,7 +183,7 @@ export default function UserProfileScreen() {
       const taskList = await getTasks();
       console.log("[UserProfile] Got tasks:", taskList.length);
       if (!mountedRef.current) return null;
-      
+
       // Only update tasks state if we got valid data
       if (taskList && taskList.length >= 0) {
         setTasksState(taskList);
@@ -196,11 +211,14 @@ export default function UserProfileScreen() {
             }
           }
 
-          console.log("[UserProfile] Scheduled info:", { 
-            taskIds: scheduledTaskIds.size, 
-            subtaskKeys: scheduledSubtaskKeys.size 
+          console.log("[UserProfile] Scheduled info:", {
+            taskIds: scheduledTaskIds.size,
+            subtaskKeys: scheduledSubtaskKeys.size,
           });
-          const progress = calculateTaskProgress(taskList, 14, { taskIds: scheduledTaskIds, subtaskKeys: scheduledSubtaskKeys });
+          const progress = calculateTaskProgress(taskList, 14, {
+            taskIds: scheduledTaskIds,
+            subtaskKeys: scheduledSubtaskKeys,
+          });
           console.log("[UserProfile] Progress calculated:", {
             todayTotal: progress.today.total,
             todayCompleted: progress.today.completed,
@@ -209,14 +227,14 @@ export default function UserProfileScreen() {
           setTaskProgress(progress);
           // Only update progressData if we have meaningful data or if user has tasks
           // This prevents UI from flashing zeros during refresh
-          if (taskList.length > 0 || progress.dailyProgress.some(p => p > 0)) {
+          if (taskList.length > 0 || progress.dailyProgress.some((p) => p > 0)) {
             setProgressData(progress.dailyProgress);
           }
         } else {
           console.log("[UserProfile] No scheduled tasks for today, using fallback");
           const progress = calculateTaskProgress(taskList, 14);
           setTaskProgress(progress);
-          if (taskList.length > 0 || progress.dailyProgress.some(p => p > 0)) {
+          if (taskList.length > 0 || progress.dailyProgress.some((p) => p > 0)) {
             setProgressData(progress.dailyProgress);
           }
         }
@@ -225,7 +243,7 @@ export default function UserProfileScreen() {
         console.log("[UserProfile] Scheduled fetch failed, using fallback");
         const progress = calculateTaskProgress(taskList, 14);
         setTaskProgress(progress);
-        if (taskList.length > 0 || progress.dailyProgress.some(p => p > 0)) {
+        if (taskList.length > 0 || progress.dailyProgress.some((p) => p > 0)) {
           setProgressData(progress.dailyProgress);
         }
       }
@@ -263,10 +281,13 @@ export default function UserProfileScreen() {
           }
 
           // Recalculate progress with scheduled info using the freshly fetched task list
-          const progress = calculateTaskProgress(taskList, 14, { taskIds: scheduledTaskIds, subtaskKeys: scheduledSubtaskKeys });
+          const progress = calculateTaskProgress(taskList, 14, {
+            taskIds: scheduledTaskIds,
+            subtaskKeys: scheduledSubtaskKeys,
+          });
           setTaskProgress(progress);
           // Only update if meaningful data
-          if (taskList.length > 0 || progress.dailyProgress.some(p => p > 0)) {
+          if (taskList.length > 0 || progress.dailyProgress.some((p) => p > 0)) {
             setProgressData(progress.dailyProgress);
           }
         }
@@ -308,6 +329,8 @@ export default function UserProfileScreen() {
         onEditPreferences={() => setCurrentScreen("edit-preferences")}
         onChatSettings={() => setCurrentScreen("chat-settings")}
         onNotificationSettings={() => setCurrentScreen("notification-settings")}
+        onAccessibilitySettings={() => setCurrentScreen("accessibility-settings")}
+        onSubcategoryManager={() => setCurrentScreen("subcategory-manager")}
       />
     );
   }
@@ -340,11 +363,17 @@ export default function UserProfileScreen() {
 
   // If on Notification Settings screen, render NotificationSettingsScreen
   if (currentScreen === "notification-settings") {
-    return (
-      <NotificationSettingsScreen
-        onBack={() => setCurrentScreen("settings")}
-      />
-    );
+    return <NotificationSettingsScreen onBack={() => setCurrentScreen("settings")} />;
+  }
+
+  // If on Accessibility Settings screen, render AccessibilitySettingsScreen
+  if (currentScreen === "accessibility-settings") {
+    return <AccessibilitySettingsScreen onBack={() => setCurrentScreen("settings")} />;
+  }
+
+  // If on Subcategory Manager screen, render SubcategoryManager
+  if (currentScreen === "subcategory-manager") {
+    return <SubcategoryManager onBack={() => setCurrentScreen("settings")} />;
   }
 
   return (
@@ -364,30 +393,30 @@ export default function UserProfileScreen() {
           ) : (
             <>
               {taskProgress && (
-                <View style={styles.progressSummary}>
+                <View style={[styles.progressSummary, { backgroundColor: colors.bg2 }]}>
                   <View style={styles.progressSummaryItem}>
                     <AppText variant="boldText" style={styles.progressSummaryValue}>
                       {taskProgress.today.completed}/{taskProgress.today.total}
                     </AppText>
-                    <AppText variant="notes" style={styles.progressSummaryLabel}>
+                    <AppText variant="notes" style={[styles.progressSummaryLabel, { color: colors.gray1 }]}>
                       Today
                     </AppText>
                   </View>
-                  <View style={styles.progressSummaryDivider} />
+                  <View style={[styles.progressSummaryDivider, { backgroundColor: colors.gray1 }]} />
                   <View style={styles.progressSummaryItem}>
                     <AppText variant="boldText" style={styles.progressSummaryValue}>
                       {taskProgress.today.percentage}%
                     </AppText>
-                    <AppText variant="notes" style={styles.progressSummaryLabel}>
+                    <AppText variant="notes" style={[styles.progressSummaryLabel, { color: colors.gray1 }]}>
                       Completed
                     </AppText>
                   </View>
-                  <View style={styles.progressSummaryDivider} />
+                  <View style={[styles.progressSummaryDivider, { backgroundColor: colors.gray1 }]} />
                   <View style={styles.progressSummaryItem}>
                     <AppText variant="boldText" style={styles.progressSummaryValue}>
                       {taskProgress.week.completed}
                     </AppText>
-                    <AppText variant="notes" style={styles.progressSummaryLabel}>
+                    <AppText variant="notes" style={[styles.progressSummaryLabel, { color: colors.gray1 }]}>
                       This Week
                     </AppText>
                   </View>
@@ -396,7 +425,7 @@ export default function UserProfileScreen() {
               <ProgressGraph data={progressData} width={graphWidth} height={moderateScale(100)} />
             </>
           )}
-          <AppText variant="notes" style={styles.progressNote}>
+          <AppText variant="notes" style={[styles.progressNote, { color: colors.gray1 }]}>
             {tasks.length > 0
               ? `Track your daily task completion over the last ${progressData.length} days`
               : "Complete tasks to see your progress here!"}
@@ -405,7 +434,7 @@ export default function UserProfileScreen() {
       </Box>
 
       {/* Logout Button */}
-      <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
+      <TouchableOpacity style={[styles.logoutButton, { backgroundColor: colors.bg1 }]} onPress={signOut}>
         <AppText variant="boldText" style={styles.logoutText}>
           Logout
         </AppText>

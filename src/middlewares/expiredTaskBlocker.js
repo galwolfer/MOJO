@@ -12,14 +12,17 @@ const ALLOWED_ROUTES = [
   "/api/users/login",
   "/api/users/register",
   "/api/users/logout",
-  
+
   // Health check
   "/api/health",
   "/health",
-  
+
   // Expired tasks routes (so user can handle them!)
   "/api/tasks/expired",
-  
+
+  // Overdue tasks check (used by frontend to detect and redirect on startup)
+  "/api/tasks/overdue",
+
   // Static files
   "/static",
   "/public",
@@ -34,13 +37,13 @@ function isRouteAllowed(path) {
 
 /**
  * Middleware to block users with expired tasks
- * 
+ *
  * If the user has expired tasks, they get a 403 response with details
  * about what tasks need to be handled.
- * 
+ *
  * Usage:
  *   app.use(expiredTaskBlocker);
- * 
+ *
  * Or for specific routes:
  *   router.get('/dashboard', expiredTaskBlocker, dashboardHandler);
  */
@@ -88,15 +91,6 @@ export async function expiredTaskBlocker(req, res, next) {
           url: "/api/tasks/expired/:taskId/extend",
           body: { newDeadline: "ISO date string" },
         },
-        forfeit: {
-          method: "DELETE",
-          url: "/api/tasks/expired/:taskId/forfeit",
-        },
-        handleAll: {
-          method: "POST",
-          url: "/api/tasks/expired/:taskId/handle",
-          body: { action: "extend|forfeit", newDeadline: "for extend only" },
-        },
       },
     });
   } catch (error) {
@@ -116,7 +110,7 @@ export async function expiredTaskWarner(req, res, next) {
 
     if (userId) {
       const hasExpired = await userHasExpiredTasks(userId);
-      
+
       if (hasExpired) {
         // Add warning header but don't block
         res.setHeader("X-Expired-Tasks", "true");

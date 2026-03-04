@@ -1,6 +1,7 @@
 import React from "react";
 import { Animated, Platform, TextInput, TextInputProps, StyleSheet } from "react-native";
 import { TYPOGRAPHY, COLORS } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 
 interface InputFieldProps extends TextInputProps {
   webNativeID?: string | null;
@@ -14,13 +15,15 @@ interface InputFieldProps extends TextInputProps {
  * @param rest - Other TextInput props.
  */
 const InputField = React.forwardRef<TextInput, InputFieldProps>(({ webNativeID, placeholderText, ...rest }, ref) => {
+  const colors = useColors();
+
   return (
     <Animated.View style={styles.container}>
       <TextInput
         ref={ref}
-        style={[styles.input]}
+        style={[styles.input, { color: colors.text1 }]}
         placeholder={placeholderText ?? undefined}
-        placeholderTextColor={COLORS.lightGray}
+        placeholderTextColor={colors.gray1}
         {...((Platform as any).OS === "web" && webNativeID ? { nativeID: webNativeID } : {})}
         {...rest}
       />

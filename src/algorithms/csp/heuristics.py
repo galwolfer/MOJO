@@ -9,25 +9,68 @@ def select_variable_mrv(unassigned_variables: List[Dict], rng: Optional[random.R
     if not unassigned_variables:
         return None
 
-    # Find minimal domain size
-    best_domain_size = min(len(e.get("domain", [])) for e in unassigned_variables)
-    # Collect candidates with minimal domain size
-    candidates = [e for e in unassigned_variables if len(e.get("domain", [])) == best_domain_size]
+    # ORDERING CONSTRAINT: Only consider chunks whose previous chunks are already assigned
+    # Filter out chunks that can't be scheduled yet due to ordering
+    selectable = []
+    for entry in unassigned_variables:
+        var = entry.get("variable", {})
+        var_id = var.get("id", "")
+        
+        # Check if this is a chunk variable
+        if "_chunk_" in var_id:
+            parts = var_id.split("_chunk_")
+            if len(parts) == 2:
+                task_id = parts[0]
+                try:
+                    chunk_num = int(parts[1])
+                except:
+                    chunk_num = 0
+                
+                # For chunk N, check if all chunks 0..N-1 are already assigned
+                # We do this by checking if they're in the unassigned list
+                can_select = True
+                for prev_chunk in range(chunk_num):
+                    prev_chunk_id = f"{task_id}_chunk_{prev_chunk}"
+                    # If previous chunk is still unassigned, can't select this one yet
+                    if any(e.get("variable", {}).get("id") == prev_chunk_id for e in unassigned_variables):
+                        can_select = False
+                        break
+                
+                if can_select:
+                    selectable.append(entry)
+            else:
+                selectable.append(entry)
+        else:
+            selectable.append(entry)
+    
+    if not selectable:
+        return None
 
-    if len(candidates) == 1:
-        return candidates[0]
-
-    # Tie-break by highest priorityScore
-    max_priority = max(c.get("variable", {}).get("priorityScore", 0) for c in candidates)
-    priority_candidates = [c for c in candidates if c.get("variable", {}).get("priorityScore", 0) == max_priority]
-
-    if len(priority_candidates) == 1:
-        return priority_candidates[0]
-
-    # Final tie-break: deterministic choice if no rng, otherwise random choice
-    if rng:
-        return rng.choice(priority_candidates)
-    return priority_candidates[0]
+    # CRITICAL FIX: Among selectable variables, prioritize by CHUNK INDEX first
+    # This ensures chunk_0 is selected before chunk_1, chunk_1 before chunk_2, etc.
+    def get_chunk_index(entry):
+        var_id = entry.get("variable", {}).get("id", "")
+        if "_chunk_" in var_id:
+            parts = var_id.split("_chunk_")
+            if len(parts) == 2:
+                try:
+                    return int(parts[1])
+                except:
+                    pass
+        return 999999  # Non-chunk variables get high index (scheduled last)
+    
+    # Sort by: chunk index (ascending), then domain size (ascending), then priority (descending)
+    selectable_sorted = sorted(
+        selectable,
+        key=lambda e: (
+            get_chunk_index(e),  # Lower chunk indices first
+            len(e.get("domain", [])),  # Smaller domain (MRV)
+            -e.get("variable", {}).get("priorityScore", 0)  # Higher priority
+        )
+    )
+    
+    # Return the first one (lowest chunk index, smallest domain, highest priority)
+    return selectable_sorted[0]
 
 
 def order_values_lcv(domain: List[dict], score_fn, rng: Optional[random.Random] = None) -> List[dict]:

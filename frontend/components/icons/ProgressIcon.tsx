@@ -7,7 +7,7 @@
  */
 import { motion, useSpring, useTransform, useMotionValue, animate } from "motion/react";
 import { useEffect } from "react";
-import { COLORS } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 const svgPaths = { p24bd7b90: "M7 9.06818L8.33333 11.25L11 7.25" };
 
 interface ProgressIconProps {
@@ -21,6 +21,8 @@ interface ProgressIconProps {
  * @param size - The size of the icon.
  */
 export function ProgressIcon({ value, size = 18 }: ProgressIconProps) {
+  const colors = useColors();
+
   // Clamp value between 0 and 1
   const clampedValue = Math.max(0, Math.min(1, value));
   2;
@@ -56,9 +58,9 @@ export function ProgressIcon({ value, size = 18 }: ProgressIconProps) {
 
   // Calculate color based on progress
   const getColor = (progress: number) => {
-    if (progress < 0.52) return COLORS.primary7; // Red (theme)
-    if (progress < 0.82) return COLORS.primary5; // Yellow (theme)
-    return COLORS.primary6; // Green (theme)
+    if (progress < 0.52) return colors.primary7; // Red (theme)
+    if (progress < 0.82) return colors.primary5; // Yellow (theme)
+    return colors.primary6; // Green (theme)
   };
 
   // Progress circle parameters
@@ -75,7 +77,7 @@ export function ProgressIcon({ value, size = 18 }: ProgressIconProps) {
   const fillY = useTransform(
     springValue,
     [0, 0.8, 0.9, 1],
-    [centerY + radius, centerY - radius * 0.6, centerY - radius * 0.64, centerY - radius]
+    [centerY + radius, centerY - radius * 0.6, centerY - radius * 0.64, centerY - radius],
   );
 
   // Stroke width increases during completion animation
@@ -104,7 +106,7 @@ export function ProgressIcon({ value, size = 18 }: ProgressIconProps) {
   const checkScale = useTransform(
     completionProgress,
     [0, 0.52, 0.77, 1],
-    [0.52, 1.15, 0.95, 1] // Starts small, overshoots, pulls back, settles
+    [0.52, 1.15, 0.95, 1], // Starts small, overshoots, pulls back, settles
   );
 
   return (
@@ -153,7 +155,7 @@ export function ProgressIcon({ value, size = 18 }: ProgressIconProps) {
         {/* Checkmark (complete state) - drawn animation */}
         <motion.path
           d={svgPaths.p24bd7b90}
-          stroke={COLORS.primary6}
+          stroke={colors.primary6}
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"

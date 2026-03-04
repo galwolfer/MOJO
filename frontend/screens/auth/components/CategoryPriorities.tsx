@@ -16,6 +16,7 @@ import CategoryGrid from "./CategoryGrid";
 import SliderComponent from "../../../components/inputs/Slider";
 import { CATEGORY_KEYS, getCategoryMeta, CategoryKey } from "../../../config/categoryMeta";
 import { COLORS, SPACING } from "../../../theme";
+import { useColors } from "../../../context/ThemeContext";
 
 type CategoryPrioritiesScreenProps = {
   onComplete: (priorities: Record<string, number>) => void;
@@ -34,6 +35,7 @@ const CategoryPrioritiesScreen: React.FC<CategoryPrioritiesScreenProps> = ({
   onBack,
   initialPriorities = {},
 }) => {
+  const colors = useColors();
   // Initialize priorities with default value of 3 for all categories
   const [priorities, setPriorities] = useState<Record<string, number>>(() => {
     const initial: Record<string, number> = {};
@@ -62,11 +64,11 @@ const CategoryPrioritiesScreen: React.FC<CategoryPrioritiesScreenProps> = ({
   const selectedMeta = selectedCategory ? getCategoryMeta(selectedCategory) : null;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.bg1 }]}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Header message */}
-        <View style={styles.messageBox}>
-          <AppText variant="bodyText" style={styles.messageText}>
+        <View style={[styles.messageBox, { backgroundColor: colors.bg2 }]}>
+          <AppText variant="bodyText" style={[styles.messageText, { color: colors.text1 }]}>
             Great! now after we are over that, lets talk about why are you here.... Your Goals. lets talk about what you
             want to achieve.
           </AppText>
@@ -78,7 +80,7 @@ const CategoryPrioritiesScreen: React.FC<CategoryPrioritiesScreenProps> = ({
         {/* Slider Box - shows when a category is selected */}
         {selectedCategory && selectedMeta && (
           <Box title={selectedMeta.displayName?.toUpperCase()} titleColor={selectedMeta.color} style={styles.sliderBox}>
-            <AppText variant="bodyText" style={styles.sliderDescription}>
+            <AppText variant="bodyText" style={[styles.sliderDescription, { color: colors.gray2 }]}>
               {`If you are looking for developing a new skill or wanting to improve your own skill`}
             </AppText>
             <SliderComponent
@@ -117,7 +119,6 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   messageText: {
-    color: COLORS.black,
     textAlign: "center",
   },
   sliderBox: {

@@ -6,21 +6,22 @@
  */
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
-import AppText from "../../components/common/AppText";
-import AppButton from "../../components/common/AppButton";
-import Box from "../../components/layout/Box";
-import GridEntranceItem from "../../components/common/animations/GridEntranceItem";
-import { ICONS } from "../../components/icons/icons";
-import { COLORS, SPACING, FONT_SIZES, SHADOWS, ICON_SIZES } from "../../theme";
+import AppText from "../../../components/common/AppText";
+import AppButton from "../../../components/common/AppButton";
+import Box from "../../../components/layout/Box";
+import GridEntranceItem from "../../../components/common/animations/GridEntranceItem";
+import { ICONS } from "../../../components/icons/icons";
+import { COLORS, SPACING, FONT_SIZES, SHADOWS, ICON_SIZES } from "../../../theme";
+import { useColors } from "../../../context/ThemeContext";
 import { moderateScale } from "react-native-size-matters";
-import { getAllOjoTypes, type OjoTypeName } from "../../config/ojoTypeConfig";
-import { useNavigation } from "../../context/NavigationContext";
-import { useLayout } from "../../context/LayoutContext";
-import { useKeyboard } from "../../hooks";
-import { getUserPreferences } from "../../services/apiClient";
-import { patch, setAuthToken } from "../../services/httpClient";
-import { useAuth } from "../../context/AuthContext";
-import { useOjo } from "../../context/OjoContext";
+import { getAllOjoTypes, type OjoTypeName } from "../../../config/ojoTypeConfig";
+import { useNavigation } from "../../../context/NavigationContext";
+import { useLayout } from "../../../context/LayoutContext";
+import { useKeyboard } from "../../../hooks";
+import { getUserPreferences } from "../../../services/apiClient";
+import { patch, setAuthToken } from "../../../services/httpClient";
+import { useAuth } from "../../../context/AuthContext";
+import { useOjo } from "../../../context/OjoContext";
 
 type ChatSettingsScreenProps = {
   onBack: () => void;
@@ -28,6 +29,7 @@ type ChatSettingsScreenProps = {
 };
 
 export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScreenProps) {
+  const colors = useColors();
   const { setHeaderConfig } = useNavigation();
   const { token } = useAuth();
   const { visible: keyboardVisible, height: keyboardHeight } = useKeyboard();
@@ -88,13 +90,13 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
       show: true,
       icon: ICONS.ojo,
       leftElement: (
-        <TouchableOpacity onPress={handleBackPress} style={styles.headerRightTouchable}>
-          <LeftIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
+        <TouchableOpacity onPress={handleBackPress} >
+          <LeftIcon size={ICON_SIZES.md} color={COLORS.primary1} />
         </TouchableOpacity>
       ),
       rightElement: (
         <View style={styles.headerLeft}>
-          <OjoIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
+          <OjoIcon size={ICON_SIZES.md} color={COLORS.primary1} />
         </View>
       ),
     });
@@ -141,9 +143,9 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.bg3 }]}>
         <ActivityIndicator size="large" color={COLORS.primary1} />
-        <AppText variant="bodyText" style={styles.loadingText}>
+        <AppText variant="bodyText" style={[styles.loadingText, { color: colors.gray1 }]}>
           Loading chat settings...
         </AppText>
       </View>
@@ -152,7 +154,7 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
 
   return (
     <ScrollView
-      style={styles.scroll}
+      style={[styles.scroll, { backgroundColor: colors.bg3 }]}
       contentContainerStyle={[
         styles.contentContainer,
         {
@@ -211,8 +213,8 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
                     style={[
                       styles.card,
                       {
-                        backgroundColor: COLORS.white,
-                        borderColor: isSelected ? ojo.color : COLORS.white,
+                        backgroundColor: colors.bg1,
+                        borderColor: isSelected ? ojo.color : colors.bg1,
                         borderWidth: 3,
                         ...(SHADOWS.card as object),
                       },
@@ -239,7 +241,9 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
                     <AppText variant="title3" style={[styles.ojoName, { color: ojo.color }]}>
                       {ojo.displayName}
                     </AppText>
-                    <AppText style={styles.ojoRole}>{ojo.persona.split(" ").slice(0, 3).join(" ")}</AppText>
+                    <AppText style={[styles.ojoRole, { color: colors.gray2 }]}>
+                      {ojo.persona.split(" ").slice(0, 3).join(" ")}
+                    </AppText>
                   </TouchableOpacity>
                 </GridEntranceItem>
               );
@@ -267,7 +271,6 @@ export default function ChatSettingsScreen({ onBack, onSave }: ChatSettingsScree
 const styles = StyleSheet.create({
   scroll: {
     flex: 1,
-    backgroundColor: COLORS.white3,
   },
   contentContainer: {
     flexGrow: 1,
@@ -279,12 +282,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: COLORS.white3,
     gap: SPACING.md,
   },
-  loadingText: {
-    color: COLORS.lightGray,
-  },
+  loadingText: {},
   titleSection: {
     flexDirection: "row",
     alignItems: "center",
@@ -340,6 +340,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+
   errorText: {
     color: COLORS.primary5,
     textAlign: "center",
@@ -376,7 +377,6 @@ const styles = StyleSheet.create({
   },
   ojoRole: {
     fontSize: FONT_SIZES.sm,
-    color: COLORS.darkGray,
     textAlign: "center",
   },
   // Buttons
@@ -398,7 +398,6 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   cancelButton: {
-    backgroundColor: COLORS.white,
     borderWidth: 1,
     borderColor: COLORS.primary5,
   },
@@ -408,9 +407,7 @@ const styles = StyleSheet.create({
   saveButton: {
     backgroundColor: COLORS.primary6,
   },
-  saveButtonText: {
-    color: COLORS.colorWhite,
-  },
+  saveButtonText: {},
   button: {
     width: "48%",
   },

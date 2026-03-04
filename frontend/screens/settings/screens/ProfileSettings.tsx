@@ -1,19 +1,21 @@
 import React, { useEffect, useState, useRef } from "react";
 import { View, StyleSheet, Image, Alert, Platform } from "react-native";
 import { moderateScale } from "react-native-size-matters";
-import AppText from "../../components/common/AppText";
-import Input from "../../components/inputs/Input";
-import AppButton from "../../components/common/AppButton";
-import ProfilePhotoWidget from "../../components/special/ProfilePhotoWidget";
-import ErrorText from "../../components/common/ErrorText";
-import { COLORS, SPACING, SHADOWS } from "../../theme";
-import { useAuth } from "../../context/AuthContext";
-import { ICONS } from "../../components/icons/icons";
-import { updateProfile } from "../../services/apiClient";
-import { Box } from "../../components";
-import UserAvatar from "../../components/common/UserAvatar";
+import AppText from "../../../components/common/AppText";
+import Input from "../../../components/inputs/Input";
+import AppButton from "../../../components/common/AppButton";
+import ProfilePhotoWidget from "../../../components/special/ProfilePhotoWidget";
+import ErrorText from "../../../components/common/ErrorText";
+import { COLORS, SPACING, SHADOWS } from "../../../theme";
+import { useColors } from "../../../context/ThemeContext";
+import { useAuth } from "../../../context/AuthContext";
+import { ICONS } from "../../../components/icons/icons";
+import { updateProfile } from "../../../services/apiClient";
+import { Box } from "../../../components";
+import UserAvatar from "../../../components/common/UserAvatar";
 
 export default function ProfileSettings() {
+  const colors = useColors();
   const { user, signIn, token } = useAuth();
   const UserIcon = ICONS.user;
 
@@ -126,7 +128,7 @@ export default function ProfileSettings() {
 
           try {
             const uploadResp = await (
-              await import("../../services/apiClient")
+              await import("../../../services/apiClient")
             ).uploadProfileImage(newProfileImage as File);
             if (uploadResp && uploadResp.url) updateData.profileImage = uploadResp.url;
             else {
@@ -157,7 +159,7 @@ export default function ProfileSettings() {
             }
 
             const uploadResp = await (
-              await import("../../services/apiClient")
+              await import("../../../services/apiClient")
             ).uploadProfileImage(newProfileImage as string);
             if (uploadResp && uploadResp.url) updateData.profileImage = uploadResp.url;
             else {
@@ -235,7 +237,7 @@ export default function ProfileSettings() {
 
         {isEditMode ? (
           <View style={styles.editForm}>
-            <View style={styles.imageSection}>
+            <View style={[styles.imageSection, { borderBottomColor: colors.bg2 }]}>
               <AppText variant="boldText" style={styles.imageSectionTitle}>
                 Profile Picture
               </AppText>
@@ -279,7 +281,7 @@ export default function ProfileSettings() {
             />
 
             {showPasswordSection && (
-              <View style={styles.passwordSection}>
+              <View style={[styles.passwordSection, { borderTopColor: colors.bg2 }]}>
                 <Input
                   label="Current Password"
                   value={currentPassword}
@@ -335,11 +337,11 @@ export default function ProfileSettings() {
                 {user?.displayName || user?.username || "User"}
               </AppText>
               {user?.username && (
-                <AppText variant="notes" style={styles.userUsername}>
+                <AppText variant="notes" style={[styles.userUsername, { color: colors.gray1 }]}>
                   @{user.username}
                 </AppText>
               )}
-              <AppText variant="notes" style={styles.userEmail}>
+              <AppText variant="notes" style={[styles.userEmail, { color: colors.gray1 }]}>
                 {user?.email || "email@example.com"}
               </AppText>
             </View>
@@ -381,7 +383,6 @@ const styles = StyleSheet.create({
     width: moderateScale(100),
     height: moderateScale(100),
     borderRadius: moderateScale(50),
-    backgroundColor: COLORS.white,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
@@ -412,12 +413,9 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   userUsername: {
-    color: COLORS.lightGray,
     marginTop: SPACING.xs,
   },
-  userEmail: {
-    color: COLORS.lightGray,
-  },
+  userEmail: {},
   editButton: {
     alignSelf: "center",
     paddingVertical: SPACING.sm,
@@ -436,7 +434,6 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
     paddingBottom: SPACING.md,
     borderBottomWidth: SPACING.xs,
-    borderBottomColor: COLORS.white2,
   },
   imageSectionTitle: {
     color: COLORS.primary1,
@@ -465,7 +462,6 @@ const styles = StyleSheet.create({
     marginTop: SPACING.md,
     paddingTop: SPACING.md,
     borderTopWidth: SPACING.xs,
-    borderTopColor: COLORS.white2,
   },
   passwordSectionTitle: {
     color: COLORS.primary1,

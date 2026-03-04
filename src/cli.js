@@ -11,12 +11,20 @@ import { apiClient } from "./utils/apiClient.js";
 
 // Services
 import { getUserById, updateRoutineSettings } from "./services/authService.js";
-import { registerUserApi, loginUserApi, updateUserProfileApi, sendChatMessage, resetChatSession, getChatHistory, checkChatHealth } from "./services/apiService.js";
-import { 
-  createTask, 
-  getTasksForUser, 
-  checkSuggestionFollowed, 
-  updateScheduleEntryStatus, 
+import {
+  registerUserApi,
+  loginUserApi,
+  updateUserProfileApi,
+  sendChatMessage,
+  resetChatSession,
+  getChatHistory,
+  checkChatHealth,
+} from "./services/apiService.js";
+import {
+  createTask,
+  getTasksForUser,
+  checkSuggestionFollowed,
+  updateScheduleEntryStatus,
   updateTask,
   getSubTasksForTask,
   updateSubTask,
@@ -24,13 +32,18 @@ import {
   deleteTask as deleteTaskService,
   createBusyBlock,
   getUpcomingBusyBlocks,
-  findExpiredTasksForUser
+  findExpiredTasksForUser,
 } from "./services/taskService.js";
-import { generatePlan, savePlan, getUpcomingSessions, getRoutineSettings, describeRoutineWindows } from "./services/schedulingService.js";
+import {
+  generatePlan,
+  savePlan,
+  getUpcomingSessions,
+  getRoutineSettings,
+  describeRoutineWindows,
+} from "./services/schedulingService.js";
 import { coacherAlgorithm } from "./services/index.js";
 import { suggestTaskFromProfile } from "./algorithms/priority/suggestions.js";
 import { logEvent } from "./services/telemetryService.js";
-
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
@@ -125,7 +138,7 @@ const preferenceQuestions = [
         continue;
       }
     }
-    
+
     printMenu();
     const choice = (await ask("Choose an option ➤ ")).trim();
     if (choice === "1") await register();
@@ -158,14 +171,14 @@ async function checkAndBlockExpiredTasks() {
   if (!currentUser) return false;
 
   const expiredTasks = await findExpiredTasksForUser(currentUser._id);
-  
+
   if (expiredTasks.length === 0) {
     return false;
   }
 
   // There are expired tasks - force user to handle them
   await handleExpiredTasks();
-  
+
   // If user cancelled (currentUser is now null), return true to restart loop
   return currentUser === null;
 }
@@ -173,17 +186,17 @@ async function checkAndBlockExpiredTasks() {
 function printMenu() {
   console.log(theme.muted("\n═════════════════════════════════════"));
   console.log(theme.title(" Mojo Coacher — Task Companion "));
-  
+
   // Show login status
   if (currentUser) {
     console.log(theme.success(` 👤 Logged in as: ${currentUser.username} `));
   } else {
     console.log(theme.warning(" 🔒 Not logged in "));
   }
-  
+
   console.log(theme.subtitle(" What would you like to do? "));
   console.log(theme.muted("═════════════════════════════════════"));
-  
+
   menuOptions.forEach(({ key, label, requiresAuth }) => {
     // Show appropriate options based on login status
     if (requiresAuth === true && !currentUser) {
@@ -229,7 +242,7 @@ async function register() {
 
   // Optionally collect priorities and update profile
   const wantsPriorities = (await ask("\nWould you like to set your task priorities now? (y/N): ")).trim().toLowerCase();
-  if (wantsPriorities === 'y' || wantsPriorities === 'yes') {
+  if (wantsPriorities === "y" || wantsPriorities === "yes") {
     const priorities = await collectPriorities();
     const updateResult = await updateUserProfileApi({ priorities });
     if (updateResult.success) {
@@ -281,7 +294,7 @@ async function logout() {
   }
 
   const confirm = (await ask(`\nLogout from ${currentUser.username}? (Y/n): `)).trim().toLowerCase();
-  if (confirm === 'n' || confirm === 'no') {
+  if (confirm === "n" || confirm === "no") {
     console.log(theme.muted("Logout cancelled."));
     return;
   }
@@ -291,7 +304,7 @@ async function logout() {
   setAuthToken(null);
   lastSuggestion = null;
   chatSessionId = null;
-  
+
   console.log(theme.success(`👋 Logged out from ${previousUser}. See you next time!`));
 }
 
@@ -303,7 +316,7 @@ async function handleExpiredTasks() {
   if (!currentUser) return;
 
   const expiredTasks = await findExpiredTasksForUser(currentUser._id);
-  
+
   if (expiredTasks.length === 0) {
     return; // No expired tasks, continue normally
   }
@@ -319,7 +332,7 @@ async function handleExpiredTasks() {
   for (let i = 0; i < expiredTasks.length; i++) {
     const task = expiredTasks[i];
     const handled = await handleSingleExpiredTask(task, i + 1, expiredTasks.length);
-    
+
     if (!handled) {
       // User chose to exit - they can't continue until tasks are handled
       console.log(theme.warning("\n⚠️  You must handle all expired tasks to use the app."));
@@ -334,7 +347,7 @@ async function handleExpiredTasks() {
 
 async function handleSingleExpiredTask(task, index, total) {
   const daysOverdue = task.daysOverdue || 0;
-  
+
   console.log(theme.muted("───────────────────────────────────────────────────────────"));
   console.log(theme.title(`  📋 Expired Task ${index}/${total}`));
   console.log(theme.muted("───────────────────────────────────────────────────────────"));
@@ -346,7 +359,7 @@ async function handleSingleExpiredTask(task, index, total) {
   console.log(`  ${theme.error(`  ⏰ ${daysOverdue} day(s) overdue`)}`);
   console.log(`  ${theme.subtitle("Importance:")} ${"⭐".repeat(task.importance || 3)}`);
   console.log("");
-  
+
   console.log(theme.subtitle("What would you like to do?"));
   console.log(`${theme.option("1)")} 📅 Extend deadline (set a new date)`);
   console.log(`${theme.option("2)")} 🗑️  Delete this task (forfeit)`);
@@ -363,14 +376,14 @@ async function handleSingleExpiredTask(task, index, total) {
       // If extension failed, ask again
       continue;
     }
-    
+
     if (choice === "2") {
       // Forfeit/delete task
       const deleted = await forfeitTask(task);
       if (deleted) return true;
       continue;
     }
-    
+
     if (choice === "0") {
       // Cancel - user can't continue
       return false;
@@ -385,14 +398,14 @@ async function extendTaskDeadline(task) {
   console.log(theme.muted("Format: YYYY-MM-DD (e.g., 2025-12-15)\n"));
 
   const input = (await ask("New deadline ➤ ")).trim();
-  
+
   if (!input) {
     console.log(theme.warning("No date entered. Please try again."));
     return false;
   }
 
   const newDate = parseDateOnly(input);
-  
+
   if (!newDate) {
     console.log(theme.error("❌ Invalid date format. Use YYYY-MM-DD."));
     return false;
@@ -400,19 +413,19 @@ async function extendTaskDeadline(task) {
 
   const now = new Date();
   now.setHours(0, 0, 0, 0);
-  
+
   if (newDate <= now) {
     console.log(theme.error("❌ New deadline must be in the future!"));
     return false;
   }
 
   const result = await extendTaskDeadlineService({ taskId: task._id, userId: currentUser._id, newDeadline: newDate });
-  
+
   if (!result.success) {
     console.log(theme.error(`❌ Failed to update task: ${result.error}`));
     return false;
   }
-  
+
   console.log(theme.success(`\n✅ Deadline extended to ${formatLocalDate(newDate)}!`));
   return true;
 }
@@ -422,7 +435,7 @@ async function forfeitTask(task) {
   console.log(theme.muted("This action cannot be undone.\n"));
 
   const confirm = (await ask("Type 'yes' to confirm ➤ ")).trim().toLowerCase();
-  
+
   if (confirm !== "yes") {
     console.log(theme.muted("Deletion cancelled."));
     return false;
@@ -532,13 +545,14 @@ async function addTask() {
   });
 
   console.log(theme.success("✅ Task added! We'll keep its score in sync."));
-  if (created.subCategory?.label) {
+  const createdSubLabel = created.subCategory?.label || created.subCategory?.name;
+  if (createdSubLabel) {
     const confidence = created.subCategory?.confidence;
     const confidenceLabel = Number.isFinite(confidence) ? `${Math.round(confidence * 100)}%` : "n/a";
     console.log(
       theme.muted(
-        `Auto sub-category: ${created.subCategory.label} (${created.subCategory.source}, confidence ${confidenceLabel})`
-      )
+        `Auto sub-category: ${createdSubLabel} (${created.subCategory.source}, confidence ${confidenceLabel})`,
+      ),
     );
   }
 
@@ -565,12 +579,9 @@ async function listTasks() {
   console.log(theme.accent(`\n${currentUser.username}'s tasks:`));
   tasks.forEach((task, index) => {
     const category = task.category || "uncategorized";
-    const subCategory = task.subCategory?.label || null;
+    const subCategory = task.subCategory?.label || task.subCategory?.name || null;
     const displayName = task.taskname || task.title || "(no title)";
-    const detailParts = [
-      `importance ${task.importance}`,
-      `effort ${task.effort}`,
-    ];
+    const detailParts = [`importance ${task.importance}`, `effort ${task.effort}`];
 
     // Include description inside parentheses if available, quoted safely
     const desc = task.description || task.note || "";
@@ -590,10 +601,11 @@ async function listTasks() {
 async function recommendTask() {
   if (!ensureLoggedIn()) return;
 
-  const { top, ranked = [], reasons = [] } = await coacherAlgorithm.computeFromDb(
-    currentUser._id,
-    currentUser.profile || {}
-  );
+  const {
+    top,
+    ranked = [],
+    reasons = [],
+  } = await coacherAlgorithm.computeFromDb(currentUser._id, currentUser.profile || {});
 
   if (!top) {
     console.log(theme.info("🤷 Nothing to recommend right now."));
@@ -656,7 +668,7 @@ async function editTaskOption() {
   console.log(`${theme.option("0)")} Cancel`);
 
   const selection = (await ask("\nSelect task number ➤ ")).trim();
-  
+
   if (selection === "0" || !selection) {
     console.log(theme.muted("Edit cancelled."));
     return;
@@ -692,13 +704,13 @@ async function editTaskMenu(task) {
       await editTaskFields(task);
       // Refresh task data after edit
       const refreshed = await getTasksForUser(currentUser._id);
-      const updated = refreshed.find(t => t._id.toString() === task._id.toString());
+      const updated = refreshed.find((t) => t._id.toString() === task._id.toString());
       if (updated) task = updated;
     } else if (choice === "2") {
       await editSubTasksOption(task);
       // Refresh task data after subtask edits
       const refreshed = await getTasksForUser(currentUser._id);
-      const updated = refreshed.find(t => t._id.toString() === task._id.toString());
+      const updated = refreshed.find((t) => t._id.toString() === task._id.toString());
       if (updated) task = updated;
     } else {
       console.log(theme.warning("Invalid option. Please choose 1, 2, or 0."));
@@ -769,12 +781,21 @@ async function editTaskFields(task) {
   console.log(theme.muted(`\nCurrent task type: ${currentTaskType}`));
   console.log(theme.subtitle("Task type options: perfect, in_parts, leaky"));
   const newTaskTypeRaw = (await ask(`New task type [${currentTaskType}]: `)).trim().toLowerCase();
-  if (newTaskTypeRaw && ["perfect", "in_parts", "leaky"].includes(newTaskTypeRaw) && newTaskTypeRaw !== currentTaskType) {
+  if (
+    newTaskTypeRaw &&
+    ["perfect", "in_parts", "leaky"].includes(newTaskTypeRaw) &&
+    newTaskTypeRaw !== currentTaskType
+  ) {
     updates.taskType = newTaskTypeRaw;
   }
 
   // Chunk Count (if applicable)
-  if (task.taskType === "in_parts" || task.taskType === "leaky" || updates.taskType === "in_parts" || updates.taskType === "leaky") {
+  if (
+    task.taskType === "in_parts" ||
+    task.taskType === "leaky" ||
+    updates.taskType === "in_parts" ||
+    updates.taskType === "leaky"
+  ) {
     const currentChunkCount = task.chunkCount || 1;
     const newChunkCountRaw = (await ask(`Chunk count [${currentChunkCount}]: `)).trim();
     if (newChunkCountRaw) {
@@ -821,8 +842,7 @@ async function editTaskFields(task) {
   // Confirm changes
   console.log(theme.subtitle("\nChanges to apply:"));
   for (const [field, value] of Object.entries(updates)) {
-    const displayValue = value instanceof Date ? formatLocalDate(value) : 
-                         value === null ? "(cleared)" : value;
+    const displayValue = value instanceof Date ? formatLocalDate(value) : value === null ? "(cleared)" : value;
     console.log(theme.muted(`  • ${field}: ${displayValue}`));
   }
 
@@ -854,7 +874,7 @@ async function editSubTasksOption(task) {
   }
 
   const subtasks = await getSubTasksForTask({ userId: currentUser._id, taskId: task._id });
-  
+
   if (!subtasks || subtasks.length === 0) {
     console.log(theme.warning("\n⚠️  No subtasks found for this task."));
     console.log(theme.muted("Subtasks should be created automatically. Try updating the task's chunk count."));
@@ -865,7 +885,7 @@ async function editSubTasksOption(task) {
     console.log(theme.muted("\n═════════════════════════════════════"));
     console.log(theme.title(` SubTasks for: ${task.taskname || task.title}`));
     console.log(theme.muted("═════════════════════════════════════"));
-    
+
     subtasks.forEach((sub, index) => {
       const statusIcon = sub.status === "done" ? "✓" : "○";
       const titleDisplay = sub.title || `Part ${sub.index}`;
@@ -888,7 +908,7 @@ async function editSubTasksOption(task) {
 
     const subtaskToEdit = subtasks[subIndex];
     await editSubTaskFields(subtaskToEdit);
-    
+
     // Refresh subtask list
     const refreshed = await getSubTasksForTask({ userId: currentUser._id, taskId: task._id });
     if (refreshed && refreshed.length) {
@@ -1297,14 +1317,14 @@ async function chatWithAssistant() {
 
     // Handle special commands
     const lowerMessage = message.toLowerCase();
-    
-    if (lowerMessage === 'exit' || lowerMessage === 'quit') {
+
+    if (lowerMessage === "exit" || lowerMessage === "quit") {
       console.log(theme.muted("\n👋 Chat ended. Returning to main menu."));
       console.log(theme.muted("Your conversation will be saved for next time.\n"));
       break;
     }
 
-    if (lowerMessage === 'reset') {
+    if (lowerMessage === "reset") {
       console.log(theme.muted("🔄 Resetting conversation..."));
       const resetResult = await resetChatSession({ sessionId: chatSessionId });
       if (resetResult.success) {
@@ -1316,7 +1336,7 @@ async function chatWithAssistant() {
       continue;
     }
 
-    if (lowerMessage === 'history') {
+    if (lowerMessage === "history") {
       await showChatHistory();
       continue;
     }
@@ -1327,7 +1347,7 @@ async function chatWithAssistant() {
 
     if (!result.success) {
       console.log(theme.error(`\n❌ Chat error: ${result.error}`));
-      if (result.error.includes('token') || result.error.includes('auth')) {
+      if (result.error.includes("token") || result.error.includes("auth")) {
         console.log(theme.warning("Try logging out and back in."));
       }
       continue;
@@ -1363,8 +1383,8 @@ async function showChatHistory() {
   console.log(theme.muted("─".repeat(50)));
 
   for (const msg of result.history) {
-    const role = msg.role === 'user' ? '👤 You' : '🤖 Assistant';
-    const roleStyle = msg.role === 'user' ? theme.subtitle : theme.accent;
+    const role = msg.role === "user" ? "👤 You" : "🤖 Assistant";
+    const roleStyle = msg.role === "user" ? theme.subtitle : theme.accent;
     console.log(roleStyle(`\n${role}:`));
     console.log(msg.content);
   }

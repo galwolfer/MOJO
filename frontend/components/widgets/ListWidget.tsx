@@ -19,7 +19,7 @@ import {
 } from "../../services/taskService";
 import { useTaskUpdateSubscription } from "../../context/TaskContext";
 import { getCategoryMeta } from "../../config/categoryMeta";
-import { COLORS } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 import TaskDetailWidget from "./TaskDetailWidget";
 import TaskListWidget from "./TaskListWidget";
 import UpcomingTasksWidget from "./UpcomingTasksWidget";
@@ -50,6 +50,7 @@ const ListWidget: React.FC<BaseWidgetProps> = ({
   entranceDelay,
   entranceDuration,
 }) => {
+  const colors = useColors();
   const payload = data as ListWidgetData;
   const listType = useMemo(() => (payload.listType || payload.list_type || "task_list").toLowerCase(), [payload]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -84,8 +85,8 @@ const ListWidget: React.FC<BaseWidgetProps> = ({
       category: task.category || null,
       categoryDisplay: categoryMeta.displayName,
       subCategory: task.subCategory || null,
-      subcategory: task.subCategory?.label || null,
-      subcategoryDisplay: task.subCategory?.label || null,
+      subcategory: task.subCategory?.label || task.subCategory?.name || null,
+      subcategoryDisplay: task.subCategory?.label || task.subCategory?.name || null,
       tags: task.tags || null,
       scheduledSessions: scheduledSessions || [],
       subtasks: [] as Array<Record<string, any>>,
@@ -228,8 +229,10 @@ const ListWidget: React.FC<BaseWidgetProps> = ({
 
   if (loading) {
     return (
-      <Widget {...getWidgetEntranceProps({ entranceEnabled, entranceDelay, entranceDuration }, { skipAnimation: true })}>
-        <AppText variant="notes" style={styles.stateText}>
+      <Widget
+        {...getWidgetEntranceProps({ entranceEnabled, entranceDelay, entranceDuration }, { skipAnimation: true })}
+      >
+        <AppText variant="notes" style={[styles.stateText, { color: colors.gray2 }]}>
           Loading tasks...
         </AppText>
       </Widget>
@@ -238,8 +241,10 @@ const ListWidget: React.FC<BaseWidgetProps> = ({
 
   if (error) {
     return (
-      <Widget {...getWidgetEntranceProps({ entranceEnabled, entranceDelay, entranceDuration }, { skipAnimation: true })}>
-        <AppText variant="notes" style={styles.stateText}>
+      <Widget
+        {...getWidgetEntranceProps({ entranceEnabled, entranceDelay, entranceDuration }, { skipAnimation: true })}
+      >
+        <AppText variant="notes" style={[styles.stateText, { color: colors.gray2 }]}>
           {error}
         </AppText>
       </Widget>
@@ -265,9 +270,7 @@ const ListWidget: React.FC<BaseWidgetProps> = ({
 };
 
 const styles = StyleSheet.create({
-  stateText: {
-    color: COLORS.darkGray,
-  },
+  stateText: {},
 });
 
 export default ListWidget;

@@ -2,6 +2,7 @@ import React from "react";
 import { View, StyleSheet } from "react-native";
 import Svg, { Path, Defs, LinearGradient, Stop, Line, Circle } from "react-native-svg";
 import { COLORS } from "../../../theme";
+import { useColors } from "../../../context/ThemeContext";
 
 /**
  * ProgressGraph
@@ -39,6 +40,7 @@ const ProgressGraph: React.FC<ProgressGraphProps> = ({
   width = 280,
   height = 100,
 }) => {
+  const colors = useColors();
   // Prefer real data passed via props; fallback to a sensible default for display
   const data = propData && propData.length ? propData : [20, 35, 25, 50, 45, 60, 55, 70, 65, 80, 75];
 
@@ -186,7 +188,7 @@ const ProgressGraph: React.FC<ProgressGraphProps> = ({
             cy={point.y}
             r={pointRadius}
             fill={point.color}
-            stroke={COLORS.white2}
+            stroke={colors.bg2}
             strokeWidth={pointStrokeWidth}
           />
         ))}

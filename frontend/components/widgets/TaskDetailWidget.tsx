@@ -8,6 +8,7 @@ import { View, StyleSheet, TouchableOpacity, Image, useWindowDimensions } from "
 import AppText from "../common/AppText";
 import AppButton from "../common/AppButton";
 import { COLORS, SPACING, ICON_SIZES, paletteIndexFromKey, getPalettePair } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 import Widget from "../special/Widget";
 import Tag from "../inputs/tag";
 import { ICONS } from "../icons/icons";
@@ -60,6 +61,9 @@ interface TaskDetail {
   subcategoryDisplay?: string;
   subCategory?: {
     label?: string;
+    name?: string;
+    icon?: string | null;
+    parent?: string;
     source?: string;
     confidence?: number;
     updatedAt?: string;
@@ -93,6 +97,7 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
   entranceDuration,
 }) => {
   const task: TaskDetail = data.task || data;
+  const colors = useColors();
   const { notifyTaskUpdate } = useTaskContext();
   const { notifyStatsChange } = useOptionalStatsContext();
 
@@ -160,7 +165,8 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
 
   const categoryMeta = getCategoryMeta(task.category);
   const categoryDisplayNormalized = getCategoryDisplay(task.category, task.categoryDisplay);
-  const subLabel = task.subcategoryDisplay || task.subCategory?.label || task.subcategory || "";
+  const subLabel =
+    task.subcategoryDisplay || task.subCategory?.label || task.subCategory?.name || task.subcategory || "";
   const subIndex = paletteIndexFromKey(subLabel);
 
   const contentNodes: React.ReactNode[] = [
@@ -175,7 +181,8 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
       category={task.category}
       categoryDisplay={categoryDisplayNormalized}
       subcategory={task.subcategory}
-      subcategoryDisplay={task.subcategoryDisplay || task.subCategory?.label}
+      subcategoryDisplay={task.subcategoryDisplay || task.subCategory?.label || task.subCategory?.name}
+      subCategory={task.subCategory}
       importance={task.importance}
       effort={task.effort}
     />,
@@ -214,7 +221,8 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
         estimatedDuration={task.estimatedDuration || task.duration}
         progressPercentage={task.progressPercentage ?? null}
         sessionHeaderMode="date"
-        dividerColor={COLORS.white}
+        hideTaskTitle={true}
+        dividerColor={colors.bg1}
         taskStatus={task.status}
       />
     </View>,
@@ -244,7 +252,6 @@ const styles = StyleSheet.create({
     textAlign: "left",
   },
   title: {
-    color: COLORS.black,
     fontWeight: "600",
     flexShrink: 1,
     display: "flex",
@@ -258,9 +265,7 @@ const styles = StyleSheet.create({
   section: {
     gap: SPACING.sm,
   },
-  labelText: {
-    color: COLORS.darkGray,
-  },
+  labelText: {},
 
   detailsGrid: {
     flexDirection: "row",
@@ -305,9 +310,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: SPACING.xs,
   },
-  scheduleTime: {
-    color: COLORS.darkGray,
-  },
+  scheduleTime: {},
+
   sectionTitle: {
     fontWeight: "600",
     marginBottom: SPACING.sm,
@@ -315,7 +319,6 @@ const styles = StyleSheet.create({
   subtaskCard: {
     padding: SPACING.sm,
     borderLeftWidth: SPACING.xs,
-    borderLeftColor: COLORS.darkGray,
   },
   subtaskTitle: {
     fontWeight: "500",
@@ -323,11 +326,9 @@ const styles = StyleSheet.create({
   },
   subtaskCompleted: {
     textDecorationLine: "line-through",
-    color: COLORS.darkGray,
   },
-  subtaskDescription: {
-    color: COLORS.darkGray,
-  },
+  subtaskDescription: {},
+
   subtaskDuration: {
     color: COLORS.primary1,
     marginTop: SPACING.xs,

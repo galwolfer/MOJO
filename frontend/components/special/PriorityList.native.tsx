@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { View, Text, StyleSheet } from "react-native";
 import DraggableFlatList, { RenderItemParams } from "react-native-draggable-flatlist";
 import { COLORS, SPACING, TYPOGRAPHY, COMPONENT_STYLES, DIVIDER, SHADOWS, ICON_SIZES } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 import { ICONS } from "../icons/icons";
 
 export type PriorityListItem = {
@@ -45,7 +46,6 @@ const styles = StyleSheet.create({
   text: {
     fontFamily: TYPOGRAPHY.bodyText.fontFamily,
     fontSize: TYPOGRAPHY.bodyText.fontSize,
-    color: COLORS.black,
     flex: 1,
   },
   dragHandle: {
@@ -74,21 +74,24 @@ function orderKey(arr: PriorityListItem[]): string {
  * @param isActive - Whether the item is being dragged.
  */
 const RenderItem = ({ item, drag, isActive }: RenderItemParams<PriorityListItem>) => {
+  const colors = useColors();
   return (
-    <View style={[styles.card, isActive && styles.cardDragging, isActive && styles.cardActive]}>
+    <View
+      style={[
+        styles.card,
+        isActive && [styles.cardDragging, { backgroundColor: colors.bg3 }],
+        isActive && styles.cardActive,
+      ]}
+    >
       <View style={styles.contentRow}>
         {item.icon && <View style={styles.iconWrap}>{item.icon}</View>}
-        <Text style={styles.text} numberOfLines={1} ellipsizeMode="tail">
+        <Text style={[styles.text, { color: colors.text1 }]} numberOfLines={1} ellipsizeMode="tail">
           {item.label}
         </Text>
       </View>
 
       <View style={styles.dragHandle} onTouchStart={drag}>
-        <ICONS.move
-          width={ICON_SIZES.sm}
-          height={ICON_SIZES.sm}
-          color={isActive ? COLORS.darkGray : COLORS.lightGray}
-        />
+        <ICONS.move width={ICON_SIZES.sm} height={ICON_SIZES.sm} color={isActive ? colors.gray2 : colors.gray1} />
       </View>
     </View>
   );

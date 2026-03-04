@@ -8,7 +8,7 @@
 import React, { useEffect, useRef, useState, memo } from "react";
 import { Animated, TouchableOpacity, Easing } from "react-native";
 import Svg, { Path, Rect } from "react-native-svg";
-import { COLORS } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 
 const svgPaths = { p24bd7b90: "M7 9.06818L8.33333 11.25L11 7.25" };
 
@@ -28,6 +28,7 @@ interface CheckboxProps {
  * @param size - The size of the checkbox.
  */
 export const Checkbox = memo(function Checkbox({ checked, onChange, size = 18 }: CheckboxProps) {
+  const colors = useColors();
   const progress = useRef(new Animated.Value(checked ? 1 : 0)).current;
   const [animating, setAnimating] = useState(false);
 
@@ -44,7 +45,7 @@ export const Checkbox = memo(function Checkbox({ checked, onChange, size = 18 }:
   }, [checked, progress]);
 
   // Use a static stroke color (no continuous animation) to reduce work
-  const strokeColor = checked ? COLORS.primary6 : COLORS.lightGray;
+  const strokeColor = checked ? colors.primary6 : colors.gray1;
 
   const checkDashoffset = progress.interpolate({ inputRange: [0, 1], outputRange: [10, 0] });
   const checkOpacity = progress.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
