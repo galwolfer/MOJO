@@ -1,21 +1,16 @@
 import React from "react";
 import { View, StyleSheet } from "react-native";
 import AppText from "../../common/AppText";
-import SessionRow from "./SessionRow";
+import TimeRangeDisplay from "../../common/TimeRangeDisplay";
+import { CompletionItem } from "./CompletionItem";
 import { SessionTime } from "./SessionTime";
 import List from "../../layout/List";
 import { COLORS, ICON_SIZES, SPACING } from "../../../theme";
-import { ScheduledSession, Subtask, getSessionKey, getTimeParts } from "../../widgets/taskHelpers";
-import SubtaskItem from "../../../screens/calendar/components/SubtaskItem";
+import { useColors } from "../../../context/ThemeContext";
+import { ScheduledSession, Subtask as WidgetSubtask, getSessionKey, getTimeParts } from "../../widgets/taskHelpers";
+import { Subtask as CalendarSubtask } from "../../../screens/calendar/types";
 import { useTaskUpdateSubscription } from "../../../context/TaskContext";
-import TaskTitle from "./TaskTitle";
-
-// Format ISO string → "9:00 AM"
-const formatTime = (iso?: string): string => {
-  if (!iso) return "";
-  const { time, ampm } = getTimeParts(iso);
-  return time ? `${time} ${ampm}`.trim() : "";
-};
+import { TaskTitle } from "./TaskTitle";
 
 export const ScheduledSessionsSection: React.FC<{
   taskId: string;
@@ -25,8 +20,8 @@ export const ScheduledSessionsSection: React.FC<{
   categoryColor?: string;
   completedParts?: Set<string>;
   loadingParts?: Set<string>;
-  subtasks?: Subtask[];
-  onToggleSession?: (taskId: string, session: ScheduledSession, index: number, subtasks?: Subtask[]) => void;
+  subtasks?: WidgetSubtask[];
+  onToggleSession?: (taskId: string, session: ScheduledSession, index: number, subtasks?: WidgetSubtask[]) => void;
   onRefresh?: (taskId?: string) => void;
   estimatedDuration?: number;
   progressPercentage?: number | null;
@@ -49,9 +44,13 @@ export const ScheduledSessionsSection: React.FC<{
   hideTitle = false,
   hideTaskTitle = false,
   sessionHeaderMode = "none",
-  dividerColor = COLORS.white,
+  dividerColor,
   taskStatus,
 }) => {
+  const colors = useColors();
+  const resolvedDividerColor = dividerColor ?? colors.bg1;
+  // Listen for task updates and invoke parent's refresh when task updates occur elsewhere
+
   useTaskUpdateSubscription((payload?: { taskId?: string }) => {
     if (!payload || !payload.taskId || payload.taskId === taskId) {
       onRefresh?.(payload?.taskId);
@@ -59,7 +58,39 @@ export const ScheduledSessionsSection: React.FC<{
   });
 
   const sessions = scheduledSessions || [];
-  if (sessions.length === 0) return null;
+
+  // Fallback: when there are no sessions but there are subtasks, render subtasks directly
+  if (sessions.length === 0) {
+    if (!subtasks || subtasks.length === 0) return null;
+    return (
+      <View style={{ gap: SPACING.sm, alignSelf: "stretch" }}>
+        {!hideTitle && sessionHeaderMode === "taskTitle" ? (
+          <TaskTitle title={taskTitle} category={category} size="md" />
+        ) : null}
+        <List
+          dividerColor={resolvedDividerColor}
+          data={subtasks.map((st, i) => {
+            const id = st.id || String(i);
+            const isDone = st.completed || completedParts?.has(id);
+            return {
+              id,
+              divider: i < subtasks.length - 1,
+              content: (
+                <CompletionItem
+                  type="subtask"
+                  subtask={{ id, title: st.title, completed: isDone ?? false } as any}
+                  parentTaskId={taskId}
+                  isCompleted={isDone ?? false}
+                  categoryColor={categoryColor}
+                  onToggle={() => {}}
+                />
+              ),
+            };
+          })}
+        />
+      </View>
+    );
+  }
 
   const titleMode = sessionHeaderMode === "taskTitle";
 
@@ -92,23 +123,30 @@ export const ScheduledSessionsSection: React.FC<{
           id: key,
           divider: true,
           content: (
-            <SessionRow
-              session={session}
-              taskId={taskId}
-              categoryColor={categoryColor}
-              taskTitle={taskTitle}
-              subtasks={subtasks}
-              sessionIndex={index}
-              isDone={isDone}
-              isLoading={loadingParts?.has(key)}
-              checkboxOnToggle={onToggleSession ? () => onToggleSession(taskId, session, index, subtasks) : undefined}
-              rowOnPress={onToggleSession ? () => onToggleSession(taskId, session, index, subtasks) : undefined}
-              canToggle={!!onToggleSession}
-              hideTaskTitle={hideTaskTitle || sessions.length === 1}
-              lightTitle={titleMode || hideTaskTitle}
-              // Show date only for the first group
-              showTaskDate={sessionHeaderMode === "date" && groupIdx === 0}
-            />
+            <View>
+              {/* Show date only for the first item of this day group */}
+              {sessionHeaderMode === "date" && (
+                <AppText variant="notes" style={[styles.dateText, { color: categoryColor || COLORS.primary1 }]}>
+                  {date}
+                </AppText>
+              )}
+              <CompletionItem
+                type="session"
+                session={session}
+                taskId={taskId}
+                categoryColor={categoryColor}
+                taskTitle={taskTitle}
+                subtasks={subtasks}
+                sessionIndex={index}
+                isDone={isDone}
+                isLoading={loadingParts?.has(key)}
+                checkboxOnToggle={onToggleSession ? () => onToggleSession(taskId, session, index, subtasks) : undefined}
+                rowOnPress={onToggleSession ? () => onToggleSession(taskId, session, index, subtasks) : undefined}
+                canToggle={!!onToggleSession}
+                hideTaskTitle={hideTaskTitle || sessions.length === 1}
+                lightTitle={titleMode || hideTaskTitle}
+              />
+            </View>
           ),
           style: { paddingStart: titleMode ? (ICON_SIZES.md - SPACING.xs) / 2 : 0 },
         },
@@ -125,44 +163,52 @@ export const ScheduledSessionsSection: React.FC<{
         id: groupKey,
         divider: groupIdx < dateGroups.length - 1,
         content: (
-          <View style={styles.groupedBlock}>
-            {/* Single time bar spanning first start → last end */}
-            <SessionTime timeStart={firstSession.start} timeEnd={lastSession.end} categoryColor={categoryColor} />
-            {/* Rows for each session */}
-            <View style={styles.groupedRows}>
-              {/* Show date above the group only for the first group */}
-              {sessionHeaderMode === "date" && groupIdx === 0 && (
-                <AppText variant="notes" style={[styles.dateText, { color: categoryColor || COLORS.primary1 }]}>
-                  {date}
-                </AppText>
-              )}
-              {items.map(({ session, index }) => {
-                const key = getSessionKey(taskId, session, index, subtasks);
-                const subtaskId = (session as any).subtaskId;
-                const isDone = subtaskId
-                  ? completedParts?.has(key) || session.subtaskStatus === "done" || session.status === "completed"
-                  : taskStatus === "done" || completedParts?.has(key);
-                const isLoading = loadingParts?.has(key);
-                const label = session.subtaskTitle || `Part ${session.subtaskIndex ?? index + 1}`;
-                const timeRange =
-                  formatTime(session.start) && formatTime(session.end)
-                    ? `${formatTime(session.start)} - ${formatTime(session.end)}`
-                    : formatTime(session.start) || undefined;
+          <View style={{ gap: SPACING.sm }}>
+            {/* Show date above the group for the first item of each day */}
+            {sessionHeaderMode === "date" && (
+              <AppText variant="notes" style={[styles.dateText, { color: categoryColor || COLORS.primary1 }]}>
+                {date}
+              </AppText>
+            )}
+            <View style={styles.groupedBlock}>
+              {/* Single time bar spanning first start → last end */}
+              <SessionTime timeStart={firstSession.start} timeEnd={lastSession.end} categoryColor={categoryColor} />
+              {/* Rows for each session */}
+              <View style={styles.groupedRows}>
+                {items.map(({ session, index }) => {
+                  const key = getSessionKey(taskId, session, index, subtasks);
+                  const subtaskId = (session as any).subtaskId;
+                  const isDone = subtaskId
+                    ? completedParts?.has(key) || session.subtaskStatus === "done" || session.status === "completed"
+                    : taskStatus === "done" || completedParts?.has(key);
+                  const isLoading = loadingParts?.has(key);
+                  const label = session.subtaskTitle || `Part ${session.subtaskIndex ?? index + 1}`;
 
-                return (
-                  <SubtaskItem
-                    key={key}
-                    subtask={{ id: key, title: label, timeRange, completed: isDone ?? false }}
-                    parentTaskId={taskId}
-                    isCompleted={isDone ?? false}
-                    categoryColor={categoryColor}
-                    showTime={!!timeRange}
-                    onToggle={(_parentId: string, _subtaskId: string, _checked: boolean) => {
-                      if (!isLoading) onToggleSession?.(taskId, session, index, subtasks);
-                    }}
-                  />
-                );
-              })}
+                  // Build time range element (not a string) using TimeRangeDisplay
+                  const timeRangeElement =
+                    session.start && session.end ? (
+                      <TimeRangeDisplay startIsoString={session.start} endIsoString={session.end} />
+                    ) : session.start ? (
+                      <TimeRangeDisplay startIsoString={session.start} />
+                    ) : undefined;
+
+                  return (
+                    <CompletionItem
+                      key={key}
+                      type="subtask"
+                      subtask={{ id: key, title: label, completed: isDone ?? false } as CalendarSubtask}
+                      parentTaskId={taskId}
+                      isCompleted={isDone ?? false}
+                      categoryColor={categoryColor}
+                      showTime={!!timeRangeElement}
+                      timeRangeElement={timeRangeElement}
+                      onToggle={(_parentId: string, _subtaskId: string, _checked: boolean) => {
+                        if (!isLoading) onToggleSession?.(taskId, session, index, subtasks);
+                      }}
+                    />
+                  );
+                })}
+              </View>
             </View>
           </View>
         ),
@@ -185,7 +231,7 @@ export const ScheduledSessionsSection: React.FC<{
           alignSelf: "stretch",
         }}
       >
-        <List dividerColor={dividerColor} data={listData} />
+        <List dividerColor={resolvedDividerColor} data={listData} />
       </View>
     </View>
   );

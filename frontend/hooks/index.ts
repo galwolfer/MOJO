@@ -4,3 +4,4 @@ export { default as useContentInsets } from "./useContentInsets";
 export { useChatSessions } from "./useChatSessions";
 export { useChatMessages } from "./useChatMessages";
 export { useOjoType } from "./useOjoType";
+export { useAccessibilityPreferences } from "./useAccessibilityPreferences";

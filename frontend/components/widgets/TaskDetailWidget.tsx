@@ -8,6 +8,7 @@ import { View, StyleSheet, TouchableOpacity, Image, useWindowDimensions } from "
 import AppText from "../common/AppText";
 import AppButton from "../common/AppButton";
 import { COLORS, SPACING, ICON_SIZES, paletteIndexFromKey, getPalettePair } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 import Widget from "../special/Widget";
 import Tag from "../inputs/tag";
 import { ICONS } from "../icons/icons";
@@ -96,6 +97,7 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
   entranceDuration,
 }) => {
   const task: TaskDetail = data.task || data;
+  const colors = useColors();
   const { notifyTaskUpdate } = useTaskContext();
   const { notifyStatsChange } = useOptionalStatsContext();
 
@@ -220,7 +222,7 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
         progressPercentage={task.progressPercentage ?? null}
         sessionHeaderMode="date"
         hideTaskTitle={true}
-        dividerColor={COLORS.white}
+        dividerColor={colors.bg1}
         taskStatus={task.status}
       />
     </View>,
@@ -250,7 +252,6 @@ const styles = StyleSheet.create({
     textAlign: "left",
   },
   title: {
-    color: COLORS.black,
     fontWeight: "600",
     flexShrink: 1,
     display: "flex",
@@ -264,9 +265,7 @@ const styles = StyleSheet.create({
   section: {
     gap: SPACING.sm,
   },
-  labelText: {
-    color: COLORS.darkGray,
-  },
+  labelText: {},
 
   detailsGrid: {
     flexDirection: "row",
@@ -311,9 +310,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: SPACING.xs,
   },
-  scheduleTime: {
-    color: COLORS.darkGray,
-  },
+  scheduleTime: {},
+
   sectionTitle: {
     fontWeight: "600",
     marginBottom: SPACING.sm,
@@ -321,7 +319,6 @@ const styles = StyleSheet.create({
   subtaskCard: {
     padding: SPACING.sm,
     borderLeftWidth: SPACING.xs,
-    borderLeftColor: COLORS.darkGray,
   },
   subtaskTitle: {
     fontWeight: "500",
@@ -329,11 +326,9 @@ const styles = StyleSheet.create({
   },
   subtaskCompleted: {
     textDecorationLine: "line-through",
-    color: COLORS.darkGray,
   },
-  subtaskDescription: {
-    color: COLORS.darkGray,
-  },
+  subtaskDescription: {},
+
   subtaskDuration: {
     color: COLORS.primary1,
     marginTop: SPACING.xs,

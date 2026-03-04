@@ -17,6 +17,7 @@ import { COLORS, FONT_SIZES, SPACING } from "../../../theme";
 import { ICONS } from "../../../components/icons/icons";
 import { getOjoType } from "../../../config/ojoTypeConfig";
 import { useOjoType } from "../../../hooks";
+import { useColors } from "../../../context/ThemeContext";
 
 interface ChatMessageBubbleProps {
   role: "user" | "assistant";
@@ -47,6 +48,7 @@ function ChatMessageBubble({
   ojoTypeDisplayName,
   onWidgetAction,
 }: ChatMessageBubbleProps) {
+  const colors = useColors();
   const isUser = role === "user";
   const normalized = content.trim().toLowerCase();
   const isErrorContent =
@@ -106,12 +108,12 @@ function ChatMessageBubble({
         <TouchableOpacity onPress={onRetry} style={styles.retryRow} activeOpacity={0.7}>
           <View style={styles.retryContent}>
             <ErrorText style={styles.retryText}>Try again</ErrorText>
-            <ICONS.repeat size={FONT_SIZES.sm * 0.7} color={COLORS.lightGray} />
+            <ICONS.repeat size={FONT_SIZES.sm * 0.7} color={colors.gray1} />
           </View>
         </TouchableOpacity>
       ) : null}
       {isUser && status === "pending" ? (
-        <AppText variant="notes" style={styles.pendingText}>
+        <AppText variant="notes" style={[styles.pendingText, { color: colors.gray1 }]}>
           Sending...
         </AppText>
       ) : null}

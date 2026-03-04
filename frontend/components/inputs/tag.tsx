@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ViewStyle, StyleProp } from "react-native";
-import { COLORS, SPACING, TYPOGRAPHY, ICON_SIZES, getPalettePair } from "../../theme";
+import { SPACING, TYPOGRAPHY, ICON_SIZES, getPalettePair } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 import { ICONS } from "../icons/icons";
 
 interface TagProps {
@@ -27,9 +28,18 @@ interface TagProps {
  * @param style - Optional custom styles.
  */
 const Tag = ({ label, editable = false, onRemove, leftIcon, colorIndex, bgColor, textColor, style }: TagProps) => {
+  const colors = useColors();
   const pair = getPalettePair(typeof colorIndex === "number" ? colorIndex : undefined);
-  const bg = bgColor || pair.bg;
-  const text = textColor || pair.text;
+  const paletteIndex = pair.index;
+
+  // Use the themed colors which already account for light/dark mode:
+  // - lightP for background (bright in light mode, dark in dark mode)
+  // - darkP for text/elements (dark in light mode, bright in dark mode)
+  const lightKey = `lightP${paletteIndex}` as keyof typeof colors;
+  const darkKey = `darkP${paletteIndex}` as keyof typeof colors;
+
+  const bg = bgColor || (colors[lightKey] as string);
+  const text = textColor || (colors[darkKey] as string);
 
   return (
     <View style={[styles.root, { backgroundColor: bg }, style]}>
@@ -72,7 +82,6 @@ const styles = StyleSheet.create({
   },
   label: {
     ...TYPOGRAPHY.notes,
-    color: COLORS.darkP4,
   },
   removeTouch: {
     marginLeft: 2,

@@ -3,6 +3,7 @@ import { TouchableOpacity, StyleSheet, ViewStyle, Text, View } from "react-nativ
 import AppText from "../common/AppText";
 import { COLORS, ICON_SIZES, SHADOWS, SPACING } from "../../theme";
 import useContentInsets from "../../hooks/useContentInsets";
+import { useColors } from "../../context/ThemeContext";
 
 interface Props {
   onPress: () => void;
@@ -15,18 +16,19 @@ interface Props {
 
 export default function FloatingButton({ onPress, text = "ADD", Icon, style, color }: Props) {
   const insets = useContentInsets();
+  const colors = useColors();
   const backgroundColor = color || COLORS.primary6; // default to green (primary6)
 
   return (
     <TouchableOpacity style={[styles.floatingButton, { backgroundColor }, style]} onPress={onPress}>
       {text ? (
-        <AppText variant="bodyText" style={styles.buttonText}>
+        <AppText variant="bodyText" style={[styles.buttonText, { color: colors.text2 }]}>
           {text}
         </AppText>
       ) : null}
       {Icon ? (
         <View style={styles.iconWrap}>
-          <Icon size={ICON_SIZES.sm} color={COLORS.white} style={text ? styles.plusIcon : undefined} />
+          <Icon size={ICON_SIZES.sm} color={colors.text2} style={text ? styles.plusIcon : undefined} />
         </View>
       ) : null}
     </TouchableOpacity>

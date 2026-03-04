@@ -1,9 +1,13 @@
-/**
+﻿/**
  * SubtaskScheduleCard
  *
  * An extended subtask card used in **edit mode** that combines the basic
  * subtask fields (title, description, estimated minutes) with per-subtask
  * scheduling via the shared ScheduleToggle component.
+ *
+ * The component also supports the simpler placeholder behavior from HEAD
+ * when minimal scheduling data is provided — the toggle still works but will
+ * not display extra inputs.
  */
 
 import React from "react";
@@ -11,8 +15,7 @@ import { View, StyleSheet } from "react-native";
 import { SPACING } from "../../../theme";
 import Input from "../../../components/inputs/Input";
 import { Subtask } from "./taskFormTypes";
-import ScheduleToggle from "./ScheduleToggle";
-import type { ScheduleToggleData } from "./ScheduleToggle";
+import ScheduleToggle, { ScheduleToggleData } from "./ScheduleToggle";
 
 interface Props {
   subtask: Subtask;

@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useRef } from "react";
-import { View, StyleSheet, TouchableOpacity, Platform } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Platform, Alert } from "react-native";
 import PopupBox from "../../components/common/PopupBox";
 import AppText from "../../components/common/AppText";
 import AppButton from "../../components/common/AppButton";
 import ErrorText from "../../components/common/ErrorText";
 import ProfileSettings from "./screens/ProfileSettings";
 import { COLORS, SPACING, SHADOWS, ICON_SIZES } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 import { useNavigation } from "../../context/NavigationContext";
 import { ICONS } from "../../components/icons/icons";
 import ScrollableContent from "../../components/layout/ScrollableContent";
@@ -30,6 +31,7 @@ type SettingsScreenProps = {
   onEditPreferences?: () => void;
   onChatSettings?: () => void;
   onNotificationSettings?: () => void;
+  onAccessibilitySettings?: () => void;
   onSubcategoryManager?: () => void;
 };
 
@@ -38,13 +40,18 @@ export default function SettingsScreen({
   onEditPreferences,
   onChatSettings,
   onNotificationSettings,
+  onAccessibilitySettings,
   onSubcategoryManager,
 }: SettingsScreenProps) {
+  const colors = useColors();
   const { user, signOut, signIn, token } = useAuth();
   const { setHeaderConfig } = useNavigation();
 
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showDeletePopup, setShowDeletePopup] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Store onBack in a ref to avoid recreating header config
   const onBackRef = useRef(onBack);
@@ -58,6 +65,7 @@ export default function SettingsScreen({
   const EditIcon = ICONS.prefrences;
   const ChatIcon = ICONS.ojo;
   const NotificationIcon = ICONS.notifications;
+  const AccessibilityIcon = ICONS.settings;
   const PencilIcon = ICONS.edit;
   const ListIcon = ICONS.list;
 
@@ -105,6 +113,14 @@ export default function SettingsScreen({
     }
   };
 
+  const handleAccessibility = () => {
+    if (onAccessibilitySettings) {
+      onAccessibilitySettings();
+    } else {
+      console.log("Accessibility pressed - no handler provided");
+    }
+  };
+
   const handleSubcategoryManager = () => {
     if (onSubcategoryManager) {
       onSubcategoryManager();
@@ -116,33 +132,35 @@ export default function SettingsScreen({
   const preferenceItems: ListCellProps[] = [
     makeListCell("edit-preferences", {
       title: "Edit my prefrences",
-      logo: <EditIcon size={24} color={COLORS.primary2} />,
+      logo: <EditIcon size={ICON_SIZES.sm} color={COLORS.primary2} />,
       onPress: handleEditPreferences,
       divider: true,
     }),
     makeListCell("subcategories", {
       title: "Subcategories",
-      logo: <ListIcon size={24} color={COLORS.primary4} />,
+      logo: <ListIcon size={ICON_SIZES.sm} color={COLORS.primary4} />,
       onPress: handleSubcategoryManager,
       divider: true,
     }),
     makeListCell("chat-settings", {
       title: "Chat settings",
-      logo: <ChatIcon size={24} color={COLORS.primary1} />,
+      logo: <ChatIcon size={ICON_SIZES.sm} color={COLORS.primary1} />,
       onPress: handleChatSettings,
       divider: true,
     }),
     makeListCell("notifications", {
       title: "Notifications",
-      logo: <NotificationIcon size={24} color={COLORS.primary5} />,
+      logo: <NotificationIcon size={ICON_SIZES.sm} color={COLORS.primary5} />,
       onPress: handleNotifications,
+      divider: true,
+    }),
+    makeListCell("accessibility", {
+      title: "Accessibility",
+      logo: <AccessibilityIcon size={ICON_SIZES.sm} color={COLORS.primary3} />,
+      onPress: handleAccessibility,
       divider: false,
     }),
   ];
-
-  const [showDeletePopup, setShowDeletePopup] = useState(false);
-  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const handleDeleteAccount = () => {
     setShowDeletePopup(true);
@@ -276,6 +294,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   preferenceText: {
-    color: COLORS.black,
+    // color: applied dynamically via colors.text1
   },
 });

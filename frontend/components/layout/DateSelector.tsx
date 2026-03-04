@@ -92,9 +92,13 @@ export default function DateSelector({ selectedDate, setSelectedDate }: DateSele
               onPress={() => setSelectedDate(day.fullDate)}
               activeOpacity={0.85}
             >
-              <AppText style={[styles.dayName, showPill && styles.dayTextOnPill]}>{day.dayName}</AppText>
+              <AppText style={[styles.dayName, showPill && styles.dayTextOnPill]} numberOfLines={1}>
+                {day.dayName}
+              </AppText>
 
-              <AppText style={[styles.dayDate, showPill && styles.dayTextOnPill]}>{day.date}</AppText>
+              <AppText style={[styles.dayDate, showPill && styles.dayTextOnPill]} numberOfLines={1}>
+                {day.date}
+              </AppText>
 
               {showDot && <View style={[styles.todayDot, dotWhite && styles.todayDotOnPill]} />}
             </TouchableOpacity>
@@ -141,18 +145,18 @@ const styles = StyleSheet.create({
   dayItem: {
     alignItems: "center",
     justifyContent: "center",
-    width: SPACING.xlg,
+    width: SPACING.xlg * 1.6,
     height: SPACING.xlg * 1.5,
     borderRadius: SPACING.xlg,
     backgroundColor: "transparent",
   },
   dayItemSelected: {
     backgroundColor: COLORS.primary1,
-    width: undefined,                    // allow pill to expand only when selected
-    minWidth: SPACING.xlg * 2,         // wide enough for "Sat 21" but not huge
-    height: SPACING.xlg * 1.8,           // keep same vertical rhythm as other items
-    paddingVertical: SPACING.sm,         // compact vertical padding
-    paddingHorizontal: SPACING.md,       // modest horizontal padding
+    width: undefined, // allow pill to expand only when selected
+    minWidth: SPACING.xlg * 2, // wide enough for "Sat 21" but not huge
+    height: SPACING.xlg * 1.8, // keep same vertical rhythm as other items
+    paddingVertical: SPACING.sm, // compact vertical padding
+    paddingHorizontal: SPACING.md, // modest horizontal padding
     borderRadius: SPACING.xlg,
   },
   dayName: {
@@ -165,7 +169,6 @@ const styles = StyleSheet.create({
   dayDate: {
     fontFamily: FONTS.fredokaSemiBold,
     fontSize: FONT_SIZES.md,
-    color: COLORS.black,
     fontWeight: "600",
   },
   dayTextOnPill: {
@@ -174,8 +177,8 @@ const styles = StyleSheet.create({
   },
   todayDot: {
     marginTop: SPACING.xs,
-    width: SPACING.lg * 0.9,   // short underline width
-    height: 4,                // underline thickness
+    width: SPACING.lg * 0.9, // short underline width
+    height: 4, // underline thickness
     borderRadius: 2,
     backgroundColor: COLORS.primary1,
     alignSelf: "center",

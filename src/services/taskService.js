@@ -55,7 +55,7 @@ import {
 async function _saveUserSubCategory(userId, categoryName, subCategory) {
   if (!userId || !categoryName || !subCategory) return;
 
-  if (typeof subCategory === "string" && /^[a-fA-F0-9]{24}$/.test(subCategory)) {
+  if (typeof subCategory === "string" && /^[a-fA-F0-9]{ICON_SIZES.sm}$/.test(subCategory)) {
     return;
   }
 
@@ -151,7 +151,7 @@ export async function createTask({
     throw new Error(buildIllegalCharsError(illegalFields));
   }
 
-  const isSubcategoryIdString = typeof subCategory === "string" && /^[a-fA-F0-9]{24}$/.test(subCategory);
+  const isSubcategoryIdString = typeof subCategory === "string" && /^[a-fA-F0-9]{ICON_SIZES.sm}$/.test(subCategory);
   const resolvedSubCategoryId = subCategory
     ? await resolveSubcategoryId({
         userId,
@@ -400,7 +400,34 @@ export async function getTaskById(taskId, userId) {
   // Attach subtasks so the EditTask screen can pre-populate the parts form
   const subTasks = await SubTask.find({ taskId: task._id }).sort({ index: 1 }).lean();
   task.subTasks = subTasks;
-  return attachSubcategoryLabel(task);
+
+  // Attach scheduled sessions to match what getTasks returns
+  const schedules = await TaskSchedule.find({ taskId: task._id }).sort({ start: 1 }).lean();
+
+  // Build a map of subtask indexes to subtask details for quick lookup
+  const subtaskMap = new Map();
+  subTasks.forEach((st) => {
+    subtaskMap.set(st.index, { id: st._id, title: st.title, status: st.status });
+  });
+
+  task.scheduledSessions = schedules.map((sched) => {
+    const stInfo =
+      sched.subtaskIndex !== undefined && sched.subtaskIndex !== null ? subtaskMap.get(sched.subtaskIndex) : null;
+
+    return {
+      id: sched._id.toString(),
+      _id: sched._id.toString(),
+      ...sched,
+      subtaskId: stInfo ? stInfo.id : undefined,
+      subtaskTitle: sched.subtaskTitle || (stInfo ? stInfo.title : undefined),
+      subtaskStatus: stInfo ? stInfo.status : undefined,
+    };
+  });
+
+  attachSubcategoryLabel(task);
+  // Attach a flat display string for clients that don't chase the populated ref
+  task.subcategoryDisplay = task.subCategory ? task.subCategory.label || task.subCategory.name || null : null;
+  return task;
 }
 
 /**
@@ -417,7 +444,11 @@ export async function getUpcomingTasks(userId, days = 7) {
  */
 export async function getOverdueTasks(userId) {
   const tasks = await Task.findOverdue(userId).populate("subCategory").lean();
-  tasks.forEach(attachSubcategoryLabel);
+  tasks.forEach((task) => {
+    attachSubcategoryLabel(task);
+    // Attach a flat display string so the frontend doesn't need to chase the ref
+    task.subcategoryDisplay = task.subCategory ? task.subCategory.label || task.subCategory.name || null : null;
+  });
   return tasks;
 }
 
@@ -725,7 +756,7 @@ export async function updateTask({ userId, taskId, updates }) {
   // If user provided a subCategory, resolve to ID and record telemetry
   if (sanitizedUpdates.subCategory) {
     const rawSub = sanitizedUpdates.subCategory;
-    const isSubIdString = typeof rawSub === "string" && /^[a-fA-F0-9]{24}$/.test(rawSub);
+    const isSubIdString = typeof rawSub === "string" && /^[a-fA-F0-9]{ICON_SIZES.sm}$/.test(rawSub);
 
     const resolvedSubCategoryId = await resolveSubcategoryId({
       userId,

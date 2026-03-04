@@ -56,11 +56,9 @@ export function useCalendarTasks(
       if (!silent) setIsLoading(true);
       setError(null);
 
-      // ONLY fetch scheduled sessions - don't show tasks by their deadline
-      // The daily view shows what's SCHEDULED for that day, not what's DUE
+      // Fetch scheduled sessions for selected date
       const scheduledGroups = await getScheduledSessionsForDate(date);
 
-      // Use only scheduled sessions
       const groupsToUse: TaskGroup[] = scheduledGroups;
 
       // Initialize completed sets from server state
@@ -240,7 +238,7 @@ export function useCalendarTasks(
   };
 
   /**
-   * Get tasks filtered by selected date
+   * Get tasks filtered by selected date.
    */
   const getFilteredTaskGroups = (): TaskGroup[] => {
     const selectedDateString = getLocalDateString(selectedDate);
@@ -248,7 +246,9 @@ export function useCalendarTasks(
     const filteredGroups: TaskGroup[] = [];
 
     taskGroups.forEach((group) => {
-      const matchingTasks = group.tasks.filter((task) => task.dateString === selectedDateString);
+      const matchingTasks = group.tasks.filter((task) => {
+        return task.dateString === selectedDateString;
+      });
 
       if (matchingTasks.length > 0) {
         filteredGroups.push({

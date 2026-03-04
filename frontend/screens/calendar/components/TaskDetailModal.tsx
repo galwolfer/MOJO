@@ -6,12 +6,11 @@
  * TwoColumnGrid, ScheduledSessionsSection) for consistency.
  */
 import React, { useCallback, useEffect, useState } from "react";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
+import { View, StyleSheet } from "react-native";
 import AppText from "../../../components/common/AppText";
 import AppButton from "../../../components/common/AppButton";
 import PopupBox from "../../../components/common/PopupBox";
-import { Checkbox } from "../../../components/icons/Checkbox";
-import { COLORS, SPACING, FONTS, FONT_SIZES, ICON_SIZES } from "../../../theme";
+import { COLORS, SPACING, ICON_SIZES } from "../../../theme";
 import { getCategoryMeta } from "../../../config/categoryMeta";
 import Icon from "../../../components/icons/Icon";
 import {
@@ -23,7 +22,7 @@ import {
 import { TaskWithSubtasks } from "../../../services/taskService";
 import { useTaskContext } from "../../../context/TaskContext";
 import { useOptionalStatsContext } from "../../../context/StatsContext";
-import { formatDuration, getCategoryDisplay, ScheduledSession, Subtask } from "../../../components/widgets/taskHelpers";
+import { getCategoryDisplay, ScheduledSession, Subtask } from "../../../components/widgets/taskHelpers";
 import { toggleSubtask, toggleSessionSmart } from "../../../components/widgets/widgetHelpers";
 
 interface TaskDetailModalProps {
@@ -35,7 +34,7 @@ interface TaskDetailModalProps {
 
 // ─── Inner content (needs hooks, so lives in its own component) ──────────────
 
-function TaskDetailContent({
+export function TaskDetailContent({
   task,
   onClose,
   onEdit,
@@ -50,7 +49,7 @@ function TaskDetailContent({
   const [completedParts, setCompletedParts] = useState<Set<string>>(new Set());
   const [loadingParts, setLoadingParts] = useState<Set<string>>(new Set());
 
-  // Initialise checkbox state from task data whenever the task changes
+  // Initialize checkbox state from task data whenever the task changes
   useEffect(() => {
     const done = new Set<string>();
     const rawSubtasks: any[] = task.subtasks || (task as any).subTasks || [];
@@ -79,7 +78,11 @@ function TaskDetailContent({
 
   const categoryMeta = getCategoryMeta(task.category);
   const categoryDisplay = getCategoryDisplay(task.category);
-  const subLabel = task.subCategory?.label || task.subCategory?.name || "";
+  // Guard: subCategory may arrive as a raw ObjectId string when the API doesn't populate it.
+  const subCat = task.subCategory && typeof task.subCategory === "object" ? task.subCategory : null;
+  const subLabel = (task as any).subcategoryDisplay || subCat?.label || subCat?.name || (task as any).subcategory || "";
+
+  console.log("[TaskDetailModal] task.subCategory:", task.subCategory, "subCat:", subCat, "subLabel:", subLabel);
 
   const taskForFields = {
     dueDate: task.dueDate,
@@ -88,7 +91,7 @@ function TaskDetailContent({
     estimatedDuration: task.estimatedDuration,
   };
 
-  const normalisedSubtasks: Subtask[] = (task.subtasks || (task as any).subTasks || []).map((st: any) => ({
+  const normalizedSubtasks: Subtask[] = (task.subtasks || (task as any).subTasks || []).map((st: any) => ({
     id: st._id || st.id || String(st.index ?? ""),
     title: st.title,
     description: st.description,
@@ -99,7 +102,7 @@ function TaskDetailContent({
     order: st.index ?? st.order,
   }));
 
-  const normalisedSessions: ScheduledSession[] = (task.scheduledSessions || []).map((s: any) => ({
+  const normalizedSessions: ScheduledSession[] = (task.scheduledSessions || []).map((s: any) => ({
     ...s,
     id: s.id || s._id,
   }));
@@ -127,7 +130,7 @@ function TaskDetailContent({
         taskId: taskIdParam,
         session,
         index,
-        subtasks: subtasksParam || normalisedSubtasks,
+        subtasks: subtasksParam || normalizedSubtasks,
         completedParts,
         setCompletedParts,
         loadingParts,
@@ -136,7 +139,7 @@ function TaskDetailContent({
         notifyStatsChange,
       });
     },
-    [normalisedSubtasks, completedParts, loadingParts, notifyTaskUpdate, notifyStatsChange],
+    [normalizedSubtasks, completedParts, loadingParts, notifyTaskUpdate, notifyStatsChange],
   );
 
   return (
@@ -162,7 +165,7 @@ function TaskDetailContent({
         category={task.category}
         categoryDisplay={categoryDisplay}
         subcategoryDisplay={subLabel}
-        subCategory={task.subCategory as any}
+        subCategory={subCat}
         importance={task.importance}
         effort={task.effort}
       />
@@ -185,64 +188,25 @@ function TaskDetailContent({
       ) : null}
 
       {/* Scheduled sessions with live checkboxes */}
-      {normalisedSessions.length > 0 && (
-        <View style={styles.sessionsWrap}>
-          <ScheduledSessionsSection
-            taskId={task._id}
-            taskTitle={task.taskname || "Untitled"}
-            scheduledSessions={normalisedSessions}
-            subtasks={normalisedSubtasks}
-            category={task.category}
-            categoryColor={categoryMeta.color}
-            completedParts={completedParts}
-            loadingParts={loadingParts}
-            onToggleSession={handleToggleSession}
-            estimatedDuration={task.estimatedDuration}
-            progressPercentage={task.progressPercentage ?? null}
-            sessionHeaderMode="date"
-            hideTaskTitle
-            dividerColor={COLORS.white}
-            taskStatus={task.status}
-          />
-        </View>
-      )}
-
-      {/* Subtask list with live checkboxes (when no sessions) */}
-      {normalisedSubtasks.length > 0 && normalisedSessions.length === 0 && (
-        <View style={styles.section}>
-          <AppText variant="boldText" style={styles.sectionTitle}>
-            Subtasks
-          </AppText>
-          {normalisedSubtasks.map((st) => {
-            const id = st.id || "";
-            const isChecked = completedParts.has(id);
-            const isLoading = loadingParts.has(id);
-            return (
-              <TouchableOpacity
-                key={id}
-                style={[styles.subtaskRow, isLoading && styles.subtaskLoading]}
-                onPress={() => handleToggleSubtask(id)}
-                activeOpacity={0.7}
-                disabled={isLoading}
-              >
-                <Checkbox checked={isChecked} onChange={() => handleToggleSubtask(id)} size={18} />
-                <AppText
-                  variant="bodyText"
-                  style={[styles.subtaskText, isChecked && styles.subtaskDone]}
-                  numberOfLines={2}
-                >
-                  {st.title}
-                </AppText>
-                {st.duration ? (
-                  <AppText variant="notes" style={styles.subtaskDuration}>
-                    {formatDuration(st.duration)}
-                  </AppText>
-                ) : null}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
+      <View style={styles.ScheduledSessionsSectionContainer}>
+        <ScheduledSessionsSection
+          taskId={task._id}
+          taskTitle={task.taskname || "Untitled"}
+          scheduledSessions={normalizedSessions}
+          subtasks={normalizedSubtasks}
+          category={task.category}
+          categoryColor={categoryMeta.color}
+          completedParts={completedParts}
+          loadingParts={loadingParts}
+          onToggleSession={handleToggleSession}
+          estimatedDuration={task.estimatedDuration}
+          progressPercentage={task.progressPercentage ?? null}
+          sessionHeaderMode="date"
+          hideTaskTitle
+          dividerColor={COLORS.white}
+          taskStatus={task.status}
+        />
+      </View>
     </>
   );
 }
@@ -285,40 +249,11 @@ const styles = StyleSheet.create({
   editButton: {
     alignSelf: "flex-start",
   },
-  section: {
-    gap: SPACING.xs,
-  },
-  sectionTitle: {
-    color: COLORS.darkGray,
-    marginBottom: SPACING.xs,
-  },
   description: {
     color: COLORS.darkGray,
     lineHeight: 20,
   },
-  sessionsWrap: {
+  ScheduledSessionsSectionContainer: {
     marginStart: SPACING.sm,
-  },
-  subtaskRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.sm,
-    paddingVertical: SPACING.xs,
-  },
-  subtaskLoading: {
-    opacity: 0.5,
-  },
-  subtaskText: {
-    flex: 1,
-    fontFamily: FONTS.fredokaRegular,
-    fontSize: FONT_SIZES.base,
-    color: COLORS.black,
-  },
-  subtaskDone: {
-    textDecorationLine: "line-through",
-    color: COLORS.lightGray,
-  },
-  subtaskDuration: {
-    color: COLORS.primary1,
   },
 });

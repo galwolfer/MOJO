@@ -41,7 +41,13 @@ export function useChatSessions() {
     };
   }, [user?.id]);
 
-  // Refresh sessions from API (authoritative + pagination)
+  // Refresh sessions from API in two stages so the UI fills in immediately.
+  // Stage 1 (fast): getChatUserSessions uses User.sessions (embedded doc, very fast).
+  //   → MERGE into state so cached/optimistic messages are never overwritten.
+  // Stage 2 (full): listChatSessions queries the Session collection for the last 30
+  //   sessions with 50 messages each, picking up older history the fast path misses.
+  //   → MERGE again for the same reason.
+  // Never call setSessions([]) – always merge so stale cache stays visible on error.
   useEffect(() => {
     if (!user?.id || !token) return;
     let cancelled = false;
@@ -49,34 +55,32 @@ export function useChatSessions() {
     (async () => {
       setIsLoadingSessions(true);
       try {
-        // First try to get the quick list from User.sessions
-        const quickSessions = await getChatUserSessions({ includeMessages: 10 });
+        // --- Stage 1: fast path ---
+        const quickSessions = await getChatUserSessions({ includeMessages: 50 });
         if (cancelled) return;
 
         if (quickSessions.length > 0) {
-          setSessions(quickSessions);
-          // If we have sessions, we might have more.
-          // We can check if we need to load more by checking the count or just assuming true if we got full page.
-          // But User.sessions is capped at 5. So we likely have more if we have 5.
-          setHasMoreSessions(quickSessions.length >= 5);
-          // Set cursor to the last one's lastActiveAt
-          setNextCursor(quickSessions[quickSessions.length - 1].lastActiveAt);
-
-          // Cache these sessions
+          setSessions((prev) => mergeSessions(prev, quickSessions));
           await saveCachedSessions(user.id, quickSessions);
-        } else {
-          // Fallback to standard list if empty (maybe migration didn't run or new user)
-          const res = await listChatSessions({ limit: 10, includeMessages: 10 });
-          if (cancelled) return;
-          setSessions(res.sessions);
+        }
+
+        // --- Stage 2: full history (covers last ~5 days / 30 sessions) ---
+        const res = await listChatSessions({ limit: 30, includeMessages: 50 });
+        if (cancelled) return;
+
+        if (res.sessions.length > 0) {
+          setSessions((prev) => mergeSessions(prev, res.sessions));
           setHasMoreSessions(res.hasMore);
           setNextCursor(res.nextCursor);
-
-          // Cache only the latest 10 sessions on device
           await saveCachedSessions(user.id, res.sessions);
+        } else if (quickSessions.length === 0) {
+          // Only clear if BOTH paths returned nothing (genuine new user)
+          setSessions([]);
+          setHasMoreSessions(false);
+          setNextCursor(undefined);
         }
       } catch (_) {
-        // If network fails, cached sessions still render
+        // If network fails, cached sessions loaded above are still visible.
       } finally {
         if (!cancelled) setIsLoadingSessions(false);
       }
@@ -162,7 +166,7 @@ export function useChatSessions() {
       // Preserve messages if the incoming session doesn't include them.
       const mergedMessages = mergeMessages(
         prev?.messages,
-        Array.isArray(next.messages) ? next.messages : prev?.messages
+        Array.isArray(next.messages) ? next.messages : prev?.messages,
       );
       const merged: ChatSessionSummary = {
         ...(prev || {}),
@@ -177,7 +181,7 @@ export function useChatSessions() {
     }
 
     return Array.from(map.values()).sort(
-      (a, b) => new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime()
+      (a, b) => new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime(),
     );
   }, []);
 
@@ -185,7 +189,7 @@ export function useChatSessions() {
     if (!hasMoreSessions || isLoadingMoreSessions || !nextCursor) return;
     setIsLoadingMoreSessions(true);
     try {
-      const res = await listChatSessions({ limit: 10, cursor: nextCursor, includeMessages: 10 });
+      const res = await listChatSessions({ limit: 20, cursor: nextCursor, includeMessages: 50 });
       setSessions((prev) => mergeSessions(prev, res.sessions));
       setHasMoreSessions(res.hasMore);
       setNextCursor(res.nextCursor);
@@ -200,7 +204,7 @@ export function useChatSessions() {
     (updatedSession: ChatSessionSummary) => {
       setSessions((prev) => mergeSessions(prev, [updatedSession]));
     },
-    [mergeSessions]
+    [mergeSessions],
   );
 
   return {

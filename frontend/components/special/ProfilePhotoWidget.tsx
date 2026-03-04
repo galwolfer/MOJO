@@ -5,6 +5,7 @@ import AppText from "../common/AppText";
 import AppButton from "../common/AppButton";
 import ProfileImagePicker from "../inputs/ProfileImagePicker";
 import { SPACING, COLORS } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 
 /**
  * ProfilePhotoWidget
@@ -49,6 +50,7 @@ const ProfilePhotoWidget: React.FC<Props> = ({
   title = "Profile Photo (Optional)",
   subtitle,
 }) => {
+  const colors = useColors();
   return (
     <Widget entranceEnabled={true} style={styles.widget}>
       <View style={styles.header}>
@@ -56,7 +58,7 @@ const ProfilePhotoWidget: React.FC<Props> = ({
           {title}
         </AppText>
         {subtitle ? (
-          <AppText variant="notes" style={styles.subtitle}>
+          <AppText variant="notes" style={[styles.subtitle, { color: colors.gray1 }]}>
             {subtitle}
           </AppText>
         ) : null}

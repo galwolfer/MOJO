@@ -11,6 +11,7 @@ import SubcategoryIconPicker from "../../../components/special/IconPicker";
 import SubcategoryColorPicker from "../../../components/special/ColorPicker";
 import { ICONS } from "../../../components/icons/icons";
 import { COLORS, SPACING, SHADOWS, ICON_SIZES, FONT_SIZES } from "../../../theme";
+import { useColors } from "../../../context/ThemeContext";
 import AddSubcategoryPopup from "../../../components/special/AddSubcategoryPopup";
 import FloatingButton from "../../../components/common/FloatingButton";
 import { CATEGORY_KEYS, getCategoryMeta, type CategoryKey } from "../../../config/categoryMeta";
@@ -74,6 +75,7 @@ function updateCategoryMap(
 }
 
 export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) {
+  const colors = useColors();
   const { setHeaderConfig } = useNavigation();
   const { token, isLoading: authLoading } = useAuth();
   const onBackRef = useRef(onBack);
@@ -404,7 +406,7 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
 
         {categoriesWithSubs.length === 0 ? (
           <Box title="Your Subcategories" titleColor={COLORS.primary1}>
-            <AppText style={styles.emptyText}>No subcategories yet.</AppText>
+            <AppText style={[styles.emptyText, { color: colors.gray1 }]}>No subcategories yet.</AppText>
           </Box>
         ) : (
           categoriesWithSubs.map((categoryKey) => {
@@ -424,27 +426,29 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
                       : DefaultIcon;
                   const displayColor = subcategory.color || getAutoColor(subcategory.name || "");
                   return (
-                    <View key={subcategory.id} style={styles.subcategoryRow}>
+                    <View key={subcategory.id} style={[styles.subcategoryRow, { borderBottomColor: colors.bg2 }]}>
                       <View style={styles.subcategoryInfo}>
-                        <View style={[styles.subcategoryIcon, { backgroundColor: displayColor }]}>
-                          <Icon size={ICON_SIZES.xs} color={COLORS.white} />
-                        </View>
+                        <Icon size={ICON_SIZES.xs} color={displayColor} />
                         <View style={styles.subcategoryNameContainer}>
-                          <AppText style={styles.subcategoryName}>{subcategory.name}</AppText>
-                          {isDefault && <AppText style={styles.defaultBadge}>Default</AppText>}
+                          <AppText style={[styles.subcategoryName, { color: colors.text1 }]}>
+                            {subcategory.name}
+                          </AppText>
+                          {isDefault && (
+                            <AppText style={[styles.defaultBadge, { color: colors.text2 }]}>Default</AppText>
+                          )}
                         </View>
                       </View>
                       <View style={styles.subcategoryActions}>
                         {!isDefault && (
                           <>
-                            <TouchableOpacity onPress={() => handleEdit(subcategory)} style={styles.actionButton}>
-                              <EditIcon size={ICON_SIZES.xs} color={COLORS.primary2} />
+                            <TouchableOpacity onPress={() => handleEdit(subcategory)} style={[styles.actionButton]}>
+                              <EditIcon size={ICON_SIZES.xs} color={colors.gray1} />
                             </TouchableOpacity>
                             <TouchableOpacity
                               onPress={() => handleStageDelete(subcategory)}
-                              style={styles.actionButton}
+                              style={[styles.actionButton]}
                             >
-                              <TrashIcon size={ICON_SIZES.xs} color={COLORS.primary6} />
+                              <TrashIcon size={ICON_SIZES.xs} color={colors.gray1} />
                             </TouchableOpacity>
                           </>
                         )}
@@ -485,7 +489,6 @@ const styles = StyleSheet.create({
   },
   label: {
     fontWeight: "400",
-    color: COLORS.darkGray,
     marginBottom: 4,
   },
   buttonRow: {
@@ -499,7 +502,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: SPACING.sm,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.white2,
   },
   subcategoryInfo: {
     flexDirection: "row",
@@ -511,7 +513,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: COLORS.white2,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -523,11 +524,9 @@ const styles = StyleSheet.create({
   },
   subcategoryName: {
     fontSize: FONT_SIZES.md,
-    color: COLORS.black,
   },
   defaultBadge: {
     fontSize: FONT_SIZES.sm,
-    color: COLORS.white,
     backgroundColor: COLORS.primary3,
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -544,10 +543,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: COLORS.white2,
   },
   emptyText: {
-    color: COLORS.lightGray,
     textAlign: "center",
     paddingVertical: SPACING.md,
   },

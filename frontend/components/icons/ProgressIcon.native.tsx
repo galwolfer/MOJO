@@ -7,7 +7,7 @@
 import React, { useEffect, useRef, useState, memo } from "react";
 import { Animated, View, Easing } from "react-native";
 import Svg, { Path, Rect, Defs, ClipPath, G } from "react-native-svg";
-import { COLORS } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 
 const svgPaths = { p24bd7b90: "M7 9.06818L8.33333 11.25L11 7.25" };
 
@@ -26,6 +26,7 @@ interface ProgressIconProps {
  * @param size - The size of the icon.
  */
 export const ProgressIcon = memo(function ProgressIcon({ value, size = 18 }: ProgressIconProps) {
+  const colors = useColors();
   const springValue = useRef(new Animated.Value(0)).current;
   const completionProgress = useRef(new Animated.Value(0)).current;
   const [animating, setAnimating] = useState(false);
@@ -105,16 +106,10 @@ export const ProgressIcon = memo(function ProgressIcon({ value, size = 18 }: Pro
     outputRange: [0, 1],
   });
 
-  // Subtle checkmark scale to avoid jumpiness on native
-  const checkScale = completionProgress.interpolate({
-    inputRange: [0, 0.52, 0.77, 1],
-    outputRange: [0.9, 1.02, 0.99, 1],
-  });
-
   const getColor = (progress: number) => {
-    if (progress < 0.52) return COLORS.primary7; // Red (theme)
-    if (progress < 0.82) return COLORS.primary5; // Yellow (theme)
-    return COLORS.primary6; // Green (theme)
+    if (progress < 0.52) return colors.primary7; // Red (theme)
+    if (progress < 0.82) return colors.primary5; // Yellow (theme)
+    return colors.primary6; // Green (theme)
   };
 
   const color = getColor(Math.max(0, Math.min(1, value)));
@@ -166,15 +161,13 @@ export const ProgressIcon = memo(function ProgressIcon({ value, size = 18 }: Pro
         {/* Checkmark (complete state) - drawn animation */}
         <AnimatedPath
           d={svgPaths.p24bd7b90}
-          stroke={COLORS.primary6}
+          stroke={colors.primary6}
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
           strokeDasharray={[10, 10]}
           strokeDashoffset={checkDashoffset}
           opacity={checkOpacity}
-          transform={[{ scale: checkScale }]}
-          origin="9, 9"
         />
       </Svg>
     </View>

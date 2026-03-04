@@ -12,7 +12,6 @@ calendar/
 │   ├── CalendarHeader.tsx   # Header with title & date selector
 │   ├── EmptyState.tsx       # Empty state view
 │   ├── FloatingActionButton.tsx  # FAB for adding tasks
-│   ├── SubtaskItem.tsx      # Individual subtask display
 │   ├── TaskCard.tsx         # Task card (compact & expanded)
 │   └── TaskGroup.tsx        # Date group wrapper
 ├── hooks/                   # Custom hooks
@@ -62,15 +61,6 @@ Displays a task in compact or expanded view.
 - **Compact**: Time, title, category icon, progress indicator
 - **Expanded**: Full details with tags, subtasks, description, actions
 
-### SubtaskItem
-Individual subtask display with checkbox and delete button.
-
-**Props:**
-- `subtask: Subtask` - Subtask data
-- `parentTaskId: string` - Parent task ID
-- `isCompleted: boolean` - Completion state
-- `onToggle: (parentTaskId: string, subtaskId: string, checked: boolean) => void` - Toggle handler
-- `onDelete: (parentTaskId: string, subtaskId: string) => void` - Delete handler
 
 ### TaskGroup
 Wraps tasks for a specific date with a date header.
@@ -202,10 +192,12 @@ import { CalendarScreen } from './screens/calendar/Calendar';
 Or import individual components:
 
 ```tsx
-import { TaskCard, SubtaskItem } from './screens/calendar/components';
+import { TaskCard } from './screens/calendar/components';
+import { CompletionItem } from '../../../components/special/task/CompletionItem';
 
 // Use components individually
 <TaskCard task={task} {...props} />
+<CompletionItem type="subtask" subtask={subtask} {...props} />
 ```
 
 ## Migration Notes

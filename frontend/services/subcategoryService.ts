@@ -8,6 +8,8 @@ export type Subcategory = {
   color?: string | null;
   source?: string;
   confidence?: number;
+  /** true for built‑in/default entries (e.g. "General", category defaults) */
+  isDefault?: boolean;
 };
 
 export type SubcategoriesByCategory = Record<string, Subcategory[]>;

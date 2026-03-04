@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TaskDetailsSection
  *
  * Renders the "TASK DETAILS" box used in both EditTask and (optionally) CreateTask:
@@ -113,7 +113,7 @@ const TaskDetailsSection: React.FC<Props> = ({
 
       {/* Effort + Importance sliders */}
       <View style={styles.slidersContainer}>
-        <View style={[styles.sliderWrapper, { flex: 1, marginRight: SPACING.md }]}>
+        <View style={[styles.sliderWrapper, { flex: 1, marginRight: SPACING.md }]}> 
           <SliderComponent
             value={effort}
             onValueChange={onEffortChange}
@@ -126,7 +126,7 @@ const TaskDetailsSection: React.FC<Props> = ({
             valueDescriptions={{ 1: "Very Easy", 2: "Easy", 3: "Moderate", 4: "Hard", 5: "Very Hard" }}
           />
         </View>
-        <View style={[styles.sliderWrapper, { flex: 1 }]}>
+        <View style={[styles.sliderWrapper, { flex: 1 }]}> 
           <SliderComponent
             value={importance}
             onValueChange={onImportanceChange}

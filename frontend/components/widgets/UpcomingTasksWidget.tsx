@@ -9,6 +9,7 @@ import AppText from "../common/AppText";
 import Widget from "../special/Widget";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
 import { COLORS, ICON_SIZES, SPACING } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 import { updateSubTask } from "../../services/taskService";
 import { useTaskContext } from "../../context/TaskContext";
 import { useOptionalStatsContext } from "../../context/StatsContext";
@@ -68,6 +69,7 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({
   entranceDuration,
 }) => {
   const payload = data as UpcomingTasksData;
+  const colors = useColors();
   const { notifyTaskUpdate } = useTaskContext();
   const { notifyStatsChange } = useOptionalStatsContext();
   const { width } = useWindowDimensions();
@@ -194,10 +196,10 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({
             hideTitle={false}
             hideTaskTitle={true}
             sessionHeaderMode="taskTitle"
-            dividerColor={COLORS.white}
+            dividerColor={colors.bg1}
           />
         ) : (
-          <AppText variant="notes" style={styles.emptySessions}>
+          <AppText variant="notes" style={[styles.emptySessions, { color: colors.gray2 }]}>
             No scheduled sessions
           </AppText>
         )}
@@ -249,12 +251,12 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({
         </View>
 
         {tasks.length === 0 ? (
-          <AppText variant="notes" style={styles.emptyText}>
+          <AppText variant="notes" style={[styles.emptyText, { color: colors.gray2 }]}>
             {emptyLabel}
           </AppText>
         ) : (
           <View style={styles.listContainer}>
-            <List dividerColor={COLORS.white} data={tasks.map((task) => buildTaskCell(task))} />
+            <List dividerColor={colors.bg1} data={tasks.map((task) => buildTaskCell(task))} />
           </View>
         )}
       </View>
@@ -282,13 +284,13 @@ const UpcomingTasksWidget: React.FC<BaseWidgetProps> = ({
     <Widget {...widgetEntranceProps}>
       <View style={styles.header}>
         <View>
-          <AppText variant="notes" style={styles.headerSubtitle}>
+          <AppText variant="notes" style={[styles.headerSubtitle, { color: colors.gray2 }]}>
             Your tasks for the next {daysLabel}
           </AppText>
         </View>
       </View>
 
-      <List data={dayCells} dividerColor={COLORS.white} />
+      <List data={dayCells} dividerColor={colors.bg1} />
     </Widget>
   );
 };
@@ -303,21 +305,17 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
   },
   headerTitle: {
-    color: COLORS.black,
     fontWeight: "700",
     alignSelf: "stretch",
     width: "100%",
   },
-  headerSubtitle: {
-    color: COLORS.darkGray,
-  },
+  headerSubtitle: {},
+
   headerBadge: {
-    backgroundColor: COLORS.white,
     borderRadius: SPACING.md,
     paddingHorizontal: SPACING.md,
   },
   headerBadgeText: {
-    color: COLORS.darkGray,
     fontWeight: "600",
   },
   headerProgressSpacer: {
@@ -357,15 +355,10 @@ const styles = StyleSheet.create({
     marginTop: -SPACING.md,
     marginBottom: SPACING.sm,
   },
-  sectionCount: {
-    color: COLORS.lightGray,
-  },
-  emptyText: {
-    color: COLORS.darkGray,
-  },
-  emptySessions: {
-    color: COLORS.darkGray,
-  },
+  sectionCount: {},
+
+  emptyText: {},
+  emptySessions: {},
 });
 
 export default UpcomingTasksWidget;

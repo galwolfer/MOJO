@@ -1,8 +1,7 @@
 import React from "react";
 import { View, StyleSheet } from "react-native";
-import AppText from "../../common/AppText";
-import { getTimeParts } from "../../widgets/taskHelpers";
-import { SPACING, COLORS, FONT_SIZES } from "../../../theme";
+import TimeDisplay from "../../common/TimeDisplay";
+import { SPACING, COLORS } from "../../../theme";
 
 interface SessionTimeProps {
   /** ISO datetime string – parsed automatically into time + AM/PM parts. */
@@ -14,6 +13,7 @@ interface SessionTimeProps {
   categoryColor?: string;
 }
 
+/** Split a pre-formatted label like "9:00 AM" into time + ampm parts. */
 const parseLabel = (label?: string): { time: string; ampm: string } => {
   if (!label) return { time: "", ampm: "" };
   const match = label.match(/^(.+?)\s*(AM|PM)$/i);
@@ -28,46 +28,23 @@ export const SessionTime: React.FC<SessionTimeProps> = ({
   endLabel,
   categoryColor,
 }) => {
-  const rawStart = getTimeParts(timeStart);
-  const rawEnd = getTimeParts(timeEnd);
-  const labelStart = parseLabel(startLabel);
-  const labelEnd = parseLabel(endLabel);
+  const hasStart = !!(timeStart || startLabel);
+  const hasEnd = !!(timeEnd || endLabel);
 
-  const startTime = startLabel ? labelStart.time : rawStart.time;
-  const startAmpm = startLabel ? labelStart.ampm : rawStart.ampm;
-  const endTime = endLabel ? labelEnd.time : rawEnd.time;
-  const endAmpm = endLabel ? labelEnd.ampm : rawEnd.ampm;
-  const hasStart = !!(startLabel || timeStart);
-  const hasEnd = !!(endLabel || timeEnd);
+  // Pre-parse labels only when we have no ISO string to pass to TimeDisplay directly
+  const labelStart = !timeStart ? parseLabel(startLabel) : undefined;
+  const labelEnd = !timeEnd ? parseLabel(endLabel) : undefined;
 
   return (
     <View style={styles.sessionTimeBlock}>
       <View style={[styles.sessionTimeLine, { backgroundColor: categoryColor || COLORS.primary1 }]} />
       <View style={styles.sessionTimeColumn}>
-        <AppText variant="notes" style={styles.sessionHourText}>
-          {hasStart ? (
-            <>
-              {startTime || "Time"}
-              {startAmpm ? (
-                <AppText variant="notes" style={styles.sessionAmPm}>
-                  {" " + startAmpm}
-                </AppText>
-              ) : null}
-            </>
-          ) : (
-            "Time"
-          )}
-        </AppText>
-        {hasEnd ? (
-          <AppText variant="notes" style={styles.sessionHourText}>
-            {endTime}
-            {endAmpm ? (
-              <AppText variant="notes" style={styles.sessionAmPm}>
-                {" " + endAmpm}
-              </AppText>
-            ) : null}
-          </AppText>
-        ) : null}
+        {hasStart ? (
+          <TimeDisplay isoString={timeStart} time={labelStart?.time} ampm={labelStart?.ampm} />
+        ) : (
+          <TimeDisplay time="Time" />
+        )}
+        {hasEnd ? <TimeDisplay isoString={timeEnd} time={labelEnd?.time} ampm={labelEnd?.ampm} /> : null}
       </View>
     </View>
   );
@@ -86,14 +63,6 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
     justifyContent: "space-between",
   },
-  sessionHourText: {
-    color: COLORS.lightGray,
-  },
-  sessionAmPm: {
-    fontSize: FONT_SIZES.sm * 0.8,
-    color: COLORS.lightGray,
-  },
-
   sessionTimeLine: {
     width: SPACING.xs,
     alignSelf: "stretch",

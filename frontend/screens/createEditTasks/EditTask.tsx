@@ -17,6 +17,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { View, StyleSheet, SafeAreaView, TouchableOpacity, ActivityIndicator } from "react-native";
 import { COLORS, SPACING, FONT_SIZES, ICON_SIZES } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 
 // ── Common components ─────────────────────────────────────────────────────────
 import AppText from "../../components/common/AppText";
@@ -55,6 +56,7 @@ import { combineLocalDateTime, validateEditableSessions } from "../../components
 const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
   const { setHeaderConfig, setActiveTab } = useNavigation();
   const { notifyTaskUpdate } = useTaskContext();
+  const colors = useColors();
 
   // ── Form state ────────────────────────────────────────────────────────────
   const [formState, setFormState] = useState<TaskFormState>({
@@ -195,7 +197,7 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
         // ── Load sessions and merge into subtask / single-task schedule ──
         try {
           const sessionsData = await getTaskSessions(taskId);
-          if (!cancelled && sessionsData) {
+          if (!cancelled && sessionsData && "manualSchedule" in sessionsData && "sessions" in sessionsData) {
             const isManual = sessionsData.manualSchedule;
             const activeSessions = (sessionsData.sessions ?? [])
               .filter((s: any) => s.status !== "completed")
@@ -571,9 +573,10 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
   // ── Loading / error states ────────────────────────────────────────────────
   if (isFetching) {
     return (
-      <SafeAreaView style={styles.loadingWrapper}>
+      <SafeAreaView style={[styles.loadingWrapper, { backgroundColor: colors.bg3 }]}>
+        \
         <ActivityIndicator size="large" color={COLORS.primary1} />
-        <AppText style={styles.loadingText}>Loading task...</AppText>
+        <AppText style={[styles.loadingText, { color: colors.gray2 }]}>Loading task...</AppText>
       </SafeAreaView>
     );
   }
@@ -606,7 +609,7 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
       extraBottomPadding={SPACING.xlg * 3}
     >
       {/* Error banner at top */}
-      <ErrorBanner errors={formErrors} />
+      <ErrorBanner message={formErrors.join("\n")} />
 
       <TaskDetailsSection
         taskName={formState.taskName}
@@ -676,7 +679,7 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
       </View>
 
       {/* Error banner below buttons */}
-      <ErrorBanner errors={formErrors} />
+      <ErrorBanner message={formErrors.join("\n")} />
 
       {/* Popup / Alert */}
       <PopupBox
@@ -685,7 +688,7 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
         title={popupInfo?.title ?? ""}
         titleColor={COLORS.primary1}
       >
-        <AppText style={styles.popupMessage}>{popupInfo?.message}</AppText>
+        <AppText style={[styles.popupMessage, { color: colors.gray2 }]}>{popupInfo?.message}</AppText>
         {popupInfo?.confirmAction ? (
           <View style={styles.confirmRow}>
             <AppButton title="Cancel" mode="filled" color="lightGray" onPress={() => setPopupInfo(null)} width="48%" />

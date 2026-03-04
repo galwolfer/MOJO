@@ -1,4 +1,5 @@
 export { default as SettingsScreen } from "./Settings";
+export { default as AccessibilitySettingsScreen } from "./screens/AccessibilitySettings";
 export { default as EditPreferencesScreen } from "./screens/EditPreferences";
 export { default as ChatSettingsScreen } from "./screens/ChatSettings";
 export { default as ProfileSettings } from "./screens/ProfileSettings";

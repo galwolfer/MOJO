@@ -16,6 +16,7 @@ import { Platform, Text, View } from "react-native";
 import { SvgXml, type SvgProps } from "react-native-svg";
 import { SVG_DATA_URIS } from "./svg-data-uris";
 import { COLORS } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 
 export type IconProps = SvgProps & { size?: number };
 
@@ -29,6 +30,7 @@ export const ICON_FILES: Record<string, string> = {
   check: 'check.svg',
   clock: 'clock-1.svg',
   creative: 'creative.svg',
+  day: 'day.svg',
   default: 'default.svg',
   down: 'down-icon.svg',
   edit: 'edit.svg',
@@ -54,6 +56,7 @@ export const ICON_FILES: Record<string, string> = {
   mindfulness: 'mindfulness.svg',
   mojo: 'mojo-logo.svg',
   move: 'move.svg',
+  night: 'night.svg',
   notifications: 'notifications.svg',
   ojo: 'ojo.svg',
   other: 'other.svg',
@@ -117,10 +120,11 @@ function createIcon(svgFileName: string, debugName: string): React.FC<IconProps>
   }
 
   return (props: IconProps) => {
+    const colors = useColors();
     const { size: sizeProp, color, width, height, ...rest } = props;
     const resolvedSize = sizeProp || width || height || 24;
     const numericSize = typeof resolvedSize === "string" ? Number(resolvedSize) : resolvedSize;
-    const tint = typeof color === "string" ? color : color ? String(color) : COLORS.black;
+    const tint = typeof color === "string" ? color : color ? String(color) : colors.text1;
 
     const base64Content = dataUri.split(",")[1];
     let svgContent = "";

@@ -11,6 +11,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { PanResponder, Platform, StyleProp, StyleSheet, View, ViewStyle } from "react-native";
 import AppText from "../common/AppText";
 import { COLORS, SPACING, ICON_SIZES } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 
 // Size tokens derived from theme for consistency
 const THUMB_SIZE = ICON_SIZES.md; // 24-ish
@@ -52,10 +53,12 @@ const SliderComponent: React.FC<SliderComponentProps> = ({
     4: "Important",
     5: "Very Important",
   },
-  trackColor = COLORS.lightGray,
+  trackColor,
   TrackThumbColor = COLORS.primary1,
   style,
 }) => {
+  const colors = useColors();
+  const effectiveTrackColor = trackColor ?? colors.bg2;
   const [containerWidth, setContainerWidth] = useState(0);
   const [internalValue, setInternalValue] = useState(value);
   const internalValueRef = useRef(value);
@@ -198,7 +201,7 @@ const SliderComponent: React.FC<SliderComponentProps> = ({
           <View
             style={[
               styles.customTrack,
-              { backgroundColor: trackColor, height: TRACK_HEIGHT, borderRadius: TRACK_HEIGHT / 2 },
+              { backgroundColor: effectiveTrackColor, height: TRACK_HEIGHT, borderRadius: TRACK_HEIGHT / 2 },
             ]}
           />
           <View
@@ -223,6 +226,7 @@ const SliderComponent: React.FC<SliderComponentProps> = ({
                 borderRadius: THUMB_SIZE / 2,
                 backgroundColor: TrackThumbColor,
                 borderWidth: THUMB_BORDER_WIDTH,
+                borderColor: colors.bg2,
               },
             ]}
           />
@@ -282,7 +286,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderWidth: THUMB_BORDER_WIDTH,
-    borderColor: COLORS.white2,
   },
   labelRow: {
     flexDirection: "row",

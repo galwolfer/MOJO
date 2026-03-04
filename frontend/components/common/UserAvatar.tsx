@@ -5,6 +5,7 @@ import { moderateScale } from "react-native-size-matters";
 import { ICONS } from "../icons/icons";
 import { useOjo } from "../../context/OjoContext";
 import { COLORS } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 
 const UserAvatar: React.FC<{
   imageUri?: string | null;
@@ -14,6 +15,7 @@ const UserAvatar: React.FC<{
   placeholderSize?: number;
 }> = ({ imageUri, size = 110, onPress, style }) => {
   const { gradient } = useOjo();
+  const colors = useColors();
   const AvatarWrapper: any = onPress ? TouchableOpacity : View;
   const Icon = ICONS.user;
 
@@ -29,7 +31,7 @@ const UserAvatar: React.FC<{
             width: "100%",
             height: "100%",
             borderRadius: size / 2,
-            backgroundColor: COLORS.white,
+            backgroundColor: colors.bg1,
             alignItems: "center",
             justifyContent: "center",
             overflow: "hidden",
@@ -39,7 +41,7 @@ const UserAvatar: React.FC<{
             <Image source={{ uri: imageUri }} style={{ width: "100%", height: "100%" }} />
           ) : (
             <View style={{ alignItems: "center", justifyContent: "center" }}>
-              <Icon size={moderateScale(size / 3)} color={COLORS.lightGray} />
+              <Icon size={moderateScale(size / 3)} color={colors.gray1} />
             </View>
           )}
         </View>

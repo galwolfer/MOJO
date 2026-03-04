@@ -18,6 +18,7 @@
 import React from "react";
 import { View, StyleSheet } from "react-native";
 import { COLORS, SPACING } from "../../../theme";
+import { useColors } from "../../../context/ThemeContext";
 import Input from "../../../components/inputs/Input";
 import SliderComponent from "../../../components/inputs/Slider";
 import Box from "../../../components/layout/Box";
@@ -98,6 +99,8 @@ const TimeAndPartsSection: React.FC<Props> = ({
   singleTaskSchedule,
   onSingleTaskScheduleChange,
 }) => {
+  const colors = useColors();
+
   return (
     <Box title="TIME & PARTS" style={[styles.boxContent, boxContentStyle]}>
       {/* Split task counter slider */}
@@ -109,7 +112,7 @@ const TimeAndPartsSection: React.FC<Props> = ({
           min={1}
           max={10}
           step={1}
-          trackColor={COLORS.lightGray}
+          trackColor={colors.gray1}
           TrackThumbColor={COLORS.primary1}
           valueDescriptions={{
             1: "Single Task",

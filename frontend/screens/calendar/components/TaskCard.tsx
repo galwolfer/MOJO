@@ -11,6 +11,7 @@ import AppText from "../../../components/common/AppText";
 import AppButton from "../../../components/common/AppButton";
 import PopupBox from "../../../components/common/PopupBox";
 import { COLORS, SPACING, FONT_SIZES, FONTS, ICON_SIZES } from "../../../theme";
+import { useColors } from "../../../context/ThemeContext";
 import { ICONS } from "../../../components/icons/icons";
 import { ProgressIcon } from "../../../components/icons/ProgressIcon.native";
 import { getCategoryMeta } from "../../../config/categoryMeta";
@@ -19,7 +20,7 @@ import { TaskTitle } from "../../../components/special/task/TaskTitle";
 import { TaskTagsRow } from "../../../components/special/task/TaskTagsRow";
 import { TwoColumnGrid, renderTaskField } from "../../../components/special/task";
 import { SessionTime } from "../../../components/special/task/SessionTime";
-import SubtaskItem from "./SubtaskItem";
+import { CompletionItem } from "../../../components/special/task/CompletionItem";
 import List from "../../../components/layout/List";
 import { Task } from "../types";
 
@@ -46,6 +47,7 @@ function TaskCard({
   onSubtaskToggle,
   onSubtaskDelete,
 }: TaskCardProps) {
+  const colors = useColors();
   const categoryMeta = task.category ? getCategoryMeta(task.category) : null;
   const effectiveId = task.taskId || task.id;
   const categoryColor = categoryMeta?.color || task.color;
@@ -103,17 +105,17 @@ function TaskCard({
   return (
     <>
       <TouchableOpacity
-        style={styles.container}
+        style={[styles.container, { borderBottomColor: colors.bg2 }]}
         onPress={() => onPress(task.id)}
         activeOpacity={isExpanded ? 0.9 : 0.7}
       >
         {isExpanded && (
           <>
             <TouchableOpacity style={styles.editBtn} onPress={() => onEdit(task)}>
-              <ICONS.edit size={ICON_SIZES.sm} color={COLORS.lightGray} />
+              <ICONS.edit size={ICON_SIZES.sm} color={colors.gray1} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.deleteBtn} onPress={handleConfirmDelete}>
-              <ICONS.trash size={ICON_SIZES.sm} color={COLORS.lightGray} />
+              <ICONS.trash size={ICON_SIZES.sm} color={colors.gray1} />
             </TouchableOpacity>
           </>
         )}
@@ -132,7 +134,10 @@ function TaskCard({
                 isExpanded ? styles.titleRowExpanded : undefined,
                 { marginBottom: isExpanded ? SPACING.sm : 0 },
               ]}
-              textStyle={[styles.titleText, { fontFamily: isExpanded ? FONTS.fredokaSemiBold : FONTS.fredokaRegular }]}
+              textStyle={[
+                styles.titleText,
+                { fontFamily: isExpanded ? FONTS.fredokaSemiBold : FONTS.fredokaRegular, color: colors.text1 },
+              ]}
               iconStyle={{ marginLeft: 0, marginBottom: 0 }}
               leadingNode={<ProgressIcon value={taskProgress} size={ICON_SIZES.md} />}
               reversed={!isExpanded}
@@ -161,18 +166,23 @@ function TaskCard({
                   ]}
                 />
 
-                {task.mainTaskDescription && <AppText style={styles.description}>{task.mainTaskDescription}</AppText>}
-                {task.description && <AppText style={styles.description}>{task.description}</AppText>}
+                {task.mainTaskDescription && (
+                  <AppText style={[styles.description, { color: colors.gray2 }]}>{task.mainTaskDescription}</AppText>
+                )}
+                {task.description && (
+                  <AppText style={[styles.description, { color: colors.gray2 }]}>{task.description}</AppText>
+                )}
 
                 {task.subtasks && task.subtasks.length > 0 && (
                   <List
                     data={task.subtasks.map((subtask) => ({
                       id: subtask.id,
                       content: (
-                        <SubtaskItem
+                        <CompletionItem
+                          type="subtask"
                           subtask={subtask}
                           parentTaskId={effectiveId}
-                          isCompleted={localSubtasks.has(subtask.id)}
+                          isCompleted={localSubtasks.has(subtask.id || "")}
                           categoryColor={categoryColor}
                           showTime={(task.subtasks?.length ?? 0) > 1}
                           onToggle={handleSubtaskToggle}
@@ -192,7 +202,8 @@ function TaskCard({
                 data={task.subtasks!.map((subtask) => ({
                   id: subtask.id,
                   content: (
-                    <SubtaskItem
+                    <CompletionItem
+                      type="subtask"
                       subtask={subtask}
                       parentTaskId={effectiveId}
                       isCompleted={localSubtasks.has(subtask.id)}
@@ -234,17 +245,18 @@ const styles = StyleSheet.create({
   },
   titleRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: SPACING.sm,
     flex: 1,
-    flexWrap: "nowrap",
+    flexWrap: "nowrap", // keep icon and text on same line
     minWidth: 0,
   },
   titleText: {
     fontSize: FONT_SIZES.base,
-    color: COLORS.black,
     flex: 1,
     minWidth: 0,
+    flexWrap: "wrap", // allow title to wrap within its space
+    flexShrink: 1,
   },
   titleRowExpanded: {
     // Reserve space so title text doesn't bleed under the absolute-positioned edit/delete buttons
@@ -300,7 +312,6 @@ const styles = StyleSheet.create({
   subtaskText: {
     fontFamily: FONTS.fredokaRegular,
     fontSize: FONT_SIZES.sm,
-    color: COLORS.black,
     flex: 1,
   },
   completedText: {

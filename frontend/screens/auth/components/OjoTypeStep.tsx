@@ -12,6 +12,7 @@ import AuthStep from "./AuthStep";
 import AuthButtonsGroup from "./AuthButtonsGroup";
 import GridEntranceItem from "../../../components/common/animations/GridEntranceItem";
 import { COLORS, SPACING, FONT_SIZES, SHADOWS } from "../../../theme";
+import { useColors } from "../../../context/ThemeContext";
 import { moderateScale } from "react-native-size-matters";
 import { ICONS } from "../../../components/icons/icons";
 import { getAllOjoTypes, type OjoTypeName } from "../../../config/ojoTypeConfig";
@@ -25,6 +26,7 @@ interface Props {
 }
 
 const OjoTypeStep: React.FC<Props> = ({ pendingToken, onNext }) => {
+  const colors = useColors();
   const [selectedOjo, setSelectedOjo] = useState<OjoTypeName>("mentorjo");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,8 +100,8 @@ const OjoTypeStep: React.FC<Props> = ({ pendingToken, onNext }) => {
                       style={[
                         styles.card,
                         {
-                          backgroundColor: COLORS.white,
-                          borderColor: isSelected ? ojo.color : COLORS.white,
+                          backgroundColor: colors.bg1,
+                          borderColor: isSelected ? ojo.color : colors.bg1,
                           borderWidth: 3,
                           ...(SHADOWS.card as object),
                         },
@@ -119,14 +121,16 @@ const OjoTypeStep: React.FC<Props> = ({ pendingToken, onNext }) => {
                         ]}
                       >
                         {typeof IconComponent === "function" && (
-                          <IconComponent size={iconSize * 0.55} color={COLORS.white} />
+                          <IconComponent size={iconSize * 0.55} color={colors.text2} />
                         )}
                       </View>
 
                       <AppText variant="title3" style={[styles.ojoName, { color: ojo.color }]}>
                         {ojo.displayName}
                       </AppText>
-                      <AppText style={styles.ojoRole}>{ojo.persona.split(" ").slice(0, 3).join(" ")}</AppText>
+                      <AppText style={[styles.ojoRole, { color: colors.gray2 }]}>
+                        {ojo.persona.split(" ").slice(0, 3).join(" ")}
+                      </AppText>
                     </TouchableOpacity>
                   </GridEntranceItem>
                 );
@@ -134,7 +138,7 @@ const OjoTypeStep: React.FC<Props> = ({ pendingToken, onNext }) => {
             </View>
           )}
 
-          {error && <AppText style={styles.errorText}>{error}</AppText>}
+          {error && <AppText style={[styles.errorText, { color: colors.primary7 }]}>{error}</AppText>}
 
           {/* No Back button per design; show only Next */}
           <AuthButtonsGroup

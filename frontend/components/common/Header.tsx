@@ -11,6 +11,7 @@ import {
   Pressable,
 } from "react-native";
 import { COLORS, SPACING, TYPOGRAPHY, SHADOWS, ICON_SIZES, COMPONENT_STYLES, FONT_SIZES } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 import GlassSurface from "./GlassSurface";
 import { moderateScale } from "react-native-size-matters";
 import AppText from "./AppText";
@@ -40,6 +41,7 @@ type HeaderProps = {
 export default function Header({ title, Icon, show = true, rightElement, leftElement, element, style }: HeaderProps) {
   const { width } = useWindowDimensions();
   const [overflowOpen, setOverflowOpen] = useState(false);
+  const colors = useColors();
 
   if (!show) return null;
 
@@ -72,7 +74,7 @@ export default function Header({ title, Icon, show = true, rightElement, leftEle
 
   return (
     <View style={[styles.wrapper, style]}>
-      <GlassSurface intensity={50} style={[styles.blurSurface, COMPONENT_STYLES.glassSurface]}>
+      <GlassSurface intensity={60} style={styles.blurSurface}>
         <View style={styles.container}>
           {/* Left Section (arrow/icon + title) */}
           <View style={styles.leftSection}>
@@ -169,7 +171,7 @@ const styles = StyleSheet.create({
   modalContent: {
     minWidth: 200,
     maxWidth: "90%",
-    backgroundColor: (COLORS as any).surface || "#fff",
+    backgroundColor: COLORS.white1,
     padding: SPACING.lg,
     borderRadius: SPACING.md,
   },

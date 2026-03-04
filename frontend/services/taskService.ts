@@ -116,6 +116,9 @@ export type TaskProgressResponse = {
   data: TaskProgressData;
 };
 
+// Scheduling helpers are defined later in the file alongside other API calls
+// ─────────────────────────────────────────────────────────────────────────
+
 export type ScheduledDayGroup = {
   date: string | null;
   tasks: Array<{
@@ -189,12 +192,35 @@ export async function getTasks(filters?: {
 export async function getTaskById(id: string): Promise<Task | null> {
   try {
     const response = await get<{ success: boolean; task: Task }>(`/tasks/${id}`);
-    const task = response.task || null;
-    if (task) {
+    const raw = response.task || null;
+    if (raw) {
+      const subTasks: any[] = (raw as any).subTasks || raw.subtasks || [];
+
+      // Aggregate scheduledSessions from each subTask when the API doesn't include
+      // a top-level array (single-task endpoint may omit it).
+      const topSessions: any[] = (raw as any).scheduledSessions || [];
+      const aggregatedSessions: any[] =
+        topSessions.length > 0
+          ? topSessions
+          : subTasks.flatMap((st: any) =>
+              (st.scheduledSessions || []).map((s: any) => ({
+                ...s,
+                subtaskIndex: st.index ?? st.order,
+                subtaskTitle: st.title,
+                subtaskId: st._id || st.id,
+              })),
+            );
+
+      // Guard: subCategory may be an unpopulated ObjectId string
+      const subCatRaw = (raw as any).subCategory;
+      const subCategory = subCatRaw && typeof subCatRaw === "object" ? subCatRaw : undefined;
+
       return {
-        ...task,
-        subtasks: (task as any).subTasks || task.subtasks || [],
-      };
+        ...raw,
+        subCategory,
+        subtasks: subTasks,
+        scheduledSessions: aggregatedSessions,
+      } as Task;
     }
     return null;
   } catch (error) {
@@ -1495,8 +1521,15 @@ export async function getScheduledSessionsForDate(date: Date): Promise<CalendarT
         // Detail fields for expanded TaskCard view
         importance: task.importance ?? undefined,
         effort: task.effort ?? undefined,
-        subcategoryDisplay: task.subCategory?.name ?? undefined,
-        subCategory: task.subCategory ?? undefined,
+        // Guard: subCategory may arrive as a raw ObjectId string (not populated).
+        // Only extract display fields when it's a real object.
+        ...(() => {
+          const subCat = task.subCategory && typeof task.subCategory === "object" ? task.subCategory : null;
+          return {
+            subcategoryDisplay: subCat?.name ?? subCat?.label ?? undefined,
+            subCategory: subCat,
+          };
+        })(),
         estimatedDuration: task.estimatedDuration ?? undefined,
         earliestStart: task.earliestStart ?? undefined,
         deadline: task.dueDate ?? undefined,

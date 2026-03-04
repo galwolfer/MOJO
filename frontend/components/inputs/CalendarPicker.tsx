@@ -272,7 +272,6 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: FONT_SIZES.md,
-    color: COLORS.black,
     fontWeight: "500",
   },
   dateTextInactive: {

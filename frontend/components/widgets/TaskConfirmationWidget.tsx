@@ -9,6 +9,7 @@ import AppText from "../common/AppText";
 import { Checkbox } from "../icons/Checkbox";
 import { ICONS } from "../icons/icons";
 import { COLORS, ICON_SIZES, SPACING } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 import Widget from "../special/Widget";
 import { BaseWidgetProps } from "../../utils/widgetFactory";
 import List from "../layout/List";
@@ -26,7 +27,7 @@ import { getCategoryMeta, resolveCategoryKey } from "../../config/categoryMeta";
 import { getCategoryDisplay } from "./taskHelpers";
 
 /**
- * Normalises the raw widget data payload coming from the model.
+ * Normalizes the raw widget data payload coming from the model.
  * The model may output:
  *  - snake_case field names  (task_name, can_split, estimated_duration …)
  *  - category as a display name ("Social Activity") instead of a key ("social_activity")
@@ -68,7 +69,7 @@ function normalizeConfirmationData(raw: Record<string, any>): TaskData {
     minMinutes: raw.minMinutes ?? raw.min_minutes,
     maxMinutes: raw.maxMinutes ?? raw.max_minutes,
     earliestStart: raw.earliestStart ?? raw.earliest_start,
-    // Normalised recurrence object
+    // Normalized recurrence object
     recurrence,
   } as TaskData;
 }
@@ -150,7 +151,9 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
   entranceDelay,
   entranceDuration,
 }) => {
-  // Normalise raw model payload (snake_case → camelCase, category key resolution, recurrence shape)
+  // Data is passed directly - use as TaskData
+  const colors = useColors();
+  // Normalize category display name for UI (prefer explicit display from payload, then server meta, then raw key)
   const task: TaskData = normalizeConfirmationData(data as Record<string, any>);
   // Derive display name from the now-resolved category key
   const categoryDisplayNormalized = getCategoryDisplay(task.category, task.categoryDisplay);
@@ -168,7 +171,7 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
         {/* Description */}
         {task.description ? (
           <View style={styles.field}>
-            <AppText variant="notes" style={styles.labelText}>
+            <AppText variant="notes" style={[styles.labelText, { color: colors.gray2 }]}>
               Description
             </AppText>
             <AppText variant="bodyText">{task.description}</AppText>
@@ -218,60 +221,6 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
           progressPercentage={task.status === "draft" ? null : (task.progressPercentage ?? null)}
         />
 
-        {/* Subtasks */}
-        {task.subtasks && task.subtasks.length > 0 && (
-          <View style={styles.section}>
-            <AppText variant="boldText" style={{ color: getCategoryMeta(task.category)?.color || COLORS.primary1 }}>
-              {`${task.subtasks.length}`} Subtasks
-            </AppText>
-            <List
-              data={task.subtasks.map((subtask, index) => ({
-                id: subtask.id || `subtask-${index}`,
-                content: (
-                  <View style={styles.subtaskCard}>
-                    <View style={styles.subtaskTitleRow}>
-                      <View style={styles.subtaskTitleCheck}>
-                        <Checkbox checked={subtask.completed || subtask.status === "completed"} size={16} />
-                        <AppText
-                          variant="bodyText"
-                          style={[
-                            styles.subtaskTitle,
-                            (subtask.completed || subtask.status === "completed") && styles.subtaskCompleted,
-                          ]}
-                        >
-                          {subtask.title}
-                        </AppText>
-                      </View>
-
-                      {(subtask.duration || subtask.minutes) && (
-                        <View style={styles.subtaskDurationRow}>
-                          <AppText
-                            variant="notes"
-                            style={{ color: getCategoryMeta(task.category)?.color || COLORS.primary1 }}
-                          >
-                            {formatDuration(subtask.duration || subtask.minutes || 0)}
-                          </AppText>
-                          <ICONS.clock
-                            size={ICON_SIZES.sm / 2}
-                            color={getCategoryMeta(task.category)?.color || COLORS.primary1}
-                          />
-                        </View>
-                      )}
-                    </View>
-                    {subtask.description ? (
-                      <AppText variant="notes" style={styles.subtaskDescription}>
-                        {subtask.description}
-                      </AppText>
-                    ) : null}
-                  </View>
-                ),
-                divider: index < (task.subtasks?.length || 0) - 1,
-              }))}
-              dividerColor={COLORS.white2}
-            />
-          </View>
-        )}
-
         {/* Action buttons removed for now */}
       </ScrollView>
     </Widget>
@@ -285,7 +234,6 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: SPACING.md,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.white2,
     paddingBottom: SPACING.sm,
   },
   headerTitle: {
@@ -295,9 +243,8 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
     gap: 4,
   },
-  labelText: {
-    color: COLORS.darkGray,
-  },
+  labelText: {},
+
   row: {
     flexDirection: "row",
     marginBottom: SPACING.md,
@@ -324,7 +271,6 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   scheduleCard: {
-    backgroundColor: COLORS.white2,
     padding: SPACING.sm,
     borderRadius: SPACING.md,
     borderLeftWidth: SPACING.xs,
@@ -338,9 +284,8 @@ const styles = StyleSheet.create({
     color: COLORS.primary1,
     fontWeight: "500",
   },
-  scheduleTime: {
-    color: COLORS.darkGray,
-  },
+  scheduleTime: {},
+
   subtaskCard: {
     width: "100%",
   },
@@ -368,13 +313,11 @@ const styles = StyleSheet.create({
   },
   subtaskCompleted: {
     textDecorationLine: "line-through",
-    color: COLORS.darkGray,
   },
   subtaskDuration: {
     color: COLORS.primary1,
   },
   subtaskDescription: {
-    color: COLORS.darkGray,
     marginTop: SPACING.xs,
     marginLeft: SPACING.sm,
   },

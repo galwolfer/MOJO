@@ -13,6 +13,7 @@ import Box from "../../../components/layout/Box";
 import CategoryGrid from "../../auth/components/CategoryGrid";
 import { ICONS } from "../../../components/icons/icons";
 import { COLORS, SPACING, FONT_SIZES, SHADOWS, ICON_SIZES } from "../../../theme";
+import { useColors } from "../../../context/ThemeContext";
 import { moderateScale } from "react-native-size-matters";
 import { CATEGORY_KEYS, type CategoryKey } from "../../../config/categoryMeta";
 import { useNavigation } from "../../../context/NavigationContext";
@@ -32,6 +33,7 @@ type EditPreferencesScreenProps = {
 };
 
 export default function EditPreferencesScreen({ onBack, onSave }: EditPreferencesScreenProps) {
+  const colors = useColors();
   const { setHeaderConfig } = useNavigation();
   const { token } = useAuth();
   const { visible: keyboardVisible, height: keyboardHeight } = useKeyboard();
@@ -149,9 +151,9 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.bg3 }]}>
         <ActivityIndicator size="large" color={COLORS.primary1} />
-        <AppText variant="bodyText" style={styles.loadingText}>
+        <AppText variant="bodyText" style={[styles.loadingText, { color: colors.gray1 }]}>
           Loading preferences...
         </AppText>
       </View>
@@ -160,7 +162,7 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
 
   return (
     <ScrollableContent
-      style={styles.scroll}
+      style={[styles.scroll, { backgroundColor: colors.bg3 }]}
       extraTopPadding={SPACING.lg}
       contentContainerStyle={[
         styles.contentContainer,
@@ -254,7 +256,6 @@ export default function EditPreferencesScreen({ onBack, onSave }: EditPreference
 const styles = StyleSheet.create({
   scroll: {
     flex: 1,
-    backgroundColor: COLORS.white3,
   },
   contentContainer: {
     flexGrow: 1,
@@ -264,12 +265,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: COLORS.white3,
     gap: SPACING.md,
   },
-  loadingText: {
-    color: COLORS.lightGray,
-  },
+  loadingText: {},
   titleSection: {
     flexDirection: "row",
     alignItems: "center",

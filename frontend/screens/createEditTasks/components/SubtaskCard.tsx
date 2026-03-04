@@ -7,8 +7,7 @@
 
 import React from "react";
 import { View, StyleSheet } from "react-native";
-import { COLORS, SPACING, FONT_SIZES } from "../../../theme";
-import AppText from "../../../components/common/AppText";
+import { SPACING } from "../../../theme";
 import Input from "../../../components/inputs/Input";
 import { Subtask } from "./taskFormTypes";
 

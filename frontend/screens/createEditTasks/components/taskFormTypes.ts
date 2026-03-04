@@ -1,7 +1,9 @@
-/**
+﻿/**
  * Shared types for task create/edit forms.
  * Consumed by EditTask, CreateTask, and the extracted section components.
  */
+
+// Shared types used by create/edit task screens
 
 export interface Subtask {
   id: string;

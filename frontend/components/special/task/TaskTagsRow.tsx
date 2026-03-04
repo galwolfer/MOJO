@@ -14,10 +14,19 @@ export const TaskTagsRow: React.FC<{
   subCategory?: { icon?: string | null; color?: string | null; source?: string | null; parent?: string | null } | null;
   importance?: number | null;
   effort?: number | null;
-  tags?: string[];
+  tags?: string[] | null;
 }> = ({ category, categoryDisplay, subcategory, subcategoryDisplay, subCategory, importance, effort, tags }) => {
   const categoryMeta = getCategoryMeta(category);
   const subLabel = subcategoryDisplay || subcategory || "";
+
+  console.log(
+    "[TaskTagsRow] subcategoryDisplay:",
+    subcategoryDisplay,
+    "subCategory:",
+    subCategory,
+    "subLabel:",
+    subLabel,
+  );
 
   const importanceIcon = (imp?: number | null) => {
     if (!imp) return "list";
@@ -89,6 +98,7 @@ export const TaskTagsRow: React.FC<{
             return (
               <Tag
                 label={subLabel}
+                leftIcon={subCategory?.icon || undefined}
                 colorIndex={Math.max(0, Math.min(17, subLabel.length % 9))}
                 style={styles.tagItem}
               />
@@ -115,15 +125,18 @@ export const TaskTagsRow: React.FC<{
       ) : null}
 
       {tags && tags.length > 0
-        ? tags.map((tag) => (
-            <Tag
-              key={tag}
-              label={tag}
-              leftIcon={categoryMeta.icon}
-              colorIndex={categoryMeta.colorIndex}
-              style={styles.tagItem}
-            />
-          ))
+        ? tags
+            // Filter out raw MongoDB ObjectIds (24-char hex) that should never be shown as tags
+            .filter((tag) => !/^[0-9a-f]{24}$/i.test(tag))
+            .map((tag) => (
+              <Tag
+                key={tag}
+                label={tag}
+                leftIcon={categoryMeta.icon}
+                colorIndex={categoryMeta.colorIndex}
+                style={styles.tagItem}
+              />
+            ))
         : null}
     </View>
   );

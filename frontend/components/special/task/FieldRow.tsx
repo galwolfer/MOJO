@@ -3,7 +3,10 @@ import { View, useWindowDimensions } from "react-native";
 import AppText from "../../common/AppText";
 import Icon from "../../icons/Icon";
 import { StyleSheet } from "react-native";
-import { SPACING, COLORS, ICON_SIZES } from "../../../theme";
+import { SPACING, ICON_SIZES } from "../../../theme";
+import { useColors } from "../../../context/ThemeContext";
+
+const BREAKPOINT_WIDTH = 640;
 
 export const FieldRow: React.FC<{
   icon?: string;
@@ -13,9 +16,10 @@ export const FieldRow: React.FC<{
   children?: React.ReactNode;
   horizontal?: boolean;
 }> = ({ icon, label, value, formatter, children, horizontal = false }) => {
+  const colors = useColors();
   const { width } = useWindowDimensions();
-  const isTwoColumn = width >= 600;
-  const isLabelInline = width < 600;
+  const isTwoColumn = width >= BREAKPOINT_WIDTH;
+  const isLabelInline = width < BREAKPOINT_WIDTH;
 
   let containerStyle;
   let valueStyle;
@@ -37,8 +41,8 @@ export const FieldRow: React.FC<{
   return (
     <View style={containerStyle}>
       <View style={styles.labelRow}>
-        {icon ? <Icon name={icon} size={ICON_SIZES.sm} color={COLORS.lightGray} style={styles.labelIcon} /> : null}
-        <AppText variant="notes" style={styles.labelText}>
+        {icon ? <Icon name={icon} size={ICON_SIZES.sm} color={colors.gray1} style={styles.labelIcon} /> : null}
+        <AppText variant="notes" style={[styles.labelText, { color: colors.gray1 }]}>
           {label}:
         </AppText>
       </View>
@@ -77,9 +81,8 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
   },
 
-  labelText: {
-    color: COLORS.lightGray,
-  },
+  labelText: {},
+
   labelRow: {
     flexDirection: "row",
     alignItems: "center",

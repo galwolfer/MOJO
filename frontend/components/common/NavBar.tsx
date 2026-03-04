@@ -3,6 +3,7 @@ import { View, StyleSheet, TouchableOpacity, Platform, Animated } from "react-na
 import { ICONS } from "../icons/icons";
 import { COLORS, SPACING, SHADOWS, ICON_SIZES } from "../../theme";
 import { useNavigation, TabName } from "../../context/NavigationContext";
+import { useColors } from "../../context/ThemeContext";
 import useKeyboard from "../../hooks/useKeyboard";
 import GlassSurface from "./GlassSurface";
 
@@ -21,6 +22,7 @@ type NavBarProps = {
 export default function NavBar({ show = true, hideIcons = false }: NavBarProps) {
   const { activeTab, setActiveTab, navBarConfig } = useNavigation();
   const { visible: keyboardVisible } = useKeyboard();
+  const colors = useColors();
 
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
@@ -67,7 +69,7 @@ export default function NavBar({ show = true, hideIcons = false }: NavBarProps) 
   const shouldShowIcons = !hideIcons;
 
   const getIconColor = (tab: TabName) => {
-    return activeTab === tab ? COLORS.primary1 : COLORS.lightGray;
+    return activeTab === tab ? colors.primary1 : colors.gray1;
   };
 
   const widthStyle = keyboardVisible ? styles.fullWidth : {};
