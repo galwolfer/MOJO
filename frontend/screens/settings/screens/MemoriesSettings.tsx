@@ -5,7 +5,7 @@
  * that the Ojo LLM uses for context.
  */
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, TouchableOpacity, ActivityIndicator, TextInput, Alert } from "react-native";
+import { View, StyleSheet, TouchableOpacity, ActivityIndicator, TextInput } from "react-native";
 import { COLORS, SPACING, FONT_SIZES, ICON_SIZES } from "../../../theme";
 import { useColors } from "../../../context/ThemeContext";
 import { ICONS } from "../../../components/icons/icons";
@@ -17,6 +17,7 @@ import Box from "../../../components/layout/Box";
 import List, { type ListCellProps } from "../../../components/layout/List";
 import { makeListCell } from "../../../components/layout/ListItem";
 import ErrorText from "../../../components/common/ErrorText";
+import PopupBox from "../../../components/common/PopupBox";
 import { getMemories, addMemory, updateMemory, deleteMemory, type Memory } from "../../../services/memoryService";
 
 type MemoriesSettingsScreenProps = {
@@ -36,6 +37,10 @@ export default function MemoriesSettingsScreen({ onBack }: MemoriesSettingsScree
 
   const [addingNew, setAddingNew] = useState(false);
   const [newMemoryText, setNewMemoryText] = useState("");
+
+  // confirmation / error state for deletes
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -75,35 +80,33 @@ export default function MemoriesSettingsScreen({ onBack }: MemoriesSettingsScree
       setEditingId(null);
       setEditText("");
     } catch (err: any) {
-      Alert.alert("Error", err?.message || "Failed to update memory.");
+      setError(err?.message || "Failed to update memory.");
     } finally {
       setMemoriesSaving((s) => ({ ...s, [memoryId]: false }));
     }
   };
 
   const handleDeleteMemory = (memoryId: string) => {
-    Alert.alert("Delete Memory", "Are you sure you want to delete this memory?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            setMemoriesSaving((s) => ({ ...s, [memoryId]: true }));
-            await deleteMemory(memoryId);
-            setMemories((prev) => prev.filter((m) => m.id !== memoryId));
-          } catch (err: any) {
-            Alert.alert("Error", err?.message || "Failed to delete memory.");
-          } finally {
-            setMemoriesSaving((s) => {
-              const next = { ...s };
-              delete next[memoryId];
-              return next;
-            });
-          }
-        },
-      },
-    ]);
+    // show popup box, deletion happens in confirmDeleteMemory
+    setDeleteConfirmId(memoryId);
+  };
+
+  const confirmDeleteMemory = async (memoryId: string) => {
+    setDeleteError(null);
+    try {
+      setMemoriesSaving((s) => ({ ...s, [memoryId]: true }));
+      await deleteMemory(memoryId);
+      setMemories((prev) => prev.filter((m) => m.id !== memoryId));
+    } catch (err: any) {
+      setDeleteError(err?.message || "Failed to delete memory.");
+    } finally {
+      setMemoriesSaving((s) => {
+        const next = { ...s };
+        delete next[memoryId];
+        return next;
+      });
+      setDeleteConfirmId(null);
+    }
   };
 
   const handleAddMemory = async () => {
@@ -116,7 +119,7 @@ export default function MemoriesSettingsScreen({ onBack }: MemoriesSettingsScree
       setNewMemoryText("");
       setAddingNew(false);
     } catch (err: any) {
-      Alert.alert("Error", err?.message || "Failed to add memory.");
+      setError(err?.message || "Failed to add memory.");
     } finally {
       setMemoriesSaving((s) => {
         const next = { ...s };
@@ -178,10 +181,20 @@ export default function MemoriesSettingsScreen({ onBack }: MemoriesSettingsScree
       divider: !isLast,
       rightElement: (
         <View style={styles.rowActions}>
-          <TouchableOpacity onPress={() => handleStartEdit(memory)} disabled={isSaving} style={styles.actionBtn}>
+          <TouchableOpacity
+            onPress={() => handleStartEdit(memory)}
+            disabled={isSaving}
+            style={styles.actionBtn}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
             <EditIcon size={ICON_SIZES.xs} color={COLORS.primary1} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleDeleteMemory(memory.id)} disabled={isSaving} style={styles.actionBtn}>
+          <TouchableOpacity
+            onPress={() => handleDeleteMemory(memory.id)}
+            disabled={isSaving}
+            style={styles.actionBtn}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
             {isSaving ? (
               <ActivityIndicator size="small" color={COLORS.primary5} />
             ) : (
@@ -264,6 +277,29 @@ export default function MemoriesSettingsScreen({ onBack }: MemoriesSettingsScree
           </View>
         </Box>
       )}
+
+      {/* delete confirmation popup */}
+      <PopupBox visible={!!deleteConfirmId} onClose={() => setDeleteConfirmId(null)} title="Delete Memory">
+        <AppText>Are you sure you want to delete this memory?</AppText>
+        <View style={{ flexDirection: "row", gap: SPACING.md, justifyContent: "center", marginTop: SPACING.md }}>
+          <AppButton title="Cancel" onPress={() => setDeleteConfirmId(null)} color="primary6" />
+          <AppButton
+            title={deleteConfirmId && memoriesSaving[deleteConfirmId] ? "Deleting..." : "Delete"}
+            onPress={() => deleteConfirmId && confirmDeleteMemory(deleteConfirmId)}
+            mode="light"
+            color="primary7"
+            disabled={!!(deleteConfirmId && memoriesSaving[deleteConfirmId])}
+          />
+        </View>
+      </PopupBox>
+
+      {/* error popup for delete failures */}
+      <PopupBox visible={!!deleteError} onClose={() => setDeleteError(null)} title="Error" titleColor={COLORS.primary6}>
+        <ErrorText>{deleteError}</ErrorText>
+        <View style={{ marginTop: SPACING.md }}>
+          <AppButton title="Close" onPress={() => setDeleteError(null)} />
+        </View>
+      </PopupBox>
     </SettingsSubScreen>
   );
 }
