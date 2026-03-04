@@ -530,7 +530,7 @@ def backtrack_search(variables: List[dict], variable_domains: Dict[str, List[dic
         chunk_index = variable.get("chunkIndex", 0)
         reference_date = today.date() if chunk_index is not None else None
 
-        ordered = order_values_lcv(selected["domain"], lambda slot: compute_soft_score(candidate_slot={**slot, "minutes": variable["chunkMinutes"]}, task_id=variable["taskId"], existing_assignments=assigned_slots, daily_cap_minutes=daily_cap_minutes, chunk_index=chunk_index, reference_date=reference_date), rng)
+        ordered = order_values_lcv(selected["domain"], lambda slot: compute_soft_score(candidate_slot={**slot, "minutes": variable["chunkMinutes"]}, task_id=variable["taskId"], existing_assignments=assigned_slots, daily_cap_minutes=daily_cap_minutes, chunk_index=chunk_index, reference_date=reference_date, min_gap_minutes=gap_minutes), rng)
 
         slots_tried = 0
         slots_passed_hard = 0

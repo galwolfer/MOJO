@@ -20,6 +20,9 @@ import { get, post, put, del } from "./httpClient";
 // Domain types
 // ──────────────────────────────────────────────────────────────────────────────
 
+export type BusyBlockType = "DAILY" | "WEEKLY" | "ONCE" | "FULL_DAY";
+
+/** Legacy recurrence sub-document (present on old records only) */
 export interface BusyBlockRecurrence {
   /** Weekday indices: 0 = Sun, 1 = Mon, …, 6 = Sat */
   daysOfWeek: number[];
@@ -30,12 +33,32 @@ export interface BusyBlockRecurrence {
 export interface BusyBlock {
   _id: string;
   title: string;
-  /** ISO datetime string */
-  start: string;
-  /** ISO datetime string */
-  end: string;
-  isRecurring: boolean;
-  recurrence: BusyBlockRecurrence | null;
+
+  /** Discriminator — null on legacy documents */
+  blockType: BusyBlockType | null;
+
+  // Date targeting
+  /** ISO datetime — ONCE / one-time FULL_DAY */
+  date?: string | null;
+  /** WEEKLY / recurring FULL_DAY: 0=Sun … 6=Sat */
+  daysOfWeek?: number[];
+  /** ISO datetime or null = no expiry (DAILY / WEEKLY / recurring FULL_DAY) */
+  recurrenceEndDate?: string | null;
+
+  // Times (HH:MM UTC) — absent for FULL_DAY
+  startTime?: string | null;
+  endTime?: string | null;
+
+  // Buffer
+  bufferBeforeMinutes: number;
+  bufferAfterMinutes: number;
+
+  // Legacy fields (present on old documents)
+  start?: string;
+  end?: string;
+  isRecurring?: boolean;
+  recurrence?: BusyBlockRecurrence | null;
+
   source: "manual" | "calendar";
   createdAt?: string;
   updatedAt?: string;
@@ -43,39 +66,40 @@ export interface BusyBlock {
 
 export interface CreateBusyBlockPayload {
   title?: string;
-  /** Full ISO datetime (one-time) or reference date + daily time (recurring) */
-  start: string;
-  end: string;
-  isRecurring?: boolean;
-  recurrence?: {
-    daysOfWeek: number[];
-    endDate?: string | null;
-  };
+  blockType: BusyBlockType;
+  /** YYYY-MM-DD or ISO — ONCE / one-time FULL_DAY */
+  date?: string;
+  /** WEEKLY / recurring FULL_DAY */
+  daysOfWeek?: number[];
+  /** ISO date or null = no expiry */
+  recurrenceEndDate?: string | null;
+  /** HH:MM — omit for FULL_DAY */
+  startTime?: string;
+  endTime?: string;
+  bufferBeforeMinutes?: number;
+  bufferAfterMinutes?: number;
   source?: "manual";
 }
 
-export interface UpdateBusyBlockPayload {
-  title?: string;
-  start?: string;
-  end?: string;
-  isRecurring?: boolean;
-  recurrence?: {
-    daysOfWeek: number[];
-    endDate?: string | null;
-  };
-}
+export type UpdateBusyBlockPayload = Partial<Omit<CreateBusyBlockPayload, "blockType">> & {
+  blockType?: BusyBlockType;
+};
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Pure domain helpers (no I/O)
 // ──────────────────────────────────────────────────────────────────────────────
 
-/** Normalise a raw server response so start/end are always valid ISO strings. */
+/** Normalise a raw server response — ensure numeric buffers are always present. */
 export function normalizeBusyBlock(raw: BusyBlock): BusyBlock {
   return {
     ...raw,
+    bufferBeforeMinutes: raw.bufferBeforeMinutes ?? 0,
+    bufferAfterMinutes:  raw.bufferAfterMinutes  ?? 0,
+    daysOfWeek: raw.daysOfWeek ?? [],
+    // Normalise legacy fields if present
     isRecurring: Boolean(raw.isRecurring),
-    start: new Date(raw.start).toISOString(),
-    end: new Date(raw.end).toISOString(),
+    start: raw.start ? new Date(raw.start).toISOString() : undefined,
+    end:   raw.end   ? new Date(raw.end).toISOString()   : undefined,
     recurrence: raw.recurrence
       ? {
           daysOfWeek: raw.recurrence.daysOfWeek ?? [],
@@ -88,40 +112,29 @@ export function normalizeBusyBlock(raw: BusyBlock): BusyBlock {
 }
 
 /**
- * Validate a one-time block's start/end before sending to the server.
+ * Client-side validation for a new-style block.
  * Returns an error string or null when valid.
  */
-export function validateBusyBlock(start: string, end: string): string | null {
-  if (!start) return "Start date and time are required";
-  if (!end) return "End date and time are required";
-  const s = new Date(start);
-  const e = new Date(end);
-  if (isNaN(s.getTime())) return "Invalid start date/time";
-  if (isNaN(e.getTime())) return "Invalid end date/time";
-  if (e <= s) return "End time must be after start time";
-  return null;
-}
+export function validateBusyBlockPayload(payload: CreateBusyBlockPayload): string | null {
+  const HH_MM = /^([01]\d|2[0-3]):[0-5]\d$/;
+  const { blockType, date, daysOfWeek = [], startTime, endTime,
+          bufferBeforeMinutes = 0, bufferAfterMinutes = 0 } = payload;
 
-/**
- * Validate a recurring block's time range (time portion only).
- * Returns an error string or null when valid.
- */
-export function validateRecurringBlock(
-  startTime: string,
-  endTime: string,
-  daysOfWeek: number[]
-): string | null {
-  if (!startTime) return "Start time is required";
-  if (!endTime) return "End time is required";
-  if (!daysOfWeek.length) return "Select at least one day of the week";
-
-  const [sh, sm] = startTime.split(":").map(Number);
-  const [eh, em] = endTime.split(":").map(Number);
-  if ([sh, sm, eh, em].some(isNaN)) return "Invalid time format — use HH:MM";
-
-  const startMin = sh * 60 + sm;
-  const endMin = eh * 60 + em;
-  if (endMin <= startMin) return "End time must be after start time";
+  if (blockType === "WEEKLY" && !daysOfWeek.length)
+    return "Select at least one day of the week";
+  if (blockType === "ONCE" && !date)
+    return "Date is required for a one-time block";
+  if (blockType === "FULL_DAY" && !date && !daysOfWeek.length)
+    return "Provide a date (one-time) or days of week (recurring) for a day-off";
+  if (blockType !== "FULL_DAY") {
+    if (!startTime || !HH_MM.test(startTime)) return "Start time must be HH:MM";
+    if (!endTime   || !HH_MM.test(endTime))   return "End time must be HH:MM";
+    const [sh, sm] = startTime.split(":").map(Number);
+    const [eh, em] = endTime.split(":").map(Number);
+    if (eh * 60 + em <= sh * 60 + sm) return "End time must be after start time";
+  }
+  if (bufferBeforeMinutes < 0 || bufferBeforeMinutes > 120) return "Buffer before must be 0–120 min";
+  if (bufferAfterMinutes  < 0 || bufferAfterMinutes  > 120) return "Buffer after must be 0–120 min";
   return null;
 }
 
@@ -135,13 +148,10 @@ export async function listBusyBlocks(): Promise<BusyBlock[]> {
   return (data.busyBlocks || []).map(normalizeBusyBlock);
 }
 
-/** Create a new busy block (one-time or recurring). */
+/** Create a new busy block. */
 export async function createBusyBlock(payload: CreateBusyBlockPayload): Promise<BusyBlock> {
-  // Client-side validation
-  if (!payload.isRecurring) {
-    const err = validateBusyBlock(payload.start, payload.end);
-    if (err) throw new Error(err);
-  }
+  const err = validateBusyBlockPayload(payload);
+  if (err) throw new Error(err);
   const data = await post<{ busyBlock: BusyBlock }>("/busy-blocks", payload);
   return normalizeBusyBlock(data.busyBlock);
 }
@@ -151,10 +161,6 @@ export async function updateBusyBlock(
   id: string,
   payload: UpdateBusyBlockPayload
 ): Promise<BusyBlock> {
-  if (!payload.isRecurring && payload.start && payload.end) {
-    const err = validateBusyBlock(payload.start, payload.end);
-    if (err) throw new Error(err);
-  }
   const data = await put<{ busyBlock: BusyBlock }>(`/busy-blocks/${id}`, payload);
   return normalizeBusyBlock(data.busyBlock);
 }

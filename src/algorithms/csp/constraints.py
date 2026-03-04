@@ -104,7 +104,7 @@ def satisfies_hard_constraints(*, candidate_slot: dict, existing_assignments: Li
 
 
 # Compute a soft score for a candidate slot (lower is better)
-def compute_soft_score(*, candidate_slot: dict, task_id, existing_assignments: List[dict], daily_cap_minutes: int = 240, chunk_index: int = 0, reference_date = None) -> int:
+def compute_soft_score(*, candidate_slot: dict, task_id, existing_assignments: List[dict], daily_cap_minutes: int = 240, chunk_index: int = 0, reference_date = None, min_gap_minutes: int = 10) -> int:
     date_key = candidate_slot["start"].date().isoformat()
 
     minutes_on_day = candidate_slot.get("minutes", 0)
@@ -144,7 +144,7 @@ def compute_soft_score(*, candidate_slot: dict, task_id, existing_assignments: L
         gap_minutes = (candidate_slot["start"] - latest_same_task_end).total_seconds() / 60
         # Penalty grows with the gap — a 10-min gap is fine (score 0),
         # but a 60-min gap means something got interleaved (score 2500)
-        excess_gap = max(0, gap_minutes - 15)  # 15 min grace for mandatory gap
+        excess_gap = max(0, gap_minutes - min_gap_minutes)  # use actual user gap as grace
         grouping_penalty = int(excess_gap * 50)
 
     # ── DAILY CAP PENALTY ────────────────────────────────────────────

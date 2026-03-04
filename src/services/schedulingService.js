@@ -190,6 +190,145 @@ function expandRecurringBlock(block, fromDate, toDate) {
 }
 
 /**
+ * Expand ANY BusyBlock (new schema or legacy) into concrete
+ * { key: "YYYY-MM-DD", start: Date, end: Date } occurrences
+ * over [fromDate, toDate].  Buffers are applied at expansion time
+ * so the Python CSP receives already-padded intervals.
+ *
+ * blockType dispatch:
+ *  ONCE           — single occurrence on block.date
+ *  FULL_DAY       — whole day(s); one-time when only date set,
+ *                   recurring when daysOfWeek set
+ *  DAILY          — every day in horizon (optional recurrenceEndDate)
+ *  WEEKLY         — matching daysOfWeek (optional recurrenceEndDate)
+ *  null (legacy)  — delegates to expandRecurringBlock() or start/end
+ *
+ * @param {object} block     - Mongoose lean BusyBlock document
+ * @param {Date}   fromDate  - Inclusive start of expansion window
+ * @param {Date}   toDate    - Inclusive end of expansion window
+ * @returns {{ key: string, start: Date, end: Date }[]}
+ */
+export function expandBusyBlock(block, fromDate, toDate) {
+  const bufBefore = (block.bufferBeforeMinutes || 0) * 60_000;
+  const bufAfter  = (block.bufferAfterMinutes  || 0) * 60_000;
+
+  function applyBuffer(s, e) {
+    return {
+      start: new Date(s.getTime() - bufBefore),
+      end:   new Date(e.getTime() + bufAfter),
+    };
+  }
+
+  function hhmmToMinutes(hhmm) {
+    const [h, m] = hhmm.split(":").map(Number);
+    return h * 60 + m;
+  }
+
+  /** Build one occurrence for a calendar day given start/end minutes-since-midnight */
+  function buildOccurrence(dayDate, startMin, endMin) {
+    const s = new Date(dayDate);
+    s.setUTCHours(0, startMin, 0, 0);
+    const e = new Date(dayDate);
+    e.setUTCHours(0, endMin, 0, 0);
+    const { start, end } = applyBuffer(s, e);
+    return { key: dayDate.toISOString().slice(0, 10), start, end };
+  }
+
+  const type = block.blockType;
+
+  // ── ONCE ─────────────────────────────────────────────────────────────────
+  if (type === "ONCE") {
+    const d = new Date(block.date);
+    if (d < fromDate || d > toDate) return [];
+    return [buildOccurrence(d, hhmmToMinutes(block.startTime), hhmmToMinutes(block.endTime))];
+  }
+
+  // ── FULL_DAY ───────────────────────────────────────────────────────────
+  if (type === "FULL_DAY") {
+    const results = [];
+    const isOneTime = block.date && (!block.daysOfWeek || !block.daysOfWeek.length);
+    if (isOneTime) {
+      const d = new Date(block.date);
+      if (d >= fromDate && d <= toDate) {
+        const key = d.toISOString().slice(0, 10);
+        const s = new Date(key + "T00:00:00.000Z");
+        const e = new Date(key + "T23:59:59.999Z");
+        const b = applyBuffer(s, e);
+        results.push({ key, start: b.start, end: b.end });
+      }
+      return results;
+    }
+    // Recurring full days
+    const expiry = block.recurrenceEndDate ? new Date(block.recurrenceEndDate) : toDate;
+    const windowEnd = expiry < toDate ? expiry : toDate;
+    let cursor = new Date(fromDate);
+    while (cursor <= windowEnd) {
+      const dow = block.daysOfWeek;
+      if (!dow || !dow.length || dow.includes(cursor.getUTCDay())) {
+        const key = cursor.toISOString().slice(0, 10);
+        const s = new Date(key + "T00:00:00.000Z");
+        const e = new Date(key + "T23:59:59.999Z");
+        const b = applyBuffer(s, e);
+        results.push({ key, start: b.start, end: b.end });
+      }
+      cursor = addDays(cursor, 1);
+    }
+    return results;
+  }
+
+  // ── DAILY ───────────────────────────────────────────────────────────────
+  if (type === "DAILY") {
+    const sm = hhmmToMinutes(block.startTime);
+    const em = hhmmToMinutes(block.endTime);
+    const expiry = block.recurrenceEndDate ? new Date(block.recurrenceEndDate) : toDate;
+    const windowEnd = expiry < toDate ? expiry : toDate;
+    const results = [];
+    let cursor = new Date(fromDate);
+    while (cursor <= windowEnd) {
+      results.push(buildOccurrence(cursor, sm, em));
+      cursor = addDays(cursor, 1);
+    }
+    return results;
+  }
+
+  // ── WEEKLY ──────────────────────────────────────────────────────────────
+  if (type === "WEEKLY") {
+    const sm = hhmmToMinutes(block.startTime);
+    const em = hhmmToMinutes(block.endTime);
+    const expiry = block.recurrenceEndDate ? new Date(block.recurrenceEndDate) : toDate;
+    const windowEnd = expiry < toDate ? expiry : toDate;
+    const results = [];
+    let cursor = new Date(fromDate);
+    while (cursor <= windowEnd) {
+      if (block.daysOfWeek && block.daysOfWeek.includes(cursor.getUTCDay())) {
+        results.push(buildOccurrence(cursor, sm, em));
+      }
+      cursor = addDays(cursor, 1);
+    }
+    return results;
+  }
+
+  // ── Legacy fallback ────────────────────────────────────────────────────────────
+  if (block.isRecurring && block.recurrence?.daysOfWeek?.length) {
+    return expandRecurringBlock(block, fromDate, toDate).map(({ key, start, end }) => {
+      const b = applyBuffer(start, end);
+      return { key, start: b.start, end: b.end };
+    });
+  }
+  // Single one-time block
+  if (block.start && block.end) {
+    const s = new Date(block.start);
+    const e = new Date(block.end);
+    if (s < toDate && e > fromDate) {
+      const key = s.toISOString().slice(0, 10);
+      const b = applyBuffer(s, e);
+      return [{ key, start: b.start, end: b.end }];
+    }
+  }
+  return [];
+}
+
+/**
  * Helper: Trigger scheduler update after task operations
  * Centralizes the scheduling trigger logic to avoid duplication
  * across missions and controllers
@@ -686,14 +825,44 @@ export async function generatePlan({ userId, profile = {}, planningHorizonDays =
   const busyBlocks = await BusyBlock.find({
     userId,
     $or: [
-      // One-time blocks that overlap the planning horizon
+      // ── New-style: one-time blocks within horizon ────────────────────────────
       {
+        blockType: { $in: ["ONCE"] },
+        date: { $gte: todayStart, $lt: horizonEnd },
+      },
+      // ── New-style: one-time FULL_DAY (has date, empty daysOfWeek) ───────────
+      {
+        blockType: "FULL_DAY",
+        date: { $gte: todayStart, $lt: horizonEnd },
+        $or: [{ daysOfWeek: { $size: 0 } }, { daysOfWeek: { $exists: false } }],
+      },
+      // ── New-style: recurring blocks (DAILY / WEEKLY / FULL_DAY recurring) ──
+      {
+        blockType: { $in: ["DAILY", "WEEKLY"] },
+        $or: [
+          { recurrenceEndDate: null },
+          { recurrenceEndDate: { $gt: todayStart } },
+        ],
+      },
+      // FULL_DAY with daysOfWeek set (recurring)
+      {
+        blockType: "FULL_DAY",
+        daysOfWeek: { $exists: true, $not: { $size: 0 } },
+        $or: [
+          { recurrenceEndDate: null },
+          { recurrenceEndDate: { $gt: todayStart } },
+        ],
+      },
+      // ── Legacy one-time blocks that overlap the planning horizon ──────────
+      {
+        blockType: null,
         isRecurring: { $ne: true },
         start: { $lt: horizonEnd },
         end: { $gt: todayStart },
       },
-      // Recurring rules that are still active during the horizon
+      // ── Legacy recurring rules that are still active during the horizon ──
       {
+        blockType: null,
         isRecurring: true,
         $or: [
           { "recurrence.endDate": null },
@@ -704,17 +873,9 @@ export async function generatePlan({ userId, profile = {}, planningHorizonDays =
   }).lean();
 
   for (const block of busyBlocks) {
-    if (block.isRecurring && block.recurrence?.daysOfWeek?.length) {
-      // Expand recurring rule over the entire planning horizon
-      for (const { key, start, end } of expandRecurringBlock(block, todayStart, horizonEnd)) {
-        if (!busyBlocksByDate[key]) busyBlocksByDate[key] = [];
-        busyBlocksByDate[key].push({ start, end });
-      }
-    } else {
-      // One-time block — original behaviour
-      const key = block.start.toISOString().slice(0, 10);
+    for (const { key, start, end } of expandBusyBlock(block, todayStart, horizonEnd)) {
       if (!busyBlocksByDate[key]) busyBlocksByDate[key] = [];
-      busyBlocksByDate[key].push({ start: new Date(block.start), end: new Date(block.end) });
+      busyBlocksByDate[key].push({ start, end });
     }
   }
 

@@ -37,7 +37,9 @@ import {
   createBusyBlock,
   updateBusyBlock,
   deleteBusyBlock,
+  validateBusyBlockPayload,
   type BusyBlock,
+  type BusyBlockType,
 } from "../../services/busyBlockService";
 import {
   getSchedulingPreferences,
@@ -48,6 +50,16 @@ import {
 // Domain helpers (pure — no React)
 // ──────────────────────────────────────────────────────────────────────────────
 
+const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const BUFFER_OPTIONS: number[] = [0, 5, 10, 15, 30];
+
+const BLOCK_TYPE_LABELS: Record<BusyBlockType, string> = {
+  DAILY:    "Every day",
+  WEEKLY:   "Weekly",
+  ONCE:     "Specific date",
+  FULL_DAY: "Day off",
+};
+
 function isoToDatePart(iso: string): string {
   try { return new Date(iso).toISOString().slice(0, 10); } catch { return ""; }
 }
@@ -55,32 +67,39 @@ function isoToDatePart(iso: string): string {
 function isoToTimePart(iso: string): string {
   try {
     const d = new Date(iso);
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
   } catch { return "00:00"; }
 }
 
-/** Combine a YYYY-MM-DD date and HH:MM time into a local-time ISO string. */
-function combineDatetime(date: string, time: string): string {
-  if (!date) return "";
-  const [h, m] = (time || "00:00").split(":").map(Number);
-  const d = new Date(date);
-  d.setHours(isNaN(h) ? 0 : h, isNaN(m) ? 0 : m, 0, 0);
-  return d.toISOString();
-}
-
-function formatTimeRange(startIso: string, endIso: string): string {
-  return `${isoToTimePart(startIso)} – ${isoToTimePart(endIso)}`;
-}
-
-/** Validate HH:MM start/end times. Returns error string or null. */
-function validateTimes(startTime: string, endTime: string): string | null {
-  if (!startTime) return "Start time is required";
-  if (!endTime) return "End time is required";
-  const [sh, sm] = startTime.split(":").map(Number);
-  const [eh, em] = endTime.split(":").map(Number);
-  if ([sh, sm, eh, em].some(isNaN)) return "Invalid time format — use HH:MM";
-  if (eh * 60 + em <= sh * 60 + sm) return "End time must be after start time";
-  return null;
+/**
+ * Human-readable summary for a block row.
+ * New-style: derived from blockType + new fields.
+ * Legacy: derived from start/end times.
+ */
+function blockSummary(block: BusyBlock): string {
+  if (block.blockType === "FULL_DAY") {
+    if (block.daysOfWeek?.length) {
+      const days = block.daysOfWeek.map((d) => DAY_LABELS[d]).join(", ");
+      return `Full day off — ${days}`;
+    }
+    return block.date ? `Full day off — ${block.date.slice(0, 10)}` : "Full day off";
+  }
+  if (block.blockType === "ONCE") {
+    const dateStr = block.date ? new Date(block.date).toISOString().slice(0, 10) : "";
+    return `${dateStr} ∣ ${block.startTime ?? "?"} – ${block.endTime ?? "?"}`;
+  }
+  if (block.blockType === "WEEKLY") {
+    const days = (block.daysOfWeek ?? []).map((d) => DAY_LABELS[d]).join(", ");
+    return `${days} ∣ ${block.startTime ?? "?"} – ${block.endTime ?? "?"}`;
+  }
+  if (block.blockType === "DAILY") {
+    return `Every day ∣ ${block.startTime ?? "?"} – ${block.endTime ?? "?"}`;
+  }
+  // Legacy
+  if (block.start && block.end) {
+    return `${isoToTimePart(block.start)} – ${isoToTimePart(block.end)}`;
+  }
+  return "";
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -89,27 +108,161 @@ function validateTimes(startTime: string, endTime: string): string | null {
 
 interface BlockFormState {
   title: string;
-  startTime: string; // HH:MM
-  endTime: string;   // HH:MM
+  blockType: BusyBlockType;
+  // Date (ONCE / FULL_DAY one-time)
+  date: string;               // YYYY-MM-DD
+  // Days of week (WEEKLY / FULL_DAY recurring)
+  daysOfWeek: number[];
+  // Recurrence end (DAILY / WEEKLY / FULL_DAY recurring)
+  recurrenceEndDate: string;  // YYYY-MM-DD or ""
+  // Times (all except FULL_DAY)
+  startTime: string;          // HH:MM
+  endTime: string;            // HH:MM
+  // Buffer
+  bufferBeforeMinutes: number;
+  bufferAfterMinutes: number;
 }
 
 const EMPTY_FORM: BlockFormState = {
   title: "",
+  blockType: "DAILY",
+  date: "",
+  daysOfWeek: [],
+  recurrenceEndDate: "",
   startTime: "09:00",
   endTime: "10:00",
+  bufferBeforeMinutes: 0,
+  bufferAfterMinutes: 0,
 };
 
 function blockToForm(block: BusyBlock): BlockFormState {
+  const type = block.blockType ?? "DAILY";
   return {
     title: block.title || "",
-    startTime: isoToTimePart(block.start),
-    endTime: isoToTimePart(block.end),
+    blockType: type,
+    date: block.date ? new Date(block.date).toISOString().slice(0, 10) : "",
+    daysOfWeek: block.daysOfWeek ?? [],
+    recurrenceEndDate: block.recurrenceEndDate
+      ? new Date(block.recurrenceEndDate).toISOString().slice(0, 10)
+      : "",
+    startTime: block.startTime ?? (block.start ? isoToTimePart(block.start) : "09:00"),
+    endTime:   block.endTime   ?? (block.end   ? isoToTimePart(block.end)   : "10:00"),
+    bufferBeforeMinutes: block.bufferBeforeMinutes ?? 0,
+    bufferAfterMinutes:  block.bufferAfterMinutes  ?? 0,
   };
+}
+
+/** Build the API payload from the form state */
+function buildPayload(form: BlockFormState) {
+  const base = {
+    title: form.title,
+    blockType: form.blockType,
+    bufferBeforeMinutes: form.bufferBeforeMinutes,
+    bufferAfterMinutes:  form.bufferAfterMinutes,
+    ...(form.blockType !== "FULL_DAY" ? { startTime: form.startTime, endTime: form.endTime } : {}),
+    ...((form.blockType === "ONCE" || form.blockType === "FULL_DAY") && form.date
+      ? { date: form.date } : {}),
+    ...((form.blockType === "WEEKLY" || form.blockType === "FULL_DAY")
+      ? { daysOfWeek: form.daysOfWeek } : {}),
+    ...(form.blockType !== "ONCE"
+      ? { recurrenceEndDate: form.recurrenceEndDate || null } : {}),
+  };
+  return base;
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Sub-components
 // ──────────────────────────────────────────────────────────────────────────────
+
+// ── TypePicker ────────────────────────────────────────────────────────────────
+interface TypePickerProps {
+  value: BusyBlockType;
+  onChange: (v: BusyBlockType) => void;
+}
+
+const BLOCK_TYPES: BusyBlockType[] = ["DAILY", "WEEKLY", "ONCE", "FULL_DAY"];
+
+function TypePicker({ value, onChange }: TypePickerProps) {
+  return (
+    <>
+      <AppText style={formStyles.fieldLabel}>Block type</AppText>
+      <View style={formStyles.chipRow}>
+        {BLOCK_TYPES.map((t) => (
+          <Pressable
+            key={t}
+            style={[formStyles.chip, value === t && formStyles.chipActive]}
+            onPress={() => onChange(t)}
+          >
+            <AppText style={[formStyles.chipText, value === t && formStyles.chipTextActive]}>
+              {BLOCK_TYPE_LABELS[t]}
+            </AppText>
+          </Pressable>
+        ))}
+      </View>
+    </>
+  );
+}
+
+// ── DayPicker ─────────────────────────────────────────────────────────────────
+interface DayPickerProps {
+  selected: number[];
+  onChange: (v: number[]) => void;
+}
+
+const DAY_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+function DayPicker({ selected, onChange }: DayPickerProps) {
+  const toggle = (d: number) =>
+    onChange(selected.includes(d) ? selected.filter((x) => x !== d) : [...selected, d]);
+  return (
+    <>
+      <AppText style={[formStyles.fieldLabel, { marginTop: SPACING.sm }]}>
+        Days of week
+      </AppText>
+      <View style={formStyles.dayRow}>
+        {DAY_SHORT.map((label, i) => (
+          <Pressable
+            key={i}
+            style={[formStyles.dayCircle, selected.includes(i) && formStyles.dayCircleActive]}
+            onPress={() => toggle(i)}
+          >
+            <AppText style={[formStyles.dayText, selected.includes(i) && formStyles.dayTextActive]}>
+              {label}
+            </AppText>
+          </Pressable>
+        ))}
+      </View>
+    </>
+  );
+}
+
+// ── BufferPicker ──────────────────────────────────────────────────────────────
+interface BufferPickerProps {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+}
+
+function BufferPicker({ label, value, onChange }: BufferPickerProps) {
+  return (
+    <>
+      <AppText style={[formStyles.fieldLabel, { marginTop: SPACING.sm }]}>{label}</AppText>
+      <View style={formStyles.chipRow}>
+        {BUFFER_OPTIONS.map((opt) => (
+          <Pressable
+            key={opt}
+            style={[formStyles.chip, value === opt && formStyles.chipActive]}
+            onPress={() => onChange(opt)}
+          >
+            <AppText style={[formStyles.chipText, value === opt && formStyles.chipTextActive]}>
+              {opt === 0 ? "None" : `${opt} min`}
+            </AppText>
+          </Pressable>
+        ))}
+      </View>
+    </>
+  );
+}
 
 // ── TitleField ────────────────────────────────────────────────────────────────
 interface TitleFieldProps {
@@ -171,14 +324,80 @@ interface BlockFormFieldsProps {
 }
 
 function BlockFormFields({ form, onField }: BlockFormFieldsProps) {
+  const { blockType } = form;
+  const showDayPicker = blockType === "WEEKLY" || blockType === "FULL_DAY";
+  const showDate      = blockType === "ONCE" || (blockType === "FULL_DAY" && !form.daysOfWeek.length);
+  const showTimes     = blockType !== "FULL_DAY";
+  const showRecEnd    = blockType === "DAILY" || blockType === "WEEKLY" ||
+                        (blockType === "FULL_DAY" && form.daysOfWeek.length > 0);
+
   return (
     <>
       <TitleField value={form.title} onChange={(v) => onField("title", v)} />
-      <TimeRangeFields
-        startTime={form.startTime}
-        endTime={form.endTime}
-        onStartChange={(v) => onField("startTime", v)}
-        onEndChange={(v) => onField("endTime", v)}
+
+      {/* Type selector */}
+      <View style={{ marginTop: SPACING.sm }}>
+        <TypePicker value={blockType} onChange={(v) => onField("blockType", v)} />
+      </View>
+
+      {/* Day-of-week picker (WEEKLY / FULL_DAY recurring) */}
+      {showDayPicker && (
+        <DayPicker
+          selected={form.daysOfWeek}
+          onChange={(v) => onField("daysOfWeek", v)}
+        />
+      )}
+
+      {/* Specific date (ONCE / FULL_DAY one-time) */}
+      {showDate && (
+        <>
+          <AppText style={[formStyles.fieldLabel, { marginTop: SPACING.sm }]}>
+            Date (YYYY-MM-DD)
+          </AppText>
+          <Input
+            placeholder="2026-03-15"
+            value={form.date}
+            onChangeText={(v) => onField("date", v)}
+            type="text"
+          />
+        </>
+      )}
+
+      {/* Start / End time (not needed for FULL_DAY) */}
+      {showTimes && (
+        <TimeRangeFields
+          startTime={form.startTime}
+          endTime={form.endTime}
+          onStartChange={(v) => onField("startTime", v)}
+          onEndChange={(v) => onField("endTime", v)}
+        />
+      )}
+
+      {/* Recurrence end date */}
+      {showRecEnd && (
+        <>
+          <AppText style={[formStyles.fieldLabel, { marginTop: SPACING.sm }]}>
+            Ends on (YYYY-MM-DD, optional)
+          </AppText>
+          <Input
+            placeholder="Leave blank for no end"
+            value={form.recurrenceEndDate}
+            onChangeText={(v) => onField("recurrenceEndDate", v)}
+            type="text"
+          />
+        </>
+      )}
+
+      {/* Buffers */}
+      <BufferPicker
+        label="Buffer before"
+        value={form.bufferBeforeMinutes}
+        onChange={(v) => onField("bufferBeforeMinutes", v)}
+      />
+      <BufferPicker
+        label="Buffer after"
+        value={form.bufferAfterMinutes}
+        onChange={(v) => onField("bufferAfterMinutes", v)}
       />
     </>
   );
@@ -190,6 +409,55 @@ const formStyles = StyleSheet.create({
     color: COLORS.darkGray,
     marginBottom: 4,
     fontWeight: "400",
+  },
+  chipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  chip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: COLORS.primary1,
+    backgroundColor: COLORS.white,
+  },
+  chipActive: {
+    backgroundColor: COLORS.primary1,
+  },
+  chipText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.primary1,
+    fontWeight: "500",
+  },
+  chipTextActive: {
+    color: COLORS.white,
+  },
+  dayRow: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  dayCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: COLORS.primary1,
+    backgroundColor: COLORS.white,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  dayCircleActive: {
+    backgroundColor: COLORS.primary1,
+  },
+  dayText: {
+    fontSize: 11,
+    color: COLORS.primary1,
+    fontWeight: "600",
+  },
+  dayTextActive: {
+    color: COLORS.white,
   },
 });
 
@@ -241,15 +509,26 @@ interface BlockItemProps {
 }
 
 function BlockItem({ block, onEdit, onDelete }: BlockItemProps) {
+  const typeLabel = block.blockType ? BLOCK_TYPE_LABELS[block.blockType] : null;
+  const summary = blockSummary(block);
+  const bufText = [
+    block.bufferBeforeMinutes ? `−${block.bufferBeforeMinutes}m` : "",
+    block.bufferAfterMinutes  ? `+${block.bufferAfterMinutes}m`  : "",
+  ].filter(Boolean).join(" / ");
+
   return (
     <View style={blockItemStyles.container}>
       <View style={blockItemStyles.info}>
         {block.title ? (
           <AppText style={blockItemStyles.title}>{block.title}</AppText>
         ) : null}
-        <AppText style={blockItemStyles.timeRange}>
-          {formatTimeRange(block.start, block.end)}
-        </AppText>
+        {typeLabel ? (
+          <AppText style={blockItemStyles.typeLabel}>{typeLabel}</AppText>
+        ) : null}
+        <AppText style={blockItemStyles.timeRange}>{summary}</AppText>
+        {bufText ? (
+          <AppText style={blockItemStyles.bufferLabel}>Buffer: {bufText}</AppText>
+        ) : null}
       </View>
       <View style={blockItemStyles.actions}>
         <Pressable
@@ -283,6 +562,8 @@ const blockItemStyles = StyleSheet.create({
   info: { flex: 1, gap: 2 },
   title: { fontSize: FONT_SIZES.sm, fontWeight: "600", color: COLORS.darkGray },
   timeRange: { fontSize: FONT_SIZES.sm, color: COLORS.darkGray },
+  typeLabel: { fontSize: FONT_SIZES.sm, color: COLORS.primary1, fontWeight: "600" as const, textTransform: "uppercase" as const },
+  bufferLabel: { fontSize: FONT_SIZES.sm, color: COLORS.lightGray },
   actions: { flexDirection: "row", gap: 6 },
   iconBtn: {
     width: 30,
@@ -512,35 +793,19 @@ export default function BusyBlocksSection({ style }: { style?: ViewStyle }) {
 
   // ── Submit form ───────────────────────────────────────────────────────────
   const handleFormSubmit = async () => {
-    const validationErr = validateTimes(form.startTime, form.endTime);
+    const payload = buildPayload(form);
+    const validationErr = validateBusyBlockPayload(payload as any);
     if (validationErr) { setFormError(validationErr); return; }
-
-    // Reference date = today; only the time-of-day matters for daily blocks
-    const refDate = isoToDatePart(new Date().toISOString());
-    const payload = {
-      title: form.title,
-      start: combineDatetime(refDate, form.startTime),
-      end: combineDatetime(refDate, form.endTime),
-      isRecurring: true,
-      recurrence: {
-        daysOfWeek: [0, 1, 2, 3, 4, 5, 6], // every day
-        endDate: null,
-      },
-    };
 
     setSaving(true);
     setFormError(null);
     try {
       if (editingBlock) {
-        const updated = await updateBusyBlock(editingBlock._id, payload);
+        const updated = await updateBusyBlock(editingBlock._id, payload as any);
         setBlocks((prev) => prev.map((b) => (b._id === updated._id ? updated : b)));
       } else {
-        const created = await createBusyBlock(payload);
-        setBlocks((prev) =>
-          [...prev, created].sort(
-            (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()
-          )
-        );
+        const created = await createBusyBlock(payload as any);
+        setBlocks((prev) => [...prev, created]);
       }
       setFormVisible(false);
     } catch (err: any) {

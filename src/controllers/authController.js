@@ -650,6 +650,12 @@ export async function updateSchedulingPreferences(req, res, next) {
         ? user.schedulingPreferences.toObject()
         : JSON.parse(JSON.stringify(user.schedulingPreferences));
 
+    // Re-run the scheduler so the new gap is immediately reflected in the plan
+    try {
+      const { triggerSchedulerUpdate } = await import("../services/schedulingService.js");
+      triggerSchedulerUpdate(userId, "preferences-update", "API").catch(() => {});
+    } catch (_) {}
+
     res.json({ success: true, schedulingPreferences: saved });
   } catch (error) {
     next(error);
