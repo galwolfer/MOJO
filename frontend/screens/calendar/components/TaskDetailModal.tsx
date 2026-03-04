@@ -80,7 +80,9 @@ function TaskDetailContent({
   const categoryDisplay = getCategoryDisplay(task.category);
   // Guard: subCategory may arrive as a raw ObjectId string when the API doesn't populate it.
   const subCat = task.subCategory && typeof task.subCategory === "object" ? task.subCategory : null;
-  const subLabel = subCat?.label || subCat?.name || "";
+  const subLabel = (task as any).subcategoryDisplay || subCat?.label || subCat?.name || (task as any).subcategory || "";
+
+  console.log("[TaskDetailModal] task.subCategory:", task.subCategory, "subCat:", subCat, "subLabel:", subLabel);
 
   const taskForFields = {
     dueDate: task.dueDate,

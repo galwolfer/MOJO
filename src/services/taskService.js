@@ -400,7 +400,10 @@ export async function getTaskById(taskId, userId) {
   // Attach subtasks so the EditTask screen can pre-populate the parts form
   const subTasks = await SubTask.find({ taskId: task._id }).sort({ index: 1 }).lean();
   task.subTasks = subTasks;
-  return attachSubcategoryLabel(task);
+  attachSubcategoryLabel(task);
+  // Attach a flat display string for clients that don't chase the populated ref
+  task.subcategoryDisplay = task.subCategory ? task.subCategory.label || task.subCategory.name || null : null;
+  return task;
 }
 
 /**
@@ -417,7 +420,11 @@ export async function getUpcomingTasks(userId, days = 7) {
  */
 export async function getOverdueTasks(userId) {
   const tasks = await Task.findOverdue(userId).populate("subCategory").lean();
-  tasks.forEach(attachSubcategoryLabel);
+  tasks.forEach((task) => {
+    attachSubcategoryLabel(task);
+    // Attach a flat display string so the frontend doesn't need to chase the ref
+    task.subcategoryDisplay = task.subCategory ? task.subCategory.label || task.subCategory.name || null : null;
+  });
   return tasks;
 }
 

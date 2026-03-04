@@ -19,6 +19,15 @@ export const TaskTagsRow: React.FC<{
   const categoryMeta = getCategoryMeta(category);
   const subLabel = subcategoryDisplay || subcategory || "";
 
+  console.log(
+    "[TaskTagsRow] subcategoryDisplay:",
+    subcategoryDisplay,
+    "subCategory:",
+    subCategory,
+    "subLabel:",
+    subLabel,
+  );
+
   const importanceIcon = (imp?: number | null) => {
     if (!imp) return "list";
     if (imp <= 2) return "lowImportant";
@@ -89,6 +98,7 @@ export const TaskTagsRow: React.FC<{
             return (
               <Tag
                 label={subLabel}
+                leftIcon={subCategory?.icon || undefined}
                 colorIndex={Math.max(0, Math.min(17, subLabel.length % 9))}
                 style={styles.tagItem}
               />

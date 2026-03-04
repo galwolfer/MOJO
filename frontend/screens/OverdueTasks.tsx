@@ -80,13 +80,45 @@ export default function OverdueTasksModal({ visible, onClose }: OverdueTasksModa
   const [detailTask, setDetailTask] = useState<TaskWithSubtasks | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
 
-  const handleOpenDetail = useCallback(async (taskId: string) => {
-    const task = await getTaskById(taskId);
-    if (task) {
-      setDetailTask(task as TaskWithSubtasks);
+  const handleOpenDetail = useCallback(
+    async (taskId: string) => {
+      // The locally-loaded overdue task already has a populated subCategory object.
+      // getTaskById(/tasks/:id) may return subCategory as an unpopulated ObjectId string,
+      // so we prefer the local version for that field.
+      const localTask = tasks.find((t) => t._id === taskId);
+      const fetched = await getTaskById(taskId);
+
+      const base = fetched || localTask;
+      if (!base) return;
+
+      // Pick the best populated subCategory
+      const localSubCat =
+        localTask?.subCategory && typeof localTask.subCategory === "object" ? localTask.subCategory : null;
+      const fetchedSubCat =
+        fetched?.subCategory && typeof fetched.subCategory === "object" ? fetched.subCategory : null;
+      const subCategory = localSubCat ?? fetchedSubCat ?? undefined;
+
+      // Prefer subcategoryDisplay from localTask (which has the populated ref string)
+      const subcategoryDisplay =
+        (localTask as any)?.subcategoryDisplay ||
+        (fetched as any)?.subcategoryDisplay ||
+        subCategory?.label ||
+        subCategory?.name ||
+        undefined;
+
+      console.log("[OverdueTasks] handleOpenDetail:", {
+        taskId,
+        localTaskSubCategory: localTask?.subCategory,
+        fetchedSubCategory: fetched?.subCategory,
+        mergedSubCategory: subCategory,
+        subcategoryDisplay,
+      });
+
+      setDetailTask({ ...base, subCategory, subcategoryDisplay } as any);
       setDetailVisible(true);
-    }
-  }, []);
+    },
+    [tasks],
+  );
 
   // Load overdue tasks when modal becomes visible
   useEffect(() => {
