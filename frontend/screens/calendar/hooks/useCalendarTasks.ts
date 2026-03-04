@@ -26,6 +26,7 @@ import { useState, useEffect } from "react";
 import {
   getScheduledSessionsForDate,
   updateTask,
+  toggleTaskCompletion,
   getSubTasksForTask,
   markSubTaskComplete,
   markSubTaskTodo,
@@ -70,7 +71,8 @@ export function useCalendarTasks(
 
           // Handle tasks with NO subtasks
           if (!t.subtasks || t.subtasks.length === 0) {
-            if (t.completed === true || t.status === "done") {
+            // scheduled sessions may report status="completed" rather than "done"
+            if (t.completed === true || t.status === "done" || t.status === "completed") {
               doneTasks.add(taskIdToUse);
             }
             return;
@@ -166,8 +168,12 @@ export function useCalendarTasks(
         }
       }
 
-      // Persist parent task status update
-      await updateTask(parentTaskId, { status: checked ? "done" : "todo" });
+      // Persist parent task status update by toggling; the toggle endpoint will
+      // handle both completion and reversal and also update any scheduled sessions
+      // accordingly. We ignore `checked` since toggle flips whatever the server has.
+      // In the unlikely event the UI state and server drift, the optimistic update
+      // above will keep things coherent until the silent refetch.
+      await toggleTaskCompletion(parentTaskId);
 
       // Notify other components
       notifyTaskUpdate();

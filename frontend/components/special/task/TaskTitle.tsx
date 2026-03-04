@@ -38,11 +38,22 @@ export const TaskTitle: React.FC<{
   const iconSize = size === "sm" ? ICON_SIZES.sm : size === "md" ? ICON_SIZES.md : ICON_SIZES.big;
   const titleVariant = size === "sm" ? "bodyText" : size === "md" ? "boldText" : "title3";
 
-  // Insert zero‑width spaces between characters so extremely long words (or
-  // languages without spaces) can wrap anywhere. The invisible characters do
-  // not affect rendering but give the layout engine valid breakpoints.
+  // Insert zero‑width spaces only inside very long words so that they can
+  // break if necessary.  Short words are left untouched, letting the layout
+  // engine wrap at normal spaces.  The threshold is arbitrary but should be
+  // high enough to avoid unnecessary mid-word wrapping in common text.
   const rawText = title || taskname || "";
-  const breakableText = rawText.split("").join("\u200B");
+  const WRAP_THRESHOLD = 12;
+  const breakableText = rawText
+    .split(" ")
+    .map((word) => {
+      if (word.length > WRAP_THRESHOLD) {
+        // only apply when word exceeds threshold
+        return word.split("").join("\u200B");
+      }
+      return word;
+    })
+    .join(" ");
 
   return (
     <View style={[styles.titleRow, style, reversed ? styles.reversedRow : null]}>
@@ -51,7 +62,15 @@ export const TaskTitle: React.FC<{
       ) : null}
       <View style={styles.rightTitle}>
         {leadingNode}
-        <AppText variant={titleVariant} style={{ flex: 1, flexWrap: "wrap", flexShrink: 1 }}>
+        <AppText
+          variant={titleVariant}
+          style={{
+            flex: 1,
+            flexWrap: "wrap",
+            flexShrink: 1,
+            maxWidth: "100%", // ensure the text cannot overflow its container
+          }}
+        >
           {breakableText}
         </AppText>
       </View>

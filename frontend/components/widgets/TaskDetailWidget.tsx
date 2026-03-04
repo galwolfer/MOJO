@@ -171,9 +171,7 @@ const TaskDetailWidget: React.FC<BaseWidgetProps> = ({
 
   const contentNodes: React.ReactNode[] = [
     /* Header */
-    <View style={styles.header} key="header">
-      <TaskTitle title={task.title} taskname={task.taskname} category={task.category} />
-    </View>,
+    <TaskTitle key="header" title={task.title} taskname={task.taskname} category={task.category} />,
 
     /* Tags row (category, subcategory, importance, effort) */
     <TaskTagsRow
@@ -242,14 +240,6 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
     width: "100%",
     alignSelf: "stretch",
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: SPACING.sm,
-    // Ensure title alignment matches TaskTitle textAlign
-    textAlign: "left",
   },
   title: {
     fontWeight: "600",

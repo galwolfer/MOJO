@@ -14,6 +14,7 @@ import { COLORS, SPACING, FONT_SIZES, FONTS, ICON_SIZES } from "../../../theme";
 import { useColors } from "../../../context/ThemeContext";
 import { ICONS } from "../../../components/icons/icons";
 import { ProgressIcon } from "../../../components/icons/ProgressIcon.native";
+import { Checkbox } from "../../../components/icons/Checkbox";
 import { getCategoryMeta } from "../../../config/categoryMeta";
 import { computeTaskProgress } from "../../../components/widgets/taskHelpers";
 import { TaskTitle } from "../../../components/special/task/TaskTitle";
@@ -32,6 +33,7 @@ interface TaskCardProps {
   onPress: (taskId: string) => void;
   onEdit: (task: Task) => void;
   onDelete: (taskId: string) => void;
+  onTaskToggle: (taskId: string, checked: boolean) => void;
   onSubtaskToggle: (taskId: string, subtaskId: string, checked: boolean) => void;
   onSubtaskDelete: (taskId: string, subtaskId: string) => void;
 }
@@ -44,6 +46,7 @@ function TaskCard({
   onPress,
   onEdit,
   onDelete,
+  onTaskToggle,
   onSubtaskToggle,
   onSubtaskDelete,
 }: TaskCardProps) {
@@ -90,6 +93,37 @@ function TaskCard({
       onSubtaskToggle(parentId, subtaskId, checked);
     },
     [onSubtaskToggle],
+  );
+
+  const isSingleSubtask = task.subtasks?.length === 1;
+  const hasNoSubtasks = !task.subtasks || task.subtasks.length === 0;
+  const showCheckbox = hasNoSubtasks || isSingleSubtask;
+  const singleSubtask = isSingleSubtask ? task.subtasks![0] : null;
+  const singleSubtaskCompleted = singleSubtask ? localSubtasks.has(singleSubtask.id || "") : false;
+  const checkboxChecked = hasNoSubtasks ? isCompleted : singleSubtaskCompleted;
+
+  const handleSingleSubtaskToggle = useCallback(() => {
+    if (hasNoSubtasks) {
+      // Optimistically update local state so the checkbox responds immediately
+      setIsCompleted(!isCompleted);
+      onTaskToggle(effectiveId, !isCompleted);
+    } else if (singleSubtask) {
+      handleSubtaskToggle(effectiveId, singleSubtask.id || "", !singleSubtaskCompleted);
+    }
+  }, [
+    hasNoSubtasks,
+    singleSubtask,
+    effectiveId,
+    isCompleted,
+    singleSubtaskCompleted,
+    handleSubtaskToggle,
+    onTaskToggle,
+  ]);
+
+  const leadingNode = showCheckbox ? (
+    <Checkbox checked={checkboxChecked} onChange={handleSingleSubtaskToggle} size={ICON_SIZES.md} />
+  ) : (
+    <ProgressIcon value={taskProgress} size={ICON_SIZES.md} />
   );
 
   const handleConfirmDelete = useCallback(() => setDeleteVisible(true), []);
@@ -139,7 +173,7 @@ function TaskCard({
                 { fontFamily: isExpanded ? FONTS.fredokaSemiBold : FONTS.fredokaRegular, color: colors.text1 },
               ]}
               iconStyle={{ marginLeft: 0, marginBottom: 0 }}
-              leadingNode={<ProgressIcon value={taskProgress} size={ICON_SIZES.md} />}
+              leadingNode={leadingNode}
               reversed={!isExpanded}
             />
 

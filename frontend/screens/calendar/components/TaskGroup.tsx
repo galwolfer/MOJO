@@ -67,6 +67,7 @@ function TaskGroup({
               onPress={onTaskPress}
               onEdit={onTaskEdit}
               onDelete={onTaskDelete}
+              onTaskToggle={onTaskToggle}
               onSubtaskToggle={onSubtaskToggle}
               onSubtaskDelete={onSubtaskDelete}
             />
