@@ -12,12 +12,22 @@ interface PopupBoxProps {
   titleIcon?: React.ReactNode;
   children?: React.ReactNode;
   contentStyle?: object;
+  /** whether clicking outside the popup closes it (default: true) */
+  closeOnBackdropPress?: boolean;
 }
 
-export default function PopupBox({ visible, onClose, title, titleColor, titleIcon, children }: PopupBoxProps) {
+export default function PopupBox({
+  visible,
+  onClose,
+  title,
+  titleColor,
+  titleIcon,
+  children,
+  closeOnBackdropPress = true,
+}: PopupBoxProps) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
+      <Pressable style={styles.overlay} onPress={closeOnBackdropPress ? onClose : undefined}>
         <Pressable onPress={(e) => e.stopPropagation()} style={styles.boxContainer}>
           <View style={styles.boxWrapper}>
             <Box title={title} titleColor={titleColor || COLORS.primary1} titleIcon={titleIcon}>
