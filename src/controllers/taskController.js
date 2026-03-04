@@ -724,10 +724,9 @@ export async function updateTask(req, res) {
             id: sub.id || undefined,
             title: sub.title ? String(sub.title).trim() : "",
             description: sub.description ? String(sub.description).trim() : "",
-            minutes: sub.minutes ? Number(sub.minutes) : 30,
+            minutes: sub.minutes !== undefined && sub.minutes !== null && sub.minutes !== "" ? Number(sub.minutes) : undefined,
             index: sub.index !== undefined ? Number(sub.index) : undefined,
-          }))
-          .filter((sub) => sub.title.length > 0);
+          }));
 
         if (validSubtasks.length > 0) {
           updates.subtasks = validSubtasks;

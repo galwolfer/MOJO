@@ -107,6 +107,17 @@ async function syncSubTasksForTask(taskDoc) {
         // Remove all existing subtasks first
         await SubTask.deleteMany({ taskId: taskDoc._id }).catch(() => {});
 
+        // Auto-fill minutes for any subtasks that have 0/undefined minutes
+        // by distributing the remaining estimated duration evenly among them.
+        const totalMinutes = taskDoc.estimatedDuration || 0;
+        const parsedMinutes = pendingSubtasks.map((st) => (st.minutes ? parseInt(st.minutes, 10) : 0));
+        const knownTotal = parsedMinutes.reduce((sum, m) => sum + m, 0);
+        const zeroCount = parsedMinutes.filter((m) => m === 0).length;
+        const fillMinutes =
+          zeroCount > 0
+            ? Math.max(1, Math.round((totalMinutes - knownTotal) / zeroCount))
+            : 0;
+
         // Create subtasks with the exact provided data
         const createOps = pendingSubtasks.map((subtask, index) => ({
           taskId: taskDoc._id,
@@ -114,7 +125,7 @@ async function syncSubTasksForTask(taskDoc) {
           index: index + 1,
           title: subtask.title || `Part ${index + 1}`,
           description: subtask.description || "",
-          minutes: subtask.minutes ? parseInt(subtask.minutes, 10) : 0,
+          minutes: parsedMinutes[index] > 0 ? parsedMinutes[index] : fillMinutes,
         }));
 
         if (createOps.length) {

@@ -828,7 +828,8 @@ export async function updateTask({ userId, taskId, updates }) {
         // If an id was provided, update the existing subtask
         if (s.id) {
           const updateFields = {};
-          if (s.title !== undefined) updateFields.title = String(s.title).trim();
+          // Only update title if a non-empty value is provided; preserve existing auto-generated title otherwise
+          if (s.title !== undefined && String(s.title).trim().length > 0) updateFields.title = String(s.title).trim();
           if (s.description !== undefined) updateFields.description = String(s.description);
           if (s.minutes !== undefined) updateFields.minutes = Number(s.minutes);
           if (s.index !== undefined) updateFields.index = Number(s.index);

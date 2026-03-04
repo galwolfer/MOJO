@@ -252,7 +252,6 @@ const CreateTask: React.FC = () => {
     setIsLoading(true);
     try {
       const subtasksData = formState.subtasks
-        .filter((st) => st.title.trim())
         .map((st) => ({
           title: st.title,
           description: st.description || undefined,

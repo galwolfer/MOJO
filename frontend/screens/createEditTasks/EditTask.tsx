@@ -469,7 +469,6 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
     try {
       // ── 1. Build & send task update ─────────────────────────────────────
       const subtasksData = formState.subtasks
-        .filter((st) => st.title.trim())
         .map((st, idx) => ({
           id: st.id,
           title: st.title,
