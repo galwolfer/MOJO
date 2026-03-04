@@ -287,7 +287,7 @@ export default function OverdueTasksModal({ visible, onClose }: OverdueTasksModa
             <AppButton
               title="Decline"
               mode="light"
-              color={colors.text2}
+              color={colors.gray1}
               onPress={() => handleDeclineTask(task)}
               disabled={actionInProgress === task._id}
               style={overdueListStyles.taskActionBtn}
@@ -494,7 +494,6 @@ const getOverdueStyles = (colors: any) =>
       fontSize: FONT_SIZES.lg,
     },
     subtitle: {
-      color: colors.text2,
       marginBottom: SPACING.md,
       lineHeight: 20,
     },

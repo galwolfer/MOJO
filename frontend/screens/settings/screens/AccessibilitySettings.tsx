@@ -70,14 +70,17 @@ export default function AccessibilitySettingsScreen({ onBack }: AccessibilitySet
   }
 
   const ClockIcon = ICONS.clock;
-  const PaletteIcon = ICONS.settings; // Replace with actual palette/theme icon
+  // choose a sun or moon icon depending on the current theme preference
+  const PaletteIcon = preferences.theme === "dark" ? ICONS.night : ICONS.day;
 
   const accessibilityItems: ListCellProps[] = [
     makeListCell("theme-mode", {
       title: "Theme Mode",
       subtitle:
         preferences.theme === "dark" ? "Dark Mode" : preferences.theme === "light" ? "Light Mode" : "System Default",
-      logo: <PaletteIcon size={ICON_SIZES.sm} color={COLORS.primary3} />,
+      logo: (
+        <PaletteIcon size={ICON_SIZES.sm} color={preferences.theme === "dark" ? COLORS.primary1 : COLORS.primary5} />
+      ),
       onPress: () => setCurrentScreen("theme-mode"),
       divider: true,
     }),

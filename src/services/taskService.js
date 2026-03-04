@@ -400,6 +400,30 @@ export async function getTaskById(taskId, userId) {
   // Attach subtasks so the EditTask screen can pre-populate the parts form
   const subTasks = await SubTask.find({ taskId: task._id }).sort({ index: 1 }).lean();
   task.subTasks = subTasks;
+
+  // Attach scheduled sessions to match what getTasks returns
+  const schedules = await TaskSchedule.find({ taskId: task._id }).sort({ start: 1 }).lean();
+
+  // Build a map of subtask indexes to subtask details for quick lookup
+  const subtaskMap = new Map();
+  subTasks.forEach((st) => {
+    subtaskMap.set(st.index, { id: st._id, title: st.title, status: st.status });
+  });
+
+  task.scheduledSessions = schedules.map((sched) => {
+    const stInfo =
+      sched.subtaskIndex !== undefined && sched.subtaskIndex !== null ? subtaskMap.get(sched.subtaskIndex) : null;
+
+    return {
+      id: sched._id.toString(),
+      _id: sched._id.toString(),
+      ...sched,
+      subtaskId: stInfo ? stInfo.id : undefined,
+      subtaskTitle: sched.subtaskTitle || (stInfo ? stInfo.title : undefined),
+      subtaskStatus: stInfo ? stInfo.status : undefined,
+    };
+  });
+
   attachSubcategoryLabel(task);
   // Attach a flat display string for clients that don't chase the populated ref
   task.subcategoryDisplay = task.subCategory ? task.subCategory.label || task.subCategory.name || null : null;

@@ -34,7 +34,7 @@ interface TaskDetailModalProps {
 
 // ─── Inner content (needs hooks, so lives in its own component) ──────────────
 
-function TaskDetailContent({
+export function TaskDetailContent({
   task,
   onClose,
   onEdit,

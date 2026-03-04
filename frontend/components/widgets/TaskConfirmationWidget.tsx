@@ -221,63 +221,6 @@ const TaskConfirmationWidget: React.FC<BaseWidgetProps> = ({
           progressPercentage={task.status === "draft" ? null : (task.progressPercentage ?? null)}
         />
 
-        {/* Subtasks */}
-        {task.subtasks && task.subtasks.length > 0 && (
-          <View style={styles.section}>
-            <AppText variant="boldText" style={{ color: getCategoryMeta(task.category)?.color || COLORS.primary1 }}>
-              {`${task.subtasks.length}`} Subtasks
-            </AppText>
-            <List
-              data={task.subtasks.map((subtask, index) => ({
-                id: subtask.id || `subtask-${index}`,
-                content: (
-                  <View style={styles.subtaskCard}>
-                    <View style={styles.subtaskTitleRow}>
-                      <View style={styles.subtaskTitleCheck}>
-                        <Checkbox checked={subtask.completed || subtask.status === "completed"} size={16} />
-                        <AppText
-                          variant="bodyText"
-                          style={[
-                            styles.subtaskTitle,
-                            (subtask.completed || subtask.status === "completed") && [
-                              styles.subtaskCompleted,
-                              { color: colors.gray2 },
-                            ],
-                          ]}
-                        >
-                          {subtask.title}
-                        </AppText>
-                      </View>
-
-                      {(subtask.duration || subtask.minutes) && (
-                        <View style={styles.subtaskDurationRow}>
-                          <AppText
-                            variant="notes"
-                            style={{ color: getCategoryMeta(task.category)?.color || COLORS.primary1 }}
-                          >
-                            {formatDuration(subtask.duration || subtask.minutes || 0)}
-                          </AppText>
-                          <ICONS.clock
-                            size={ICON_SIZES.sm / 2}
-                            color={getCategoryMeta(task.category)?.color || COLORS.primary1}
-                          />
-                        </View>
-                      )}
-                    </View>
-                    {subtask.description ? (
-                      <AppText variant="notes" style={[styles.subtaskDescription, { color: colors.gray2 }]}>
-                        {subtask.description}
-                      </AppText>
-                    ) : null}
-                  </View>
-                ),
-                divider: index < (task.subtasks?.length || 0) - 1,
-              }))}
-              dividerColor={colors.bg2}
-            />
-          </View>
-        )}
-
         {/* Action buttons removed for now */}
       </ScrollView>
     </Widget>
