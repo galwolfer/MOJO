@@ -712,7 +712,7 @@ const TextBouble: React.FC<Props> = ({
                   // Keep the old look: only web uses CSS blur; native keeps the component's original rendering
                   filter: "blur(10px)",
                   // On web, inherit bubble border so the conic gradient aligns with container edges
-                  ...((Platform as any).OS === "web" ? { borderWidth: 0.15, borderColor: COLORS.brightP1 } : {}),
+                  ...((Platform as any).OS === "web" ? { borderWidth: 0.15, borderColor: colors.lightP1 } : {}),
                 }}
               />
             </Animated.View>
@@ -808,8 +808,7 @@ const styles = StyleSheet.create({
     ...(SHADOWS.glowingMessage as ViewStyle),
   },
 
-  text: {
-  },
+  text: {},
 
   spacer: {
     opacity: 0,

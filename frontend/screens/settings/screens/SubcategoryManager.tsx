@@ -395,9 +395,7 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
                       <View style={styles.subcategoryInfo}>
                         <Icon size={ICON_SIZES.xs} color={displayColor} />
                         <View style={styles.subcategoryNameContainer}>
-                          <AppText style={[styles.subcategoryName, { color: colors.text1 }]}>
-                            {subcategory.name}
-                          </AppText>
+                          <AppText>{subcategory.name}</AppText>
                           {isDefault && (
                             <AppText style={[styles.defaultBadge, { color: colors.text2 }]}>Default</AppText>
                           )}
@@ -486,9 +484,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: SPACING.xs,
     flex: 1,
-  },
-  subcategoryName: {
-    fontSize: FONT_SIZES.md,
   },
   defaultBadge: {
     fontSize: FONT_SIZES.sm,
