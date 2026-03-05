@@ -146,7 +146,7 @@ export const CompletionItem: React.FC<CompletionItemProps> = (props) => {
           </View>
           {sp.showEditIcon && sp.editOnPress && (
             <Pressable style={styles.editSlot} onPress={sp.editOnPress}>
-              {ICONS.edit ? React.createElement(ICONS.edit, { size: ICON_SIZES.sm, color: accentColor }) : null}
+              {ICONS.edit ? React.createElement(ICONS.edit, { size: ICON_SIZES.xs, color: accentColor }) : null}
             </Pressable>
           )}
         </RowContainer>
