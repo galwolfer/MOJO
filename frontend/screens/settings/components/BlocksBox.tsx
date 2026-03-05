@@ -56,6 +56,7 @@ export function BlocksBox({ blocks, loading, onEdit, onDelete, onAdd }: BlocksBo
               hideTitle={true}
               dividerColor={COLORS.lightGray}
               showCheckbox={false}
+              groupByDate={false} // ensure each busy block is shown separately
               onEditSession={(taskId: string, session: any, index: number) => {
                 onEdit(blocks[index]);
               }}
