@@ -37,6 +37,8 @@ interface SessionProps {
   lightTitle?: boolean;
   checkboxOnToggle?: () => void | Promise<void>;
   rowOnPress?: () => void | Promise<void>;
+  showEditIcon?: boolean;
+  editOnPress?: () => void;
 }
 
 interface SubtaskProps {
@@ -48,6 +50,8 @@ interface SubtaskProps {
   categoryColor?: string;
   showTime?: boolean;
   timeRangeElement?: React.ReactNode;
+  showEditIcon?: boolean;
+  editOnPress?: () => void;
 }
 
 export type CompletionItemType = "session" | "subtask";
@@ -140,6 +144,11 @@ export const CompletionItem: React.FC<CompletionItemProps> = (props) => {
               ) : null}
             </AppText>
           </View>
+          {sp.showEditIcon && sp.editOnPress && (
+            <Pressable style={styles.editSlot} onPress={sp.editOnPress}>
+              {ICONS.edit ? React.createElement(ICONS.edit, { size: ICON_SIZES.sm, color: accentColor }) : null}
+            </Pressable>
+          )}
         </RowContainer>
       </View>
     );
@@ -174,6 +183,11 @@ export const CompletionItem: React.FC<CompletionItemProps> = (props) => {
             </View>
           )}
         </View>
+        {tp!.showEditIcon && tp!.editOnPress && (
+          <Pressable style={styles.editSlot} onPress={tp!.editOnPress}>
+            {ICONS.edit ? React.createElement(ICONS.edit, { size: ICON_SIZES.sm, color: colors.text1 }) : null}
+          </Pressable>
+        )}
       </View>
       {tp!.subtask.description && (
         <AppText style={[styles.description, { color: colors.gray2 }]}>{tp!.subtask.description}</AppText>
@@ -292,6 +306,12 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     marginLeft: SPACING.xlg,
     lineHeight: Math.round(FONT_SIZES.sm * 1.2),
+  },
+  editSlot: {
+    width: SPACING.lg,
+    height: SPACING.lg,
+    justifyContent: "center",
+    alignItems: "center",
   },
 
   // Shared text states

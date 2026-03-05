@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, Pressable } from "react-native";
 import AppText from "../../common/AppText";
 import TimeRangeDisplay from "../../common/TimeRangeDisplay";
 import { CompletionItem } from "./CompletionItem";
@@ -10,6 +10,7 @@ import { useColors } from "../../../context/ThemeContext";
 import { ScheduledSession, Subtask as WidgetSubtask, getSessionKey, getTimeParts } from "../../widgets/taskHelpers";
 import { Subtask as CalendarSubtask } from "../../../screens/calendar/types";
 import { useTaskUpdateSubscription } from "../../../context/TaskContext";
+import { ICONS } from "../../icons/icons";
 import { TaskTitle } from "./TaskTitle";
 
 export const ScheduledSessionsSection: React.FC<{
@@ -30,6 +31,8 @@ export const ScheduledSessionsSection: React.FC<{
   dividerColor?: string;
   sessionHeaderMode?: "taskTitle" | "date" | "none";
   taskStatus?: string;
+  showCheckbox?: boolean;
+  onEditSession?: (taskId: string, session: ScheduledSession, index: number) => void;
 }> = ({
   taskId,
   taskTitle,
@@ -46,6 +49,8 @@ export const ScheduledSessionsSection: React.FC<{
   sessionHeaderMode = "none",
   dividerColor,
   taskStatus,
+  showCheckbox = true,
+  onEditSession,
 }) => {
   const colors = useColors();
   const resolvedDividerColor = dividerColor ?? colors.bg1;
@@ -140,11 +145,15 @@ export const ScheduledSessionsSection: React.FC<{
                 sessionIndex={index}
                 isDone={isDone}
                 isLoading={loadingParts?.has(key)}
-                checkboxOnToggle={onToggleSession ? () => onToggleSession(taskId, session, index, subtasks) : undefined}
+                checkboxOnToggle={
+                  showCheckbox && onToggleSession ? () => onToggleSession(taskId, session, index, subtasks) : undefined
+                }
                 rowOnPress={onToggleSession ? () => onToggleSession(taskId, session, index, subtasks) : undefined}
-                canToggle={!!onToggleSession}
+                canToggle={showCheckbox && !!onToggleSession}
                 hideTaskTitle={hideTaskTitle || sessions.length === 1}
                 lightTitle={titleMode || hideTaskTitle}
+                showEditIcon={!!onEditSession}
+                editOnPress={onEditSession ? () => onEditSession(taskId, session, index) : undefined}
               />
             </View>
           ),
@@ -193,19 +202,23 @@ export const ScheduledSessionsSection: React.FC<{
                     ) : undefined;
 
                   return (
-                    <CompletionItem
-                      key={key}
-                      type="subtask"
-                      subtask={{ id: key, title: label, completed: isDone ?? false } as CalendarSubtask}
-                      parentTaskId={taskId}
-                      isCompleted={isDone ?? false}
-                      categoryColor={categoryColor}
-                      showTime={!!timeRangeElement}
-                      timeRangeElement={timeRangeElement}
-                      onToggle={(_parentId: string, _subtaskId: string, _checked: boolean) => {
-                        if (!isLoading) onToggleSession?.(taskId, session, index, subtasks);
-                      }}
-                    />
+                    <View style={styles.sessionRowWrapper}>
+                      <CompletionItem
+                        key={key}
+                        type="subtask"
+                        subtask={{ id: key, title: label, completed: isDone ?? false } as CalendarSubtask}
+                        parentTaskId={taskId}
+                        isCompleted={isDone ?? false}
+                        categoryColor={categoryColor}
+                        showTime={!!timeRangeElement}
+                        timeRangeElement={timeRangeElement}
+                        onToggle={(_parentId: string, _subtaskId: string, _checked: boolean) => {
+                          if (!isLoading) onToggleSession?.(taskId, session, index, subtasks);
+                        }}
+                        showEditIcon={!!onEditSession}
+                        editOnPress={onEditSession ? () => onEditSession(taskId, session, index) : undefined}
+                      />
+                    </View>
                   );
                 })}
               </View>
@@ -253,6 +266,19 @@ const styles = StyleSheet.create({
   dateText: {
     fontWeight: "600",
     marginBottom: SPACING.xs,
+  },
+  sessionRowWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  editIconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: COLORS.white2 ?? "#F0F0F8",
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
 

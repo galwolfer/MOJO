@@ -46,19 +46,13 @@ const SliderComponent: React.FC<SliderComponentProps> = ({
   max = 5,
   step = 1,
   label,
-  valueDescriptions = {
-    1: "Not Important",
-    2: "Low Priority",
-    3: "Moderate",
-    4: "Important",
-    5: "Very Important",
-  },
+  valueDescriptions = {},
   trackColor,
   TrackThumbColor = COLORS.primary1,
   style,
 }) => {
   const colors = useColors();
-  const effectiveTrackColor = trackColor ?? colors.bg2;
+  const effectiveTrackColor = trackColor ?? colors.bg3;
   const [containerWidth, setContainerWidth] = useState(0);
   const [internalValue, setInternalValue] = useState(value);
   const internalValueRef = useRef(value);
