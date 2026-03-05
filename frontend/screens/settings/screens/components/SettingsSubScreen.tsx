@@ -2,6 +2,7 @@ import React, { useLayoutEffect } from "react";
 import { View, StyleSheet, TouchableOpacity, type ViewStyle } from "react-native";
 import { COLORS, SPACING, ICON_SIZES } from "../../../../theme";
 import { useNavigation } from "../../../../context/NavigationContext";
+import { useBackHandler } from "../../../../hooks/useBackHandler";
 import { ICONS } from "../../../../components/icons/icons";
 import ScrollableContent from "../../../../components/layout/ScrollableContent";
 
@@ -35,6 +36,12 @@ export default function SettingsSubScreen({
   const { setHeaderConfig } = useNavigation();
   const LeftIcon = ICONS.left;
   const RightIcon = ICONS[iconName];
+
+  // Register onBack with the global back handler stack so hardware back works
+  useBackHandler(() => {
+    onBack();
+    return true;
+  });
 
   // useLayoutEffect fires synchronously before paint � eliminates header flicker on navigation
   useLayoutEffect(() => {

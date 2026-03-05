@@ -2,6 +2,7 @@ import React from "react";
 import { Modal, Pressable, StyleSheet, View, ScrollView } from "react-native";
 import Box from "../layout/Box";
 import { SPACING, COLORS } from "../../theme";
+import { useBackHandler } from "../../hooks/useBackHandler";
 
 interface PopupBoxProps {
   visible: boolean;
@@ -25,6 +26,12 @@ export default function PopupBox({
   children,
   closeOnBackdropPress = true,
 }: PopupBoxProps) {
+  // Close on hardware/software back when visible
+  useBackHandler(() => {
+    onClose();
+    return true;
+  }, visible);
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={closeOnBackdropPress ? onClose : undefined}>

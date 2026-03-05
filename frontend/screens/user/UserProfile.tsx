@@ -33,6 +33,7 @@ import {
 } from "../../services/taskService";
 import UserAvatar from "../../components/common/UserAvatar";
 import { SettingsScreen } from "../settings";
+import { useBackHandler } from "../../hooks/useBackHandler";
 import { useStatsContext } from "../../context/StatsContext";
 
 /**
@@ -90,6 +91,12 @@ export default function UserProfileScreen() {
 
   // Screen navigation state
   const [currentScreen, setCurrentScreen] = useState<"profile" | "settings">("profile");
+
+  // When settings is open, back navigates to profile (sub-screens supersede this via their own handlers)
+  useBackHandler(() => {
+    setCurrentScreen("profile");
+    return true;
+  }, currentScreen === "settings");
 
   const [loading, setLoading] = useState(true);
   const [progressData, setProgressData] = useState<number[]>(DEFAULT_PROGRESS);
