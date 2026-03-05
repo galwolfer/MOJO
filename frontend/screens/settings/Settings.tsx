@@ -8,6 +8,7 @@ import ProfileSettings from "./screens/ProfileSettings";
 import EditPreferencesScreen from "./screens/EditPreferences";
 import ChatSettingsScreen from "./screens/ChatSettings";
 import NotificationSettingsScreen from "./screens/NotificationSettings";
+import { NotificationSettingsProvider } from "../../context/NotificationSettingsContext";
 import AccessibilitySettingsScreen from "./screens/AccessibilitySettings";
 import SubcategoryManager from "./screens/SubcategoryManager";
 import { COLORS, SPACING, SHADOWS, ICON_SIZES } from "../../theme";
@@ -129,7 +130,11 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
   if (currentScreen === "edit-preferences") return <EditPreferencesScreen onBack={() => setCurrentScreen("main")} />;
   if (currentScreen === "chat-settings") return <ChatSettingsScreen onBack={() => setCurrentScreen("main")} />;
   if (currentScreen === "notification-settings")
-    return <NotificationSettingsScreen onBack={() => setCurrentScreen("main")} />;
+    return (
+      <NotificationSettingsProvider>
+        <NotificationSettingsScreen onBack={() => setCurrentScreen("main")} />
+      </NotificationSettingsProvider>
+    );
   if (currentScreen === "accessibility-settings")
     return <AccessibilitySettingsScreen onBack={() => setCurrentScreen("main")} />;
   if (currentScreen === "subcategory-manager") return <SubcategoryManager onBack={() => setCurrentScreen("main")} />;
