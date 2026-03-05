@@ -104,7 +104,7 @@ def satisfies_hard_constraints(*, candidate_slot: dict, existing_assignments: Li
 
 
 # Compute a soft score for a candidate slot (lower is better)
-def compute_soft_score(*, candidate_slot: dict, task_id, existing_assignments: List[dict], daily_cap_minutes: int = 240, chunk_index: int = 0, reference_date = None, min_gap_minutes: int = 10) -> int:
+def compute_soft_score(*, candidate_slot: dict, task_id, existing_assignments: List[dict], daily_cap_minutes: int = 240, chunk_index: int = 0, reference_date = None, min_gap_minutes: int = 10, task_deadline = None) -> int:
     date_key = candidate_slot["start"].date().isoformat()
 
     minutes_on_day = candidate_slot.get("minutes", 0)
@@ -150,13 +150,49 @@ def compute_soft_score(*, candidate_slot: dict, task_id, existing_assignments: L
     # ── DAILY CAP PENALTY ────────────────────────────────────────────
     cap_penalty = daily_cap_penalty(minutes_on_day, daily_cap_minutes) * 10
 
-    # ── MILD EARLINESS PREFERENCE ────────────────────────────────────
-    # Small nudge toward earlier dates so the scheduler doesn't push
-    # everything to the last possible day. Deliberately weak so it never
-    # overrides the spreading penalties above.
+    # ── EARLINESS PREFERENCE ─────────────────────────────────────────
+    # Penalise later dates so the scheduler actively prefers earlier
+    # feasible days.  150 pts/day means a 7-day window spans 0..1050,
+    # giving clear separation between empty days while staying well
+    # below the deadline-day penalties below.
     earliness_penalty = 0
     if reference_date is not None:
         days_from_ref = (candidate_slot["start"].date() - reference_date).days
-        earliness_penalty = max(0, days_from_ref) * 5
+        earliness_penalty = max(0, days_from_ref) * 150
 
-    return day_load_penalty + cluster_penalty + grouping_penalty + cap_penalty + earliness_penalty
+    # ── DEADLINE PROXIMITY PENALTIES ─────────────────────────────────
+    # Goal: the deadline day (and the day before it) should ALWAYS lose
+    # to any reasonably-loaded earlier day.
+    #
+    # Worst realistic "earlier day" load:
+    #   3 sessions from other tasks  →  day_load = 3² × 500 = 4500
+    #   same-task session already    →  cluster  = 1² × 300 =  300
+    #   total ≈ 4800
+    #
+    # So deadline_day_penalty must exceed 4800 to guarantee deadline
+    # day is never chosen when ANY earlier day is feasible.
+    # We use 6000 — comfortably above even a 3-session day.
+    #
+    # Graduated near-deadline penalties taper the pressure over the
+    # last 3 days so the scheduler distributes load progressively
+    # rather than cramming everything into the earliest possible slot.
+    #
+    #   deadline day  (days_before == 0)  →  +6000
+    #   1 day before                      →  +2500
+    #   2 days before                     →  +800
+    #   3 days before                     →  +200
+    deadline_day_penalty = 0
+    if task_deadline is not None:
+        deadline_date = task_deadline.date() if hasattr(task_deadline, "date") else task_deadline
+        candidate_date = candidate_slot["start"].date()
+        days_before_deadline = (deadline_date - candidate_date).days
+        if days_before_deadline == 0:
+            deadline_day_penalty = 6000
+        elif days_before_deadline == 1:
+            deadline_day_penalty = 2500
+        elif days_before_deadline == 2:
+            deadline_day_penalty = 800
+        elif days_before_deadline == 3:
+            deadline_day_penalty = 200
+
+    return day_load_penalty + cluster_penalty + grouping_penalty + cap_penalty + earliness_penalty + deadline_day_penalty

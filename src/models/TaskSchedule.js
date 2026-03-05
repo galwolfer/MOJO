@@ -14,7 +14,7 @@ const taskScheduleSchema = new mongoose.Schema(
     start: { type: Date, required: true },
     end: { type: Date, required: true },
     minutes: { type: Number, required: true },
-    status: { type: String, enum: ["planned", "completed", "skipped"], default: "planned" },
+    status: { type: String, enum: ["planned", "completed", "skipped", "missed"], default: "planned" },
     /** True when the user manually set this session via the schedule editor; the auto-scheduler will not delete it */
     manuallyScheduled: { type: Boolean, default: false },
     /**

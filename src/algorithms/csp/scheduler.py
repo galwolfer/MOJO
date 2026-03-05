@@ -18,9 +18,14 @@ DEFAULT_DAILY_CAP_MINUTES = 240
 SLOT_GRANULARITY_MINUTES = 10
 MAX_BACKTRACK_ITERATIONS = 10000
 
+# Set LOG_CSP_DEBUG=1 (or "true" / "yes") to enable verbose scheduling diagnostics.
+# Logs are written to stderr so they appear in the Node debug log file
+# (csp_scheduler_node_debug.log in the system temp directory).
+_DEBUG = os.environ.get("LOG_CSP_DEBUG", "").lower() in ("1", "true", "yes")
+
 def log_debug(msg: str):
-    # Debug logging disabled in production - kept as no-op so calls remain safe
-    return None
+    if _DEBUG:
+        print(f"[CSP] {msg}", file=sys.stderr, flush=True)
 
 
 def start_of_day(dt: datetime) -> datetime:
@@ -119,6 +124,9 @@ def schedule_tasks_csp(tasks: List[dict], options: Dict = None) -> Dict:
     
     log_debug(f"Today: {today}")
     log_debug(f"Horizon end: {horizon_end}")
+    log_debug(f"Planning window: {today.date()} → {horizon_end.date()} ({planning_horizon_days} days)")
+    log_debug(f"Working hours: {working_hours.get('startHour'):02d}:{working_hours.get('startMinute',0):02d} – {working_hours.get('endHour'):02d}:{working_hours.get('endMinute',0):02d}")
+    log_debug(f"Daily cap: {daily_cap_minutes} min | Gap: {gap_minutes} min")
 
     # Controlled randomness: set rng when randomize enabled (for deterministic ties)
     randomize = options.get("randomize", False)
@@ -145,6 +153,18 @@ def schedule_tasks_csp(tasks: List[dict], options: Dict = None) -> Dict:
             variables_with_domains.append(variable)
         else:
             variables_without_domains.append(variable)
+
+    # ── Debug: per-day candidate slot counts ──────────────────────────
+    if _DEBUG:
+        day_candidate_counts: Dict[str, int] = {}
+        for var_id, dom in variable_domains.items():
+            for slot in dom:
+                dk = slot["dateKey"]
+                day_candidate_counts[dk] = day_candidate_counts.get(dk, 0) + 1
+        log_debug("=== CANDIDATE SLOTS PER DAY (across all variables) ===")
+        for dk in sorted(day_candidate_counts):
+            log_debug(f"  {dk}: {day_candidate_counts[dk]} candidate slots")
+        log_debug(f"Variables with domains: {len(variables_with_domains)}, without: {len(variables_without_domains)}")
 
     result = backtrack_search(variables_with_domains, variable_domains, busy_blocks_by_date, working_hours, daily_cap_minutes, today, rng, gap_minutes)
 
@@ -478,6 +498,11 @@ def generate_domain(variable: dict, today: datetime, horizon_end: datetime, busy
         current_day = add_days(current_day, 1)
 
     log_debug(f"Total slots generated: {len(slots)}")
+    if _DEBUG:
+        from collections import Counter
+        per_day = Counter(s["dateKey"] for s in slots)
+        for dk in sorted(per_day):
+            log_debug(f"  {dk}: {per_day[dk]} slots")
     log_debug(f"=== END DOMAIN GENERATION ===\n")
     return slots
 
@@ -529,8 +554,9 @@ def backtrack_search(variables: List[dict], variable_domains: Dict[str, List[dic
         # Get chunk index and reference date for earliness scoring
         chunk_index = variable.get("chunkIndex", 0)
         reference_date = today.date() if chunk_index is not None else None
+        task_deadline = variable.get("deadline")
 
-        ordered = order_values_lcv(selected["domain"], lambda slot: compute_soft_score(candidate_slot={**slot, "minutes": variable["chunkMinutes"]}, task_id=variable["taskId"], existing_assignments=assigned_slots, daily_cap_minutes=daily_cap_minutes, chunk_index=chunk_index, reference_date=reference_date, min_gap_minutes=gap_minutes), rng)
+        ordered = order_values_lcv(selected["domain"], lambda slot: compute_soft_score(candidate_slot={**slot, "minutes": variable["chunkMinutes"]}, task_id=variable["taskId"], existing_assignments=assigned_slots, daily_cap_minutes=daily_cap_minutes, chunk_index=chunk_index, reference_date=reference_date, min_gap_minutes=gap_minutes, task_deadline=task_deadline), rng)
 
         slots_tried = 0
         slots_passed_hard = 0
@@ -541,6 +567,7 @@ def backtrack_search(variables: List[dict], variable_domains: Dict[str, List[dic
             busy_blocks = parsed_busy_blocks_by_date.get(slot.get("dateKey"), [])
 
             if not satisfies_hard_constraints(candidate_slot=candidate_slot, existing_assignments=assigned_slots, busy_blocks_for_day=busy_blocks, working_window=working_window, deadline=variable.get("deadline"), variable_id=variable["id"], min_gap_minutes=gap_minutes):
+                log_debug(f"[BACKTRACK] ❌ Hard constraint failed: {variable.get('id')} -> {slot['start']} (day={slot.get('dateKey')})")
                 continue
 
             slots_passed_hard += 1
@@ -548,9 +575,9 @@ def backtrack_search(variables: List[dict], variable_domains: Dict[str, List[dic
             assignments.append(assignment)
             assigned_slots.append(candidate_slot)
             
-            log_debug(f"[BACKTRACK] ✅ Assigned {variable.get('id')} to slot: {candidate_slot['start']} → {candidate_slot['end']} ({candidate_slot['minutes']} min)")
+            log_debug(f"[BACKTRACK] ✅ Assigned {variable.get('id')} to slot: {candidate_slot['start']} → {candidate_slot['end']} ({candidate_slot['minutes']} min) | day={candidate_slot.get('dateKey')}")
 
-            pruned = forward_check(candidate_slot, domains, variable["id"])
+            pruned = forward_check(candidate_slot, domains, variable["id"], gap_minutes)
             if pruned is not None:
                 saved = domains
                 domains = pruned

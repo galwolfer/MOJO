@@ -947,6 +947,64 @@ export async function getUpcomingSessions(userId, { limit = 50 } = {}) {
 // PRIORITY SCHEDULER (BACKGROUND JOB)
 // =============================================================================
 
+/**
+ * Transition every planned session whose `end` is in the past to "missed".
+ * Called on every scheduler tick so the DB reflects reality without requiring
+ * the frontend to infer status from timestamps.
+ */
+async function markMissedSessions() {
+  const now = new Date();
+  const result = await TaskSchedule.updateMany(
+    { end: { $lt: now }, status: "planned" },
+    { $set: { status: "missed" } }
+  );
+  if (result.modifiedCount > 0) {
+    logger.info(`[SCHEDULER] Marked ${result.modifiedCount} past session(s) as "missed"`);
+  }
+  return result.modifiedCount;
+}
+
+/**
+ * One-time startup cleanup: for each (userId, taskId, subtaskIndex) group of
+ * planned (non-manual) sessions, keep only the session with the latest start
+ * time and delete the rest.
+ *
+ * These duplicates can arise if a reschedule ran while the task-level wipe
+ * (Step 1 of _persistPlanLocked) was not yet in place, or if a past session
+ * slipped through the time-gated delete before that guard was added.
+ */
+async function removeDuplicatePlannedSessions() {
+  const groups = await TaskSchedule.aggregate([
+    { $match: { status: "planned", manuallyScheduled: { $ne: true } } },
+    {
+      $group: {
+        _id: {
+          userId: "$userId",
+          taskId: "$taskId",
+          subtaskIndex: { $ifNull: ["$subtaskIndex", null] },
+        },
+        docs: { $push: { id: "$_id", start: "$start" } },
+        count: { $sum: 1 },
+      },
+    },
+    { $match: { count: { $gt: 1 } } },
+  ]);
+
+  let deletedTotal = 0;
+  for (const group of groups) {
+    // Sort newest-first — keep the most recently scheduled session (index 0)
+    group.docs.sort((a, b) => new Date(b.start) - new Date(a.start));
+    const toDelete = group.docs.slice(1).map((d) => d.id);
+    const res = await TaskSchedule.deleteMany({ _id: { $in: toDelete } });
+    deletedTotal += res.deletedCount;
+  }
+
+  if (deletedTotal > 0) {
+    logger.info(`[SCHEDULER] Startup cleanup: removed ${deletedTotal} duplicate planned session(s)`);
+  }
+  return deletedTotal;
+}
+
 const DEFAULT_INTERVAL_MS = 60 * 60 * 1000; // every hour
 let intervalHandle = null;
 let isRunning = false;
@@ -955,10 +1013,11 @@ const runOnce = async () => {
   if (isRunning) return;
   isRunning = true;
   try {
-    logger.info("Priority scheduler: refreshing scores");
+    logger.info("Priority scheduler: refreshing scores and expiring past sessions");
+    await markMissedSessions();
     await updateAllScores();
   } catch (error) {
-    logger.error("Priority scheduler failed to update scores:", error);
+    logger.error("Priority scheduler failed:", error);
   } finally {
     isRunning = false;
   }
@@ -966,11 +1025,16 @@ const runOnce = async () => {
 
 /**
  * Start the priority scheduler background job.
+ * On startup: runs a one-time duplicate-session cleanup, then begins the
+ * regular hourly tick (score refresh + missed-session expiry).
  */
 export function startPriorityScheduler() {
   if (intervalHandle) return;
   const intervalMs = Number(env.PRIORITY_SCHEDULER_INTERVAL_MS) || DEFAULT_INTERVAL_MS;
-  runOnce();
+  // Startup: clean up any legacy duplicate sessions, then run the first tick
+  removeDuplicatePlannedSessions()
+    .catch((err) => logger.error("[SCHEDULER] Startup dedup cleanup failed:", err))
+    .finally(() => runOnce());
   intervalHandle = setInterval(runOnce, intervalMs);
   logger.info(`Priority scheduler enabled (interval: ${intervalMs} ms)`);
 }
