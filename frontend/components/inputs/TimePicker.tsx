@@ -101,15 +101,25 @@ const WheelColumn: React.FC<WheelCol> = ({
   const mountedRef = useRef(false);
   const itemCount = items.length;
 
-  // Infinite loop: repeat items many times so we can scroll in both directions without hitting boundaries
-  // This avoids hitting the end while still maintaining proper wrapping behavior
+  // Infinite loop: only repeat when the column has more than two values (hours/minutes).
+  // AM/PM has just two entries and should not cycle endlessly – users expect a simple toggle.
   const loopedItems = useMemo(() => {
+    if (itemCount <= 2) {
+      // no repetition, just render the original array
+      return items;
+    }
     const repeated: string[] = [];
     for (let i = 0; i < LOOP_MULTIPLIER; i += 1) repeated.push(...items);
     return repeated;
-  }, [items]);
+  }, [items, itemCount]);
 
-  const centerIndexFor = useCallback((index: number) => MID_LOOP_COPY * itemCount + mod(index, itemCount), [itemCount]);
+  const centerIndexFor = useCallback(
+    (index: number) => {
+      if (itemCount <= 2) return index;
+      return MID_LOOP_COPY * itemCount + mod(index, itemCount);
+    },
+    [itemCount],
+  );
 
   const recenterTo = useCallback(
     (index: number, animated = false) => {
