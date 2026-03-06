@@ -55,7 +55,7 @@ import {
 async function _saveUserSubCategory(userId, categoryName, subCategory) {
   if (!userId || !categoryName || !subCategory) return;
 
-  if (typeof subCategory === "string" && /^[a-fA-F0-9]{ICON_SIZES.sm}$/.test(subCategory)) {
+  if (typeof subCategory === "string" && /^[a-fA-F0-9]{24}$/.test(subCategory)) {
     return;
   }
 
@@ -151,7 +151,7 @@ export async function createTask({
     throw new Error(buildIllegalCharsError(illegalFields));
   }
 
-  const isSubcategoryIdString = typeof subCategory === "string" && /^[a-fA-F0-9]{ICON_SIZES.sm}$/.test(subCategory);
+  const isSubcategoryIdString = typeof subCategory === "string" && /^[a-fA-F0-9]{24}$/.test(subCategory);
   const resolvedSubCategoryId = subCategory
     ? await resolveSubcategoryId({
         userId,
@@ -756,7 +756,7 @@ export async function updateTask({ userId, taskId, updates }) {
   // If user provided a subCategory, resolve to ID and record telemetry
   if (sanitizedUpdates.subCategory) {
     const rawSub = sanitizedUpdates.subCategory;
-    const isSubIdString = typeof rawSub === "string" && /^[a-fA-F0-9]{ICON_SIZES.sm}$/.test(rawSub);
+    const isSubIdString = typeof rawSub === "string" && /^[a-fA-F0-9]{24}$/.test(rawSub);
 
     const resolvedSubCategoryId = await resolveSubcategoryId({
       userId,
