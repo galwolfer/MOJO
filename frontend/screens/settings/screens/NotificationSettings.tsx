@@ -6,7 +6,7 @@
  * Uses SettingsSubScreen for consistent header/scroll layout across all settings screens.
  * Business logic delegated to NotificationSettingsContext.
  */
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import { View, StyleSheet } from "react-native";
 import { moderateScale } from "react-native-size-matters";
 import { TimePicker } from "../../../components/inputs/TimePicker";
@@ -158,97 +158,121 @@ export default function NotificationSettingsScreen({ onBack }: Props) {
   const digestTimeDisabled = !allEnabled || !digestEnabled || isSaving;
   const taskChildDisabled = !allEnabled || !taskRemindersEnabled || isSaving;
 
-  const settingItems: ListCellProps[] = [
-    // ── All Notifications ──────────────────────────────────────────────────
-    makeListCell("all-notifications", {
-      title: "All Notifications",
-      subtitle: "Enable or disable all push notifications",
-      logo: <NotificationIcon size={ICON_SIZES.sm} color={COLORS.primary1} />,
-      disabled: isSaving,
-      rightElement: (
-        <Checkbox
-          checked={allEnabled}
-          onChange={isSaving ? undefined : handleToggleNotifications}
-          size={ICON_SIZES.sm}
-        />
-      ),
-    }),
-
-    // ── Morning Digest + Time Picker ─────────────────────────────────────
-    {
-      id: "morning-digest",
-      disabled: childDisabled,
-      content: (
-        <View>
-          <ListItem
-            title="Morning Digest"
-            subtitle={`Daily summary at ${String(digestHour).padStart(2, "0")}:${String(digestMinute).padStart(2, "0")}`}
-            logo={<DayIcon size={ICON_SIZES.sm} color={COLORS.primary5} />}
-            rightElement={
-              <Checkbox
-                checked={digestEnabled}
-                onChange={childDisabled ? undefined : handleToggleMorningDigest}
-                size={ICON_SIZES.sm}
-              />
-            }
+  const settingItems: ListCellProps[] = useMemo(
+    () => [
+      // ── All Notifications ──────────────────────────────────────────────────
+      makeListCell("all-notifications", {
+        title: "All Notifications",
+        subtitle: "Enable or disable all push notifications",
+        logo: <NotificationIcon size={ICON_SIZES.sm} color={COLORS.primary1} />,
+        disabled: isSaving,
+        onPress: isSaving ? undefined : () => handleToggleNotifications(!allEnabled),
+        rightElement: (
+          <Checkbox
+            checked={allEnabled}
+            onChange={isSaving ? undefined : handleToggleNotifications}
+            size={ICON_SIZES.sm}
           />
-          <View style={[styles.timePicker, !digestEnabled && { opacity: 0.5 }]}>
-            <TimePicker
-              label=" Set Digest Time"
-              value={`${String(digestHour).padStart(2, "0")}:${String(digestMinute).padStart(2, "0")}`}
-              onChange={handleDigestTimeChange}
-              disabled={digestTimeDisabled}
+        ),
+      }),
+
+      // ── Morning Digest + Time Picker ─────────────────────────────────────
+      {
+        id: "morning-digest",
+        disabled: childDisabled,
+        content: (
+          <View>
+            <ListItem
+              title="Morning Digest"
+              subtitle={`Daily summary at ${String(digestHour).padStart(2, "0")}:${String(digestMinute).padStart(2, "0")}`}
+              logo={<DayIcon size={ICON_SIZES.sm} color={COLORS.primary5} />}
+              rightElement={
+                <Checkbox
+                  checked={digestEnabled}
+                  onChange={childDisabled ? undefined : handleToggleMorningDigest}
+                  size={ICON_SIZES.sm}
+                />
+              }
             />
+            <View style={[styles.timePicker, !digestEnabled && { opacity: 0.5 }]}>
+              <TimePicker
+                value={`${String(digestHour).padStart(2, "0")}:${String(digestMinute).padStart(2, "0")}`}
+                onChange={handleDigestTimeChange}
+                disabled={digestTimeDisabled}
+              />
+            </View>
           </View>
-        </View>
-      ),
-    } as ListCellProps,
+        ),
+      } as ListCellProps,
 
-    // ── Task Reminders ─────────────────────────────────────────────────────
-    makeListCell("task-reminders", {
-      title: "Task Reminders",
-      subtitle: "Get reminded before task deadlines",
-      logo: <ClockIcon size={ICON_SIZES.sm} color={COLORS.primary1} />,
-      disabled: childDisabled,
-      rightElement: (
-        <Checkbox
-          checked={taskRemindersEnabled}
-          onChange={childDisabled ? undefined : handleToggleTaskReminders}
-          size={ICON_SIZES.sm}
-        />
-      ),
-    }),
+      // ── Task Reminders ─────────────────────────────────────────────────────
+      makeListCell("task-reminders", {
+        title: "Task Reminders",
+        subtitle: "Get reminded before task deadlines",
+        logo: <ClockIcon size={ICON_SIZES.sm} color={COLORS.primary1} />,
+        disabled: childDisabled,
+        onPress: childDisabled ? undefined : () => handleToggleTaskReminders(!taskRemindersEnabled),
+        rightElement: (
+          <Checkbox
+            checked={taskRemindersEnabled}
+            onChange={childDisabled ? undefined : handleToggleTaskReminders}
+            size={ICON_SIZES.sm}
+          />
+        ),
+      }),
 
-    // ── Smart Reminders ────────────────────────────────────────────────────
-    makeListCell("smart-reminders", {
-      title: "Smart Reminders",
-      subtitle: "Use AI to optimize reminder timing",
-      logo: <PuzzleIcon size={ICON_SIZES.sm} color={COLORS.primary4} />,
-      disabled: taskChildDisabled,
-      rightElement: (
-        <Checkbox
-          checked={smartRemindersEnabled}
-          onChange={taskChildDisabled ? undefined : handleToggleSmartReminders}
-          size={ICON_SIZES.sm}
-        />
-      ),
-    }),
+      // ── Smart Reminders ────────────────────────────────────────────────────
+      makeListCell("smart-reminders", {
+        title: "Smart Reminders",
+        subtitle: "Use AI to optimize reminder timing",
+        logo: <PuzzleIcon size={ICON_SIZES.sm} color={COLORS.primary4} />,
+        disabled: taskChildDisabled,
+        onPress: taskChildDisabled ? undefined : () => handleToggleSmartReminders(!smartRemindersEnabled),
+        rightElement: (
+          <Checkbox
+            checked={smartRemindersEnabled}
+            onChange={taskChildDisabled ? undefined : handleToggleSmartReminders}
+            size={ICON_SIZES.sm}
+          />
+        ),
+      }),
 
-    // ── Ojo Personality ────────────────────────────────────────────────────
-    makeListCell("ojo-personality", {
-      title: "Ojo Personality",
-      subtitle: "AI-crafted notifications with personality",
-      logo: <OjoIcon size={ICON_SIZES.sm} color={COLORS.primary3} />,
-      disabled: taskChildDisabled,
-      rightElement: (
-        <Checkbox
-          checked={ojoEnabled}
-          onChange={taskChildDisabled ? undefined : handleToggleOjoNotifications}
-          size={ICON_SIZES.sm}
-        />
-      ),
-    }),
-  ];
+      // ── Ojo Personality ────────────────────────────────────────────────────
+      makeListCell("ojo-personality", {
+        title: "Ojo Personality",
+        subtitle: "AI-crafted notifications with personality",
+        logo: <OjoIcon size={ICON_SIZES.sm} color={COLORS.primary3} />,
+        disabled: taskChildDisabled,
+        onPress: taskChildDisabled ? undefined : () => handleToggleOjoNotifications(!ojoEnabled),
+        rightElement: (
+          <Checkbox
+            checked={ojoEnabled}
+            onChange={taskChildDisabled ? undefined : handleToggleOjoNotifications}
+            size={ICON_SIZES.sm}
+          />
+        ),
+      }),
+    ],
+    [
+      allEnabled,
+      isSaving,
+      digestEnabled,
+      digestHour,
+      digestMinute,
+      childDisabled,
+      digestTimeDisabled,
+      taskChildDisabled,
+      taskRemindersEnabled,
+      smartRemindersEnabled,
+      ojoEnabled,
+      handleToggleNotifications,
+      handleToggleMorningDigest,
+      handleDigestTimeChange,
+      handleToggleTaskReminders,
+      handleToggleSmartReminders,
+      handleToggleOjoNotifications,
+    ],
+  );
 
   return (
     <SettingsSubScreen title="Notifications" iconName="notifications" scrollKey="notification-settings" onBack={onBack}>

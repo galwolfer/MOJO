@@ -4,7 +4,7 @@
  * Manages all notification preferences, testing, and ui state for the notification settings screen.
  * Separates business logic from the UI component.
  */
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import { useNotifications } from "./NotificationContext";
 import { post, get } from "../services/httpClient";
 import { OjoType, OjoTypeOption } from "../services/notificationService";
@@ -119,86 +119,107 @@ export function NotificationSettingsProvider({ children }: { children: React.Rea
 
   // ── Save helper ──────────────────────────────────────────────────────────
 
-  const save = async (fn: () => Promise<unknown>) => {
+  const save = useCallback(async (fn: () => Promise<unknown>) => {
     setIsSaving(true);
     try {
       await fn();
     } finally {
       setIsSaving(false);
     }
-  };
+  }, []);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
-  const handleToggleNotifications = (enabled: boolean) => save(() => updatePreferences({ enabled }));
+  const handleToggleNotifications = useCallback(
+    (enabled: boolean) => save(() => updatePreferences({ enabled })),
+    [save, updatePreferences],
+  );
 
-  const handleToggleMorningDigest = (enabled: boolean) =>
-    save(() =>
-      updatePreferences({
-        morningDigest: { enabled, hour: digestHour, minute: digestMinute },
-      }),
-    );
+  const handleToggleMorningDigest = useCallback(
+    (enabled: boolean) =>
+      save(() =>
+        updatePreferences({
+          morningDigest: { enabled, hour: digestHour, minute: digestMinute },
+        }),
+      ),
+    [save, updatePreferences, digestHour, digestMinute],
+  );
 
-  const changeDigestTime = (hour: number, minute: number) =>
-    save(() =>
-      updatePreferences({
-        morningDigest: {
-          enabled: preferences?.morningDigest?.enabled ?? true,
-          hour,
-          minute,
-        },
-      }),
-    );
+  const changeDigestTime = useCallback(
+    (hour: number, minute: number) =>
+      save(() =>
+        updatePreferences({
+          morningDigest: {
+            enabled: preferences?.morningDigest?.enabled ?? true,
+            hour,
+            minute,
+          },
+        }),
+      ),
+    [save, updatePreferences, preferences],
+  );
 
-  const handleToggleTaskReminders = (enabled: boolean) =>
-    save(() =>
-      updatePreferences({
-        taskReminders: {
-          enabled,
-          defaultReminderMinutes: preferences?.taskReminders?.defaultReminderMinutes ?? 60,
-          useSmartReminders: preferences?.taskReminders?.useSmartReminders ?? true,
-        },
-      }),
-    );
+  const handleToggleTaskReminders = useCallback(
+    (enabled: boolean) =>
+      save(() =>
+        updatePreferences({
+          taskReminders: {
+            enabled,
+            defaultReminderMinutes: preferences?.taskReminders?.defaultReminderMinutes ?? 60,
+            useSmartReminders: preferences?.taskReminders?.useSmartReminders ?? true,
+          },
+        }),
+      ),
+    [save, updatePreferences, preferences],
+  );
 
-  const handleToggleSmartReminders = (useSmartReminders: boolean) =>
-    save(() =>
-      updatePreferences({
-        taskReminders: {
-          enabled: preferences?.taskReminders?.enabled ?? true,
-          defaultReminderMinutes: preferences?.taskReminders?.defaultReminderMinutes ?? 60,
-          useSmartReminders,
-        },
-      }),
-    );
+  const handleToggleSmartReminders = useCallback(
+    (useSmartReminders: boolean) =>
+      save(() =>
+        updatePreferences({
+          taskReminders: {
+            enabled: preferences?.taskReminders?.enabled ?? true,
+            defaultReminderMinutes: preferences?.taskReminders?.defaultReminderMinutes ?? 60,
+            useSmartReminders,
+          },
+        }),
+      ),
+    [save, updatePreferences, preferences],
+  );
 
-  const handleToggleOjoNotifications = (enabled: boolean) =>
-    save(() =>
-      updatePreferences({
-        ojoNotifications: {
-          enabled,
-          selectedOjoType: preferences?.ojoNotifications?.selectedOjoType ?? null,
-        },
-      }),
-    );
+  const handleToggleOjoNotifications = useCallback(
+    (enabled: boolean) =>
+      save(() =>
+        updatePreferences({
+          ojoNotifications: {
+            enabled,
+            selectedOjoType: preferences?.ojoNotifications?.selectedOjoType ?? null,
+          },
+        }),
+      ),
+    [save, updatePreferences, preferences],
+  );
 
-  const handleSelectOjoType = (ojoType: OjoType) =>
-    save(() =>
-      updatePreferences({
-        ojoNotifications: {
-          enabled: preferences?.ojoNotifications?.enabled ?? true,
-          selectedOjoType: ojoType,
-        },
-      }),
-    );
+  const handleSelectOjoType = useCallback(
+    (ojoType: OjoType) =>
+      save(() =>
+        updatePreferences({
+          ojoNotifications: {
+            enabled: preferences?.ojoNotifications?.enabled ?? true,
+            selectedOjoType: ojoType,
+          },
+        }),
+      ),
+    [save, updatePreferences, preferences],
+  );
 
-  const handleTestNotification = async () => {
+  const handleTestNotification = useCallback(async () => {
     setIsTesting(true);
     await testNotification();
     setIsTesting(false);
-  };
+  }, [testNotification]);
 
-  const handleTestMorningDigest = async () => {
+  const handleTestMorningDigest = useCallback(async () => {
     setIsTestingMorningDigest(true);
     try {
       await post("/notifications/test/morning-digest", {});
@@ -206,9 +227,9 @@ export function NotificationSettingsProvider({ children }: { children: React.Rea
     } finally {
       setIsTestingMorningDigest(false);
     }
-  };
+  }, []);
 
-  const handleTestSmartReminder = async () => {
+  const handleTestSmartReminder = useCallback(async () => {
     setIsTestingSmartReminder(true);
     try {
       await post("/notifications/test/task-reminder", { useSmartReminders: true, useOjo: false });
@@ -216,9 +237,9 @@ export function NotificationSettingsProvider({ children }: { children: React.Rea
     } finally {
       setIsTestingSmartReminder(false);
     }
-  };
+  }, []);
 
-  const handleTestDefaultReminder = async () => {
+  const handleTestDefaultReminder = useCallback(async () => {
     setIsTestingDefaultReminder(true);
     try {
       await post("/notifications/test/task-reminder", { useSmartReminders: false, useOjo: false });
@@ -226,18 +247,18 @@ export function NotificationSettingsProvider({ children }: { children: React.Rea
     } finally {
       setIsTestingDefaultReminder(false);
     }
-  };
+  }, []);
 
-  const handleTestSmartCalculation = async () => {
+  const handleTestSmartCalculation = useCallback(async () => {
     try {
       const result = await post("/notifications/test/smart-reminder", {});
       setSmartReminderResult(result);
     } catch {
       setSmartReminderResult({ success: false, error: "Failed to calculate" });
     }
-  };
+  }, []);
 
-  const handleTestOjoNotification = async (ojoType?: OjoType) => {
+  const handleTestOjoNotification = useCallback(async (ojoType?: OjoType) => {
     setIsTestingOjo(true);
     try {
       await post("/notifications/test/ojo-reminder", { ojoType });
@@ -245,63 +266,111 @@ export function NotificationSettingsProvider({ children }: { children: React.Rea
     } finally {
       setIsTestingOjo(false);
     }
-  };
+  }, []);
 
-  const handleToggleTestMode = async () => {
+  const handleToggleTestMode = useCallback(async () => {
     setIsTogglingTestMode(true);
     if (testModeActive) await stopPeriodicTest();
     else await startPeriodicTest();
     setIsTogglingTestMode(false);
-  };
+  }, [testModeActive, stopPeriodicTest, startPeriodicTest]);
 
   // ── Context value ────────────────────────────────────────────────────────
 
-  const value: NotificationSettingsContextType = {
-    isInitialized,
-    isLoading,
-    permissionStatus,
-    pushToken,
-    preferences,
-    isPhysicalDevice,
-    error,
-    testModeActive,
-    initialize,
-    updatePreferences,
-    testNotification,
-    startPeriodicTest,
-    stopPeriodicTest,
-    isSaving,
-    isTesting,
-    isTestingMorningDigest,
-    isTogglingTestMode,
-    isTestingSmartReminder,
-    isTestingDefaultReminder,
-    isTestingOjo,
-    smartReminderResult,
-    availableOjoTypes,
-    allEnabled,
-    digestEnabled,
-    digestHour,
-    digestMinute,
-    taskRemindersEnabled,
-    smartRemindersEnabled,
-    ojoEnabled,
-    save,
-    handleToggleNotifications,
-    handleToggleMorningDigest,
-    changeDigestTime,
-    handleToggleTaskReminders,
-    handleToggleSmartReminders,
-    handleToggleOjoNotifications,
-    handleSelectOjoType,
-    handleTestNotification,
-    handleTestMorningDigest,
-    handleTestSmartReminder,
-    handleTestDefaultReminder,
-    handleTestSmartCalculation,
-    handleTestOjoNotification,
-    handleToggleTestMode,
-  };
+  const value = useMemo<NotificationSettingsContextType>(
+    () => ({
+      isInitialized,
+      isLoading,
+      permissionStatus,
+      pushToken,
+      preferences,
+      isPhysicalDevice,
+      error,
+      testModeActive,
+      initialize,
+      updatePreferences,
+      testNotification,
+      startPeriodicTest,
+      stopPeriodicTest,
+      isSaving,
+      isTesting,
+      isTestingMorningDigest,
+      isTogglingTestMode,
+      isTestingSmartReminder,
+      isTestingDefaultReminder,
+      isTestingOjo,
+      smartReminderResult,
+      availableOjoTypes,
+      allEnabled,
+      digestEnabled,
+      digestHour,
+      digestMinute,
+      taskRemindersEnabled,
+      smartRemindersEnabled,
+      ojoEnabled,
+      save,
+      handleToggleNotifications,
+      handleToggleMorningDigest,
+      changeDigestTime,
+      handleToggleTaskReminders,
+      handleToggleSmartReminders,
+      handleToggleOjoNotifications,
+      handleSelectOjoType,
+      handleTestNotification,
+      handleTestMorningDigest,
+      handleTestSmartReminder,
+      handleTestDefaultReminder,
+      handleTestSmartCalculation,
+      handleTestOjoNotification,
+      handleToggleTestMode,
+    }),
+    [
+      isInitialized,
+      isLoading,
+      permissionStatus,
+      pushToken,
+      preferences,
+      isPhysicalDevice,
+      error,
+      testModeActive,
+      initialize,
+      updatePreferences,
+      testNotification,
+      startPeriodicTest,
+      stopPeriodicTest,
+      isSaving,
+      isTesting,
+      isTestingMorningDigest,
+      isTogglingTestMode,
+      isTestingSmartReminder,
+      isTestingDefaultReminder,
+      isTestingOjo,
+      smartReminderResult,
+      availableOjoTypes,
+      allEnabled,
+      digestEnabled,
+      digestHour,
+      digestMinute,
+      taskRemindersEnabled,
+      smartRemindersEnabled,
+      ojoEnabled,
+      save,
+      handleToggleNotifications,
+      handleToggleMorningDigest,
+      changeDigestTime,
+      handleToggleTaskReminders,
+      handleToggleSmartReminders,
+      handleToggleOjoNotifications,
+      handleSelectOjoType,
+      handleTestNotification,
+      handleTestMorningDigest,
+      handleTestSmartReminder,
+      handleTestDefaultReminder,
+      handleTestSmartCalculation,
+      handleTestOjoNotification,
+      handleToggleTestMode,
+    ],
+  );
 
   return <NotificationSettingsContext.Provider value={value}>{children}</NotificationSettingsContext.Provider>;
 }
