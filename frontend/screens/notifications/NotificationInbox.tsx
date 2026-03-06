@@ -253,7 +253,11 @@ function NotificationRow({ item, colors, onTap, onDelete }: RowProps) {
       activeOpacity={0.85}
       onPress={() => onTap(item)}
       onLongPress={() => onDelete(item._id)}
-      style={[styles.row, isUnread && styles.rowUnread]}
+      style={[
+        styles.row,
+        { backgroundColor: colors.bg2, shadowColor: colors.shadow },
+        isUnread && styles.rowUnread,
+      ]}
     >
       {/* Colored accent bar on the left */}
       <View style={[styles.accentBar, { backgroundColor: accentColor }]} />
@@ -270,7 +274,7 @@ function NotificationRow({ item, colors, onTap, onDelete }: RowProps) {
             numberOfLines={1}
             style={[
               styles.title,
-              { fontFamily: isUnread ? FONTS.fredokaSemiBold : FONTS.fredokaMedium },
+              { color: colors.text1, fontFamily: isUnread ? FONTS.fredokaSemiBold : FONTS.fredokaMedium },
             ]}
           >
             {item.title}
@@ -278,11 +282,11 @@ function NotificationRow({ item, colors, onTap, onDelete }: RowProps) {
           {isUnread && <View style={[styles.unreadDot, { backgroundColor: accentColor }]} />}
         </View>
         {!!item.body && (
-          <Text numberOfLines={2} style={styles.body}>
+          <Text numberOfLines={2} style={[styles.body, { color: colors.gray1 }]}>
             {item.body}
           </Text>
         )}
-        <Text style={styles.time}>{timeAgo(item.createdAt)}</Text>
+        <Text style={[styles.time, { color: colors.gray1 }]}>{timeAgo(item.createdAt)}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -314,13 +318,11 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.black2,
     borderRadius: 16,
     padding: SPACING.md,
     gap: SPACING.md,
     overflow: "hidden",
-    // Shadow matching the banner
-    shadowColor: "#000",
+    // Shadow
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -357,20 +359,17 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: FONT_SIZES.sm,
-    color: COLORS.white,
     flex: 1,
   },
   time: {
     fontSize: FONT_SIZES.sm * 0.85,
     fontFamily: FONTS.fredokaRegular,
-    color: COLORS.lightGray,
     marginTop: 2,
     opacity: 0.7,
   },
   body: {
     fontSize: FONT_SIZES.sm,
     fontFamily: FONTS.fredokaRegular,
-    color: COLORS.lightGray,
     lineHeight: FONT_SIZES.sm * 1.4,
   },
   unreadDot: {

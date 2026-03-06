@@ -21,6 +21,7 @@ import {
   StatusBar,
 } from "react-native";
 import { COLORS, FONTS, FONT_SIZES, SPACING } from "../../theme";
+import { useColors } from "../../context/ThemeContext";
 import { ICONS } from "../icons/icons";
 import { getOjoType, getOjoTypeColor, type OjoTypeName } from "../../config/ojoTypeConfig";
 
@@ -85,6 +86,8 @@ export function OjoNotificationBanner({ data, duration = 5000, onDismiss }: Prop
     };
   }, [data]);
 
+  const colors = useColors();
+
   if (!visible && !data) return null;
 
   const ojoType = data?.ojoType ?? null;
@@ -101,7 +104,7 @@ export function OjoNotificationBanner({ data, duration = 5000, onDismiss }: Prop
       ]}
     >
       <TouchableOpacity
-        style={styles.banner}
+        style={[styles.banner, { backgroundColor: colors.bg2, shadowColor: colors.shadow }]}
         activeOpacity={0.85}
         onPress={() => {
           if (timerRef.current) clearTimeout(timerRef.current);
@@ -116,10 +119,10 @@ export function OjoNotificationBanner({ data, duration = 5000, onDismiss }: Prop
 
         {/* Text content */}
         <View style={styles.textContainer}>
-          <Text style={styles.title} numberOfLines={1}>
+          <Text style={[styles.title, { color: colors.text1 }]} numberOfLines={1}>
             {data?.title || ""}
           </Text>
-          <Text style={styles.body} numberOfLines={2}>
+          <Text style={[styles.body, { color: colors.gray1 }]} numberOfLines={2}>
             {data?.body || ""}
           </Text>
         </View>
@@ -143,7 +146,6 @@ const styles = StyleSheet.create({
   banner: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.black2,
     marginHorizontal: SPACING.md,
     marginTop: SPACING.sm,
     borderRadius: 16,
@@ -151,7 +153,6 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
     overflow: "hidden",
     // Shadow
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -180,12 +181,10 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: FONTS.fredokaSemiBold,
     fontSize: FONT_SIZES.sm,
-    color: COLORS.white,
   },
   body: {
     fontFamily: FONTS.fredokaRegular,
     fontSize: FONT_SIZES.sm,
-    color: COLORS.lightGray,
     lineHeight: FONT_SIZES.sm * 1.4,
   },
 });
