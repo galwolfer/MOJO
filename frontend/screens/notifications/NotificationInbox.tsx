@@ -19,7 +19,7 @@ import {
   Animated,
   RefreshControl,
 } from "react-native";
-import { COLORS, FONTS, FONT_SIZES, SPACING, SHADOWS } from "../../theme";
+import { COLORS, FONTS, FONT_SIZES, SPACING } from "../../theme";
 import { useColors } from "../../context/ThemeContext";
 import { useNavigation } from "../../context/NavigationContext";
 import { useNotifications } from "../../context/NotificationContext";
@@ -59,16 +59,16 @@ function notificationIcon(type: string, ojoType: OjoTypeName | null, color: stri
   if (ojoType) {
     const cfg = getOjoType(ojoType);
     const OjoIcon = ICONS[cfg.icon as keyof typeof ICONS];
-    if (OjoIcon) return <OjoIcon size={22} color={getOjoTypeColor(ojoType)} />;
+    if (OjoIcon) return <OjoIcon size={28} color={getOjoTypeColor(ojoType)} />;
   }
 
   switch (type) {
     case "morning_digest":
-      return ICONS.sun ? <ICONS.sun size={22} color={color} /> : <ICONS.calendar size={22} color={color} />;
+      return ICONS.sun ? <ICONS.sun size={28} color={color} /> : <ICONS.calendar size={28} color={color} />;
     case "task_reminder":
-      return <ICONS.notifications size={22} color={color} />;
+      return <ICONS.notifications size={28} color={color} />;
     default:
-      return <ICONS.notifications size={22} color={color} />;
+      return <ICONS.notifications size={28} color={color} />;
   }
 }
 
@@ -246,49 +246,44 @@ type RowProps = {
 
 function NotificationRow({ item, colors, onTap, onDelete }: RowProps) {
   const accentColor = item.ojoType ? getOjoTypeColor(item.ojoType as OjoTypeName) : COLORS.primary1;
-  const unreadDot = !item.read;
+  const isUnread = !item.read;
 
   return (
     <TouchableOpacity
-      activeOpacity={0.7}
+      activeOpacity={0.85}
       onPress={() => onTap(item)}
       onLongPress={() => onDelete(item._id)}
-      style={[
-        styles.row,
-        {
-          backgroundColor: unreadDot ? colors.bg2 : colors.bg3,
-          borderLeftColor: accentColor,
-        },
-      ]}
+      style={[styles.row, isUnread && styles.rowUnread]}
     >
-      {/* Icon */}
-      <View style={[styles.iconCircle, { backgroundColor: accentColor + "18" }]}>
+      {/* Colored accent bar on the left */}
+      <View style={[styles.accentBar, { backgroundColor: accentColor }]} />
+
+      {/* Ojo icon with colored circle */}
+      <View style={[styles.iconCircle, { backgroundColor: accentColor + "20" }]}>
         {notificationIcon(item.type, item.ojoType as OjoTypeName | null, accentColor)}
       </View>
 
-      {/* Content */}
+      {/* Text content */}
       <View style={styles.textArea}>
         <View style={styles.titleRow}>
           <Text
             numberOfLines={1}
             style={[
               styles.title,
-              { color: colors.text1, fontFamily: unreadDot ? FONTS.fredokaSemiBold : FONTS.fredokaMedium },
+              { fontFamily: isUnread ? FONTS.fredokaSemiBold : FONTS.fredokaMedium },
             ]}
           >
             {item.title}
           </Text>
-          <Text style={[styles.time, { color: colors.gray1 }]}>{timeAgo(item.createdAt)}</Text>
+          {isUnread && <View style={[styles.unreadDot, { backgroundColor: accentColor }]} />}
         </View>
         {!!item.body && (
-          <Text numberOfLines={2} style={[styles.body, { color: colors.gray2 }]}>
+          <Text numberOfLines={2} style={styles.body}>
             {item.body}
           </Text>
         )}
+        <Text style={styles.time}>{timeAgo(item.createdAt)}</Text>
       </View>
-
-      {/* Unread dot */}
-      {unreadDot && <View style={[styles.unreadDot, { backgroundColor: accentColor }]} />}
     </TouchableOpacity>
   );
 }
@@ -319,16 +314,35 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 14,
+    backgroundColor: COLORS.black2,
+    borderRadius: 16,
     padding: SPACING.md,
-    borderLeftWidth: 3,
     gap: SPACING.md,
-    ...(SHADOWS.card as object),
+    overflow: "hidden",
+    // Shadow matching the banner
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  rowUnread: {
+    shadowOpacity: 0.3,
+    elevation: 10,
+  },
+  accentBar: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    borderTopLeftRadius: 16,
+    borderBottomLeftRadius: 16,
   },
   iconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -338,21 +352,25 @@ const styles = StyleSheet.create({
   },
   titleRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    gap: SPACING.sm,
+    gap: SPACING.xs,
   },
   title: {
-    fontSize: FONT_SIZES.base,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.white,
     flex: 1,
   },
   time: {
-    fontSize: FONT_SIZES.sm,
+    fontSize: FONT_SIZES.sm * 0.85,
     fontFamily: FONTS.fredokaRegular,
+    color: COLORS.lightGray,
+    marginTop: 2,
+    opacity: 0.7,
   },
   body: {
     fontSize: FONT_SIZES.sm,
     fontFamily: FONTS.fredokaRegular,
+    color: COLORS.lightGray,
     lineHeight: FONT_SIZES.sm * 1.4,
   },
   unreadDot: {

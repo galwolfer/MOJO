@@ -26,7 +26,7 @@ import { getOjoType, getOjoTypeColor, type OjoTypeName } from "../../config/ojoT
 
 /** Props for the banner data */
 export type OjoNotificationBannerData = {
-  ojoType: OjoTypeName;
+  ojoType?: OjoTypeName | null;
   title: string;
   body: string;
   onTap?: () => void;
@@ -87,10 +87,11 @@ export function OjoNotificationBanner({ data, duration = 5000, onDismiss }: Prop
 
   if (!visible && !data) return null;
 
-  const ojoType = data?.ojoType || "mentorjo";
-  const config = getOjoType(ojoType);
-  const color = getOjoTypeColor(ojoType);
-  const OjoIcon = ICONS[config.icon as keyof typeof ICONS] || ICONS.ojo;
+  const ojoType = data?.ojoType ?? null;
+  const color = ojoType ? getOjoTypeColor(ojoType) : COLORS.primary1;
+  const OjoIcon = ojoType
+    ? (ICONS[getOjoType(ojoType).icon as keyof typeof ICONS] || ICONS.notifications)
+    : ICONS.notifications;
 
   return (
     <Animated.View

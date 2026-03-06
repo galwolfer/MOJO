@@ -120,13 +120,12 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
           // Bump unread count for the in-app inbox
           setUnreadCount((prev) => prev + 1);
 
-          if (data?.ojoType) {
-            setBannerData({
-              ojoType: data.ojoType,
-              title: content?.title || "Reminder",
-              body: content?.body || "",
-            });
-          }
+          // Show in-app banner for ALL foreground notifications
+          setBannerData({
+            ojoType: data?.ojoType || null,
+            title: content?.title || "Notification",
+            body: content?.body || "",
+          });
         }
       );
 
