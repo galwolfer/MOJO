@@ -1,10 +1,16 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useLayoutEffect, useState, useRef } from "react";
 import { View, StyleSheet, TouchableOpacity, Platform, Alert } from "react-native";
 import PopupBox from "../../components/common/PopupBox";
 import AppText from "../../components/common/AppText";
 import AppButton from "../../components/common/AppButton";
 import ErrorText from "../../components/common/ErrorText";
 import ProfileSettings from "./screens/ProfileSettings";
+import EditPreferencesScreen from "./screens/EditPreferences";
+import ChatSettingsScreen from "./screens/ChatSettings";
+import NotificationSettingsScreen from "./screens/NotificationSettings";
+import { NotificationSettingsProvider } from "../../context/NotificationSettingsContext";
+import AccessibilitySettingsScreen from "./screens/AccessibilitySettings";
+import SubcategoryManager from "./screens/SubcategoryManager";
 import { COLORS, SPACING, SHADOWS, ICON_SIZES } from "../../theme";
 import { useColors } from "../../context/ThemeContext";
 import { useNavigation } from "../../context/NavigationContext";
@@ -14,8 +20,15 @@ import Box from "../../components/layout/Box";
 import List, { ListCellProps } from "../../components/layout/List";
 import ListItem, { makeListCell } from "../../components/layout/ListItem";
 import { moderateScale } from "react-native-size-matters";
-import { deleteAccount } from "../../services/apiClient";
 import { useAuth } from "../../context/AuthContext";
+
+type CurrentScreen =
+  | "main"
+  | "edit-preferences"
+  | "chat-settings"
+  | "notification-settings"
+  | "accessibility-settings"
+  | "subcategory-manager";
 
 /**
  * SettingsScreen
@@ -28,34 +41,20 @@ import { useAuth } from "../../context/AuthContext";
 
 type SettingsScreenProps = {
   onBack: () => void;
-  onEditPreferences?: () => void;
-  onChatSettings?: () => void;
-  onNotificationSettings?: () => void;
-  onAccessibilitySettings?: () => void;
-  onSubcategoryManager?: () => void;
 };
 
-export default function SettingsScreen({
-  onBack,
-  onEditPreferences,
-  onChatSettings,
-  onNotificationSettings,
-  onAccessibilitySettings,
-  onSubcategoryManager,
-}: SettingsScreenProps) {
+export default function SettingsScreen({ onBack }: SettingsScreenProps) {
   const colors = useColors();
   const { user, signOut, signIn, token } = useAuth();
   const { setHeaderConfig } = useNavigation();
 
+  const [currentScreen, setCurrentScreen] = useState<CurrentScreen>("main");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showDeletePopup, setShowDeletePopup] = useState(false);
-  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Store onBack in a ref to avoid recreating header config
   const onBackRef = useRef(onBack);
-  useEffect(() => {
+  useLayoutEffect(() => {
     onBackRef.current = onBack;
   }, [onBack]);
 
@@ -69,16 +68,16 @@ export default function SettingsScreen({
   const PencilIcon = ICONS.edit;
   const ListIcon = ICONS.list;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (currentScreen !== "main") return;
     const handleBackPress = () => onBackRef.current();
-
     setHeaderConfig({
       title: "Settings",
       show: true,
       icon: ICONS.settings,
       leftElement: (
         <TouchableOpacity onPress={handleBackPress}>
-          <LeftIcon size={ICON_SIZES.md} color={COLORS.primary1} />
+          <LeftIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
         </TouchableOpacity>
       ),
       rightElement: (
@@ -87,47 +86,13 @@ export default function SettingsScreen({
         </View>
       ),
     });
-  }, []);
+  }, [currentScreen]);
 
-  const handleEditPreferences = () => {
-    if (onEditPreferences) {
-      onEditPreferences();
-    } else {
-      console.log("Edit preferences pressed - no handler provided");
-    }
-  };
-
-  const handleChatSettings = () => {
-    if (onChatSettings) {
-      onChatSettings();
-    } else {
-      console.log("Chat settings pressed - no handler provided");
-    }
-  };
-
-  const handleNotifications = () => {
-    if (onNotificationSettings) {
-      onNotificationSettings();
-    } else {
-      console.log("Notifications pressed - no handler provided");
-    }
-  };
-
-  const handleAccessibility = () => {
-    if (onAccessibilitySettings) {
-      onAccessibilitySettings();
-    } else {
-      console.log("Accessibility pressed - no handler provided");
-    }
-  };
-
-  const handleSubcategoryManager = () => {
-    if (onSubcategoryManager) {
-      onSubcategoryManager();
-    } else {
-      console.log("Subcategory manager pressed - no handler provided");
-    }
-  };
+  const handleEditPreferences = () => setCurrentScreen("edit-preferences");
+  const handleChatSettings = () => setCurrentScreen("chat-settings");
+  const handleNotifications = () => setCurrentScreen("notification-settings");
+  const handleAccessibility = () => setCurrentScreen("accessibility-settings");
+  const handleSubcategoryManager = () => setCurrentScreen("subcategory-manager");
 
   const preferenceItems: ListCellProps[] = [
     makeListCell("edit-preferences", {
@@ -162,30 +127,17 @@ export default function SettingsScreen({
     }),
   ];
 
-  const handleDeleteAccount = () => {
-    setShowDeletePopup(true);
-  };
-
-  const confirmDeleteAccount = async () => {
-    setIsDeletingAccount(true);
-    setDeleteError(null);
-    try {
-      setIsSaving(true);
-      setError(null);
-      console.log("Deleting account...");
-      await deleteAccount();
-      console.log("Account deleted successfully");
-      // Sign out after account deletion
-      await signOut();
-    } catch (err: any) {
-      console.error("Error deleting account:", err);
-      setDeleteError(err?.message || "Failed to delete account");
-    } finally {
-      setIsDeletingAccount(false);
-      setIsSaving(false);
-      setShowDeletePopup(false);
-    }
-  };
+  if (currentScreen === "edit-preferences") return <EditPreferencesScreen onBack={() => setCurrentScreen("main")} />;
+  if (currentScreen === "chat-settings") return <ChatSettingsScreen onBack={() => setCurrentScreen("main")} />;
+  if (currentScreen === "notification-settings")
+    return (
+      <NotificationSettingsProvider>
+        <NotificationSettingsScreen onBack={() => setCurrentScreen("main")} />
+      </NotificationSettingsProvider>
+    );
+  if (currentScreen === "accessibility-settings")
+    return <AccessibilitySettingsScreen onBack={() => setCurrentScreen("main")} />;
+  if (currentScreen === "subcategory-manager") return <SubcategoryManager onBack={() => setCurrentScreen("main")} />;
 
   return (
     <ScrollableContent
@@ -208,43 +160,12 @@ export default function SettingsScreen({
         </View>
       </Box>
 
-      {/* Logout & Delete Row */}
+      {/* Logout button only */}
       <View style={styles.signButtonsRow}>
         <AppButton title="Logout" onPress={signOut} mode="light" color="primary7" />
-        <AppButton
-          title={isSaving ? "Deleting..." : "Delete Account"}
-          onPress={handleDeleteAccount}
-          mode="light"
-          color="lightGray"
-          disabled={isSaving}
-        />
       </View>
 
       {error && <ErrorText>{error}</ErrorText>}
-
-      <PopupBox visible={showDeletePopup} onClose={() => setShowDeletePopup(false)} title="Delete Account">
-        <AppText>
-          Are you sure you want to delete your account? This action cannot be undone and all your data will be
-          permanently deleted.
-        </AppText>
-        <View style={{ flexDirection: "row", gap: SPACING.md, justifyContent: "center", marginTop: SPACING.md }}>
-          <AppButton title="Cancel" onPress={() => setShowDeletePopup(false)} color="primary6" />
-          <AppButton
-            title={isDeletingAccount ? "Deleting..." : "Delete"}
-            onPress={confirmDeleteAccount}
-            mode="light"
-            color="primary7"
-            disabled={isDeletingAccount}
-          />
-        </View>
-      </PopupBox>
-
-      <PopupBox visible={!!deleteError} onClose={() => setDeleteError(null)} title="Error" titleColor={COLORS.primary6}>
-        <ErrorText>{deleteError}</ErrorText>
-        <View style={{ marginTop: SPACING.md }}>
-          <AppButton title="Close" onPress={() => setDeleteError(null)} />
-        </View>
-      </PopupBox>
     </ScrollableContent>
   );
 }

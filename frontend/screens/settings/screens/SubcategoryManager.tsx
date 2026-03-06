@@ -1,10 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { View, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
 import AppText from "../../../components/common/AppText";
 import AppButton from "../../../components/common/AppButton";
 import Input from "../../../components/inputs/Input";
 import Box from "../../../components/layout/Box";
-import ScrollableContent from "../../../components/layout/ScrollableContent";
 import ErrorText from "../../../components/common/ErrorText";
 import PopupBox from "../../../components/common/PopupBox";
 import SubcategoryIconPicker from "../../../components/special/IconPicker";
@@ -14,8 +13,8 @@ import { COLORS, SPACING, SHADOWS, ICON_SIZES, FONT_SIZES } from "../../../theme
 import { useColors } from "../../../context/ThemeContext";
 import AddSubcategoryPopup from "../../../components/special/AddSubcategoryPopup";
 import FloatingButton from "../../../components/common/FloatingButton";
+import SettingsSubScreen from "./components/SettingsSubScreen";
 import { CATEGORY_KEYS, getCategoryMeta, type CategoryKey } from "../../../config/categoryMeta";
-import { useNavigation } from "../../../context/NavigationContext";
 import { useAuth } from "../../../context/AuthContext";
 import {
   fetchAllSubcategories,
@@ -26,7 +25,6 @@ import {
   type SubcategoriesByCategory,
 } from "../../../services/subcategoryService";
 import { setAuthToken } from "../../../services/httpClient";
-import { moderateScale } from "react-native-size-matters";
 
 const PRIMARY_COLORS = [
   COLORS.primary1,
@@ -76,9 +74,7 @@ function updateCategoryMap(
 
 export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) {
   const colors = useColors();
-  const { setHeaderConfig } = useNavigation();
   const { token, isLoading: authLoading } = useAuth();
-  const onBackRef = useRef(onBack);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -94,8 +90,6 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
   const [editingSubcategory, setEditingSubcategory] = useState<Subcategory | null>(null);
   const [showEditPopup, setShowEditPopup] = useState(false);
 
-  const ListIcon = ICONS.list;
-  const LeftIcon = ICONS.left;
   const EditIcon = ICONS.edit;
   const TrashIcon = ICONS.trash;
   const DefaultIcon = ICONS.default;
@@ -114,28 +108,6 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
       }),
     [],
   );
-
-  useEffect(() => {
-    onBackRef.current = onBack;
-  }, [onBack]);
-
-  useEffect(() => {
-    setHeaderConfig({
-      title: "Subcategories",
-      show: true,
-      icon: ICONS.list,
-      leftElement: (
-        <TouchableOpacity onPress={() => onBackRef.current()} style={styles.headerRightTouchable}>
-          <LeftIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
-        </TouchableOpacity>
-      ),
-      rightElement: (
-        <View style={styles.headerLeft}>
-          <ListIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
-        </View>
-      ),
-    });
-  }, [setHeaderConfig, ListIcon, LeftIcon]);
 
   // Add Subcategory popup state
   const [showAddPopup, setShowAddPopup] = useState(false);
@@ -351,127 +323,126 @@ export default function SubcategoryManager({ onBack }: SubcategoryManagerProps) 
 
   return (
     <>
-      <ScrollableContent
-        respectHeader={true}
-        respectNavBar={true}
-        extraTopPadding={SPACING.lg}
-        scrollKey="subcategory-manager"
-        extraBottomPadding={SPACING.xlg * 3}
-        contentContainerStyle={styles.contentContainer}
-      >
-        {error && (
-          <View style={styles.errorBlock}>
-            <ErrorText>{error}</ErrorText>
-            <AppButton title="Retry" onPress={loadSubcategories} mode="light" color="lightGray" />
-          </View>
-        )}
-
-        {hasPendingChanges && (
-          <Box title="Pending Changes">
-            <AppText style={styles.pendingText}>You have unsaved changes. Click "Save All" to apply them.</AppText>
-            <View style={styles.buttonRow}>
-              <AppButton title="Discard All" onPress={handleDiscardAll} mode="light" color="lightGray" icon="cancel" />
-              <AppButton
-                title="Save All"
-                onPress={handleSaveAll}
-                mode="filled"
-                color="primary6"
-                icon="check"
-                disabled={saving}
-              />
+      <SettingsSubScreen title="Sub-Categories" iconName="list" scrollKey="subcategory-manager" onBack={onBack}>
+        <View style={styles.boxWrapper}>
+          {error && (
+            <View style={styles.errorBlock}>
+              <ErrorText>{error}</ErrorText>
+              <AppButton title="Retry" onPress={loadSubcategories} mode="light" color="lightGray" />
             </View>
-          </Box>
-        )}
+          )}
 
-        {/* Global add popup (opens from FloatingButton) */}
-        <AddSubcategoryPopup visible={showAddPopup} onClose={closeAddPopup} onCreate={createFromPopup} />
+          {hasPendingChanges && (
+            <Box title="Pending Changes">
+              <AppText style={styles.pendingText}>You have unsaved changes. Click "Save All" to apply them.</AppText>
+              <View style={styles.buttonRow}>
+                <AppButton
+                  title="Discard All"
+                  onPress={handleDiscardAll}
+                  mode="light"
+                  color="lightGray"
+                  icon="cancel"
+                />
+                <AppButton
+                  title="Save All"
+                  onPress={handleSaveAll}
+                  mode="filled"
+                  color="primary6"
+                  icon="check"
+                  disabled={saving}
+                />
+              </View>
+            </Box>
+          )}
 
-        {/* Edit popup */}
-        <AddSubcategoryPopup
-          visible={showEditPopup}
-          onClose={handleCloseEditPopup}
-          onCreate={handleStageEdit}
-          mode="edit"
-          initialData={
-            editingSubcategory
-              ? {
-                  name: editingSubcategory.name || "",
-                  category: editingSubcategory.parent,
-                  icon: editingSubcategory.icon || null,
-                  color: editingSubcategory.color || null,
-                }
-              : undefined
-          }
-        />
+          {/* Global add popup (opens from FloatingButton) */}
+          <AddSubcategoryPopup visible={showAddPopup} onClose={closeAddPopup} onCreate={createFromPopup} />
 
-        {categoriesWithSubs.length === 0 ? (
-          <Box title="Your Subcategories" titleColor={COLORS.primary1}>
-            <AppText style={[styles.emptyText, { color: colors.gray1 }]}>No subcategories yet.</AppText>
-          </Box>
-        ) : (
-          categoriesWithSubs.map((categoryKey) => {
-            const meta = getCategoryMeta(categoryKey);
-            const subs = filteredSubcategoriesByCategory[categoryKey] || [];
-            return (
-              <Box key={categoryKey} title={meta.displayName || categoryKey} titleColor={COLORS.primary1}>
-                {subs.map((subcategory) => {
-                  const isDefault =
-                    subcategory.isDefault ||
-                    subcategory.source === "category-default" ||
-                    subcategory.name === "General";
-                  const Icon = isDefault
-                    ? ICONS[meta.icon] || DefaultIcon
-                    : subcategory.icon && ICONS[subcategory.icon]
-                      ? ICONS[subcategory.icon]
-                      : DefaultIcon;
-                  const displayColor = subcategory.color || getAutoColor(subcategory.name || "");
-                  return (
-                    <View key={subcategory.id} style={[styles.subcategoryRow, { borderBottomColor: colors.bg2 }]}>
-                      <View style={styles.subcategoryInfo}>
-                        <Icon size={ICON_SIZES.xs} color={displayColor} />
-                        <View style={styles.subcategoryNameContainer}>
-                          <AppText style={[styles.subcategoryName, { color: colors.text1 }]}>
-                            {subcategory.name}
-                          </AppText>
-                          {isDefault && (
-                            <AppText style={[styles.defaultBadge, { color: colors.text2 }]}>Default</AppText>
+          {/* Edit popup */}
+          <AddSubcategoryPopup
+            visible={showEditPopup}
+            onClose={handleCloseEditPopup}
+            onCreate={handleStageEdit}
+            mode="edit"
+            initialData={
+              editingSubcategory
+                ? {
+                    name: editingSubcategory.name || "",
+                    category: editingSubcategory.parent,
+                    icon: editingSubcategory.icon || null,
+                    color: editingSubcategory.color || null,
+                  }
+                : undefined
+            }
+          />
+
+          {categoriesWithSubs.length === 0 ? (
+            <Box title="Your Subcategories" titleColor={COLORS.primary1}>
+              <AppText style={[styles.emptyText, { color: colors.gray1 }]}>No subcategories yet.</AppText>
+            </Box>
+          ) : (
+            categoriesWithSubs.map((categoryKey) => {
+              const meta = getCategoryMeta(categoryKey);
+              const subs = filteredSubcategoriesByCategory[categoryKey] || [];
+              return (
+                <Box key={categoryKey} title={meta.displayName || categoryKey} titleColor={COLORS.primary1}>
+                  {subs.map((subcategory) => {
+                    const isDefault =
+                      subcategory.isDefault ||
+                      subcategory.source === "category-default" ||
+                      subcategory.name === "General";
+                    const Icon = isDefault
+                      ? ICONS[meta.icon] || DefaultIcon
+                      : subcategory.icon && ICONS[subcategory.icon]
+                        ? ICONS[subcategory.icon]
+                        : DefaultIcon;
+                    const displayColor = subcategory.color || getAutoColor(subcategory.name || "");
+                    return (
+                      <View key={subcategory.id} style={[styles.subcategoryRow, { borderBottomColor: colors.bg2 }]}>
+                        <View style={styles.subcategoryInfo}>
+                          <Icon size={ICON_SIZES.xs} color={displayColor} />
+                          <View style={styles.subcategoryNameContainer}>
+                            <AppText>{subcategory.name}</AppText>
+                            {isDefault && (
+                              <AppText style={[styles.defaultBadge, { color: colors.text2 }]}>Default</AppText>
+                            )}
+                          </View>
+                        </View>
+                        <View style={styles.subcategoryActions}>
+                          {!isDefault && (
+                            <>
+                              <TouchableOpacity onPress={() => handleEdit(subcategory)} style={[styles.actionButton]}>
+                                <EditIcon size={ICON_SIZES.xs} color={colors.gray1} />
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                onPress={() => handleStageDelete(subcategory)}
+                                style={[styles.actionButton]}
+                              >
+                                <TrashIcon size={ICON_SIZES.xs} color={colors.gray1} />
+                              </TouchableOpacity>
+                            </>
                           )}
                         </View>
                       </View>
-                      <View style={styles.subcategoryActions}>
-                        {!isDefault && (
-                          <>
-                            <TouchableOpacity onPress={() => handleEdit(subcategory)} style={[styles.actionButton]}>
-                              <EditIcon size={ICON_SIZES.xs} color={colors.gray1} />
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              onPress={() => handleStageDelete(subcategory)}
-                              style={[styles.actionButton]}
-                            >
-                              <TrashIcon size={ICON_SIZES.xs} color={colors.gray1} />
-                            </TouchableOpacity>
-                          </>
-                        )}
-                      </View>
-                    </View>
-                  );
-                })}
-              </Box>
-            );
-          })
-        )}
-        <PopupBox
-          visible={!!saveResult}
-          onClose={() => setSaveResult(null)}
-          title={saveResult?.title}
-          titleColor={saveResult?.title === "Success" ? COLORS.primary1 : COLORS.primary6}
-        >
-          <AppText>{saveResult?.message}</AppText>
-          <View style={{ marginTop: SPACING.md }}>
-            <AppButton title="OK" onPress={() => setSaveResult(null)} />
-          </View>
-        </PopupBox>
-      </ScrollableContent>
+                    );
+                  })}
+                </Box>
+              );
+            })
+          )}
+          <PopupBox
+            visible={!!saveResult}
+            onClose={() => setSaveResult(null)}
+            title={saveResult?.title}
+            titleColor={saveResult?.title === "Success" ? COLORS.primary1 : COLORS.primary6}
+          >
+            <AppText>{saveResult?.message}</AppText>
+            <View style={{ marginTop: SPACING.md }}>
+              <AppButton title="OK" onPress={() => setSaveResult(null)} />
+            </View>
+          </PopupBox>
+        </View>
+      </SettingsSubScreen>
 
       {/* Floating Add Subcategory button (replaces header + icon) */}
       <FloatingButton onPress={openAddPopup} text="Add Subcategory" Icon={ICONS.plus} />
@@ -522,9 +493,6 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
     flex: 1,
   },
-  subcategoryName: {
-    fontSize: FONT_SIZES.md,
-  },
   defaultBadge: {
     fontSize: FONT_SIZES.sm,
     backgroundColor: COLORS.primary3,
@@ -562,20 +530,12 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
     color: COLORS.primary1,
   },
+  boxWrapper: {
+    gap: SPACING.lg,
+  },
   errorBlock: {
     width: "100%",
     gap: SPACING.sm,
     alignItems: "center",
-  },
-  headerRightTouchable: {
-    width: moderateScale(44),
-    height: moderateScale(44),
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
   },
 });

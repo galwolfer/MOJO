@@ -2,7 +2,7 @@ import React from "react";
 import { View, StyleSheet } from "react-native";
 import { useWindowDimensions } from "react-native";
 import AppText from "../../../components/common/AppText";
-import { COLORS, SPACING, SHADOWS } from "../../../theme";
+import { COLORS, SPACING, SHADOWS, FONT_SIZES } from "../../../theme";
 import { useColors } from "../../../context/ThemeContext";
 import { moderateScale } from "react-native-size-matters";
 
@@ -96,14 +96,14 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   value: {
-    fontSize: moderateScale(14),
+    fontSize: FONT_SIZES.md,
     color: COLORS.colorWhite,
-    lineHeight: moderateScale(16),
+    lineHeight: FONT_SIZES.md,
   },
   label: {
-    fontSize: moderateScale(10),
+    fontSize: FONT_SIZES.sm,
     color: COLORS.colorWhite,
-    lineHeight: moderateScale(12),
+    lineHeight: FONT_SIZES.sm,
     textAlign: "center",
   },
 });

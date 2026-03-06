@@ -6,7 +6,20 @@
 import express from "express";
 import path from "path";
 import multer from "multer";
-import { register, login, getMe, updateProfile, updateCategoryPriorities, updateSchedulingPreferences, deleteAccount, getPreferences } from "../controllers/authController.js";
+import {
+  register,
+  login,
+  getMe,
+  updateProfile,
+  updateCategoryPriorities,
+  updateSchedulingPreferences,
+  deleteAccount,
+  getPreferences,
+  getMemories,
+  addMemory,
+  updateMemory,
+  deleteMemory,
+} from "../controllers/authController.js";
 import { requireAuth } from "../middlewares/auth.js";
 
 const router = express.Router();
@@ -73,5 +86,11 @@ router.get("/preferences", requireAuth, getPreferences);
 
 // Update scheduling preferences (minGapMinutes, etc.)
 router.patch("/scheduling-preferences", requireAuth, updateSchedulingPreferences);
+
+// Memory management (primary memories the LLM uses for user context)
+router.get("/memories", requireAuth, getMemories);
+router.post("/memories", requireAuth, addMemory);
+router.patch("/memories/:memoryId", requireAuth, updateMemory);
+router.delete("/memories/:memoryId", requireAuth, deleteMemory);
 
 export default router;

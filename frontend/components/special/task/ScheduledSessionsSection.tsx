@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, Pressable } from "react-native";
 import AppText from "../../common/AppText";
 import TimeRangeDisplay from "../../common/TimeRangeDisplay";
 import { CompletionItem } from "./CompletionItem";
@@ -10,6 +10,7 @@ import { useColors } from "../../../context/ThemeContext";
 import { ScheduledSession, Subtask as WidgetSubtask, getSessionKey, getTimeParts } from "../../widgets/taskHelpers";
 import { Subtask as CalendarSubtask } from "../../../screens/calendar/types";
 import { useTaskUpdateSubscription } from "../../../context/TaskContext";
+import { ICONS } from "../../icons/icons";
 import { TaskTitle } from "./TaskTitle";
 
 export const ScheduledSessionsSection: React.FC<{
@@ -30,6 +31,9 @@ export const ScheduledSessionsSection: React.FC<{
   dividerColor?: string;
   sessionHeaderMode?: "taskTitle" | "date" | "none";
   taskStatus?: string;
+  showCheckbox?: boolean;
+  onEditSession?: (taskId: string, session: ScheduledSession, index: number) => void;
+  groupByDate?: boolean; // new flag to disable same-day grouping
 }> = ({
   taskId,
   taskTitle,
@@ -44,8 +48,11 @@ export const ScheduledSessionsSection: React.FC<{
   hideTitle = false,
   hideTaskTitle = false,
   sessionHeaderMode = "none",
+  groupByDate = true,
   dividerColor,
   taskStatus,
+  showCheckbox = true,
+  onEditSession,
 }) => {
   const colors = useColors();
   const resolvedDividerColor = dividerColor ?? colors.bg1;
@@ -58,6 +65,49 @@ export const ScheduledSessionsSection: React.FC<{
   });
 
   const sessions = scheduledSessions || [];
+
+  // helper to prepare groups by date (and optionally by short gap) or treat all sessions individually
+  interface DateGroup {
+    date: string;
+    items: { session: ScheduledSession; index: number }[];
+    showDateHeader: boolean;
+  }
+
+  const dateGroups: DateGroup[] = [];
+  if (groupByDate) {
+    let prevDate: string | null = null;
+    let prevEnd: string = ""; // keep ISO string of previous end (empty if none)
+    for (let i = 0; i < sessions.length; i++) {
+      const session = sessions[i];
+      const date = getTimeParts(session.start).date;
+
+      // determine if we should start a new group
+      let startNew = false;
+      if (prevDate === null || date !== prevDate) {
+        startNew = true;
+      } else if (prevEnd) {
+        const gapMinutes = (new Date(session.start ?? "").getTime() - new Date(prevEnd).getTime()) / 60000;
+        if (gapMinutes > 60) {
+          startNew = true;
+        }
+      }
+
+      if (startNew) {
+        const showHeader = prevDate === null || date !== prevDate;
+        dateGroups.push({ date, items: [{ session, index: i }], showDateHeader: showHeader });
+      } else {
+        dateGroups[dateGroups.length - 1].items.push({ session, index: i });
+      }
+
+      prevDate = date;
+      prevEnd = session.end || "";
+    }
+  } else {
+    // no grouping, each session its own group with empty date prefix
+    sessions.forEach((session, i) => {
+      dateGroups.push({ date: "", items: [{ session, index: i }], showDateHeader: false });
+    });
+  }
 
   // Fallback: when there are no sessions but there are subtasks, render subtasks directly
   if (sessions.length === 0) {
@@ -94,21 +144,7 @@ export const ScheduledSessionsSection: React.FC<{
 
   const titleMode = sessionHeaderMode === "taskTitle";
 
-  // Group consecutive sessions by calendar date
-  type IndexedSession = { session: ScheduledSession; index: number };
-  const dateGroups: { date: string; items: IndexedSession[] }[] = [];
-  for (let i = 0; i < sessions.length; i++) {
-    const session = sessions[i];
-    const date = getTimeParts(session.start).date;
-    const last = dateGroups[dateGroups.length - 1];
-    if (last && last.date === date) {
-      last.items.push({ session, index: i });
-    } else {
-      dateGroups.push({ date, items: [{ session, index: i }] });
-    }
-  }
-
-  const listData = dateGroups.flatMap(({ date, items }, groupIdx) => {
+  const listData = dateGroups.flatMap(({ date, items, showDateHeader }, groupIdx) => {
     if (items.length === 1) {
       // Single session — render as normal SessionRow
       const { session, index } = items[0];
@@ -125,7 +161,7 @@ export const ScheduledSessionsSection: React.FC<{
           content: (
             <View>
               {/* Show date only for the first item of this day group */}
-              {sessionHeaderMode === "date" && (
+              {sessionHeaderMode === "date" && showDateHeader && (
                 <AppText variant="notes" style={[styles.dateText, { color: categoryColor || COLORS.primary1 }]}>
                   {date}
                 </AppText>
@@ -140,11 +176,15 @@ export const ScheduledSessionsSection: React.FC<{
                 sessionIndex={index}
                 isDone={isDone}
                 isLoading={loadingParts?.has(key)}
-                checkboxOnToggle={onToggleSession ? () => onToggleSession(taskId, session, index, subtasks) : undefined}
+                checkboxOnToggle={
+                  showCheckbox && onToggleSession ? () => onToggleSession(taskId, session, index, subtasks) : undefined
+                }
                 rowOnPress={onToggleSession ? () => onToggleSession(taskId, session, index, subtasks) : undefined}
-                canToggle={!!onToggleSession}
+                canToggle={showCheckbox && !!onToggleSession}
                 hideTaskTitle={hideTaskTitle || sessions.length === 1}
                 lightTitle={titleMode || hideTaskTitle}
+                showEditIcon={!!onEditSession}
+                editOnPress={onEditSession ? () => onEditSession(taskId, session, index) : undefined}
               />
             </View>
           ),
@@ -165,7 +205,7 @@ export const ScheduledSessionsSection: React.FC<{
         content: (
           <View style={{ gap: SPACING.sm }}>
             {/* Show date above the group for the first item of each day */}
-            {sessionHeaderMode === "date" && (
+            {sessionHeaderMode === "date" && showDateHeader && (
               <AppText variant="notes" style={[styles.dateText, { color: categoryColor || COLORS.primary1 }]}>
                 {date}
               </AppText>
@@ -193,19 +233,23 @@ export const ScheduledSessionsSection: React.FC<{
                     ) : undefined;
 
                   return (
-                    <CompletionItem
-                      key={key}
-                      type="subtask"
-                      subtask={{ id: key, title: label, completed: isDone ?? false } as CalendarSubtask}
-                      parentTaskId={taskId}
-                      isCompleted={isDone ?? false}
-                      categoryColor={categoryColor}
-                      showTime={!!timeRangeElement}
-                      timeRangeElement={timeRangeElement}
-                      onToggle={(_parentId: string, _subtaskId: string, _checked: boolean) => {
-                        if (!isLoading) onToggleSession?.(taskId, session, index, subtasks);
-                      }}
-                    />
+                    <View style={styles.sessionRowWrapper}>
+                      <CompletionItem
+                        key={key}
+                        type="subtask"
+                        subtask={{ id: key, title: label, completed: isDone ?? false } as CalendarSubtask}
+                        parentTaskId={taskId}
+                        isCompleted={isDone ?? false}
+                        categoryColor={categoryColor}
+                        showTime={!!timeRangeElement}
+                        timeRangeElement={timeRangeElement}
+                        onToggle={(_parentId: string, _subtaskId: string, _checked: boolean) => {
+                          if (!isLoading) onToggleSession?.(taskId, session, index, subtasks);
+                        }}
+                        showEditIcon={!!onEditSession}
+                        editOnPress={onEditSession ? () => onEditSession(taskId, session, index) : undefined}
+                      />
+                    </View>
                   );
                 })}
               </View>
@@ -253,6 +297,19 @@ const styles = StyleSheet.create({
   dateText: {
     fontWeight: "600",
     marginBottom: SPACING.xs,
+  },
+  sessionRowWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  editIconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: COLORS.white2 ?? "#F0F0F8",
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
 

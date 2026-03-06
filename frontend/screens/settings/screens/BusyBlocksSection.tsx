@@ -10,53 +10,51 @@
  * The form only asks for a title (optional) and a start/end time (HH:MM).
  * Every block applies every day with no end date.
  *
- * Form sub-components:
- *   TitleField, TimeRangeFields, BlockFormFields,
- *   BlockFormButtons, BlockItem, GapBox, BlocksBox
+ * Form UI is factored out into `BusyBlockForm` in the
+ * settings/components directory. Other helpers are no longer defined
+ * inline here.
+ *   BlockItem, GapBox, BlocksBox
  *
  * All error and confirmation dialogs use PopupBox — no native Alert calls.
  */
 import React, { useState, useEffect, useCallback } from "react";
+import { View, StyleSheet, Pressable, ScrollView, ViewStyle } from "react-native";
+import AppText from "../../../components/common/AppText";
+import AppButton from "../../../components/common/AppButton";
+import PopupBox from "../../../components/common/PopupBox";
+import { COLORS, SPACING, FONT_SIZES, SHADOWS } from "../../../theme";
+import { ICONS } from "../../../components/icons/icons";
 import {
-  View,
-  StyleSheet,
-  Pressable,
-  ActivityIndicator,
-  ScrollView,
-  ViewStyle,
-} from "react-native";
-import AppText from "../common/AppText";
-import AppButton from "../common/AppButton";
-import Input from "../inputs/Input";
-import Box from "../layout/Box";
-import PopupBox from "../common/PopupBox";
-import { COLORS, SPACING, FONT_SIZES, SHADOWS } from "../../theme";
-import { ICONS } from "../icons/icons";
-import {
+  BusyBlock,
   listBusyBlocks,
   createBusyBlock,
   updateBusyBlock,
   deleteBusyBlock,
-  type BusyBlock,
-} from "../../services/busyBlockService";
-import {
-  getSchedulingPreferences,
-  updateSchedulingPreferences,
-} from "../../services/apiClient";
+} from "../../../services/busyBlockService";
+import { getSchedulingPreferences, updateSchedulingPreferences } from "../../../services/apiClient";
+import { GapBox } from "../components/GapBox";
+import { BlocksBox } from "../components/BlocksBox";
+import { BusyBlockForm, BlockFormState } from "../components/BusyBlockForm";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Domain helpers (pure — no React)
 // ──────────────────────────────────────────────────────────────────────────────
 
 function isoToDatePart(iso: string): string {
-  try { return new Date(iso).toISOString().slice(0, 10); } catch { return ""; }
+  try {
+    return new Date(iso).toISOString().slice(0, 10);
+  } catch {
+    return "";
+  }
 }
 
 function isoToTimePart(iso: string): string {
   try {
     const d = new Date(iso);
     return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  } catch { return "00:00"; }
+  } catch {
+    return "00:00";
+  }
 }
 
 /** Combine a YYYY-MM-DD date and HH:MM time into a local-time ISO string. */
@@ -83,16 +81,7 @@ function validateTimes(startTime: string, endTime: string): string | null {
   return null;
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Types
-// ──────────────────────────────────────────────────────────────────────────────
-
-interface BlockFormState {
-  title: string;
-  startTime: string; // HH:MM
-  endTime: string;   // HH:MM
-}
-
+// NOTE: BlockFormState is imported from BusyBlockForm.tsx; we only declare EMPTY_FORM here.
 const EMPTY_FORM: BlockFormState = {
   title: "",
   startTime: "09:00",
@@ -108,131 +97,6 @@ function blockToForm(block: BusyBlock): BlockFormState {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Sub-components
-// ──────────────────────────────────────────────────────────────────────────────
-
-// ── TitleField ────────────────────────────────────────────────────────────────
-interface TitleFieldProps {
-  value: string;
-  onChange: (v: string) => void;
-}
-
-function TitleField({ value, onChange }: TitleFieldProps) {
-  return (
-    <>
-      <AppText style={formStyles.fieldLabel}>Title (optional)</AppText>
-      <Input
-        placeholder="e.g. Morning workout"
-        value={value}
-        onChangeText={onChange}
-        type="text"
-      />
-    </>
-  );
-}
-
-// ── TimeRangeFields ───────────────────────────────────────────────────────────
-interface TimeRangeFieldsProps {
-  startTime: string;
-  endTime: string;
-  onStartChange: (v: string) => void;
-  onEndChange: (v: string) => void;
-}
-
-function TimeRangeFields({ startTime, endTime, onStartChange, onEndChange }: TimeRangeFieldsProps) {
-  return (
-    <>
-      <AppText style={[formStyles.fieldLabel, { marginTop: SPACING.sm }]}>
-        Start time (HH:MM)
-      </AppText>
-      <Input
-        placeholder="09:00"
-        value={startTime}
-        onChangeText={onStartChange}
-        type="text"
-      />
-      <AppText style={[formStyles.fieldLabel, { marginTop: SPACING.sm }]}>
-        End time (HH:MM)
-      </AppText>
-      <Input
-        placeholder="10:00"
-        value={endTime}
-        onChangeText={onEndChange}
-        type="text"
-      />
-    </>
-  );
-}
-
-// ── BlockFormFields ───────────────────────────────────────────────────────────
-interface BlockFormFieldsProps {
-  form: BlockFormState;
-  onField: <K extends keyof BlockFormState>(key: K, value: BlockFormState[K]) => void;
-}
-
-function BlockFormFields({ form, onField }: BlockFormFieldsProps) {
-  return (
-    <>
-      <TitleField value={form.title} onChange={(v) => onField("title", v)} />
-      <TimeRangeFields
-        startTime={form.startTime}
-        endTime={form.endTime}
-        onStartChange={(v) => onField("startTime", v)}
-        onEndChange={(v) => onField("endTime", v)}
-      />
-    </>
-  );
-}
-
-const formStyles = StyleSheet.create({
-  fieldLabel: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.darkGray,
-    marginBottom: 4,
-    fontWeight: "400",
-  },
-});
-
-// ── BlockFormButtons ──────────────────────────────────────────────────────────
-interface BlockFormButtonsProps {
-  isEditing: boolean;
-  saving: boolean;
-  onCancel: () => void;
-  onSubmit: () => void;
-}
-
-function BlockFormButtons({ isEditing, saving, onCancel, onSubmit }: BlockFormButtonsProps) {
-  return (
-    <View style={blockFormBtnStyles.row}>
-      <AppButton
-        title="Cancel"
-        mode="light"
-        color="lightGray"
-        onPress={onCancel}
-        width="48%"
-        disabled={saving}
-      />
-      <AppButton
-        title={saving ? "Saving…" : isEditing ? "Update" : "Add"}
-        mode="filled"
-        color="primary1"
-        onPress={onSubmit}
-        width="48%"
-        disabled={saving}
-      />
-    </View>
-  );
-}
-
-const blockFormBtnStyles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    gap: SPACING.md,
-    marginTop: SPACING.lg,
-    width: "100%",
-  },
-});
-
 // ── BlockItem ─────────────────────────────────────────────────────────────────
 interface BlockItemProps {
   block: BusyBlock;
@@ -244,12 +108,8 @@ function BlockItem({ block, onEdit, onDelete }: BlockItemProps) {
   return (
     <View style={blockItemStyles.container}>
       <View style={blockItemStyles.info}>
-        {block.title ? (
-          <AppText style={blockItemStyles.title}>{block.title}</AppText>
-        ) : null}
-        <AppText style={blockItemStyles.timeRange}>
-          {formatTimeRange(block.start, block.end)}
-        </AppText>
+        {block.title ? <AppText style={blockItemStyles.title}>{block.title}</AppText> : null}
+        <AppText style={blockItemStyles.timeRange}>{formatTimeRange(block.start, block.end)}</AppText>
       </View>
       <View style={blockItemStyles.actions}>
         <Pressable
@@ -258,10 +118,7 @@ function BlockItem({ block, onEdit, onDelete }: BlockItemProps) {
         >
           {ICONS.edit ? React.createElement(ICONS.edit, { size: 15, color: COLORS.primary1 }) : null}
         </Pressable>
-        <Pressable
-          style={[blockItemStyles.iconBtn, { backgroundColor: "#FFEBEE" }]}
-          onPress={() => onDelete(block)}
-        >
+        <Pressable style={[blockItemStyles.iconBtn, { backgroundColor: "#FFEBEE" }]} onPress={() => onDelete(block)}>
           {ICONS.trash ? React.createElement(ICONS.trash, { size: 15, color: "#C62828" }) : null}
         </Pressable>
       </View>
@@ -291,145 +148,6 @@ const blockItemStyles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-});
-
-// ── GapBox ────────────────────────────────────────────────────────────────────
-interface GapBoxProps {
-  gapMinutes: number;
-  saving: boolean;
-  onDecrement: () => void;
-  onIncrement: () => void;
-  onSave: () => void;
-}
-
-function GapBox({ gapMinutes, saving, onDecrement, onIncrement, onSave }: GapBoxProps) {
-  return (
-    <Box title="GAP BETWEEN TASKS" titleColor={COLORS.primary1} style={gapBoxStyles.box}>
-      <AppText style={gapBoxStyles.helpText}>
-        Minimum minutes of free time between two scheduled sessions.
-      </AppText>
-      <View style={gapBoxStyles.row}>
-        <Pressable style={gapBoxStyles.stepBtn} onPress={onDecrement}>
-          <AppText style={gapBoxStyles.stepText}>−</AppText>
-        </Pressable>
-        <AppText style={gapBoxStyles.value}>{gapMinutes} min</AppText>
-        <Pressable style={gapBoxStyles.stepBtn} onPress={onIncrement}>
-          <AppText style={gapBoxStyles.stepText}>+</AppText>
-        </Pressable>
-        <AppButton
-          title={saving ? "…" : "Save"}
-          mode="filled"
-          color="primary6"
-          onPress={onSave}
-          disabled={saving}
-          style={gapBoxStyles.saveBtn}
-        />
-      </View>
-    </Box>
-  );
-}
-
-const gapBoxStyles = StyleSheet.create({
-  box: { width: "100%" },
-  helpText: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.darkGray,
-    marginBottom: SPACING.md,
-    lineHeight: FONT_SIZES.sm * 1.5,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.sm,
-    marginBottom: SPACING.md,
-  },
-  stepBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-    backgroundColor: COLORS.primary1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  stepText: {
-    color: COLORS.white,
-    fontSize: FONT_SIZES.base,
-    fontWeight: "700",
-    lineHeight: FONT_SIZES.base * 1.2,
-  },
-  value: {
-    flex: 1,
-    textAlign: "center",
-    fontSize: FONT_SIZES.base,
-    fontWeight: "600",
-    color: COLORS.primary1,
-  },
-  saveBtn: { flex: 1 },
-});
-
-// ── BlocksBox ─────────────────────────────────────────────────────────────────
-interface BlocksBoxProps {
-  blocks: BusyBlock[];
-  loading: boolean;
-  onEdit: (block: BusyBlock) => void;
-  onDelete: (block: BusyBlock) => void;
-  onAdd: () => void;
-}
-
-function BlocksBox({ blocks, loading, onEdit, onDelete, onAdd }: BlocksBoxProps) {
-  return (
-    <Box title="BUSY BLOCKS" titleColor={COLORS.primary1} style={blocksBoxStyles.box}>
-      <AppText style={blocksBoxStyles.helpText}>
-        Mark when you're unavailable. Mojo won't schedule tasks during these windows.
-      </AppText>
-
-      {loading ? (
-        <ActivityIndicator color={COLORS.primary1} style={{ marginVertical: SPACING.lg }} />
-      ) : (
-        <>
-          {blocks.length === 0 ? (
-            <AppText style={blocksBoxStyles.emptyText}>No busy blocks yet.</AppText>
-          ) : (
-            <View style={blocksBoxStyles.list}>
-              {blocks.map((block) => (
-                <BlockItem
-                  key={block._id}
-                  block={block}
-                  onEdit={onEdit}
-                  onDelete={onDelete}
-                />
-              ))}
-            </View>
-          )}
-          <AppButton
-            title="+ Add Busy Block"
-            mode="light"
-            color="primary1"
-            onPress={onAdd}
-            width="100%"
-            style={{ alignSelf: "stretch" }}
-          />
-        </>
-      )}
-    </Box>
-  );
-}
-
-const blocksBoxStyles = StyleSheet.create({
-  box: { width: "100%" },
-  helpText: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.darkGray,
-    marginBottom: SPACING.md,
-    lineHeight: FONT_SIZES.sm * 1.5,
-  },
-  emptyText: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.lightGray,
-    textAlign: "center",
-    marginVertical: SPACING.md,
-  },
-  list: { gap: SPACING.sm, marginBottom: SPACING.md },
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -462,10 +180,7 @@ export default function BusyBlocksSection({ style }: { style?: ViewStyle }) {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [fetchedBlocks, prefs] = await Promise.all([
-        listBusyBlocks(),
-        getSchedulingPreferences(),
-      ]);
+      const [fetchedBlocks, prefs] = await Promise.all([listBusyBlocks(), getSchedulingPreferences()]);
       setBlocks(fetchedBlocks);
       setGapMinutes(prefs?.minGapMinutes ?? 10);
     } catch (err: any) {
@@ -475,7 +190,9 @@ export default function BusyBlocksSection({ style }: { style?: ViewStyle }) {
     }
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // ── Gap preference ────────────────────────────────────────────────────────
   const handleSaveGap = async () => {
@@ -505,15 +222,16 @@ export default function BusyBlocksSection({ style }: { style?: ViewStyle }) {
     setFormVisible(true);
   };
 
-  const setFormField = <K extends keyof BlockFormState>(
-    key: K,
-    value: BlockFormState[K]
-  ) => setForm((f) => ({ ...f, [key]: value }));
+  const setFormField = <K extends keyof BlockFormState>(key: K, value: BlockFormState[K]) =>
+    setForm((f) => ({ ...f, [key]: value }));
 
   // ── Submit form ───────────────────────────────────────────────────────────
   const handleFormSubmit = async () => {
     const validationErr = validateTimes(form.startTime, form.endTime);
-    if (validationErr) { setFormError(validationErr); return; }
+    if (validationErr) {
+      setFormError(validationErr);
+      return;
+    }
 
     // Reference date = today; only the time-of-day matters for daily blocks
     const refDate = isoToDatePart(new Date().toISOString());
@@ -537,9 +255,7 @@ export default function BusyBlocksSection({ style }: { style?: ViewStyle }) {
       } else {
         const created = await createBusyBlock(payload);
         setBlocks((prev) =>
-          [...prev, created].sort(
-            (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()
-          )
+          [...prev, created].sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()),
         );
       }
       setFormVisible(false);
@@ -568,21 +284,9 @@ export default function BusyBlocksSection({ style }: { style?: ViewStyle }) {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <View style={[{ width: "100%", gap: SPACING.xlg }, style]}>
-      <GapBox
-        gapMinutes={gapMinutes}
-        saving={savingGap}
-        onDecrement={() => setGapMinutes((v) => Math.max(0, v - 5))}
-        onIncrement={() => setGapMinutes((v) => Math.min(120, v + 5))}
-        onSave={handleSaveGap}
-      />
+      <GapBox gapMinutes={gapMinutes} saving={savingGap} onChange={(v) => setGapMinutes(v)} onSave={handleSaveGap} />
 
-      <BlocksBox
-        blocks={blocks}
-        loading={loading}
-        onEdit={openEdit}
-        onDelete={setConfirmDelete}
-        onAdd={openAdd}
-      />
+      <BlocksBox blocks={blocks} loading={loading} onEdit={openEdit} onDelete={setConfirmDelete} onAdd={openAdd} />
 
       {/* ── Add / Edit popup ─────────────────────────────────── */}
       <PopupBox
@@ -591,22 +295,15 @@ export default function BusyBlocksSection({ style }: { style?: ViewStyle }) {
         title={editingBlock ? "Edit Busy Block" : "Add Busy Block"}
         titleColor={COLORS.primary1}
       >
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          style={{ width: "100%" }}
-        >
-          <BlockFormFields form={form} onField={setFormField} />
-
-          {formError && (
-            <AppText style={popupStyles.errorText}>{formError}</AppText>
-          )}
-
-          <BlockFormButtons
-            isEditing={editingBlock !== null}
+        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ width: "100%" }}>
+          <BusyBlockForm
+            form={form}
+            onField={setFormField}
             saving={saving}
+            isEditing={editingBlock !== null}
             onCancel={() => setFormVisible(false)}
             onSubmit={handleFormSubmit}
+            error={formError}
           />
         </ScrollView>
       </PopupBox>
@@ -649,23 +346,15 @@ export default function BusyBlocksSection({ style }: { style?: ViewStyle }) {
         title="Error"
         titleColor={COLORS.primary1}
       >
-        <AppText style={{ color: COLORS.darkGray, marginBottom: SPACING.lg }}>
-          {errorMsg}
-        </AppText>
-        <AppButton
-          title="OK"
-          mode="filled"
-          color="primary1"
-          onPress={() => setErrorMsg(null)}
-          width="100%"
-        />
+        <AppText style={{ color: COLORS.darkGray, marginBottom: SPACING.lg }}>{errorMsg}</AppText>
+        <AppButton title="OK" mode="filled" color="primary1" onPress={() => setErrorMsg(null)} width="100%" />
       </PopupBox>
     </View>
   );
 }
 
 const popupStyles = StyleSheet.create({
-  errorText: { color: "#C62828", fontSize: FONT_SIZES.sm, marginTop: SPACING.sm },
+  errorText: { color: COLORS.primary7, fontSize: FONT_SIZES.sm, marginTop: SPACING.sm },
   confirmText: {
     color: COLORS.darkGray,
     marginBottom: SPACING.lg,
@@ -679,4 +368,3 @@ const popupStyles = StyleSheet.create({
     width: "100%",
   },
 });
-

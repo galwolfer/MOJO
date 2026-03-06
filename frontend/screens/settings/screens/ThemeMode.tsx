@@ -1,84 +1,46 @@
-/**
- * ThemeModeScreen
- *
- * Allows users to select between light and dark theme modes.
- */
-
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
+import { View, StyleSheet } from "react-native";
 import { COLORS, SPACING, ICON_SIZES } from "../../../theme";
-import { useNavigation } from "../../../context/NavigationContext";
-import { ICONS } from "../../../components/icons/icons";
-import ScrollableContent from "../../../components/layout/ScrollableContent";
-import { useAccessibilityPreferences, ThemeMode } from "../../../hooks/useAccessibilityPreferences";
+import { useAccessibilityPreferences, type ThemeMode } from "../../../hooks/useAccessibilityPreferences";
 import { useTheme, useColors } from "../../../context/ThemeContext";
+import { ICONS } from "../../../components/icons/icons";
 import AppText from "../../../components/common/AppText";
 import Box from "../../../components/layout/Box";
-import List, { ListCellProps } from "../../../components/layout/List";
+import List, { type ListCellProps } from "../../../components/layout/List";
 import { makeListCell } from "../../../components/layout/ListItem";
 import ErrorText from "../../../components/common/ErrorText";
+import SettingsSubScreen from "./components/SettingsSubScreen";
 
-type ThemeModeScreenProps = {
-  onBack: () => void;
-};
+type ThemeModeScreenProps = { onBack: () => void };
 
 export default function ThemeModeScreen({ onBack }: ThemeModeScreenProps) {
-  const { setHeaderConfig } = useNavigation();
   const { preferences, isLoading, error } = useAccessibilityPreferences();
   const { setTheme } = useTheme();
   const colors = useColors();
   const [selectedTheme, setSelectedTheme] = useState<ThemeMode>(preferences.theme || "system");
   const [isSaving, setIsSaving] = useState(false);
 
-  const LeftIcon = ICONS.left;
-  const ThemeIcon = ICONS.settings;
-
   useEffect(() => {
-    setHeaderConfig({
-      title: "Theme Mode",
-      show: true,
-      icon: ICONS.settings,
-      leftElement: (
-        <TouchableOpacity onPress={onBack} style={styles.headerTouchable}>
-          <LeftIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
-        </TouchableOpacity>
-      ),
-      rightElement: (
-        <View style={styles.headerIcon}>
-          <ThemeIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
-        </View>
-      ),
-    });
-  }, []);
-
-  useEffect(() => {
-    if (preferences.theme) {
-      setSelectedTheme(preferences.theme);
-    }
+    if (preferences.theme) setSelectedTheme(preferences.theme);
   }, [preferences.theme]);
 
   const handleThemeSelect = async (theme: ThemeMode) => {
     if (isSaving || theme === selectedTheme) return;
-
     try {
       setIsSaving(true);
       setSelectedTheme(theme);
-      console.log(`[ThemeModeScreen] Requesting theme change => ${theme}`);
       await setTheme(theme);
-      console.log(`[ThemeModeScreen] Theme change applied => ${theme}`);
-    } catch (err) {
-      console.error("[ThemeModeScreen] Failed to apply theme:", err);
-      // Revert selection on error
+    } catch {
       setSelectedTheme(preferences.theme || "system");
     } finally {
       setIsSaving(false);
     }
   };
 
+  const CheckIcon = ICONS.check;
   const SunIcon = ICONS.day;
   const MoonIcon = ICONS.night;
-  const CheckIcon = ICONS.check;
-  const SystemIcon = ICONS.settings; // fallback; replace with a device/auto icon if available
+  const SystemIcon = ICONS.settings;
 
   const themeItems: ListCellProps[] = [
     makeListCell("system", {
@@ -108,20 +70,13 @@ export default function ThemeModeScreen({ onBack }: ThemeModeScreenProps) {
   ];
 
   return (
-    <ScrollableContent
-      respectHeader={true}
-      respectNavBar={true}
-      extraTopPadding={SPACING.lg}
-      scrollKey="theme-mode-settings"
-      contentContainerStyle={styles.contentContainer}
-      extraBottomPadding={SPACING.xlg * 3}
-    >
+    <SettingsSubScreen title="Theme Mode" iconName="settings" scrollKey="theme-mode-settings" onBack={onBack}>
       {error && <ErrorText>{error}</ErrorText>}
 
       {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <AppText variant="notes" style={[styles.loadingText, { color: colors.gray1 }]}>
-            Loading theme settings...
+        <View style={styles.loading}>
+          <AppText variant="notes" style={{ color: colors.gray1 }}>
+            Loading theme settings�
           </AppText>
         </View>
       ) : (
@@ -131,50 +86,12 @@ export default function ThemeModeScreen({ onBack }: ThemeModeScreenProps) {
           </View>
         </Box>
       )}
-
-      {isSaving && (
-        <View style={styles.savingContainer}>
-          <AppText variant="notes" style={styles.savingText}>
-            Saving...
-          </AppText>
-        </View>
-      )}
-    </ScrollableContent>
+    </SettingsSubScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  contentContainer: {
-    paddingHorizontal: SPACING.md,
-  },
-
-  headerTouchable: {
-    padding: SPACING.xs,
-  },
-
-  headerIcon: {
-    padding: SPACING.xs,
-  },
-
-  loadingContainer: {
-    padding: SPACING.lg,
-    alignItems: "center",
-  },
-
-  loadingText: {},
-
-  listContent: {
-    width: "100%",
-    paddingVertical: SPACING.sm,
-  },
-
-  savingContainer: {
-    marginTop: SPACING.md,
-    padding: SPACING.md,
-    alignItems: "center",
-  },
-
-  savingText: {
-    color: COLORS.primary1,
-  },
+  loading: { padding: SPACING.lg, alignItems: "center" },
+  listContent: { width: "100%", paddingVertical: SPACING.sm },
+  saving: { marginTop: SPACING.md, padding: SPACING.md, alignItems: "center" },
 });
