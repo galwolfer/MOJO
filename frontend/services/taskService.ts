@@ -1292,7 +1292,7 @@ export async function updateTaskSchedule(
  * Shows what the user is scheduled to work on for that day
  * For multi-day tasks, shows subtask name with parent task context and progress
  */
-export async function getScheduledSessionsForDate(date: Date): Promise<CalendarTaskGroup[]> {
+export async function getScheduledSessionsForDate(date: Date, timeFormat: "12h" | "24h" = "12h"): Promise<CalendarTaskGroup[]> {
   try {
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
@@ -1388,15 +1388,16 @@ export async function getScheduledSessionsForDate(date: Date): Promise<CalendarT
       const endTime = new Date(session.end);
 
       // Format times
+      const use12h = timeFormat === "12h";
       const timeStr = startTime.toLocaleTimeString("en-US", {
         hour: "2-digit",
         minute: "2-digit",
-        hour12: true,
+        hour12: use12h,
       });
       const endTimeStr = endTime.toLocaleTimeString("en-US", {
         hour: "2-digit",
         minute: "2-digit",
-        hour12: true,
+        hour12: use12h,
       });
 
       // Map icon to emoji

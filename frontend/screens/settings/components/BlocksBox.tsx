@@ -6,6 +6,7 @@ import AppButton from "../../../components/common/AppButton";
 import { COLORS, SPACING, FONT_SIZES, SHADOWS } from "../../../theme";
 import { ICONS } from "../../../components/icons/icons";
 import { BusyBlock, blockSummary, BLOCK_TYPE_LABEL } from "../../../services/busyBlockService";
+import { useAccessibilityPreferences } from "../../../hooks/useAccessibilityPreferences";
 
 interface BlocksBoxProps {
   blocks: BusyBlock[];
@@ -16,8 +17,9 @@ interface BlocksBoxProps {
 }
 
 function BlockRow({ block, onEdit, onDelete }: { block: BusyBlock; onEdit: () => void; onDelete: () => void }) {
+  const { preferences } = useAccessibilityPreferences();
   const typeLabel = block.blockType ? BLOCK_TYPE_LABEL[block.blockType as keyof typeof BLOCK_TYPE_LABEL] : null;
-  const summary = blockSummary(block);
+  const summary = blockSummary(block, preferences.timeFormat === "12h");
 
   return (
     <View style={rowStyles.container}>

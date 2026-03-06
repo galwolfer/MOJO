@@ -48,6 +48,7 @@ import { getSchedulingPreferences, updateSchedulingPreferences } from "../../../
 import { GapBox } from "../components/GapBox";
 import { BlocksBox } from "../components/BlocksBox";
 import { type BlockFormState } from "../components/BusyBlockForm";
+import { useAccessibilityPreferences } from "../../../hooks/useAccessibilityPreferences";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Domain helpers (pure — no React)
@@ -83,32 +84,47 @@ function isoToTimePart(iso: string): string {
  * New-style: derived from blockType + new fields.
  * Legacy: derived from start/end times.
  */
-function blockSummary(block: BusyBlock): string {
+
+/** Convert stored "HH:MM" (24h) → display string, respecting 12h/24h preference. */
+function formatHHMM(time: string, use12h: boolean): string {
+  const [hStr, mStr] = time.split(":");
+  const h = parseInt(hStr, 10);
+  const m = parseInt(mStr, 10);
+  if (isNaN(h) || isNaN(m)) return time;
+  if (!use12h) return time; // already HH:MM 24h
+  const period = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+function blockSummary(block: BusyBlock, use12h = false): string {
+  const fmt = (t: string) => formatHHMM(t, use12h);
+  const fmtRange = (t: { startTime: string; endTime: string }) => `${fmt(t.startTime)}–${fmt(t.endTime)}`;
   if (block.blockType === "ONCE") {
     const dateStr = block.date ? new Date(block.date).toISOString().slice(0, 10) : "";
-    const timesStr = (block.times ?? []).map((t) => `${t.startTime}–${t.endTime}`).join(", ");
+    const timesStr = (block.times ?? []).map(fmtRange).join(", ");
     return timesStr ? `${dateStr} ∣ ${timesStr}` : dateStr || "Once";
   }
   if (block.blockType === "WEEKLY") {
     if (block.weeklySchedule?.length) {
       return block.weeklySchedule
         .map((e) => {
-          const t = (e.times ?? []).map((t) => `${t.startTime}–${t.endTime}`).join(", ");
+          const t = (e.times ?? []).map(fmtRange).join(", ");
           return `${DAY_LABELS[e.dayOfWeek]} ∣ ${t}`;
         })
         .join("\n");
     }
     const days = (block.daysOfWeek ?? []).map((d) => DAY_LABELS[d]).join(", ");
-    const timesStr = (block.times ?? []).map((t) => `${t.startTime}–${t.endTime}`).join(", ");
+    const timesStr = (block.times ?? []).map(fmtRange).join(", ");
     return timesStr ? `${days} ∣ ${timesStr}` : days || "Weekly";
   }
   if (block.blockType === "DAILY") {
-    const timesStr = (block.times ?? []).map((t) => `${t.startTime}–${t.endTime}`).join(", ");
+    const timesStr = (block.times ?? []).map(fmtRange).join(", ");
     return timesStr ? `Every day ∣ ${timesStr}` : "Every day";
   }
   // Legacy
   if (block.start && block.end) {
-    return `${isoToTimePart(block.start)} – ${isoToTimePart(block.end)}`;
+    return `${fmt(isoToTimePart(block.start))} – ${fmt(isoToTimePart(block.end))}`;
   }
   return "";
 }
@@ -509,8 +525,9 @@ interface BlockItemProps {
 }
 
 function BlockItem({ block, onEdit, onDelete }: BlockItemProps) {
+  const { preferences } = useAccessibilityPreferences();
   const typeLabel = block.blockType ? BLOCK_TYPE_LABELS[block.blockType] : null;
-  const summary = blockSummary(block);
+  const summary = blockSummary(block, preferences.timeFormat === "12h");
 
   return (
     <View style={blockItemStyles.container}>

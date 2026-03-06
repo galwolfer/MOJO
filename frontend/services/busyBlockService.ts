@@ -20,7 +20,7 @@ import { get, post, put, del } from "./httpClient";
 // Domain types
 // ──────────────────────────────────────────────────────────────────────────────
 
-export type BusyBlockType = "DAILY" | "WEEKLY" | "ONCE";
+export type BusyBlockType = "DAILY" | "WEEKLY" | "ONCE" | "FULL_DAY";
 
 /** Legacy recurrence sub-document (present on old records only) */
 export interface BusyBlockRecurrence {
@@ -221,41 +221,58 @@ function _isoToTimePart(iso: string): string {
 }
 
 /**
+ * Convert stored "HH:MM" (24h) → display string, respecting 12h/24h preference.
+ */
+function _formatHHMM(time: string, use12h: boolean): string {
+  const [hStr, mStr] = time.split(":");
+  const h = parseInt(hStr, 10);
+  const m = parseInt(mStr, 10);
+  if (isNaN(h) || isNaN(m)) return time;
+  if (!use12h) return time;
+  const period = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+/**
  * Return a short human-readable summary for a BusyBlock row.
  * Works for all block types including legacy documents.
  */
-export function blockSummary(block: BusyBlock): string {
+export function blockSummary(block: BusyBlock, use12h = false): string {
+  const fmt = (t: string) => _formatHHMM(t, use12h);
+  const fmtRange = (t: { startTime: string; endTime: string }) => `${fmt(t.startTime)}–${fmt(t.endTime)}`;
   if (block.blockType === "ONCE") {
     const dateStr = block.date ? new Date(block.date).toISOString().slice(0, 10) : "";
-    const timesStr = (block.times ?? []).map((t) => `${t.startTime}–${t.endTime}`).join(", ");
+    const timesStr = (block.times ?? []).map(fmtRange).join(", ");
     return timesStr ? `${dateStr} ∣ ${timesStr}` : dateStr || "Once";
   }
   if (block.blockType === "WEEKLY") {
     if (block.weeklySchedule?.length) {
       return block.weeklySchedule
         .map((e) => {
-          const t = (e.times ?? []).map((t) => `${t.startTime}–${t.endTime}`).join(", ");
+          const t = (e.times ?? []).map(fmtRange).join(", ");
           return `${_DAY_SHORT[e.dayOfWeek]} ∣ ${t}`;
         })
         .join("  •  ");
     }
     const days = (block.daysOfWeek ?? []).map((d) => _DAY_SHORT[d]).join(", ");
-    const timesStr = (block.times ?? []).map((t) => `${t.startTime}–${t.endTime}`).join(", ");
+    const timesStr = (block.times ?? []).map(fmtRange).join(", ");
     return timesStr ? `${days} ∣ ${timesStr}` : days || "Weekly";
   }
   if (block.blockType === "DAILY") {
-    const timesStr = (block.times ?? []).map((t) => `${t.startTime}–${t.endTime}`).join(", ");
+    const timesStr = (block.times ?? []).map(fmtRange).join(", ");
     return timesStr ? `Every day ∣ ${timesStr}` : "Every day";
   }
   // Legacy
   if (block.start && block.end) {
-    return `${_isoToTimePart(block.start)} – ${_isoToTimePart(block.end)}`;
+    return `${fmt(_isoToTimePart(block.start))} – ${fmt(_isoToTimePart(block.end))}`;
   }
   return "";
 }
 
 export const BLOCK_TYPE_LABEL: Record<BusyBlockType, string> = {
-  DAILY:  "Every day",
-  WEEKLY: "Weekly",
-  ONCE:   "Specific date",
+  DAILY:    "Every day",
+  WEEKLY:   "Weekly",
+  ONCE:     "Specific date",
+  FULL_DAY: "Full day",
 };

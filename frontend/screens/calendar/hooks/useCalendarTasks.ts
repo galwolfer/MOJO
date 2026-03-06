@@ -35,12 +35,14 @@ import {
 } from "../../../services/taskService";
 import { TaskGroup } from "../types";
 import { getLocalDateString } from "../../../utils/dateUtils";
+import { useAccessibilityPreferences } from "../../../hooks/useAccessibilityPreferences";
 
 export function useCalendarTasks(
   selectedDate: Date,
   notifyTaskUpdate: () => void,
   subscribeToTaskUpdates: (callback: () => void) => () => void,
 ) {
+  const { preferences } = useAccessibilityPreferences();
   const [taskGroups, setTaskGroups] = useState<TaskGroup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +60,7 @@ export function useCalendarTasks(
       setError(null);
 
       // Fetch scheduled sessions for selected date
-      const scheduledGroups = await getScheduledSessionsForDate(date);
+      const scheduledGroups = await getScheduledSessionsForDate(date, preferences.timeFormat);
 
       const groupsToUse: TaskGroup[] = scheduledGroups;
 
@@ -280,11 +282,11 @@ export function useCalendarTasks(
   }, [selectedDate, subscribeToTaskUpdates]);
 
   /**
-   * Fetch tasks when selected date changes
+   * Fetch tasks when selected date or time format changes
    */
   useEffect(() => {
     fetchTasksForDate(selectedDate);
-  }, [selectedDate]);
+  }, [selectedDate, preferences.timeFormat]);
 
   return {
     taskGroups,
