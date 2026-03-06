@@ -61,26 +61,27 @@ export function addMinutes(date, minutes) {
 }
 
 /**
- * Get the start of day (midnight) for a date.
+ * Get the start of day (UTC midnight) for a date.
+ * Always uses UTC so that date keys like .toISOString().slice(0,10) are
+ * consistent with the Python scheduler, which works exclusively in UTC.
  * @param {Date} date - The date
- * @returns {Date}
+ * @returns {Date} UTC midnight of that date
  */
 export function startOfDay(date) {
   const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
+  d.setUTCHours(0, 0, 0, 0);
   return d;
 }
 
 /**
- * Add days to a date.
+ * Add days to a date using millisecond arithmetic so the result is always
+ * exactly N × 24 h ahead in UTC (no DST/local-time drift).
  * @param {Date} date - The starting date
  * @param {number} days - Days to add
  * @returns {Date}
  */
 export function addDays(date, days) {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
+  return new Date(date.getTime() + days * 86_400_000);
 }
 
 /**

@@ -1583,16 +1583,33 @@ export async function getUpcomingBusyBlocks(userId) {
   return BusyBlock.find({
     userId,
     $or: [
-      // One-time: not yet ended (isRecurring absent/false both match $ne:true)
-      { isRecurring: { $ne: true }, end: { $gte: now } },
+      // ── New-style blocks (blockType is set) ────────────────────────────
+      // DAILY / WEEKLY: repeating forever or not yet expired
+      {
+        blockType: { $in: ["DAILY", "WEEKLY"] },
+        $or: [
+          { recurrenceEndDate: null },
+          { recurrenceEndDate: { $exists: false } },
+          { recurrenceEndDate: { $gte: now } },
+        ],
+      },
+      // ONCE: target date hasn't passed yet
+      { blockType: "ONCE", date: { $gte: now } },
+      // FULL_DAY: always show (one-time future or recurring)
+      { blockType: "FULL_DAY" },
+
+      // ── Legacy blocks ───────────────────────────────────────────────────
+      // One-time: not yet ended
+      { blockType: { $exists: false }, isRecurring: { $ne: true }, end: { $gte: now } },
       // Recurring: not expired
       {
+        blockType: { $exists: false },
         isRecurring: true,
         $or: [{ "recurrence.endDate": null }, { "recurrence.endDate": { $gte: now } }],
       },
     ],
   })
-    .sort({ isRecurring: -1, start: 1 }) // recurring rules first, then by start
+    .sort({ blockType: 1, isRecurring: -1, start: 1 })
     .lean();
 }
 

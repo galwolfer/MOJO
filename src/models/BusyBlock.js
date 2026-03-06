@@ -5,16 +5,15 @@
  * blockType discriminator:
  *  DAILY    – every day (no daysOfWeek needed), optional recurrenceEndDate
  *  WEEKLY   – selected daysOfWeek each week, optional recurrenceEndDate
- *  ONCE     – single window on a specific date (date + startTime/endTime)
+ *  ONCE     – single window on a specific date
  *  FULL_DAY – entire day(s) off; one-time when only `date` is set,
  *             recurring when `daysOfWeek` is set (e.g. every Friday)
  *
- * All time values (startTime / endTime) are stored as "HH:MM" UTC strings
- * so they are timezone-floating — consistent with how the scheduler already
- * extracts getHours()/getMinutes() from the legacy Date fields.
+ * Time values are stored in the `times` array as { startTime, endTime }
+ * HH:MM UTC strings, making them timezone-floating.
  *
  * Buffers expand the blocked window outward: tasks cannot be placed within
- * bufferBeforeMinutes before the block or bufferAfterMinutes after it.
+ * bufferBeforeMinutes before any window or bufferAfterMinutes after it.
  *
  * Backward compatibility: documents without blockType (blockType = null) are
  * treated as legacy and handled by the legacy branch in expandBusyBlock():
@@ -72,17 +71,59 @@ const busyBlockSchema = new mongoose.Schema(
     recurrenceEndDate: { type: Date, default: null },
 
     // ── Time fields — HH:MM UTC; absent for FULL_DAY ────────────────────────
-    startTime: {
-      type: String,
-      default: null,
-      validate: { validator: (v) => v == null || HH_MM_RE.test(v), message: "startTime must be HH:MM" },
-    },
-    endTime: {
-      type: String,
-      default: null,
-      validate: { validator: (v) => v == null || HH_MM_RE.test(v), message: "endTime must be HH:MM" },
+    /**
+     * Primary: array of { startTime, endTime } tuples (HH:MM UTC).
+     * Each tuple becomes a separate blocked interval during scheduling.
+     */
+    times: {
+      type: [
+        {
+          startTime: {
+            type: String,
+            required: true,
+            validate: { validator: (v) => HH_MM_RE.test(v), message: "startTime must be HH:MM" },
+          },
+          endTime: {
+            type: String,
+            required: true,
+            validate: { validator: (v) => HH_MM_RE.test(v), message: "endTime must be HH:MM" },
+          },
+        },
+      ],
+      default: [],
     },
 
+    /**
+     * WEEKLY only: per-day schedule. When present, supersedes daysOfWeek + times[].
+     * Each entry covers one weekday (0=Sun … 6=Sat) with its own times[].
+     */
+    weeklySchedule: {
+      type: [
+        {
+          dayOfWeek: { type: Number, required: true, min: 0, max: 6 },
+          times: {
+            type: [
+              {
+                startTime: {
+                  type: String,
+                  required: true,
+                  validate: { validator: (v) => HH_MM_RE.test(v), message: "startTime must be HH:MM" },
+                },
+                endTime: {
+                  type: String,
+                  required: true,
+                  validate: { validator: (v) => HH_MM_RE.test(v), message: "endTime must be HH:MM" },
+                },
+              },
+            ],
+            default: [],
+          },
+        },
+      ],
+      default: [],
+    },
+
+    // Backward-compat mirrors of times[0] — kept so legacy expand code still works
     // ── Buffer ──────────────────────────────────────────────────────────────
     /** Minutes of padding _before_ the block — tasks cannot land in this window */
     bufferBeforeMinutes: { type: Number, default: 0, min: 0, max: 120 },

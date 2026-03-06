@@ -4,9 +4,9 @@
  *
  * New-style POST / PUT body (blockType present):
  * ─────────────────────────────────────────────
- *  DAILY    { blockType:"DAILY",    startTime, endTime, recurrenceEndDate?, bufferBeforeMinutes?, bufferAfterMinutes?, title? }
- *  WEEKLY   { blockType:"WEEKLY",   daysOfWeek, startTime, endTime, recurrenceEndDate?, buffer…, title? }
- *  ONCE     { blockType:"ONCE",     date, startTime, endTime, buffer…, title? }
+ *  DAILY    { blockType:"DAILY",    times:[{startTime,endTime}], recurrenceEndDate?, bufferBeforeMinutes?, bufferAfterMinutes?, title? }
+ *  WEEKLY   { blockType:"WEEKLY",   daysOfWeek, times:[{startTime,endTime}], recurrenceEndDate?, buffer…, title? }
+ *  ONCE     { blockType:"ONCE",     date, times:[{startTime,endTime}], buffer…, title? }
  *  FULL_DAY { blockType:"FULL_DAY", date? OR daysOfWeek, recurrenceEndDate?, buffer…, title? }
  *
  * Legacy POST / PUT body (no blockType — kept for backward compat):
@@ -38,13 +38,13 @@ const VALID_TYPES = ["DAILY", "WEEKLY", "ONCE", "FULL_DAY"];
 /**
  * Validate a new-style block payload. Returns an error string or null.
  */
-function validateNewBlock({ blockType, date, daysOfWeek = [], startTime, endTime,
-                            bufferBeforeMinutes = 0, bufferAfterMinutes = 0 }) {
+function validateNewBlock({ blockType, date, daysOfWeek = [], times = [],
+                            weeklySchedule, bufferBeforeMinutes = 0, bufferAfterMinutes = 0 }) {
   if (!VALID_TYPES.includes(blockType))
     return `blockType must be one of ${VALID_TYPES.join(", ")}`;
 
-  if (blockType === "WEEKLY" && (!Array.isArray(daysOfWeek) || !daysOfWeek.length))
-    return "daysOfWeek is required for WEEKLY blocks";
+  if (blockType === "WEEKLY" && !(weeklySchedule?.length) && (!Array.isArray(daysOfWeek) || !daysOfWeek.length))
+    return "For WEEKLY blocks, provide weeklySchedule or daysOfWeek";
 
   if (blockType === "FULL_DAY" && !date && (!Array.isArray(daysOfWeek) || !daysOfWeek.length))
     return "FULL_DAY blocks require either date (one-time) or daysOfWeek (recurring)";
@@ -55,12 +55,29 @@ function validateNewBlock({ blockType, date, daysOfWeek = [], startTime, endTime
   if (date && isNaN(new Date(date).getTime()))
     return "Invalid date value";
 
-  if (blockType !== "FULL_DAY") {
-    if (!startTime || !HH_MM_RE.test(startTime)) return "startTime must be HH:MM";
-    if (!endTime   || !HH_MM_RE.test(endTime))   return "endTime must be HH:MM";
-    const [sh, sm] = startTime.split(":").map(Number);
-    const [eh, em] = endTime.split(":").map(Number);
-    if (eh * 60 + em <= sh * 60 + sm) return "endTime must be after startTime";
+  if (blockType !== "FULL_DAY" && !(blockType === "WEEKLY" && weeklySchedule?.length)) {
+    if (!Array.isArray(times) || times.length === 0)
+      return "At least one time entry is required (times must be a non-empty array)";
+    for (let i = 0; i < times.length; i++) {
+      const { startTime, endTime } = times[i] || {};
+      if (!startTime || !HH_MM_RE.test(startTime)) return `times[${i}].startTime must be HH:MM`;
+      if (!endTime   || !HH_MM_RE.test(endTime))   return `times[${i}].endTime must be HH:MM`;
+      const [sh, sm] = startTime.split(":").map(Number);
+      const [eh, em] = endTime.split(":").map(Number);
+      if (eh * 60 + em <= sh * 60 + sm) return `times[${i}]: endTime must be after startTime`;
+    }
+    // Overlap check: sort by start, verify consecutive pairs don't overlap
+    const sorted = [...times].sort((a, b) => {
+      const [ah, am] = a.startTime.split(":").map(Number);
+      const [bh, bm] = b.startTime.split(":").map(Number);
+      return (ah * 60 + am) - (bh * 60 + bm);
+    });
+    for (let i = 1; i < sorted.length; i++) {
+      const [eh, em] = sorted[i - 1].endTime.split(":").map(Number);
+      const [sh, sm] = sorted[i].startTime.split(":").map(Number);
+      if (sh * 60 + sm < eh * 60 + em)
+        return `Time ranges overlap: ${sorted[i - 1].startTime}-${sorted[i - 1].endTime} and ${sorted[i].startTime}-${sorted[i].endTime}`;
+    }
   }
 
   if ((bufferBeforeMinutes ?? 0) < 0 || (bufferBeforeMinutes ?? 0) > 120)
@@ -125,8 +142,8 @@ router.post("/", async (req, res, next) => {
       date,
       daysOfWeek = [],
       recurrenceEndDate = null,
-      startTime,
-      endTime,
+      times = [],
+      weeklySchedule,
       bufferBeforeMinutes = 0,
       bufferAfterMinutes = 0,
       source = "manual",
@@ -136,8 +153,10 @@ router.post("/", async (req, res, next) => {
 
     // ── New-style block ──────────────────────────────────────────────────────
     if (blockType) {
-      const err = validateNewBlock({ blockType, date, daysOfWeek, startTime, endTime,
-                                     bufferBeforeMinutes, bufferAfterMinutes });
+      const validTimes = Array.isArray(times) ? times : [];
+
+      const err = validateNewBlock({ blockType, date, daysOfWeek, times: validTimes,
+                                     weeklySchedule, bufferBeforeMinutes, bufferAfterMinutes });
       if (err) return res.status(400).json({ success: false, error: err });
 
       const block = await BusyBlock.create({
@@ -145,8 +164,8 @@ router.post("/", async (req, res, next) => {
         date: (blockType === "ONCE" || blockType === "FULL_DAY") && date ? new Date(date) : null,
         daysOfWeek: Array.isArray(daysOfWeek) ? daysOfWeek : [],
         recurrenceEndDate: recurrenceEndDate ? new Date(recurrenceEndDate) : null,
-        startTime: blockType !== "FULL_DAY" ? startTime : null,
-        endTime:   blockType !== "FULL_DAY" ? endTime   : null,
+        weeklySchedule: Array.isArray(weeklySchedule) ? weeklySchedule : [],
+        times:     blockType !== "FULL_DAY" ? validTimes : [],
         bufferBeforeMinutes: Number(bufferBeforeMinutes) || 0,
         bufferAfterMinutes:  Number(bufferAfterMinutes)  || 0,
         source,
@@ -214,7 +233,7 @@ router.put("/:id", async (req, res, next) => {
     // ── New-style fields ─────────────────────────────────────────────────────
     const newStyleFields = [
       "title", "blockType", "date", "daysOfWeek", "recurrenceEndDate",
-      "startTime", "endTime", "bufferBeforeMinutes", "bufferAfterMinutes",
+      "weeklySchedule", "times", "bufferBeforeMinutes", "bufferAfterMinutes",
     ];
     for (const key of newStyleFields) {
       if (req.body[key] !== undefined) block[key] = req.body[key];
@@ -227,13 +246,9 @@ router.put("/:id", async (req, res, next) => {
     // Validate if blockType is set (either already or just updated)
     if (block.blockType) {
       const err = validateNewBlock({
-        blockType:            block.blockType,
-        date:                 block.date,
-        daysOfWeek:           block.daysOfWeek,
-        startTime:            block.startTime,
-        endTime:              block.endTime,
-        bufferBeforeMinutes:  block.bufferBeforeMinutes,
-        bufferAfterMinutes:   block.bufferAfterMinutes,
+        blockType: block.blockType, date: block.date, daysOfWeek: block.daysOfWeek,
+        weeklySchedule: block.weeklySchedule, times: block.times,
+        bufferBeforeMinutes: block.bufferBeforeMinutes, bufferAfterMinutes: block.bufferAfterMinutes,
       });
       if (err) return res.status(400).json({ success: false, error: err });
     }

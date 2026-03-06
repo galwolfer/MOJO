@@ -224,12 +224,16 @@ export function expandBusyBlock(block, fromDate, toDate) {
     return h * 60 + m;
   }
 
-  /** Build one occurrence for a calendar day given start/end minutes-since-midnight */
+  /** Build one occurrence for a calendar day given start/end minutes-since-midnight.
+   * Uses LOCAL time so that user-entered HH:MM values (e.g. "12:00") land on
+   * the correct local clock position regardless of the server's UTC offset.
+   * For example on a UTC+2 server, "12:00" → local noon → UTC 10:00, which
+   * correctly matches slots that Python schedules in the same UTC band. */
   function buildOccurrence(dayDate, startMin, endMin) {
     const s = new Date(dayDate);
-    s.setUTCHours(0, startMin, 0, 0);
+    s.setHours(0, startMin, 0, 0);   // local time — preserves user's clock intent
     const e = new Date(dayDate);
-    e.setUTCHours(0, endMin, 0, 0);
+    e.setHours(0, endMin, 0, 0);     // local time
     const { start, end } = applyBuffer(s, e);
     return { key: dayDate.toISOString().slice(0, 10), start, end };
   }
@@ -240,7 +244,10 @@ export function expandBusyBlock(block, fromDate, toDate) {
   if (type === "ONCE") {
     const d = new Date(block.date);
     if (d < fromDate || d > toDate) return [];
-    return [buildOccurrence(d, hhmmToMinutes(block.startTime), hhmmToMinutes(block.endTime))];
+    const ranges = block.times ?? [];
+    return ranges.map((r) =>
+      buildOccurrence(d, hhmmToMinutes(r.startTime), hhmmToMinutes(r.endTime))
+    );
   }
 
   // ── FULL_DAY ───────────────────────────────────────────────────────────
@@ -278,14 +285,15 @@ export function expandBusyBlock(block, fromDate, toDate) {
 
   // ── DAILY ───────────────────────────────────────────────────────────────
   if (type === "DAILY") {
-    const sm = hhmmToMinutes(block.startTime);
-    const em = hhmmToMinutes(block.endTime);
+    const timeSpans = block.times ?? [];
     const expiry = block.recurrenceEndDate ? new Date(block.recurrenceEndDate) : toDate;
     const windowEnd = expiry < toDate ? expiry : toDate;
     const results = [];
     let cursor = new Date(fromDate);
     while (cursor <= windowEnd) {
-      results.push(buildOccurrence(cursor, sm, em));
+      for (const span of timeSpans) {
+        results.push(buildOccurrence(cursor, hhmmToMinutes(span.startTime), hhmmToMinutes(span.endTime)));
+      }
       cursor = addDays(cursor, 1);
     }
     return results;
@@ -293,17 +301,33 @@ export function expandBusyBlock(block, fromDate, toDate) {
 
   // ── WEEKLY ──────────────────────────────────────────────────────────────
   if (type === "WEEKLY") {
-    const sm = hhmmToMinutes(block.startTime);
-    const em = hhmmToMinutes(block.endTime);
     const expiry = block.recurrenceEndDate ? new Date(block.recurrenceEndDate) : toDate;
     const windowEnd = expiry < toDate ? expiry : toDate;
     const results = [];
     let cursor = new Date(fromDate);
-    while (cursor <= windowEnd) {
-      if (block.daysOfWeek && block.daysOfWeek.includes(cursor.getUTCDay())) {
-        results.push(buildOccurrence(cursor, sm, em));
+    if (block.weeklySchedule?.length) {
+      // Per-day schedule: each entry carries its own times[]
+      while (cursor <= windowEnd) {
+        const dow = cursor.getUTCDay();
+        const dayEntry = block.weeklySchedule.find((e) => e.dayOfWeek === dow);
+        if (dayEntry) {
+          for (const span of dayEntry.times ?? []) {
+            results.push(buildOccurrence(cursor, hhmmToMinutes(span.startTime), hhmmToMinutes(span.endTime)));
+          }
+        }
+        cursor = addDays(cursor, 1);
       }
-      cursor = addDays(cursor, 1);
+    } else {
+      // Legacy: flat daysOfWeek + times[]
+      const timeSpans = block.times ?? [];
+      while (cursor <= windowEnd) {
+        if (block.daysOfWeek && block.daysOfWeek.includes(cursor.getUTCDay())) {
+          for (const span of timeSpans) {
+            results.push(buildOccurrence(cursor, hhmmToMinutes(span.startTime), hhmmToMinutes(span.endTime)));
+          }
+        }
+        cursor = addDays(cursor, 1);
+      }
     }
     return results;
   }
@@ -489,9 +513,9 @@ const splitIntervalByDay = (start, end, accumulator) => {
 const addRoutineBlockForDate = (date, block, accumulator) => {
   const dayStart = startOfDay(date);
   const start = new Date(dayStart);
-  start.setHours(block.startHour, block.startMinute, 0, 0);
+  start.setUTCHours(block.startHour, block.startMinute, 0, 0);
   let end = new Date(dayStart);
-  end.setHours(block.endHour, block.endMinute, 0, 0);
+  end.setUTCHours(block.endHour, block.endMinute, 0, 0);
   if (block.wrapsToNextDay && end <= start) {
     end = addDays(end, 1);
   }

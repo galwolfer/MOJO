@@ -20,7 +20,7 @@ import { get, post, put, del } from "./httpClient";
 // Domain types
 // ──────────────────────────────────────────────────────────────────────────────
 
-export type BusyBlockType = "DAILY" | "WEEKLY" | "ONCE" | "FULL_DAY";
+export type BusyBlockType = "DAILY" | "WEEKLY" | "ONCE";
 
 /** Legacy recurrence sub-document (present on old records only) */
 export interface BusyBlockRecurrence {
@@ -46,8 +46,10 @@ export interface BusyBlock {
   recurrenceEndDate?: string | null;
 
   // Times (HH:MM UTC) — absent for FULL_DAY
-  startTime?: string | null;
-  endTime?: string | null;
+  /** All time windows for this block. Each tuple is a separate scheduled interval. */
+  times?: Array<{ startTime: string; endTime: string }>;
+  /** WEEKLY only: per-day schedule — supersedes daysOfWeek + times[] when present */
+  weeklySchedule?: Array<{ dayOfWeek: number; times: Array<{ startTime: string; endTime: string }> }>;
 
   // Buffer
   bufferBeforeMinutes: number;
@@ -73,9 +75,10 @@ export interface CreateBusyBlockPayload {
   daysOfWeek?: number[];
   /** ISO date or null = no expiry */
   recurrenceEndDate?: string | null;
-  /** HH:MM — omit for FULL_DAY */
-  startTime?: string;
-  endTime?: string;
+  /** All time windows — each { startTime, endTime } in HH:MM. Omit for FULL_DAY. */
+  times?: Array<{ startTime: string; endTime: string }>;
+  /** WEEKLY only: per-day schedule — one entry per day with its own times[] */
+  weeklySchedule?: Array<{ dayOfWeek: number; times: Array<{ startTime: string; endTime: string }> }>;
   bufferBeforeMinutes?: number;
   bufferAfterMinutes?: number;
   source?: "manual";
@@ -117,21 +120,37 @@ export function normalizeBusyBlock(raw: BusyBlock): BusyBlock {
  */
 export function validateBusyBlockPayload(payload: CreateBusyBlockPayload): string | null {
   const HH_MM = /^([01]\d|2[0-3]):[0-5]\d$/;
-  const { blockType, date, daysOfWeek = [], startTime, endTime,
-          bufferBeforeMinutes = 0, bufferAfterMinutes = 0 } = payload;
+  const { blockType, date, daysOfWeek = [], times = [],
+          weeklySchedule, bufferBeforeMinutes = 0, bufferAfterMinutes = 0 } = payload;
 
-  if (blockType === "WEEKLY" && !daysOfWeek.length)
+  if (blockType === "WEEKLY" && !weeklySchedule?.length && !daysOfWeek.length)
     return "Select at least one day of the week";
   if (blockType === "ONCE" && !date)
     return "Date is required for a one-time block";
   if (blockType === "FULL_DAY" && !date && !daysOfWeek.length)
     return "Provide a date (one-time) or days of week (recurring) for a day-off";
-  if (blockType !== "FULL_DAY") {
-    if (!startTime || !HH_MM.test(startTime)) return "Start time must be HH:MM";
-    if (!endTime   || !HH_MM.test(endTime))   return "End time must be HH:MM";
-    const [sh, sm] = startTime.split(":").map(Number);
-    const [eh, em] = endTime.split(":").map(Number);
-    if (eh * 60 + em <= sh * 60 + sm) return "End time must be after start time";
+  if (blockType !== "FULL_DAY" && !(blockType === "WEEKLY" && weeklySchedule?.length)) {
+    if (!times.length) return "Add at least one time range";
+    for (let i = 0; i < times.length; i++) {
+      const { startTime, endTime } = times[i];
+      if (!startTime || !HH_MM.test(startTime)) return `times[${i}]: start time must be HH:MM`;
+      if (!endTime   || !HH_MM.test(endTime))   return `times[${i}]: end time must be HH:MM`;
+      const [sh, sm] = startTime.split(":").map(Number);
+      const [eh, em] = endTime.split(":").map(Number);
+      if (eh * 60 + em <= sh * 60 + sm) return `times[${i}]: end time must be after start time`;
+    }
+    // Overlap check
+    const sorted = [...times].sort((a, b) => {
+      const [ah, am] = a.startTime.split(":").map(Number);
+      const [bh, bm] = b.startTime.split(":").map(Number);
+      return (ah * 60 + am) - (bh * 60 + bm);
+    });
+    for (let i = 1; i < sorted.length; i++) {
+      const [eh, em] = sorted[i - 1].endTime.split(":").map(Number);
+      const [sh, sm] = sorted[i].startTime.split(":").map(Number);
+      if (sh * 60 + sm < eh * 60 + em)
+        return `Time ranges overlap: ${sorted[i - 1].startTime}\u2013${sorted[i - 1].endTime} and ${sorted[i].startTime}\u2013${sorted[i].endTime}`;
+    }
   }
   if (bufferBeforeMinutes < 0 || bufferBeforeMinutes > 120) return "Buffer before must be 0–120 min";
   if (bufferAfterMinutes  < 0 || bufferAfterMinutes  > 120) return "Buffer after must be 0–120 min";
