@@ -7,7 +7,7 @@
  * Business logic delegated to NotificationSettingsContext.
  */
 import React, { useCallback, useMemo } from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, Pressable } from "react-native";
 import { moderateScale } from "react-native-size-matters";
 import { TimePicker } from "../../../components/inputs/TimePicker";
 import { useNotificationSettings } from "../../../context/NotificationSettingsContext";
@@ -237,21 +237,101 @@ export default function NotificationSettingsScreen({ onBack }: Props) {
         ),
       }),
 
-      // ── Ojo Personality ────────────────────────────────────────────────────
-      makeListCell("ojo-personality", {
-        title: "Ojo Personality",
-        subtitle: "AI-crafted notifications with personality",
-        logo: <OjoIcon size={ICON_SIZES.sm} color={COLORS.primary3} />,
+      // ── Ojo Personality + Type Selector ─────────────────────────────────────
+      {
+        id: "ojo-personality",
         disabled: taskChildDisabled,
-        onPress: taskChildDisabled ? undefined : () => handleToggleOjoNotifications(!ojoEnabled),
-        rightElement: (
-          <Checkbox
-            checked={ojoEnabled}
-            onChange={taskChildDisabled ? undefined : handleToggleOjoNotifications}
-            size={ICON_SIZES.sm}
-          />
+        content: (
+          <View>
+            <ListItem
+              title="Ojo Personality"
+              subtitle={
+                ojoEnabled && !smartRemindersEnabled
+                  ? `AI notifications · ${getOjoType((preferences?.ojoNotifications?.selectedOjoType ?? "mentorjo") as OjoTypeName).displayName}`
+                  : ojoEnabled && smartRemindersEnabled
+                    ? "AI notifications · Auto-selected by Smart Reminders"
+                    : "AI-crafted notifications with personality"
+              }
+              logo={<OjoIcon size={ICON_SIZES.sm} color={COLORS.primary3} />}
+              rightElement={
+                <Checkbox
+                  checked={ojoEnabled}
+                  onChange={taskChildDisabled ? undefined : handleToggleOjoNotifications}
+                  size={ICON_SIZES.sm}
+                />
+              }
+            />
+            {ojoEnabled && !smartRemindersEnabled && (
+              <View style={[styles.ojoContainer, { backgroundColor: colors.bg3 }]}>
+                <AppText variant="notes" style={{ color: colors.gray1 }}>
+                  Choose who delivers your reminders:
+                </AppText>
+                <View style={styles.ojoGrid}>
+                  {(availableOjoTypes.length > 0
+                    ? availableOjoTypes
+                    : (["mentorjo", "brojo", "bestojo", "strictojo"] as OjoTypeName[]).map((n) => getOjoType(n))
+                  ).map((ojo) => {
+                    const cfg = getOjoType(ojo.name as OjoTypeName);
+                    const selected = (preferences?.ojoNotifications?.selectedOjoType ?? "mentorjo") === ojo.name;
+                    const OjoFaceIcon = ICONS[cfg.icon] || OjoIcon;
+                    return (
+                      <Pressable
+                        key={ojo.name}
+                        style={[
+                          styles.ojoCard,
+                          {
+                            borderColor: selected ? cfg.color : colors.bg2,
+                            backgroundColor: selected ? cfg.color + "15" : colors.bg2,
+                          },
+                        ]}
+                        onPress={() => handleSelectOjoType(ojo.name as OjoType)}
+                      >
+                        <View
+                          style={[
+                            styles.ojoIconCircle,
+                            {
+                              width: moderateScale(36),
+                              height: moderateScale(36),
+                              borderRadius: moderateScale(18),
+                              backgroundColor: cfg.color + "20",
+                            },
+                          ]}
+                        >
+                          <OjoFaceIcon size={ICON_SIZES.sm} color={cfg.color} />
+                        </View>
+                        <AppText
+                          variant="boldText"
+                          style={{ color: selected ? cfg.color : colors.text1, fontSize: moderateScale(12) }}
+                        >
+                          {cfg.displayName}
+                        </AppText>
+                        <AppText
+                          variant="notes"
+                          style={{
+                            color: colors.gray1,
+                            fontSize: moderateScale(10),
+                            textAlign: "center",
+                          }}
+                          numberOfLines={2}
+                        >
+                          {cfg.tones.join(" · ")}
+                        </AppText>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+            {ojoEnabled && smartRemindersEnabled && (
+              <View style={{ paddingHorizontal: SPACING.md, paddingBottom: SPACING.sm }}>
+                <AppText variant="notes" style={{ color: colors.gray1 }}>
+                  Ojo type is automatically chosen based on task difficulty when Smart Reminders is on.
+                </AppText>
+              </View>
+            )}
+          </View>
         ),
-      }),
+      } as ListCellProps,
     ],
     [
       allEnabled,
@@ -265,12 +345,15 @@ export default function NotificationSettingsScreen({ onBack }: Props) {
       taskRemindersEnabled,
       smartRemindersEnabled,
       ojoEnabled,
+      availableOjoTypes,
+      preferences?.ojoNotifications?.selectedOjoType,
       handleToggleNotifications,
       handleToggleMorningDigest,
       handleDigestTimeChange,
       handleToggleTaskReminders,
       handleToggleSmartReminders,
       handleToggleOjoNotifications,
+      handleSelectOjoType,
     ],
   );
 
