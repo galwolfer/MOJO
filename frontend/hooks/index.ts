@@ -5,3 +5,4 @@ export { useChatSessions } from "./useChatSessions";
 export { useChatMessages } from "./useChatMessages";
 export { useOjoType } from "./useOjoType";
 export { useAccessibilityPreferences } from "./useAccessibilityPreferences";
+export { useBackHandler } from "./useBackHandler";

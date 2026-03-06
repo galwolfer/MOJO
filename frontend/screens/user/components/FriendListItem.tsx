@@ -1,7 +1,7 @@
 import React from "react";
 import { View, StyleSheet, Image } from "react-native";
 import AppText from "../../../components/common/AppText";
-import { COLORS, SPACING, SHADOWS } from "../../../theme";
+import { COLORS, SPACING, SHADOWS, FONT_SIZES } from "../../../theme";
 import { useColors } from "../../../context/ThemeContext";
 import { ICONS } from "../../../components/icons/icons";
 import { moderateScale } from "react-native-size-matters";
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
     marginLeft: SPACING.sm,
   },
   name: {
-    fontSize: moderateScale(16),
+    fontSize: FONT_SIZES.base,
     fontWeight: "600",
   },
   statsRow: {
@@ -157,21 +157,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 6,
     paddingHorizontal: 8,
-    borderRadius: moderateScale(14),
+    borderRadius: FONT_SIZES.base,
     gap: 8,
     minWidth: moderateScale(36),
-    maxWidth: moderateScale(70),
+    maxWidth: FONT_SIZES.xlg,
     justifyContent: "center",
   },
   miniIcon: {
-    width: moderateScale(18),
-    height: moderateScale(18),
+    width: FONT_SIZES.base,
+    height: FONT_SIZES.base,
     alignItems: "center",
     justifyContent: "center",
   },
   miniValue: {
     color: COLORS.colorWhite,
-    fontSize: moderateScale(13),
+    fontSize: FONT_SIZES.sm,
     fontWeight: "700",
   },
   divider: {
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
   },
   avatarShadow: {
-    borderRadius: moderateScale(26),
+    borderRadius: FONT_SIZES.lg,
     alignItems: "center",
     justifyContent: "center",
     // apply the card shadow token for consistent look

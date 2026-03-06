@@ -12,7 +12,7 @@ import {
 
 import AppText from "../../components/common/AppText";
 import AppButton from "../../components/common/AppButton";
-import { COLORS, SPACING, SHADOWS, ICON_SIZES } from "../../theme";
+import { COLORS, SPACING, SHADOWS, ICON_SIZES, FONT_SIZES } from "../../theme";
 import { useColors } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigation } from "../../context/NavigationContext";
@@ -32,14 +32,8 @@ import {
   type TaskProgress,
 } from "../../services/taskService";
 import UserAvatar from "../../components/common/UserAvatar";
-import {
-  SettingsScreen,
-  EditPreferencesScreen,
-  ChatSettingsScreen,
-  NotificationSettingsScreen,
-  AccessibilitySettingsScreen,
-  SubcategoryManager,
-} from "../settings";
+import { SettingsScreen } from "../settings";
+import { useBackHandler } from "../../hooks/useBackHandler";
 import { useStatsContext } from "../../context/StatsContext";
 
 /**
@@ -96,9 +90,13 @@ export default function UserProfileScreen() {
   const { stats, isLoading: statsLoading, refreshStats } = useStatsContext();
 
   // Screen navigation state
-  const [currentScreen, setCurrentScreen] = useState<
-    "profile" | "settings" | "edit-preferences" | "chat-settings" | "notification-settings" | "accessibility-settings"
-  >("profile");
+  const [currentScreen, setCurrentScreen] = useState<"profile" | "settings">("profile");
+
+  // When settings is open, back navigates to profile (sub-screens supersede this via their own handlers)
+  useBackHandler(() => {
+    setCurrentScreen("profile");
+    return true;
+  }, currentScreen === "settings");
 
   const [loading, setLoading] = useState(true);
   const [progressData, setProgressData] = useState<number[]>(DEFAULT_PROGRESS);
@@ -321,59 +319,8 @@ export default function UserProfileScreen() {
 
   const graphWidth = Math.min(width - SPACING.xlg * 2 - SPACING.md * 2, 500);
 
-  // If on Settings screen, render SettingsScreen
   if (currentScreen === "settings") {
-    return (
-      <SettingsScreen
-        onBack={() => setCurrentScreen("profile")}
-        onEditPreferences={() => setCurrentScreen("edit-preferences")}
-        onChatSettings={() => setCurrentScreen("chat-settings")}
-        onNotificationSettings={() => setCurrentScreen("notification-settings")}
-        onAccessibilitySettings={() => setCurrentScreen("accessibility-settings")}
-        onSubcategoryManager={() => setCurrentScreen("subcategory-manager")}
-      />
-    );
-  }
-
-  // If on Edit Preferences screen, render EditPreferencesScreen
-  if (currentScreen === "edit-preferences") {
-    return (
-      <EditPreferencesScreen
-        onBack={() => setCurrentScreen("settings")}
-        onSave={() => {
-          // Optionally refresh data after preferences are saved
-          fetchAllData();
-        }}
-      />
-    );
-  }
-
-  // If on Chat Settings screen, render ChatSettingsScreen
-  if (currentScreen === "chat-settings") {
-    return (
-      <ChatSettingsScreen
-        onBack={() => setCurrentScreen("settings")}
-        onSave={() => {
-          // Optionally refresh data after chat settings are saved
-          fetchAllData();
-        }}
-      />
-    );
-  }
-
-  // If on Notification Settings screen, render NotificationSettingsScreen
-  if (currentScreen === "notification-settings") {
-    return <NotificationSettingsScreen onBack={() => setCurrentScreen("settings")} />;
-  }
-
-  // If on Accessibility Settings screen, render AccessibilitySettingsScreen
-  if (currentScreen === "accessibility-settings") {
-    return <AccessibilitySettingsScreen onBack={() => setCurrentScreen("settings")} />;
-  }
-
-  // If on Subcategory Manager screen, render SubcategoryManager
-  if (currentScreen === "subcategory-manager") {
-    return <SubcategoryManager onBack={() => setCurrentScreen("settings")} />;
+    return <SettingsScreen onBack={() => setCurrentScreen("profile")} />;
   }
 
   return (
@@ -432,13 +379,6 @@ export default function UserProfileScreen() {
           </AppText>
         </View>
       </Box>
-
-      {/* Logout Button */}
-      <TouchableOpacity style={[styles.logoutButton, { backgroundColor: colors.bg1 }]} onPress={signOut}>
-        <AppText variant="boldText" style={styles.logoutText}>
-          Logout
-        </AppText>
-      </TouchableOpacity>
     </ScrollableContent>
   );
 }
@@ -619,16 +559,16 @@ const styles = StyleSheet.create({
   },
   progressSummaryValue: {
     color: COLORS.primary1,
-    fontSize: moderateScale(18),
+    fontSize: FONT_SIZES.md,
   },
   progressSummaryLabel: {
     color: COLORS.lightGray,
-    fontSize: moderateScale(10),
+    fontSize: FONT_SIZES.sm,
     marginTop: 2,
   },
   progressSummaryDivider: {
     width: 1,
-    height: moderateScale(30),
+    height: FONT_SIZES.lg,
     backgroundColor: COLORS.lightGray,
     opacity: 0.3,
   },

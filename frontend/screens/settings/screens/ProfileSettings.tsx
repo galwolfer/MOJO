@@ -6,18 +6,23 @@ import Input from "../../../components/inputs/Input";
 import AppButton from "../../../components/common/AppButton";
 import ProfilePhotoWidget from "../../../components/special/ProfilePhotoWidget";
 import ErrorText from "../../../components/common/ErrorText";
+import PopupBox from "../../../components/common/PopupBox";
 import { COLORS, SPACING, SHADOWS } from "../../../theme";
 import { useColors } from "../../../context/ThemeContext";
 import { useAuth } from "../../../context/AuthContext";
 import { ICONS } from "../../../components/icons/icons";
-import { updateProfile } from "../../../services/apiClient";
+import { updateProfile, deleteAccount } from "../../../services/apiClient";
 import { Box } from "../../../components";
 import UserAvatar from "../../../components/common/UserAvatar";
 
 export default function ProfileSettings() {
   const colors = useColors();
-  const { user, signIn, token } = useAuth();
+  const { user, signIn, signOut, token } = useAuth();
   const UserIcon = ICONS.user;
+
+  const [showDeletePopup, setShowDeletePopup] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedUsername, setEditedUsername] = useState(user?.username || "");
@@ -198,8 +203,25 @@ export default function ProfileSettings() {
       setIsEditMode(false);
     } catch (err: any) {
       setError(err?.message || "Failed to update profile");
+    }
+  };
+
+  // delete account logic
+  const handleDeleteAccount = () => {
+    setShowDeletePopup(true);
+  };
+
+  const confirmDeleteAccount = async () => {
+    setIsDeletingAccount(true);
+    setDeleteError(null);
+    try {
+      await deleteAccount();
+      await signOut();
+    } catch (err: any) {
+      setDeleteError(err?.message || "Failed to delete account");
     } finally {
-      setIsSaving(false);
+      setIsDeletingAccount(false);
+      setShowDeletePopup(false);
     }
   };
 
@@ -311,12 +333,23 @@ export default function ProfileSettings() {
 
             {error && <ErrorText>{error}</ErrorText>}
 
+            {/* delete account action inside edit mode */}
+            {!showPasswordSection && (
+              <AppButton
+                title={isDeletingAccount ? "Deleting..." : "Delete Account"}
+                onPress={() => setShowDeletePopup(true)}
+                mode="light"
+                color={colors.gray1}
+                style={styles.button}
+                disabled={isSaving || isDeletingAccount}
+              />
+            )}
             <View style={styles.editButtons}>
               <AppButton
                 title="Cancel"
                 onPress={handleCancel}
                 mode="light"
-                color="lightGray"
+                color={colors.gray2}
                 style={[styles.button]}
                 disabled={isSaving}
               />
@@ -356,6 +389,30 @@ export default function ProfileSettings() {
           </>
         )}
       </View>
+
+      <PopupBox visible={showDeletePopup} onClose={() => setShowDeletePopup(false)} title="Delete Account">
+        <AppText>
+          Are you sure you want to delete your account? This action cannot be undone and all your data will be
+          permanently deleted.
+        </AppText>
+        <View style={{ flexDirection: "row", gap: SPACING.md, justifyContent: "center", marginTop: SPACING.md }}>
+          <AppButton title="Cancel" onPress={() => setShowDeletePopup(false)} color="primary6" />
+          <AppButton
+            title={isDeletingAccount ? "Deleting..." : "Delete"}
+            onPress={confirmDeleteAccount}
+            mode="light"
+            color="primary7"
+            disabled={isDeletingAccount}
+          />
+        </View>
+      </PopupBox>
+
+      <PopupBox visible={!!deleteError} onClose={() => setDeleteError(null)} title="Error" titleColor={COLORS.primary6}>
+        <ErrorText>{deleteError}</ErrorText>
+        <View style={{ marginTop: SPACING.md }}>
+          <AppButton title="Close" onPress={() => setDeleteError(null)} />
+        </View>
+      </PopupBox>
     </Box>
   );
 }

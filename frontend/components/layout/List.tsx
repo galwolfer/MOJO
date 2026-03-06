@@ -44,7 +44,7 @@ export interface ListProps {
  */
 import { TouchableOpacity } from "react-native";
 
-export const ListCell: React.FC<ListCellProps> = ({
+const ListCellComponent: React.FC<ListCellProps> = ({
   id,
   parts,
   content,
@@ -96,6 +96,9 @@ export const ListCell: React.FC<ListCellProps> = ({
     </View>
   );
 };
+
+// Memoize ListCell to prevent re-renders when props haven't changed
+export const ListCell = React.memo(ListCellComponent);
 
 /**
  * List - A simple columnar list that renders rows
