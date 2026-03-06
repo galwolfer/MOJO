@@ -320,13 +320,30 @@ function getFallbackNotification(ojoTypeName, task, subtask, timing, source) {
 }
 
 /**
+ * Resolve the user's chat Ojo type from their profile.ojoTypeId
+ * @param {Object} user - User document (must have profile.ojoTypeId)
+ * @returns {Promise<string>} Ojo type name (defaults to "mentorjo")
+ */
+async function resolveChatOjoType(user) {
+  try {
+    const ojoTypeId = user.profile?.ojoTypeId;
+    if (!ojoTypeId) return "mentorjo";
+    const ojoDoc = await OjoType.findById(ojoTypeId).lean();
+    return ojoDoc?.name || "mentorjo";
+  } catch (error) {
+    logger.warn("Failed to resolve chat Ojo type:", error.message);
+    return "mentorjo";
+  }
+}
+
+/**
  * Determine which Ojo type to use for a notification
  * 
  * @param {Object} user - User document
  * @param {Object} timing - Timing info with prediction data
- * @returns {Object} { useOjo: boolean, ojoType: string|null, source: string }
+ * @returns {Promise<Object>} { useOjo: boolean, ojoType: string|null, source: string }
  */
-export function determineOjoTypeForNotification(user, timing) {
+export async function determineOjoTypeForNotification(user, timing) {
   const prefs = user.pushNotifications;
   const ojoEnabled = prefs?.ojoNotifications?.enabled === true;
   
@@ -354,7 +371,17 @@ export function determineOjoTypeForNotification(user, timing) {
     };
   } else {
     // Smart reminders OFF: use user's selected Ojo type
-    const selectedOjoType = prefs?.ojoNotifications?.selectedOjoType;
+    let selectedOjoType = prefs?.ojoNotifications?.selectedOjoType;
+    
+    // "chat" = use the same Ojo type as the user's chat personality
+    if (selectedOjoType === "chat") {
+      const chatOjoType = await resolveChatOjoType(user);
+      return {
+        useOjo: true,
+        ojoType: chatOjoType,
+        source: "chat_synced",
+      };
+    }
     
     if (selectedOjoType) {
       return {

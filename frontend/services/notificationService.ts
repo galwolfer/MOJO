@@ -13,7 +13,7 @@ import { Platform } from "react-native";
 import { post, get, put } from "./httpClient";
 
 // Types
-export type OjoType = "mentorjo" | "brojo" | "bestojo" | "strictojo";
+export type OjoType = "mentorjo" | "brojo" | "bestojo" | "strictojo" | "chat";
 
 export type OjoTypeOption = {
   name: OjoType;

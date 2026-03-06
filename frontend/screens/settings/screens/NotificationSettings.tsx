@@ -11,6 +11,7 @@ import { View, StyleSheet, Pressable } from "react-native";
 import { moderateScale } from "react-native-size-matters";
 import { TimePicker } from "../../../components/inputs/TimePicker";
 import { useNotificationSettings } from "../../../context/NotificationSettingsContext";
+import { useOjo } from "../../../context/OjoContext";
 import { useColors } from "../../../context/ThemeContext";
 import { COLORS, SPACING, ICON_SIZES } from "../../../theme";
 import { OjoType } from "../../../services/notificationService";
@@ -31,6 +32,7 @@ type Props = { onBack: () => void };
 
 export default function NotificationSettingsScreen({ onBack }: Props) {
   const colors = useColors();
+  const { ojoName: chatOjoName } = useOjo();
   const {
     isInitialized,
     isLoading,
@@ -246,11 +248,13 @@ export default function NotificationSettingsScreen({ onBack }: Props) {
             <ListItem
               title="Ojo Personality"
               subtitle={
-                ojoEnabled && !smartRemindersEnabled
-                  ? `AI notifications · ${getOjoType((preferences?.ojoNotifications?.selectedOjoType ?? "mentorjo") as OjoTypeName).displayName}`
-                  : ojoEnabled && smartRemindersEnabled
-                    ? "AI notifications · Auto-selected by Smart Reminders"
-                    : "AI-crafted notifications with personality"
+                ojoEnabled && !smartRemindersEnabled && preferences?.ojoNotifications?.selectedOjoType === "chat"
+                  ? `AI notifications · Same as Chat (${chatOjoName ? getOjoType((chatOjoName as OjoTypeName) ?? "mentorjo").displayName : "Mentorjo"})`
+                  : ojoEnabled && !smartRemindersEnabled
+                    ? `AI notifications · ${getOjoType((preferences?.ojoNotifications?.selectedOjoType ?? "mentorjo") as OjoTypeName).displayName}`
+                    : ojoEnabled && smartRemindersEnabled
+                      ? "AI notifications · Auto-selected by Smart Reminders"
+                      : "AI-crafted notifications with personality"
               }
               logo={<OjoIcon size={ICON_SIZES.sm} color={COLORS.primary3} />}
               rightElement={
@@ -266,13 +270,65 @@ export default function NotificationSettingsScreen({ onBack }: Props) {
                 <AppText variant="notes" style={{ color: colors.gray1 }}>
                   Choose who delivers your reminders:
                 </AppText>
-                <View style={styles.ojoGrid}>
+
+                {/* Same as Chat Ojo option */}
+                <Pressable
+                  style={[
+                    styles.sameAsChatRow,
+                    {
+                      borderColor: preferences?.ojoNotifications?.selectedOjoType === "chat" ? COLORS.primary3 : colors.bg2,
+                      backgroundColor: preferences?.ojoNotifications?.selectedOjoType === "chat" ? COLORS.primary3 + "15" : colors.bg2,
+                    },
+                  ]}
+                  onPress={() =>
+                    handleSelectOjoType(
+                      preferences?.ojoNotifications?.selectedOjoType === "chat" ? "mentorjo" : ("chat" as OjoType),
+                    )
+                  }
+                >
+                  <Checkbox
+                    checked={preferences?.ojoNotifications?.selectedOjoType === "chat"}
+                    onChange={(checked) =>
+                      handleSelectOjoType(checked ? ("chat" as OjoType) : "mentorjo")
+                    }
+                    size={ICON_SIZES.sm}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <AppText
+                      variant="boldText"
+                      style={{
+                        color: preferences?.ojoNotifications?.selectedOjoType === "chat" ? COLORS.primary3 : colors.text1,
+                        fontSize: moderateScale(12),
+                      }}
+                    >
+                      Same as Chat Ojo
+                    </AppText>
+                    <AppText variant="notes" style={{ color: colors.gray1, fontSize: moderateScale(10) }}>
+                      {chatOjoName
+                        ? `Use ${getOjoType((chatOjoName as OjoTypeName) ?? "mentorjo").displayName} from your chat`
+                        : "Uses your chat personality for notifications"}
+                    </AppText>
+                  </View>
+                  {chatOjoName && (() => {
+                    const ChatIcon = ICONS[getOjoType((chatOjoName as OjoTypeName) ?? "mentorjo").icon] || OjoIcon;
+                    return (
+                      <ChatIcon
+                        size={ICON_SIZES.sm}
+                        color={getOjoType((chatOjoName as OjoTypeName) ?? "mentorjo").color}
+                      />
+                    );
+                  })()}
+                </Pressable>
+
+                {/* Ojo type grid — dimmed when "Same as Chat" is active */}
+                <View style={[styles.ojoGrid, preferences?.ojoNotifications?.selectedOjoType === "chat" && { opacity: 0.4 }]}>
                   {(availableOjoTypes.length > 0
                     ? availableOjoTypes
                     : (["mentorjo", "brojo", "bestojo", "strictojo"] as OjoTypeName[]).map((n) => getOjoType(n))
                   ).map((ojo) => {
                     const cfg = getOjoType(ojo.name as OjoTypeName);
-                    const selected = (preferences?.ojoNotifications?.selectedOjoType ?? "mentorjo") === ojo.name;
+                    const isChatMode = preferences?.ojoNotifications?.selectedOjoType === "chat";
+                    const selected = !isChatMode && (preferences?.ojoNotifications?.selectedOjoType ?? "mentorjo") === ojo.name;
                     const OjoFaceIcon = ICONS[cfg.icon] || OjoIcon;
                     return (
                       <Pressable
@@ -285,6 +341,7 @@ export default function NotificationSettingsScreen({ onBack }: Props) {
                           },
                         ]}
                         onPress={() => handleSelectOjoType(ojo.name as OjoType)}
+                        disabled={isChatMode}
                       >
                         <View
                           style={[
@@ -347,6 +404,7 @@ export default function NotificationSettingsScreen({ onBack }: Props) {
       ojoEnabled,
       availableOjoTypes,
       preferences?.ojoNotifications?.selectedOjoType,
+      chatOjoName,
       handleToggleNotifications,
       handleToggleMorningDigest,
       handleDigestTimeChange,
@@ -603,6 +661,15 @@ const styles = StyleSheet.create({
   ojoIconCircle: {
     justifyContent: "center",
     alignItems: "center",
+  },
+  sameAsChatRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+    padding: SPACING.sm,
+    borderRadius: moderateScale(10),
+    borderWidth: 2,
+    marginTop: SPACING.sm,
   },
 
   // Test section

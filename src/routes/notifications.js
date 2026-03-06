@@ -170,13 +170,13 @@ router.put("/preferences", async (req, res) => {
 
     // Validate ojoNotifications settings if provided
     if (preferences.ojoNotifications) {
-      const validOjoTypes = ["mentorjo", "brojo", "bestojo", "strictojo", null];
+      const validOjoTypes = ["mentorjo", "brojo", "bestojo", "strictojo", "chat", null];
       if (preferences.ojoNotifications.selectedOjoType !== undefined) {
         const ojoType = preferences.ojoNotifications.selectedOjoType;
         if (!validOjoTypes.includes(ojoType)) {
           return res.status(400).json({ 
             success: false, 
-            error: "Invalid Ojo type. Must be one of: mentorjo, brojo, bestojo, strictojo" 
+            error: "Invalid Ojo type. Must be one of: mentorjo, brojo, bestojo, strictojo, chat" 
           });
         }
       }
@@ -383,11 +383,11 @@ router.post("/test/ojo-reminder", async (req, res) => {
     
     // Validate ojoType if provided
     if (ojoType) {
-      const validOjoTypes = ["mentorjo", "brojo", "bestojo", "strictojo"];
+      const validOjoTypes = ["mentorjo", "brojo", "bestojo", "strictojo", "chat"];
       if (!validOjoTypes.includes(ojoType)) {
         return res.status(400).json({ 
           success: false, 
-          error: "Invalid Ojo type. Must be one of: mentorjo, brojo, bestojo, strictojo" 
+          error: "Invalid Ojo type. Must be one of: mentorjo, brojo, bestojo, strictojo, chat" 
         });
       }
     }

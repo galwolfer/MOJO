@@ -265,9 +265,10 @@ const userSchema = new mongoose.Schema(
             // Whether Ojo-styled notifications are enabled (only applies when smartReminders is OFF)
             enabled: { type: Boolean, default: false },
             // Selected Ojo type for notifications (when smartReminders is OFF)
+            // "chat" = use the same Ojo type as the user's chat personality
             selectedOjoType: { 
               type: String, 
-              enum: ["mentorjo", "brojo", "bestojo", "strictojo", null], 
+              enum: ["mentorjo", "brojo", "bestojo", "strictojo", "chat", null], 
               default: null 
             },
           },

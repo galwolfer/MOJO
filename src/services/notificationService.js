@@ -689,7 +689,7 @@ async function buildNotificationWithOjo(user, task, options = {}) {
   const { subtask, timing, source, isSubtask } = options;
   
   // Determine if we should use Ojo and which type
-  const ojoDecision = determineOjoTypeForNotification(user, timing);
+  const ojoDecision = await determineOjoTypeForNotification(user, timing);
   
   if (!ojoDecision.useOjo) {
     // Ojo disabled - use standard notification
@@ -1017,7 +1017,7 @@ export async function testTaskReminderNotification(userId, options = {}) {
 
     // Determine Ojo settings for test
     // useOjo parameter takes precedence - if explicitly false, don't use Ojo
-    const ojoDecision = determineOjoTypeForNotification(user, timing);
+    const ojoDecision = await determineOjoTypeForNotification(user, timing);
     const shouldUseOjo = useOjo === true ? true : (useOjo === false ? false : ojoDecision.useOjo);
     const selectedOjoType = shouldUseOjo ? (forceOjoType || ojoDecision.ojoType) : null;
 
