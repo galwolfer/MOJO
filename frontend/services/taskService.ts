@@ -1763,7 +1763,8 @@ export async function createTaskSchedule(
     // Backend returned success:false — scheduler ran but produced no slots
     return { success: false, message: response.message ?? "No slots found", scheduledCount: 0 };
   } catch (error: any) {
-    console.error("Failed to create task schedule:", error);
+    // Use warn (not error) — callers handle this gracefully; console.error triggers LogBox overlays in dev
+    console.warn("Failed to create task schedule:", error);
     // Return null to signal a network/server error (distinct from scheduler returning empty)
     return null;
   }

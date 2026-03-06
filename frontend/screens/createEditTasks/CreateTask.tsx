@@ -24,7 +24,7 @@ import { ICONS } from "../../components/icons/icons";
 import { TaskDetailsSection, TimeAndPartsSection } from "../../components/special/task";
 import type { TaskFormState, Subtask } from "../../components/special/task";
 import { CATEGORY_KEYS } from "../../config/categoryMeta";
-import { createTask, createTaskSchedule } from "../../services/taskService";
+import { createTask } from "../../services/taskService";
 import { fetchSubcategoriesForCategory, type Subcategory } from "../../services/subcategoryService";
 import { useNavigation } from "../../context/NavigationContext";
 import { useTaskContext } from "../../context/TaskContext";
@@ -281,16 +281,21 @@ const CreateTask: React.FC = () => {
       });
 
       if (result) {
+        // Backend already verified scheduling and saved the plan atomically.
         notifyTaskUpdate();
-        await createTaskSchedule(result._id, { planningHorizonDays: 14 }).catch(() => {});
         setPopupInfo({ title: "Success", message: "Task created successfully.", resetOnClose: true });
       } else {
         setPopupInfo({ title: "Error", message: "Failed to create task. Please try again." });
       }
     } catch (error) {
+      // The backend rolls back the task if scheduling fails and returns a clear message.
+      const msg = error instanceof Error ? error.message : "Unknown error";
+      const isSchedulingError = msg.toLowerCase().includes("could not be scheduled") || msg.toLowerCase().includes("no available time slots");
       setPopupInfo({
-        title: "Error",
-        message: `Failed to create task: ${error instanceof Error ? error.message : "Unknown error"}`,
+        title: isSchedulingError ? "Could Not Schedule Task" : "Error",
+        message: isSchedulingError
+          ? msg
+          : `Failed to create task: ${msg}`,
       });
     } finally {
       setIsLoading(false);

@@ -9,7 +9,8 @@ import { Task } from "../models/Task.js";
 import { SubTask } from "../models/SubTask.js";
 import { isValidCategory } from "../config/categories.js";
 import { hasIllegalDisplayChars } from "../utils/illegalChars.js";
-import { triggerSchedulerUpdate } from "../services/schedulingService.js";
+import { triggerSchedulerUpdate, generatePlan, savePlan } from "../services/schedulingService.js";
+import { User } from "../models/User.js";
 import { findOrCreateSubcategory } from "../services/subcategoryService.js";
 
 /**
@@ -342,8 +343,46 @@ export async function createTask(req, res) {
       subtasks: subtasks || undefined,
     });
 
-    // Trigger scheduler to update the plan after creating a task
-    await triggerSchedulerUpdate(userId, "creation", "API");
+    // ── Atomic scheduling: if this task cannot be scheduled, roll back ────
+    try {
+      const user = await User.findById(userId).select("profile schedulingPreferences").lean();
+      const profileWithGap = {
+        ...(user?.profile || {}),
+        minGapMinutes: user?.schedulingPreferences?.minGapMinutes ?? 10,
+      };
+
+      const { plan, unscheduled } = await generatePlan({
+        userId,
+        profile: profileWithGap,
+        planningHorizonDays: 14,
+      });
+
+      const taskHasSessions = plan.some((s) => String(s.taskId) === String(task._id));
+
+      if (!taskHasSessions) {
+        // Roll back — delete the task that was just created
+        await taskService.deleteTask({ taskId: String(task._id), userId });
+        return res.status(422).json({
+          success: false,
+          schedulingFailed: true,
+          error:
+            "Task could not be scheduled — there are no available time slots before the deadline. The task was not created. Try adjusting the deadline, estimated duration, or your availability.",
+        });
+      }
+
+      // Persist the generated plan
+      await savePlan({ userId, plan, unscheduled });
+    } catch (scheduleErr) {
+      // Scheduling check threw unexpectedly — roll back to keep DB clean
+      await taskService.deleteTask({ taskId: String(task._id), userId }).catch(() => {});
+      logger.error("[createTask] Scheduling failed after task creation, rolled back:", scheduleErr);
+      return res.status(422).json({
+        success: false,
+        schedulingFailed: true,
+        error:
+          "Task could not be scheduled — an error occurred while generating the schedule. The task was not created.",
+      });
+    }
 
     return res.status(201).json({
       success: true,

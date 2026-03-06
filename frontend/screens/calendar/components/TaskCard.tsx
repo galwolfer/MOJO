@@ -97,7 +97,7 @@ function TaskCard({
 
   const isSingleSubtask = task.subtasks?.length === 1;
   const hasNoSubtasks = !task.subtasks || task.subtasks.length === 0;
-  const showCheckbox = hasNoSubtasks || isSingleSubtask;
+  const showCheckbox = hasNoSubtasks;
   const singleSubtask = isSingleSubtask ? task.subtasks![0] : null;
   const singleSubtaskCompleted = singleSubtask ? localSubtasks.has(singleSubtask.id || "") : false;
   const checkboxChecked = hasNoSubtasks ? isCompleted : singleSubtaskCompleted;

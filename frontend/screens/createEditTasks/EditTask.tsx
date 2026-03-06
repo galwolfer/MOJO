@@ -14,7 +14,7 @@
  *   - TaskActionButtons  (UPDATE / Discard / DELETE)
  */
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { View, StyleSheet, SafeAreaView, TouchableOpacity, ActivityIndicator } from "react-native";
 import { COLORS, SPACING, FONT_SIZES, ICON_SIZES } from "../../theme";
 import { useColors } from "../../context/ThemeContext";
@@ -72,7 +72,10 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
     subtasks: [],
   });
 
-  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
+  // ── Snapshot of the original task data for rollback on scheduling failure ──
+  const originalTaskRef = useRef<any>(null);
+
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);;
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
 
   // ── Single-task schedule (numSubtasks === 1) ──────────────────────────────
@@ -184,6 +187,27 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
           numSubtasks,
           subtasks: formSubtasks,
         });
+
+        // Store original task data for rollback if scheduling fails after an update
+        originalTaskRef.current = {
+          taskname: task.taskname || "",
+          description: task.description || "",
+          category: task.category || "",
+          subcategoryId: subCategoryId || undefined,
+          importance: task.importance ?? 3,
+          effort: task.effort ?? 3,
+          dueDate: dateStr,
+          estimatedDuration: task.estimatedDuration ?? undefined,
+          taskType: (task as any).taskType || "perfect",
+          chunkCount: (task as any).chunkCount ?? undefined,
+          subtasks: formSubtasks.map((st, idx) => ({
+            id: st.id,
+            title: st.title,
+            description: st.description || undefined,
+            minutes: st.minutes ? parseInt(st.minutes, 10) : undefined,
+            index: idx + 1,
+          })),
+        };
 
         // Fetch subcategories for the loaded category
         if (task.category) {
@@ -557,7 +581,19 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
 
       // Trigger auto-scheduling for remaining subtasks
       if (hasAutoSubtasks) {
-        await createTaskSchedule(taskId, { planningHorizonDays: 14 }).catch(() => {});
+        const scheduleResult = await createTaskSchedule(taskId, { planningHorizonDays: 14 });
+        if (!scheduleResult?.success) {
+          // Roll back the task update so the DB is not left in a partially-updated state
+          if (originalTaskRef.current) {
+            await updateTask(taskId, originalTaskRef.current).catch(() => {});
+          }
+          setPopupInfo({
+            title: "Could Not Schedule Task",
+            message:
+              "The task could not be scheduled with these changes — there are no available time slots before the deadline. Your task was not updated. Try adjusting the deadline, estimated duration, or your availability.",
+          });
+          return;
+        }
       }
 
       notifyTaskUpdate({ taskId });
@@ -573,7 +609,6 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
   if (isFetching) {
     return (
       <SafeAreaView style={[styles.loadingWrapper, { backgroundColor: colors.bg3 }]}>
-        \
         <ActivityIndicator size="large" color={COLORS.primary1} />
         <AppText style={[styles.loadingText, { color: colors.gray2 }]}>Loading task...</AppText>
       </SafeAreaView>
