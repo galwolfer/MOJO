@@ -76,7 +76,7 @@ function notificationIcon(type: string, ojoType: OjoTypeName | null, color: stri
 
 export default function NotificationInbox() {
   const colors = useColors();
-  const { setHeaderConfig, setActiveTab, goBack, registerBackHandler } = useNavigation();
+  const { setHeaderConfig, goBack } = useNavigation();
   const { unreadCount, refreshUnreadCount } = useNotifications();
 
   const [notifications, setNotifications] = useState<InAppNotification[]>([]);
@@ -92,7 +92,7 @@ export default function NotificationInbox() {
       show: true,
       title: "Notifications",
       leftElement: BackIcon ? (
-        <TouchableOpacity onPress={() => setActiveTab("chat")} style={{ padding: SPACING.sm }}>
+        <TouchableOpacity onPress={goBack} style={{ padding: SPACING.sm }}>
           <BackIcon size={22} color={COLORS.primary1} />
         </TouchableOpacity>
       ) : undefined,
@@ -104,14 +104,6 @@ export default function NotificationInbox() {
         </TouchableOpacity>
       ),
     });
-
-    // Register back handler so hardware back goes to previous tab.
-    // Navigate directly via setActiveTab to avoid re-entering goBack() recursively.
-    const unregister = registerBackHandler(() => {
-      setActiveTab("chat");
-      return true;
-    });
-    return unregister;
   }, []);
 
   // ── Data fetching ──────────────────────────────────────────────────
