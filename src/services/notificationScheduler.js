@@ -46,7 +46,7 @@ export function startMorningDigestScheduler() {
 
 /**
  * Start the task reminder scheduler
- * Runs every 15 minutes to check for upcoming tasks
+ * Runs every minute to check for upcoming tasks
  */
 export function startTaskReminderScheduler() {
   if (taskReminderJob) {
@@ -54,8 +54,8 @@ export function startTaskReminderScheduler() {
     return;
   }
 
-  // Run every 15 minutes
-  taskReminderJob = cron.schedule("*/15 * * * *", async () => {
+  // Run every minute (like morning digest) so we never miss a reminder window
+  taskReminderJob = cron.schedule("* * * * *", async () => {
     logger.info("⏰ Running task reminder job");
     try {
       const results = await sendTaskReminderNotifications();
@@ -65,7 +65,7 @@ export function startTaskReminderScheduler() {
     }
   });
 
-  logger.info("📅 Task reminder scheduler started (runs every 15 minutes)");
+  logger.info("📅 Task reminder scheduler started (runs every minute)");
 }
 
 /**
@@ -108,7 +108,7 @@ export function getSchedulerStatus() {
     },
     taskReminder: {
       running: taskReminderJob !== null,
-      schedule: "Every 15 minutes",
+      schedule: "Every minute",
     },
   };
 }

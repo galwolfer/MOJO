@@ -14,7 +14,6 @@ import { User } from "../models/User.js";
 import { Task } from "../models/Task.js";
 import { SubTask } from "../models/SubTask.js";
 import { TaskSchedule } from "../models/TaskSchedule.js";
-import { predictTask } from "./mlPredictionService.js";
 import { logger } from "../utils/logger.js";
 import { startOfDay, addDays } from "../utils/dateUtils.js";
 import { 
@@ -25,6 +24,29 @@ import {
 
 // Expo Push Notification API endpoint
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
+
+/**
+ * In-memory tracker for sent task reminders to prevent duplicate notifications.
+ * Key format: "<taskId>-<minutesBefore>" (or "<taskId>-<subtaskIndex>-<minutesBefore>" for subtasks)
+ * Value: timestamp (ms) when the reminder was sent.
+ * Entries older than 6 hours are periodically pruned.
+ */
+const sentReminders = new Map();
+
+function getSentReminderKey(taskId, minutesBefore, subtaskIndex = null) {
+  return subtaskIndex != null
+    ? `${taskId}-sub${subtaskIndex}-${minutesBefore}`
+    : `${taskId}-${minutesBefore}`;
+}
+
+function pruneSentReminders() {
+  const sixHoursAgo = Date.now() - 6 * 60 * 60 * 1000;
+  for (const [key, timestamp] of sentReminders) {
+    if (timestamp < sixHoursAgo) {
+      sentReminders.delete(key);
+    }
+  }
+}
 
 /**
  * Validate Expo Push Token format
@@ -486,29 +508,21 @@ async function calculateSmartReminderTiming(task, user) {
   const defaultMinutes = user.pushNotifications?.taskReminders?.defaultReminderMinutes || 60;
   
   try {
-    let category, score;
-    
-    // Use pre-calculated prediction from task if available
-    if (task.predictedCompletionCategory) {
-      category = task.predictedCompletionCategory;
-      score = task.predictionScore || 0.5;
-      logger.info(`Using pre-calculated prediction for task ${task._id}: category=${category}, score=${score}`);
-    } else {
-      // Fall back to making a new ML prediction
-      const prediction = await predictTask(task);
-      
-      if (!prediction.success) {
-        return { 
-          minutesBefore: defaultMinutes, 
-          urgency: "normal",
-          remindCount: 1,
-        };
-      }
-      
-      category = prediction.category;
-      score = prediction.score;
-      logger.info(`Made new ML prediction for task ${task._id}: category=${category}, score=${score}`);
+    // Only use pre-calculated prediction stored on the task — never call the ML model at runtime
+    const category = task.predictedCompletionCategory || null;
+    const score = task.predictionScore || 0.5;
+
+    if (!category) {
+      logger.info(`No pre-calculated prediction for task ${task._id}, using defaults`);
+      return { 
+        minutesBefore: defaultMinutes, 
+        urgency: "normal",
+        remindCount: 1,
+        reminderWindows: [defaultMinutes],
+      };
     }
+
+    logger.info(`Using pre-calculated prediction for task ${task._id}: category=${category}, score=${score}`);
     
     // prediction category: 1=very quick completion, 5=unlikely to complete
     // Higher category = more reminders and earlier start
@@ -551,10 +565,24 @@ async function calculateSmartReminderTiming(task, user) {
       urgency = urgency === "low" ? "normal" : urgency;
     }
 
+    // Build evenly-spaced reminder windows from minutesBefore down to a final reminder
+    // e.g. remindCount=3, minutesBefore=180 => [180, 90, 30] (last one always 30min or less)
+    const reminderWindows = [];
+    if (remindCount === 1) {
+      reminderWindows.push(minutesBefore);
+    } else {
+      const finalReminder = Math.min(30, defaultMinutes); // last reminder is close to deadline
+      const step = (minutesBefore - finalReminder) / (remindCount - 1);
+      for (let i = 0; i < remindCount; i++) {
+        reminderWindows.push(Math.round(minutesBefore - (step * i)));
+      }
+    }
+
     return {
       minutesBefore,
       remindCount,
       urgency,
+      reminderWindows,
       predictionScore: score,
       predictionCategory: category,
     };
@@ -564,6 +592,7 @@ async function calculateSmartReminderTiming(task, user) {
       minutesBefore: defaultMinutes,
       remindCount: 1,
       urgency: "normal",
+      reminderWindows: [defaultMinutes],
     };
   }
 }
@@ -744,6 +773,9 @@ async function buildNotificationWithOjo(user, task, options = {}) {
 export async function sendTaskReminderNotifications() {
   const now = new Date();
   
+  // Prune stale entries from the sent-reminders tracker
+  pruneSentReminders();
+
   logger.info("Running task reminder check (tasks + subtasks)");
 
   const fourHoursFromNow = new Date(now.getTime() + 4 * 60 * 60 * 1000);
@@ -886,42 +918,66 @@ export async function sendTaskReminderNotifications() {
             minutesBefore: user.pushNotifications?.taskReminders?.defaultReminderMinutes || 60,
             remindCount: 1,
             urgency: "normal",
+            reminderWindows: [user.pushNotifications?.taskReminders?.defaultReminderMinutes || 60],
           };
 
-      // Check if it's time to send this reminder based on reminderDate (schedule or due date)
+      // Check each reminder window (e.g. [180, 90, 30] for a category-4 task)
+      const windows = timing.reminderWindows || [timing.minutesBefore];
       const targetTime = new Date(reminderDate).getTime();
-      const reminderTime = targetTime - (timing.minutesBefore * 60 * 1000);
-      
-      // Allow 5 minute window for the reminder
-      if (now.getTime() < reminderTime - 5 * 60 * 1000 || now.getTime() > reminderTime + 5 * 60 * 1000) {
-        results.skipped++;
-        continue;
+      let sentForThisItem = false;
+
+      for (const windowMinutes of windows) {
+        const reminderTime = targetTime - (windowMinutes * 60 * 1000);
+
+        // Allow 2 minute window (tight because cron runs every minute)
+        if (now.getTime() < reminderTime - 2 * 60 * 1000 || now.getTime() > reminderTime + 2 * 60 * 1000) {
+          continue;
+        }
+
+        // Deduplicate: skip if we already sent this exact reminder level
+        const dedupeKey = getSentReminderKey(
+          task._id.toString(),
+          windowMinutes,
+          isSubtask ? subtaskIndex : null,
+        );
+        if (sentReminders.has(dedupeKey)) {
+          continue;
+        }
+
+        // Build notification with Ojo if enabled, otherwise use standard format
+        const subtaskInfo = isSubtask ? { index: subtaskIndex, title: subtaskTitle } : null;
+        const windowTiming = { ...timing, minutesBefore: windowMinutes };
+        const notification = await buildNotificationWithOjo(user, task, {
+          subtask: subtaskInfo,
+          timing: windowTiming,
+          source,
+          isSubtask,
+        });
+        
+        const sendResult = await sendNotificationToUser(task.userId, {
+          ...notification,
+          channelId: "task-reminders",
+        });
+
+        if (sendResult.success) {
+          results.sent++;
+          sentForThisItem = true;
+
+          // Record that this reminder was sent so it won't fire again
+          sentReminders.set(dedupeKey, now.getTime());
+          
+          // Update last reminder timestamp
+          await User.updateOne(
+            { _id: task.userId },
+            { $set: { "pushNotifications.lastTaskReminder": now } }
+          );
+        } else {
+          results.failed++;
+        }
       }
 
-      // Build notification with Ojo if enabled, otherwise use standard format
-      const subtaskInfo = isSubtask ? { index: subtaskIndex, title: subtaskTitle } : null;
-      const notification = await buildNotificationWithOjo(user, task, {
-        subtask: subtaskInfo,
-        timing,
-        source,
-        isSubtask,
-      });
-      
-      const sendResult = await sendNotificationToUser(task.userId, {
-        ...notification,
-        channelId: "task-reminders",
-      });
-
-      if (sendResult.success) {
-        results.sent++;
-        
-        // Update last reminder timestamp
-        await User.updateOne(
-          { _id: task.userId },
-          { $set: { "pushNotifications.lastTaskReminder": now } }
-        );
-      } else {
-        results.failed++;
+      if (!sentForThisItem) {
+        results.skipped++;
       }
     } catch (error) {
       logger.error(`Failed to send reminder for ${isSubtask ? 'subtask' : 'task'} ${task._id}:`, error);
