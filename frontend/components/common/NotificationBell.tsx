@@ -7,12 +7,17 @@
  * Usage: Drop into any screen's header rightElement.
  */
 import React from "react";
-import { View, TouchableOpacity, Text, StyleSheet } from "react-native";
+import { View, TouchableOpacity, Text, StyleSheet, Platform } from "react-native";
 import { ICONS } from "../icons/icons";
 import { COLORS, FONTS, FONT_SIZES, SPACING, ICON_SIZES } from "../../theme";
 import { useNavigation } from "../../context/NavigationContext";
 import { useNotifications } from "../../context/NotificationContext";
 import { useColors } from "../../context/ThemeContext";
+
+const isWeb = Platform.OS === "web";
+const BADGE_SIZE = isWeb ? 22 : 16;
+const BADGE_FONT = isWeb ? 13 : 10;
+const BADGE_LINE = isWeb ? 20 : 14;
 
 export default function NotificationBell() {
   const { setActiveTab } = useNavigation();
@@ -44,20 +49,20 @@ const styles = StyleSheet.create({
   },
   badge: {
     position: "absolute",
-    top: 0,
-    right: -2,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
+    top: -2,
+    right: -4,
+    minWidth: BADGE_SIZE,
+    height: BADGE_SIZE,
+    borderRadius: BADGE_SIZE / 2,
     backgroundColor: COLORS.primary4,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 3,
+    paddingHorizontal: 4,
   },
   badgeText: {
     color: COLORS.white1,
-    fontSize: 10,
+    fontSize: BADGE_FONT,
     fontFamily: FONTS.fredokaSemiBold,
-    lineHeight: 14,
+    lineHeight: BADGE_LINE,
   },
 });
