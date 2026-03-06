@@ -198,7 +198,6 @@ export default function NotificationSettingsScreen({ onBack }: Props) {
               value={`${String(digestHour).padStart(2, "0")}:${String(digestMinute).padStart(2, "0")}`}
               onChange={handleDigestTimeChange}
               disabled={digestTimeDisabled}
-              color="primary5"
             />
           </View>
         </View>
@@ -224,7 +223,7 @@ export default function NotificationSettingsScreen({ onBack }: Props) {
     makeListCell("smart-reminders", {
       title: "Smart Reminders",
       subtitle: "Use AI to optimize reminder timing",
-      logo: <PuzzleIcon size={ICON_SIZES.sm} color={COLORS.primary5} />,
+      logo: <PuzzleIcon size={ICON_SIZES.sm} color={COLORS.primary4} />,
       disabled: taskChildDisabled,
       rightElement: (
         <Checkbox

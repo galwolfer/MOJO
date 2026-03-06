@@ -77,7 +77,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
       icon: ICONS.settings,
       leftElement: (
         <TouchableOpacity onPress={handleBackPress}>
-          <LeftIcon size={ICON_SIZES.md} color={COLORS.primary1} />
+          <LeftIcon size={ICON_SIZES.sm} color={COLORS.primary1} />
         </TouchableOpacity>
       ),
       rightElement: (
