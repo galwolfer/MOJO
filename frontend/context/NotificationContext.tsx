@@ -23,6 +23,7 @@ import {
   isPhysicalDevice,
   NotificationPreferences,
   NotificationData,
+  getUnreadCount,
 } from "../services/notificationService";
 import { useAuth } from "./AuthContext";
 import { OjoNotificationBanner, OjoNotificationBannerData } from "../components/special/OjoNotificationBanner";
@@ -40,6 +41,7 @@ type NotificationContextType = {
   isPhysicalDevice: boolean;
   error: string | null;
   testModeActive: boolean;
+  unreadCount: number;
 
   // Actions
   initialize: () => Promise<void>;
@@ -48,6 +50,7 @@ type NotificationContextType = {
   startPeriodicTest: () => Promise<boolean>;
   stopPeriodicTest: () => Promise<boolean>;
   refreshPreferences: () => Promise<void>;
+  refreshUnreadCount: () => Promise<void>;
 
   // Last notification (if app opened from notification)
   lastNotification: NotificationData | null;
@@ -72,6 +75,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
   const [lastNotification, setLastNotification] = useState<NotificationData | null>(null);
   const [testModeActive, setTestModeActive] = useState(false);
   const [bannerData, setBannerData] = useState<OjoNotificationBannerData | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Refs for listeners
   const notificationReceivedListener = useRef<{ remove: () => void } | null>(null);
@@ -112,6 +116,10 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
           console.log("Notification received in foreground:", notification);
           const content = notification?.request?.content;
           const data = content?.data;
+
+          // Bump unread count for the in-app inbox
+          setUnreadCount((prev) => prev + 1);
+
           if (data?.ojoType) {
             setBannerData({
               ojoType: data.ojoType,
@@ -314,6 +322,28 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     setLastNotification(null);
   }, []);
 
+  /**
+   * Refresh unread notification count from the server
+   */
+  const refreshUnreadCount = useCallback(async () => {
+    if (!user || !token) return;
+    try {
+      const result = await getUnreadCount();
+      if (result.success) {
+        setUnreadCount(result.unreadCount);
+      }
+    } catch (err) {
+      console.error("Error refreshing unread count:", err);
+    }
+  }, [user, token]);
+
+  // Poll unread count when initialized
+  useEffect(() => {
+    if (isInitialized && user && token) {
+      refreshUnreadCount();
+    }
+  }, [isInitialized, user, token]);
+
   const value: NotificationContextType = {
     isInitialized,
     isLoading,
@@ -323,12 +353,14 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     isPhysicalDevice: isPhysicalDeviceState,
     error,
     testModeActive,
+    unreadCount,
     initialize,
     updatePreferences,
     testNotification,
     startPeriodicTest,
     stopPeriodicTest,
     refreshPreferences,
+    refreshUnreadCount,
     lastNotification,
     clearLastNotification,
   };

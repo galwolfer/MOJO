@@ -10,6 +10,7 @@
 import { Router } from "express";
 import { requireAuth } from "../middlewares/auth.js";
 import { SentReminder } from "../models/SentReminder.js";
+import { InAppNotification } from "../models/InAppNotification.js";
 import {
   registerPushToken,
   unregisterPushToken,
@@ -439,6 +440,126 @@ router.get("/sent-reminders", async (req, res) => {
       success: false,
       error: "Failed to fetch sent reminders",
     });
+  }
+});
+
+// ─── In-App Notification Inbox ─────────────────────────────────────────
+
+/**
+ * GET /api/notifications/inbox
+ * Fetch in-app notifications for the authenticated user.
+ *
+ * Query params:
+ *   limit  – max items to return (default 50, max 100)
+ *   before – ISO date cursor for pagination (fetch items older than this)
+ *   unreadOnly – if "true", only return unread notifications
+ */
+router.get("/inbox", async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
+    const filter = { userId: req.user.userId };
+
+    if (req.query.before) {
+      filter.createdAt = { $lt: new Date(req.query.before) };
+    }
+    if (req.query.unreadOnly === "true") {
+      filter.read = false;
+    }
+
+    const notifications = await InAppNotification.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    const unreadCount = await InAppNotification.countDocuments({
+      userId: req.user.userId,
+      read: false,
+    });
+
+    return res.json({ success: true, notifications, unreadCount });
+  } catch (error) {
+    console.error("Error fetching in-app notifications:", error);
+    return res.status(500).json({ success: false, error: "Failed to fetch notifications" });
+  }
+});
+
+/**
+ * GET /api/notifications/inbox/unread-count
+ * Quick endpoint that returns only the unread badge count.
+ */
+router.get("/inbox/unread-count", async (req, res) => {
+  try {
+    const unreadCount = await InAppNotification.countDocuments({
+      userId: req.user.userId,
+      read: false,
+    });
+    return res.json({ success: true, unreadCount });
+  } catch (error) {
+    console.error("Error fetching unread count:", error);
+    return res.status(500).json({ success: false, error: "Failed to fetch unread count" });
+  }
+});
+
+/**
+ * PATCH /api/notifications/inbox/:id/read
+ * Mark a single notification as read.
+ */
+router.patch("/inbox/:id/read", async (req, res) => {
+  try {
+    const notification = await InAppNotification.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user.userId },
+      { $set: { read: true } },
+      { new: true },
+    );
+
+    if (!notification) {
+      return res.status(404).json({ success: false, error: "Notification not found" });
+    }
+
+    return res.json({ success: true, notification });
+  } catch (error) {
+    console.error("Error marking notification as read:", error);
+    return res.status(500).json({ success: false, error: "Failed to mark notification as read" });
+  }
+});
+
+/**
+ * PATCH /api/notifications/inbox/read-all
+ * Mark all notifications as read for the authenticated user.
+ */
+router.patch("/inbox/read-all", async (req, res) => {
+  try {
+    const result = await InAppNotification.updateMany(
+      { userId: req.user.userId, read: false },
+      { $set: { read: true } },
+    );
+
+    return res.json({ success: true, modifiedCount: result.modifiedCount });
+  } catch (error) {
+    console.error("Error marking all notifications as read:", error);
+    return res.status(500).json({ success: false, error: "Failed to mark notifications as read" });
+  }
+});
+
+/**
+ * DELETE /api/notifications/inbox/:id
+ * Delete a single in-app notification.
+ */
+router.delete("/inbox/:id", async (req, res) => {
+  try {
+    const result = await InAppNotification.findOneAndDelete({
+      _id: req.params.id,
+      userId: req.user.userId,
+    });
+
+    if (!result) {
+      return res.status(404).json({ success: false, error: "Notification not found" });
+    }
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting notification:", error);
+    return res.status(500).json({ success: false, error: "Failed to delete notification" });
   }
 });
 

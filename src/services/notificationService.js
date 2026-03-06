@@ -15,6 +15,7 @@ import { Task } from "../models/Task.js";
 import { SubTask } from "../models/SubTask.js";
 import { TaskSchedule } from "../models/TaskSchedule.js";
 import { SentReminder } from "../models/SentReminder.js";
+import { InAppNotification } from "../models/InAppNotification.js";
 import { logger } from "../utils/logger.js";
 import { startOfDay, addDays } from "../utils/dateUtils.js";
 import { 
@@ -72,6 +73,25 @@ async function recordSentReminder({ dedupeKey, taskId, userId, taskName, subtask
     );
   } catch (error) {
     logger.warn(`Failed to record sent reminder ${dedupeKey}:`, error.message);
+  }
+}
+
+/**
+ * Store an in-app copy of a notification so the user can view it inside the app.
+ * Fire-and-forget – failures are logged but never block push delivery.
+ */
+async function storeInAppNotification({ userId, title, body, type, data, ojoType }) {
+  try {
+    await InAppNotification.create({
+      userId,
+      type: type || data?.type || "general",
+      title: title || "",
+      body: body || "",
+      data: data || {},
+      ojoType: ojoType || data?.ojoType || null,
+    });
+  } catch (error) {
+    logger.warn("Failed to store in-app notification:", error.message);
   }
 }
 
@@ -201,6 +221,16 @@ export async function sendNotificationToUser(userId, notification) {
       priority: notification.priority || "high",
       channelId: notification.channelId || "default",
     };
+
+    // Store in-app copy (fire-and-forget)
+    storeInAppNotification({
+      userId,
+      title: notification.title,
+      body: notification.body,
+      type: notification.data?.type,
+      data: notification.data,
+      ojoType: notification.data?.ojoType,
+    });
 
     return await sendPushNotifications([message]);
   } catch (error) {
@@ -367,6 +397,7 @@ export async function sendMorningDigestNotifications() {
 
   const messages = [];
   const userUpdates = [];
+  const inAppItems = []; // parallel array for in-app storage
 
   for (const user of users) {
     try {
@@ -408,6 +439,7 @@ export async function sendMorningDigestNotifications() {
         channelId: "morning-digest",
       });
 
+      inAppItems.push({ userId: user._id, title: notification.title, body: notification.body, type: "morning_digest", data: notification.data });
       userUpdates.push(user._id);
     } catch (error) {
       logger.error(`Failed to prepare digest for user ${user._id}:`, error);
@@ -421,6 +453,11 @@ export async function sendMorningDigestNotifications() {
     
     if (sendResult.success) {
       results.sent = messages.length;
+
+      // Store in-app copies (fire-and-forget)
+      for (const item of inAppItems) {
+        storeInAppNotification(item);
+      }
       
       // Update lastMorningDigest for all users
       await User.updateMany(
@@ -466,6 +503,7 @@ export async function testMorningDigestNotifications() {
   };
 
   const messages = [];
+  const inAppItems = [];
 
   for (const user of users) {
     try {
@@ -501,6 +539,8 @@ export async function testMorningDigestNotifications() {
         priority: "high",
         channelId: "morning-digest",
       });
+
+      inAppItems.push({ userId: user._id, title: notification.title, body: notification.body, type: "morning_digest", data: notification.data });
     } catch (error) {
       logger.error(`🧪 Failed to prepare test digest for user ${user._id}:`, error);
       results.failed++;
@@ -513,6 +553,11 @@ export async function testMorningDigestNotifications() {
     
     if (sendResult.success) {
       results.sent = messages.length;
+
+      // Store in-app copies (fire-and-forget)
+      for (const item of inAppItems) {
+        storeInAppNotification(item);
+      }
     } else {
       results.failed = messages.length;
     }

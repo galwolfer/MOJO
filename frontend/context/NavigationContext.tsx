@@ -12,7 +12,7 @@ import { BackHandler, Platform } from "react-native";
  * runs (add/edit/alltasks → calendar, others → no-op / let OS handle it).
  */
 
-export type TabName = "chat" | "calendar" | "user" | "create" | "edit" | "alltasks";
+export type TabName = "chat" | "calendar" | "user" | "create" | "edit" | "alltasks" | "notifications";
 
 export type HeaderConfig = {
   title?: string;
@@ -118,6 +118,8 @@ export const NavigationProvider = ({ children }: { children: ReactNode }) => {
       setActiveTab(previousTabRef.current ?? "calendar");
     } else if (tab === "alltasks") {
       setActiveTab("calendar");
+    } else if (tab === "notifications") {
+      setActiveTab(previousTabRef.current ?? "chat");
     }
     // chat / calendar / user → let OS handle it (minimize / exit)
   }, [setActiveTab]);

@@ -34,6 +34,7 @@ import FloatingButton from "../../components/common/FloatingButton";
 import { useCalendarTasks } from "./hooks/useCalendarTasks";
 import { Task } from "./types";
 import { useOptionalStatsContext } from "../../context/StatsContext";
+import NotificationBell from "../../components/common/NotificationBell";
 
 export default function CalendarScreen() {
   const { setHeaderConfig, setActiveTab, setActiveTabWithParams, calendarSelectedDate, setCalendarSelectedDate } =
@@ -74,9 +75,12 @@ export default function CalendarScreen() {
         </TouchableOpacity>
       ),
       rightElement: (
-        <TouchableOpacity onPress={() => setActiveTab("alltasks")} activeOpacity={0.7}>
-          <ICONS.list size={ICON_SIZES.md} color={colors.primary1} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: SPACING.sm }}>
+          <NotificationBell />
+          <TouchableOpacity onPress={() => setActiveTab("alltasks")} activeOpacity={0.7}>
+            <ICONS.list size={ICON_SIZES.md} color={colors.primary1} />
+          </TouchableOpacity>
+        </View>
       ),
       element: bottomElement,
     });

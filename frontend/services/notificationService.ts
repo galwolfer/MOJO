@@ -10,7 +10,7 @@
  */
 
 import { Platform } from "react-native";
-import { post, get, put } from "./httpClient";
+import { post, get, put, del, patch } from "./httpClient";
 
 // Types
 export type OjoType = "mentorjo" | "brojo" | "bestojo" | "strictojo" | "chat";
@@ -577,5 +577,111 @@ export async function initializePushNotifications(projectId?: string): Promise<{
       permissionStatus: "error",
       error: error.message,
     };
+  }
+}
+
+// ─── In-App Notification Inbox ─────────────────────────────────────────
+
+export type InAppNotification = {
+  _id: string;
+  userId: string;
+  type: string;
+  title: string;
+  body: string;
+  data: Record<string, any>;
+  read: boolean;
+  ojoType: OjoType | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/**
+ * Fetch in-app notifications for the current user.
+ * Supports cursor-based pagination via `before` (ISO date).
+ */
+export async function getInboxNotifications(options?: {
+  limit?: number;
+  before?: string;
+  unreadOnly?: boolean;
+}): Promise<{ success: boolean; notifications: InAppNotification[]; unreadCount: number }> {
+  try {
+    const params = new URLSearchParams();
+    if (options?.limit) params.set("limit", String(options.limit));
+    if (options?.before) params.set("before", options.before);
+    if (options?.unreadOnly) params.set("unreadOnly", "true");
+
+    const qs = params.toString();
+    const response = await get<{
+      success: boolean;
+      notifications: InAppNotification[];
+      unreadCount: number;
+    }>(`/notifications/inbox${qs ? `?${qs}` : ""}`);
+
+    return {
+      success: true,
+      notifications: response.notifications ?? [],
+      unreadCount: response.unreadCount ?? 0,
+    };
+  } catch (error: any) {
+    console.error("Error fetching inbox notifications:", error);
+    return { success: false, notifications: [], unreadCount: 0 };
+  }
+}
+
+/**
+ * Get the unread notification count (lightweight endpoint).
+ */
+export async function getUnreadCount(): Promise<{ success: boolean; unreadCount: number }> {
+  try {
+    const response = await get<{ success: boolean; unreadCount: number }>(
+      "/notifications/inbox/unread-count",
+    );
+    return { success: true, unreadCount: response.unreadCount ?? 0 };
+  } catch (error: any) {
+    console.error("Error fetching unread count:", error);
+    return { success: false, unreadCount: 0 };
+  }
+}
+
+/**
+ * Mark a single notification as read.
+ */
+export async function markNotificationRead(
+  notificationId: string,
+): Promise<{ success: boolean }> {
+  try {
+    await patch<{ success: boolean }>(`/notifications/inbox/${notificationId}/read`, {});
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error marking notification as read:", error);
+    return { success: false };
+  }
+}
+
+/**
+ * Mark all notifications as read.
+ */
+export async function markAllNotificationsRead(): Promise<{ success: boolean }> {
+  try {
+    await patch<{ success: boolean }>("/notifications/inbox/read-all", {});
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error marking all notifications as read:", error);
+    return { success: false };
+  }
+}
+
+/**
+ * Delete a single in-app notification.
+ */
+export async function deleteNotification(
+  notificationId: string,
+): Promise<{ success: boolean }> {
+  try {
+    await del<{ success: boolean }>(`/notifications/inbox/${notificationId}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error deleting notification:", error);
+    return { success: false };
   }
 }
