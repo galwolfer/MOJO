@@ -16,6 +16,7 @@ import { COLORS, SPACING, FONT_SIZES, SHADOWS, FONTS } from "../../../theme";
 import AppText from "../../../components/common/AppText";
 import Input from "../../../components/inputs/Input";
 import CalendarPicker from "../../../components/inputs/CalendarPicker";
+import { TimeRangePicker } from "../../../components/inputs/TimeRangePicker";
 import { ICONS } from "../../../components/icons/icons";
 
 export interface ScheduleToggleData {
@@ -86,26 +87,13 @@ const ScheduleToggle: React.FC<Props> = ({ schedule, onChange }) => {
           )}
 
           {/* Start + End time */}
-          <View style={styles.timeRow}>
-            <View style={styles.timeField}>
-              <Input
-                label="Start (HH:MM)"
-                placeholder="09:00"
-                value={schedule.startTime}
-                onChangeText={(v) => onChange("startTime", v)}
-                type="text"
-              />
-            </View>
-            <View style={styles.timeField}>
-              <Input
-                label="End (HH:MM)"
-                placeholder="10:00"
-                value={schedule.endTime}
-                onChangeText={(v) => onChange("endTime", v)}
-                type="text"
-              />
-            </View>
-          </View>
+          <TimeRangePicker
+            startTime={schedule.startTime ?? ""}
+            endTime={schedule.endTime ?? ""}
+            onStartChange={(v) => onChange("startTime", v)}
+            onEndChange={(v) => onChange("endTime", v)}
+            color="primary1"
+          />
         </View>
       ) : (
         <View style={styles.autoBadge}>
@@ -162,13 +150,6 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
     overflow: "hidden",
     ...SHADOWS.card,
-  },
-  timeRow: {
-    flexDirection: "row",
-    gap: SPACING.md,
-  },
-  timeField: {
-    flex: 1,
   },
   autoBadge: {
     backgroundColor: COLORS.white3,

@@ -6,12 +6,13 @@
  * Uses SettingsSubScreen for consistent header/scroll layout across all settings screens.
  * Business logic delegated to NotificationSettingsContext.
  */
-import React from "react";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
+import React, { useCallback } from "react";
+import { View, StyleSheet } from "react-native";
 import { moderateScale } from "react-native-size-matters";
+import { TimePicker } from "../../../components/inputs/TimePicker";
 import { useNotificationSettings } from "../../../context/NotificationSettingsContext";
 import { useColors } from "../../../context/ThemeContext";
-import { COLORS, SPACING, FONT_SIZES, ICON_SIZES } from "../../../theme";
+import { COLORS, SPACING, ICON_SIZES } from "../../../theme";
 import { OjoType } from "../../../services/notificationService";
 import { getOjoType, OjoTypeName } from "../../../config/ojoTypeConfig";
 import { ICONS } from "../../../components/icons/icons";
@@ -74,14 +75,21 @@ export default function NotificationSettingsScreen({ onBack }: Props) {
 
   // ── Icons ─────────────────────────────────────────────────────────────────
 
-  const UpIcon = ICONS.up;
-  const DownIcon = ICONS.down;
   const DayIcon = ICONS.day;
   const ClockIcon = ICONS.clock;
   const PuzzleIcon = ICONS.puzzle;
   const OjoIcon = ICONS.ojo;
   const RepeatIcon = ICONS.repeat;
   const NotificationIcon = ICONS.notifications;
+
+  // Digest time handler for TimePicker (converts "HH:MM" → changeDigestTime)
+  const handleDigestTimeChange = useCallback(
+    (value: string) => {
+      const [h, m] = value.split(":").map(Number);
+      if (!isNaN(h) && !isNaN(m)) changeDigestTime(h, m);
+    },
+    [changeDigestTime],
+  );
 
   // ── Not initialized ───────────────────────────────────────────────────────
 
@@ -185,57 +193,13 @@ export default function NotificationSettingsScreen({ onBack }: Props) {
             }
           />
           <View style={[styles.timePicker, !digestEnabled && { opacity: 0.5 }]}>
-            <AppText variant="boldText" style={{ color: colors.text1, marginBottom: SPACING.xs }}>
-              Set Digest Time
-            </AppText>
-            <View style={styles.timeInputGroup}>
-              <View style={styles.timeInputContainer}>
-                <TouchableOpacity
-                  onPress={() => changeDigestTime(digestHour < 23 ? digestHour + 1 : 0, digestMinute)}
-                  disabled={digestTimeDisabled}
-                  style={styles.timeBtn}
-                >
-                  <UpIcon size={ICON_SIZES.xs} color={COLORS.colorWhite} />
-                </TouchableOpacity>
-                <AppText variant="title2" style={styles.timeDigit}>
-                  {String(digestHour).padStart(2, "0")}
-                </AppText>
-                <TouchableOpacity
-                  onPress={() => changeDigestTime(digestHour > 0 ? digestHour - 1 : 23, digestMinute)}
-                  disabled={digestTimeDisabled}
-                  style={styles.timeBtn}
-                >
-                  <DownIcon size={ICON_SIZES.xs} color={COLORS.colorWhite} />
-                </TouchableOpacity>
-              </View>
-
-              <AppText variant="title2" style={[styles.timeSep, { color: colors.text1 }]}>
-                :
-              </AppText>
-
-              <View style={styles.timeInputContainer}>
-                <TouchableOpacity
-                  onPress={() => changeDigestTime(digestHour, digestMinute < 59 ? digestMinute + 1 : 0)}
-                  disabled={digestTimeDisabled}
-                  style={styles.timeBtn}
-                >
-                  <UpIcon size={ICON_SIZES.xs} color={COLORS.colorWhite} />
-                </TouchableOpacity>
-                <AppText variant="title2" style={styles.timeDigit}>
-                  {String(digestMinute).padStart(2, "0")}
-                </AppText>
-                <TouchableOpacity
-                  onPress={() => changeDigestTime(digestHour, digestMinute > 0 ? digestMinute - 1 : 59)}
-                  disabled={digestTimeDisabled}
-                  style={styles.timeBtn}
-                >
-                  <DownIcon size={ICON_SIZES.xs} color={COLORS.colorWhite} />
-                </TouchableOpacity>
-              </View>
-            </View>
-            <AppText variant="notes" style={{ color: colors.gray1, textAlign: "center" }}>
-              Tap arrows to adjust the time
-            </AppText>
+            <TimePicker
+              label=" Set Digest Time"
+              value={`${String(digestHour).padStart(2, "0")}:${String(digestMinute).padStart(2, "0")}`}
+              onChange={handleDigestTimeChange}
+              disabled={digestTimeDisabled}
+              color="primary5"
+            />
           </View>
         </View>
       ),
@@ -506,32 +470,7 @@ const styles = StyleSheet.create({
   timePicker: {
     marginLeft: SPACING.md,
     paddingVertical: SPACING.md,
-    alignItems: "center",
     gap: SPACING.sm,
-  },
-  timeInputGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.lg,
-  },
-  timeInputContainer: {
-    alignItems: "center",
-    gap: SPACING.sm,
-  },
-  timeBtn: {
-    width: moderateScale(36),
-    height: moderateScale(36),
-    borderRadius: moderateScale(18),
-    backgroundColor: COLORS.primary1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  timeDigit: {
-    minWidth: FONT_SIZES.lg * 1.5,
-    textAlign: "center",
-  },
-  timeSep: {
-    marginHorizontal: SPACING.xs,
   },
 
   // Ojo type selector

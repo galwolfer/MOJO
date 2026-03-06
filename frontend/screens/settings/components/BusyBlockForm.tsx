@@ -3,6 +3,7 @@ import { View, StyleSheet } from "react-native";
 import AppText from "../../../components/common/AppText";
 import Input from "../../../components/inputs/Input";
 import AppButton from "../../../components/common/AppButton";
+import { TimeRangePicker } from "../../../components/inputs/TimeRangePicker";
 import { COLORS, SPACING, FONT_SIZES } from "../../../theme";
 
 export interface BlockFormState {
@@ -23,22 +24,28 @@ interface BusyBlockFormProps {
 
 export function BusyBlockForm({ form, onField, saving, isEditing, onCancel, onSubmit, error }: BusyBlockFormProps) {
   return (
-    <View>
-      <AppText style={styles.fieldLabel}>Title (optional)</AppText>
+    <View style={styles.container}>
       <Input
+        label="Title (optional)"
         placeholder="e.g. Morning workout"
         value={form.title}
         onChangeText={(v) => onField("title", v)}
         type="text"
+        disabled={saving}
       />
 
-      <AppText style={[styles.fieldLabel, { marginTop: SPACING.sm }]}>Start time (HH:MM)</AppText>
-      <Input placeholder="09:00" value={form.startTime} onChangeText={(v) => onField("startTime", v)} type="text" />
+      <View style={styles.timeSection}>
+        <TimeRangePicker
+          startTime={form.startTime}
+          endTime={form.endTime}
+          onStartChange={(v) => onField("startTime", v)}
+          onEndChange={(v) => onField("endTime", v)}
+          disabled={saving}
+          color="primary1"
+        />
+      </View>
 
-      <AppText style={[styles.fieldLabel, { marginTop: SPACING.sm }]}>End time (HH:MM)</AppText>
-      <Input placeholder="10:00" value={form.endTime} onChangeText={(v) => onField("endTime", v)} type="text" />
-
-      {error && <AppText style={styles.error}>{error}</AppText>}
+      {error ? <AppText style={styles.error}>{error}</AppText> : null}
 
       <View style={styles.buttonRow}>
         <AppButton title="Cancel" mode="light" color="lightGray" onPress={onCancel} width="48%" disabled={saving} />
@@ -56,7 +63,9 @@ export function BusyBlockForm({ form, onField, saving, isEditing, onCancel, onSu
 }
 
 const styles = StyleSheet.create({
+  container: { gap: SPACING.sm },
   fieldLabel: { fontSize: FONT_SIZES.sm, color: COLORS.darkGray, marginBottom: 4, fontWeight: "400" },
-  buttonRow: { flexDirection: "row", gap: SPACING.md, marginTop: SPACING.lg, width: "100%" },
+  timeSection: { marginTop: SPACING.xs },
+  buttonRow: { flexDirection: "row", gap: SPACING.md, marginTop: SPACING.sm, width: "100%" },
   error: { color: COLORS.primary7, marginTop: SPACING.sm },
 });
