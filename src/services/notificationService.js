@@ -1077,7 +1077,7 @@ export async function testTaskReminderNotification(userId, options = {}) {
     // If still no task, create a mock task for testing
     if (!task) {
       task = {
-        _id: "test-task-id",
+        _id: "aaaaaaaaaaaaaaaaaaaaaaaa",
         taskname: "Sample Test Task",
         description: "A test task to demonstrate notifications",
         importance: 3,
@@ -1366,7 +1366,7 @@ export async function testOjoReminderNotification(userId, options = {}) {
     // If still no task, create a mock task for testing
     if (!task) {
       task = {
-        _id: "test-task-id",
+        _id: "aaaaaaaaaaaaaaaaaaaaaaaa",
         taskname: "Sample Test Task",
         description: "A test task to demonstrate Ojo-powered notifications",
         importance: 3,
