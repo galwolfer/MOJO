@@ -9,6 +9,7 @@
  */
 
 import React, { createContext, useState, useEffect, useContext, useCallback, useRef } from "react";
+import { Platform } from "react-native";
 import {
   initializePushNotifications,
   getNotificationPreferences,
@@ -24,6 +25,7 @@ import {
   NotificationPreferences,
   NotificationData,
   getUnreadCount,
+  getInboxNotifications,
 } from "../services/notificationService";
 import { useAuth } from "./AuthContext";
 import { OjoNotificationBanner, OjoNotificationBannerData } from "../components/special/OjoNotificationBanner";
@@ -80,6 +82,9 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
   // Refs for listeners
   const notificationReceivedListener = useRef<{ remove: () => void } | null>(null);
   const notificationResponseListener = useRef<{ remove: () => void } | null>(null);
+
+  /** Tracks the newest notification id we've already seen, so the web poller can detect new ones. */
+  const lastSeenNotificationIdRef = useRef<string | null>(null);
 
   // Check if running on physical device
   useEffect(() => {
@@ -222,6 +227,8 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     } catch (err: any) {
       setError(err.message);
       console.error("Error initializing notifications:", err);
+      // Still mark as initialized so the inbox / unread polling works (esp. on web)
+      setIsInitialized(true);
     } finally {
       setIsLoading(false);
     }
@@ -336,12 +343,66 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     }
   }, [user, token]);
 
-  // Poll unread count when initialized
+  // Poll unread count once on init, then periodically (covers web where push listeners don't fire)
   useEffect(() => {
-    if (isInitialized && user && token) {
-      refreshUnreadCount();
-    }
-  }, [isInitialized, user, token]);
+    if (!user || !token) return;
+
+    // Initial fetch
+    refreshUnreadCount();
+
+    // Periodic refresh every 30 seconds so the badge stays current on web
+    const interval = setInterval(refreshUnreadCount, 30_000);
+    return () => clearInterval(interval);
+  }, [user, token, refreshUnreadCount]);
+
+  // ── Web-specific polling: detect new notifications and show the banner ──
+  useEffect(() => {
+    if (Platform.OS !== "web" || !user || !token) return;
+
+    let cancelled = false;
+
+    const pollForNewNotifications = async () => {
+      try {
+        const result = await getInboxNotifications({ limit: 1 });
+        if (cancelled || !result.success || result.notifications.length === 0) return;
+
+        const newest = result.notifications[0];
+
+        // On the very first poll just seed the ref — don't show a stale banner.
+        if (lastSeenNotificationIdRef.current === null) {
+          lastSeenNotificationIdRef.current = newest._id;
+          return;
+        }
+
+        // If the newest notification id changed, a new notification arrived.
+        if (newest._id !== lastSeenNotificationIdRef.current) {
+          lastSeenNotificationIdRef.current = newest._id;
+          setUnreadCount((prev) => Math.max(prev, 1));
+          const validOjoTypes = ["mentorjo", "brojo", "bestojo", "strictojo"];
+          const ojoType = newest.ojoType && validOjoTypes.includes(newest.ojoType)
+            ? (newest.ojoType as OjoNotificationBannerData["ojoType"])
+            : null;
+          setBannerData({
+            ojoType,
+            title: newest.title || "Notification",
+            body: newest.body || "",
+          });
+          // Also refresh the real count from server
+          refreshUnreadCount();
+        }
+      } catch {
+        // Silently ignore polling failures
+      }
+    };
+
+    // Seed immediately, then poll every 15s
+    pollForNewNotifications();
+    const interval = setInterval(pollForNewNotifications, 15_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [user, token]);
 
   const value: NotificationContextType = {
     isInitialized,
