@@ -21,8 +21,8 @@ import { View, Switch, Pressable, StyleSheet } from "react-native";
 import AppText from "../common/AppText";
 import AppButton from "../common/AppButton";
 import Input from "../inputs/Input";
-import InputField from "../inputs/InputField";
 import Icon from "../icons/Icon";
+import { TimeRangePicker } from "../inputs/TimeRangePicker";
 import { COLORS, SPACING, FONT_SIZES, SHADOWS } from "../../theme";
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -169,38 +169,18 @@ interface BlockEntryCardProps {
 function BlockEntryCard({ block, onChange, onRemove, canRemove }: BlockEntryCardProps) {
   return (
     <View style={bcStyles.card}>
-      {/* From / To row */}
-      <View style={bcStyles.timeRow}>
-        <AppText style={bcStyles.timeLabel}>From</AppText>
-        <View style={bcStyles.inputWrapper}>
-          <InputField
-            value={block.range.start}
-            onChangeText={(v) => onChange({ ...block, range: { ...block.range, start: v } })}
-            placeholderText="09:00"
-            keyboardType="numbers-and-punctuation"
-            maxLength={5}
-            returnKeyType="next"
-            selectTextOnFocus
-          />
-        </View>
-        <AppText style={bcStyles.timeLabel}>To</AppText>
-        <View style={bcStyles.inputWrapper}>
-          <InputField
-            value={block.range.end}
-            onChangeText={(v) => onChange({ ...block, range: { ...block.range, end: v } })}
-            placeholderText="10:00"
-            keyboardType="numbers-and-punctuation"
-            maxLength={5}
-            returnKeyType="done"
-            selectTextOnFocus
-          />
-        </View>
-        {canRemove && (
-          <Pressable style={bcStyles.removeBtn} onPress={onRemove} hitSlop={8}>
-            <Icon name="cancel" size={18} color="#C62828" />
-          </Pressable>
-        )}
-      </View>
+      <TimeRangePicker
+        startTime={block.range.start}
+        endTime={block.range.end}
+        onStartChange={(v) => onChange({ ...block, range: { ...block.range, start: v } })}
+        onEndChange={(v) => onChange({ ...block, range: { ...block.range, end: v } })}
+        color="primary1"
+      />
+      {canRemove && (
+        <Pressable style={bcStyles.removeBtn} onPress={onRemove} hitSlop={8}>
+          <Icon name="cancel" size={16} color="#C62828" />
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -208,43 +188,23 @@ function BlockEntryCard({ block, onChange, onRemove, canRemove }: BlockEntryCard
 const bcStyles = StyleSheet.create({
   card: {
     borderWidth: 1,
-    borderColor: COLORS.white3,
-    borderRadius: 10,
-    padding: SPACING.sm,
-    marginBottom: SPACING.sm,
-    backgroundColor: COLORS.white1 ?? COLORS.colorWhite,
-    gap: SPACING.xs,
-  },
-  titleRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    borderColor: COLORS.primary1 + "33",
+    borderRadius: 12,
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.sm,
+    marginBottom: SPACING.md,
+    backgroundColor: COLORS.primary1 + "08",
     gap: SPACING.sm,
   },
   removeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: "#FFEBEE",
     justifyContent: "center",
     alignItems: "center",
-  },
-  timeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.sm,
-  },
-  timeLabel: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.darkGray,
-    minWidth: 30,
-  },
-  inputWrapper: {
-    flex: 1,
-    borderWidth: 1.5,
-    borderColor: COLORS.white3,
-    borderRadius: 8,
-    backgroundColor: COLORS.colorWhite,
-    overflow: "hidden",
+    alignSelf: "flex-end",
   },
 });
 
@@ -293,12 +253,15 @@ export function DayBlockEditor({ dayKey, schedule, onChange }: DayBlockEditorPro
     onChange({ ...schedule, blocks: [...blocks, emptyBlock()] });
 
   return (
-    <View style={dayStyles.card}>
+    <View style={[dayStyles.card, enabled && dayStyles.cardEnabled]}>
       {/* Header: day name + toggle */}
       <View style={dayStyles.header}>
-        <AppText style={[dayStyles.dayName, enabled && dayStyles.dayNameEnabled]}>
-          {DAY_LABELS[dayKey]}
-        </AppText>
+        <View style={dayStyles.dayNameRow}>
+          {enabled && <View style={dayStyles.activeDot} />}
+          <AppText style={[dayStyles.dayName, enabled && dayStyles.dayNameEnabled]}>
+            {DAY_LABELS[dayKey]}
+          </AppText>
+        </View>
         <Switch
           value={enabled}
           onValueChange={toggleDay}
@@ -309,9 +272,10 @@ export function DayBlockEditor({ dayKey, schedule, onChange }: DayBlockEditorPro
         />
       </View>
 
-      {/* Block entries — only shown when enabled */}
+      {/* Divider + block entries — only shown when enabled */}
       {enabled && (
         <View style={dayStyles.body}>
+          <View style={dayStyles.divider} />
           {blocks.map((b, i) => (
             <BlockEntryCard
               key={i}
@@ -323,7 +287,7 @@ export function DayBlockEditor({ dayKey, schedule, onChange }: DayBlockEditorPro
           ))}
 
           <AppButton
-            title="+ Add More"
+            title="+ Add Time Slot"
             mode="light"
             color="primary1"
             onPress={addBlock}
@@ -338,15 +302,33 @@ export function DayBlockEditor({ dayKey, schedule, onChange }: DayBlockEditorPro
 const dayStyles = StyleSheet.create({
   card: {
     backgroundColor: COLORS.colorWhite,
-    borderRadius: 14,
-    padding: SPACING.md,
-    marginBottom: SPACING.sm,
+    borderRadius: 16,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
+    marginBottom: SPACING.md,
+    borderWidth: 1.5,
+    borderColor: COLORS.white3,
     ...SHADOWS.card,
+  },
+  cardEnabled: {
+    borderColor: COLORS.primary1 + "55",
+    backgroundColor: COLORS.colorWhite,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+  },
+  dayNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+  },
+  activeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.primary1,
   },
   dayName: {
     fontSize: FONT_SIZES.base,
@@ -354,14 +336,21 @@ const dayStyles = StyleSheet.create({
     color: COLORS.lightGray,
   },
   dayNameEnabled: {
-    color: COLORS.darkGray,
-    fontWeight: "700",
+    color: COLORS.primary1,
+    fontWeight: "500",
+    fontSize: FONT_SIZES.md,
   },
   switchScale: {
-    transform: [{ scaleX: 1.25 }, { scaleY: 1.25 }],
+    transform: [{ scaleX: 1.2 }, { scaleY: 1.2 }],
+  },
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.primary1 + "22",
+    marginBottom: SPACING.md,
+    borderRadius: 1,
   },
   body: {
-    marginTop: SPACING.md,
+    marginTop: SPACING.sm,
   },
 });
 
@@ -382,7 +371,7 @@ export default function WeeklyScheduleEditor({
     onChange({ ...schedule, [key]: day });
 
   return (
-    <View style={{ width: "100%" }}>
+    <View style={{ width: "100%", paddingTop: SPACING.sm }}>
       {DAY_KEYS.map((key) => (
         <DayBlockEditor
           key={key}

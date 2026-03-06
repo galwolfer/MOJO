@@ -129,7 +129,23 @@ export function validateBusyBlockPayload(payload: CreateBusyBlockPayload): strin
     return "Date is required for a one-time block";
   if (blockType === "FULL_DAY" && !date && !daysOfWeek.length)
     return "Provide a date (one-time) or days of week (recurring) for a day-off";
-  if (blockType !== "FULL_DAY" && !(blockType === "WEEKLY" && weeklySchedule?.length)) {
+
+  // Validate weeklySchedule entries when present
+  if (blockType === "WEEKLY" && weeklySchedule?.length) {
+    for (let d = 0; d < weeklySchedule.length; d++) {
+      const entry = weeklySchedule[d];
+      if (!Array.isArray(entry.times) || entry.times.length === 0)
+        return `Day ${d + 1} in weekly schedule has no time ranges`;
+      for (let i = 0; i < entry.times.length; i++) {
+        const { startTime, endTime } = entry.times[i];
+        if (!startTime || !HH_MM.test(startTime)) return `Day ${d + 1} range ${i + 1}: start time must be HH:MM`;
+        if (!endTime   || !HH_MM.test(endTime))   return `Day ${d + 1} range ${i + 1}: end time must be HH:MM`;
+        const [sh, sm] = startTime.split(":").map(Number);
+        const [eh, em] = endTime.split(":").map(Number);
+        if (eh * 60 + em <= sh * 60 + sm) return `Day ${d + 1} range ${i + 1}: end time must be after start time`;
+      }
+    }
+  } else if (blockType !== "FULL_DAY") {
     if (!times.length) return "Add at least one time range";
     for (let i = 0; i < times.length; i++) {
       const { startTime, endTime } = times[i];
@@ -188,3 +204,58 @@ export async function updateBusyBlock(
 export async function deleteBusyBlock(id: string): Promise<void> {
   await del<{ success: boolean }>(`/busy-blocks/${id}`);
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Display helpers
+// ──────────────────────────────────────────────────────────────────────────────
+
+const _DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function _isoToTimePart(iso: string): string {
+  try {
+    const d = new Date(iso);
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  } catch {
+    return "00:00";
+  }
+}
+
+/**
+ * Return a short human-readable summary for a BusyBlock row.
+ * Works for all block types including legacy documents.
+ */
+export function blockSummary(block: BusyBlock): string {
+  if (block.blockType === "ONCE") {
+    const dateStr = block.date ? new Date(block.date).toISOString().slice(0, 10) : "";
+    const timesStr = (block.times ?? []).map((t) => `${t.startTime}–${t.endTime}`).join(", ");
+    return timesStr ? `${dateStr} ∣ ${timesStr}` : dateStr || "Once";
+  }
+  if (block.blockType === "WEEKLY") {
+    if (block.weeklySchedule?.length) {
+      return block.weeklySchedule
+        .map((e) => {
+          const t = (e.times ?? []).map((t) => `${t.startTime}–${t.endTime}`).join(", ");
+          return `${_DAY_SHORT[e.dayOfWeek]} ∣ ${t}`;
+        })
+        .join("  •  ");
+    }
+    const days = (block.daysOfWeek ?? []).map((d) => _DAY_SHORT[d]).join(", ");
+    const timesStr = (block.times ?? []).map((t) => `${t.startTime}–${t.endTime}`).join(", ");
+    return timesStr ? `${days} ∣ ${timesStr}` : days || "Weekly";
+  }
+  if (block.blockType === "DAILY") {
+    const timesStr = (block.times ?? []).map((t) => `${t.startTime}–${t.endTime}`).join(", ");
+    return timesStr ? `Every day ∣ ${timesStr}` : "Every day";
+  }
+  // Legacy
+  if (block.start && block.end) {
+    return `${_isoToTimePart(block.start)} – ${_isoToTimePart(block.end)}`;
+  }
+  return "";
+}
+
+export const BLOCK_TYPE_LABEL: Record<BusyBlockType, string> = {
+  DAILY:  "Every day",
+  WEEKLY: "Weekly",
+  ONCE:   "Specific date",
+};

@@ -55,28 +55,49 @@ function validateNewBlock({ blockType, date, daysOfWeek = [], times = [],
   if (date && isNaN(new Date(date).getTime()))
     return "Invalid date value";
 
-  if (blockType !== "FULL_DAY" && !(blockType === "WEEKLY" && weeklySchedule?.length)) {
-    if (!Array.isArray(times) || times.length === 0)
-      return "At least one time entry is required (times must be a non-empty array)";
-    for (let i = 0; i < times.length; i++) {
-      const { startTime, endTime } = times[i] || {};
-      if (!startTime || !HH_MM_RE.test(startTime)) return `times[${i}].startTime must be HH:MM`;
-      if (!endTime   || !HH_MM_RE.test(endTime))   return `times[${i}].endTime must be HH:MM`;
-      const [sh, sm] = startTime.split(":").map(Number);
-      const [eh, em] = endTime.split(":").map(Number);
-      if (eh * 60 + em <= sh * 60 + sm) return `times[${i}]: endTime must be after startTime`;
-    }
-    // Overlap check: sort by start, verify consecutive pairs don't overlap
-    const sorted = [...times].sort((a, b) => {
-      const [ah, am] = a.startTime.split(":").map(Number);
-      const [bh, bm] = b.startTime.split(":").map(Number);
-      return (ah * 60 + am) - (bh * 60 + bm);
-    });
-    for (let i = 1; i < sorted.length; i++) {
-      const [eh, em] = sorted[i - 1].endTime.split(":").map(Number);
-      const [sh, sm] = sorted[i].startTime.split(":").map(Number);
-      if (sh * 60 + sm < eh * 60 + em)
-        return `Time ranges overlap: ${sorted[i - 1].startTime}-${sorted[i - 1].endTime} and ${sorted[i].startTime}-${sorted[i].endTime}`;
+  if (blockType !== "FULL_DAY") {
+    // WEEKLY with weeklySchedule: validate each day's entries
+    if (blockType === "WEEKLY" && weeklySchedule?.length) {
+      for (let d = 0; d < weeklySchedule.length; d++) {
+        const entry = weeklySchedule[d];
+        if (!Number.isInteger(entry.dayOfWeek) || entry.dayOfWeek < 0 || entry.dayOfWeek > 6)
+          return `weeklySchedule[${d}].dayOfWeek must be 0–6`;
+        if (!Array.isArray(entry.times) || entry.times.length === 0)
+          return `weeklySchedule[${d}] has no time ranges`;
+        for (let i = 0; i < entry.times.length; i++) {
+          const { startTime, endTime } = entry.times[i] || {};
+          if (!startTime || !HH_MM_RE.test(startTime)) return `weeklySchedule[${d}].times[${i}].startTime must be HH:MM`;
+          if (!endTime   || !HH_MM_RE.test(endTime))   return `weeklySchedule[${d}].times[${i}].endTime must be HH:MM`;
+          const [sh, sm] = startTime.split(":").map(Number);
+          const [eh, em] = endTime.split(":").map(Number);
+          if (eh * 60 + em <= sh * 60 + sm)
+            return `weeklySchedule[${d}].times[${i}]: endTime must be after startTime`;
+        }
+      }
+    } else {
+      // DAILY / ONCE: need a flat times array
+      if (!Array.isArray(times) || times.length === 0)
+        return "At least one time entry is required (times must be a non-empty array)";
+      for (let i = 0; i < times.length; i++) {
+        const { startTime, endTime } = times[i] || {};
+        if (!startTime || !HH_MM_RE.test(startTime)) return `times[${i}].startTime must be HH:MM`;
+        if (!endTime   || !HH_MM_RE.test(endTime))   return `times[${i}].endTime must be HH:MM`;
+        const [sh, sm] = startTime.split(":").map(Number);
+        const [eh, em] = endTime.split(":").map(Number);
+        if (eh * 60 + em <= sh * 60 + sm) return `times[${i}]: endTime must be after startTime`;
+      }
+      // Overlap check: sort by start, verify consecutive pairs don't overlap
+      const sorted = [...times].sort((a, b) => {
+        const [ah, am] = a.startTime.split(":").map(Number);
+        const [bh, bm] = b.startTime.split(":").map(Number);
+        return (ah * 60 + am) - (bh * 60 + bm);
+      });
+      for (let i = 1; i < sorted.length; i++) {
+        const [eh, em] = sorted[i - 1].endTime.split(":").map(Number);
+        const [sh, sm] = sorted[i].startTime.split(":").map(Number);
+        if (sh * 60 + sm < eh * 60 + em)
+          return `Time ranges overlap: ${sorted[i - 1].startTime}-${sorted[i - 1].endTime} and ${sorted[i].startTime}-${sorted[i].endTime}`;
+      }
     }
   }
 

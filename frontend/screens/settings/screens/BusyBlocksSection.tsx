@@ -22,18 +22,32 @@ import { View, StyleSheet, Pressable, ScrollView, ViewStyle } from "react-native
 import AppText from "../../../components/common/AppText";
 import AppButton from "../../../components/common/AppButton";
 import PopupBox from "../../../components/common/PopupBox";
+import Input from "../../../components/inputs/Input";
+import Icon from "../../../components/icons/Icon";
+import CalendarPicker from "../../../components/inputs/CalendarPicker";
+import { TimeRangePicker } from "../../../components/inputs/TimeRangePicker";
 import { COLORS, SPACING, FONT_SIZES, SHADOWS } from "../../../theme";
 import { ICONS } from "../../../components/icons/icons";
 import {
   BusyBlock,
+  BusyBlockType,
   listBusyBlocks,
   createBusyBlock,
   deleteBusyBlock,
 } from "../../../services/busyBlockService";
+import WeeklyScheduleEditor, {
+  emptySchedule,
+  validateSchedule,
+  DAY_KEYS,
+  DAY_INDEX,
+  type DayKey,
+  type TimeRange,
+  type WeeklySchedule,
+} from "../../../components/special/WeeklyScheduleEditor";
 import { getSchedulingPreferences, updateSchedulingPreferences } from "../../../services/apiClient";
 import { GapBox } from "../components/GapBox";
 import { BlocksBox } from "../components/BlocksBox";
-import { BusyBlockForm, BlockFormState } from "../components/BusyBlockForm";
+import { type BlockFormState } from "../components/BusyBlockForm";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Domain helpers (pure — no React)
@@ -99,12 +113,14 @@ function blockSummary(block: BusyBlock): string {
   return "";
 }
 
-// NOTE: BlockFormState is imported from BusyBlockForm.tsx; we only declare EMPTY_FORM here.
-const EMPTY_FORM: BlockFormState = {
-  title: "",
-  startTime: "09:00",
-  endTime: "10:00",
-};
+/** Today as YYYY-MM-DD (local date) */
+function todayISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** HH:MM validation regex */
+const HH_MM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 function emptyBlockForm(): BlockFormState {
   return {
@@ -273,29 +289,14 @@ function TimeRangesEditor({ ranges, onChange }: TimeRangesEditorProps) {
     <View style={{ marginTop: SPACING.md }}>
       <AppText style={formStyles.fieldLabel}>Time Range(s)</AppText>
       {ranges.map((r, i) => (
-        <View key={i} style={trStyles.row}>
-          <AppText style={trStyles.label}>From</AppText>
-          <View style={trStyles.inputWrap}>
-            <InputField
-              value={r.start}
-              onChangeText={(v) => update(i, { ...r, start: v })}
-              placeholderText="09:00"
-              keyboardType="numbers-and-punctuation"
-              maxLength={5}
-              selectTextOnFocus
-            />
-          </View>
-          <AppText style={trStyles.label}>To</AppText>
-          <View style={trStyles.inputWrap}>
-            <InputField
-              value={r.end}
-              onChangeText={(v) => update(i, { ...r, end: v })}
-              placeholderText="10:00"
-              keyboardType="numbers-and-punctuation"
-              maxLength={5}
-              selectTextOnFocus
-            />
-          </View>
+        <View key={i} style={trStyles.rangeCard}>
+          <TimeRangePicker
+            startTime={r.start}
+            endTime={r.end}
+            onStartChange={(v) => update(i, { ...r, start: v })}
+            onEndChange={(v) => update(i, { ...r, end: v })}
+            color="primary1"
+          />
           {ranges.length > 1 && (
             <Pressable style={trStyles.removeBtn} onPress={() => remove(i)} hitSlop={8}>
               <Icon name="cancel" size={16} color="#C62828" />
@@ -316,20 +317,8 @@ function TimeRangesEditor({ ranges, onChange }: TimeRangesEditorProps) {
 }
 
 const trStyles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.sm,
+  rangeCard: {
     marginBottom: SPACING.sm,
-  },
-  label: { fontSize: FONT_SIZES.sm, color: COLORS.darkGray, minWidth: 30 },
-  inputWrap: {
-    flex: 1,
-    borderWidth: 1.5,
-    borderColor: COLORS.white3,
-    borderRadius: 8,
-    backgroundColor: COLORS.colorWhite,
-    overflow: "hidden",
   },
   removeBtn: {
     width: 28,
@@ -338,6 +327,8 @@ const trStyles = StyleSheet.create({
     backgroundColor: "#FFEBEE",
     justifyContent: "center",
     alignItems: "center",
+    alignSelf: "center",
+    marginTop: SPACING.xs,
   },
 });
 
@@ -525,7 +516,8 @@ function BlockItem({ block, onEdit, onDelete }: BlockItemProps) {
     <View style={blockItemStyles.container}>
       <View style={blockItemStyles.info}>
         {block.title ? <AppText style={blockItemStyles.title}>{block.title}</AppText> : null}
-        <AppText style={blockItemStyles.timeRange}>{formatTimeRange(block.start, block.end)}</AppText>
+        {typeLabel ? <AppText style={blockItemStyles.typeLabel}>{typeLabel}</AppText> : null}
+        <AppText style={blockItemStyles.timeRange}>{summary}</AppText>
       </View>
       <View style={blockItemStyles.actions}>
         <Pressable
@@ -644,20 +636,17 @@ export default function BusyBlocksSection({ style }: { style?: ViewStyle }) {
 
   // ── Submit form ───────────────────────────────────────────────────────────
   const handleFormSubmit = async () => {
-    const validationErr = validateTimes(form.startTime, form.endTime);
-    if (validationErr) {
-      setFormError(validationErr);
-      return;
-    }
+    // Build a typed payload from the current form state
+    let payload: Parameters<typeof createBusyBlock>[0] | null = null;
 
     if (form.blockType === "WEEKLY") {
       const err = validateSchedule(form.schedule);
       if (err) { setFormError(err); return; }
 
-      // Build a single BusyBlock with weeklySchedule — one entry per enabled day
+      // One document with weeklySchedule[] — one entry per enabled day
       const weeklySchedule: Array<{ dayOfWeek: number; times: Array<{ startTime: string; endTime: string }> }> = [];
       DAY_KEYS.forEach((key) => {
-        const day = form.schedule[key];
+        const day = form.schedule[key as DayKey];
         if (!day.enabled || !day.blocks.length) return;
         weeklySchedule.push({
           dayOfWeek: DAY_INDEX[key as DayKey],
@@ -667,58 +656,53 @@ export default function BusyBlocksSection({ style }: { style?: ViewStyle }) {
 
       if (!weeklySchedule.length) { setFormError("Enable at least one day and add a time range"); return; }
 
-      payloads.push({
-        blockType: "WEEKLY",
-        title: form.title,
-        weeklySchedule,
-        source: "manual",
-      });
+      payload = { blockType: "WEEKLY", title: form.title, weeklySchedule, source: "manual" };
+
     } else if (form.blockType === "DAILY") {
       if (!form.timeRanges.length) { setFormError("Add at least one time range"); return; }
       for (const r of form.timeRanges) {
-        if (!HH_MM.test(r.start)) { setFormError(`Invalid start time: "${r.start}" — use HH:MM`); return; }
-        if (!HH_MM.test(r.end))   { setFormError(`Invalid end time: "${r.end}" — use HH:MM`); return; }
+        if (!HH_MM.test(r.start)) { setFormError(`Invalid start time "${r.start}" — use HH:MM`); return; }
+        if (!HH_MM.test(r.end))   { setFormError(`Invalid end time "${r.end}" — use HH:MM`); return; }
         if (r.end <= r.start)      { setFormError("End time must be after start time"); return; }
       }
-      payloads.push({
+      payload = {
         blockType: "DAILY",
         title: form.title,
         times: form.timeRanges.map((r) => ({ startTime: r.start, endTime: r.end })),
         source: "manual",
-      });
+      };
+
     } else if (form.blockType === "ONCE") {
       if (!form.onceDate) { setFormError("Select a date"); return; }
       if (!form.timeRanges.length) { setFormError("Add at least one time range"); return; }
       for (const r of form.timeRanges) {
-        if (!HH_MM.test(r.start)) { setFormError(`Invalid start time: "${r.start}" — use HH:MM`); return; }
-        if (!HH_MM.test(r.end))   { setFormError(`Invalid end time: "${r.end}" — use HH:MM`); return; }
+        if (!HH_MM.test(r.start)) { setFormError(`Invalid start time "${r.start}" — use HH:MM`); return; }
+        if (!HH_MM.test(r.end))   { setFormError(`Invalid end time "${r.end}" — use HH:MM`); return; }
         if (r.end <= r.start)      { setFormError("End time must be after start time"); return; }
       }
-      payloads.push({
+      payload = {
         blockType: "ONCE",
         title: form.title,
         date: form.onceDate,
         times: form.timeRanges.map((r) => ({ startTime: r.start, endTime: r.end })),
         source: "manual",
-      });
+      };
     }
 
-    if (!payloads.length) { setFormError("Nothing to save — please configure at least one block"); return; }
+    if (!payload) { setFormError("Nothing to save — please configure at least one block"); return; }
 
     setSaving(true);
     setFormError(null);
     try {
       if (editingBlock) {
-        const updated = await updateBusyBlock(editingBlock._id, payload);
-        setBlocks((prev) => prev.map((b) => (b._id === updated._id ? updated : b)));
+        // Delete the old block and recreate — this cleanly handles blockType changes
+        await deleteBusyBlock(editingBlock._id);
+        const created = await createBusyBlock(payload);
+        setBlocks((prev) => [...prev.filter((b) => b._id !== editingBlock._id), created]);
       } else {
         const created = await createBusyBlock(payload);
-        setBlocks((prev) =>
-          [...prev, created].sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()),
-        );
+        setBlocks((prev) => [...prev, created]);
       }
-      const created = await Promise.all(payloads.map((p) => createBusyBlock(p)));
-      setBlocks((prev) => [...prev, ...created]);
       setFormVisible(false);
     } catch (err: any) {
       setFormError(err?.message || "Failed to save busy block");

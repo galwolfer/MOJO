@@ -1580,6 +1580,10 @@ export async function createBusyBlock({ userId, title = "", start, end, isRecurr
  */
 export async function getUpcomingBusyBlocks(userId) {
   const now = new Date();
+  // For ONCE blocks, compare against the start of today (UTC midnight) so
+  // a block stored for today (2026-03-06T00:00:00Z) isn't filtered out by
+  // the current time being later in the same day.
+  const todayUTCMidnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   return BusyBlock.find({
     userId,
     $or: [
@@ -1593,8 +1597,8 @@ export async function getUpcomingBusyBlocks(userId) {
           { recurrenceEndDate: { $gte: now } },
         ],
       },
-      // ONCE: target date hasn't passed yet
-      { blockType: "ONCE", date: { $gte: now } },
+      // ONCE: target date is today or future (compare UTC midnight)
+      { blockType: "ONCE", date: { $gte: todayUTCMidnight } },
       // FULL_DAY: always show (one-time future or recurring)
       { blockType: "FULL_DAY" },
 
@@ -1614,18 +1618,31 @@ export async function getUpcomingBusyBlocks(userId) {
 }
 
 /**
- * Update a busy block's fields.  All parameters except blockId/userId are optional.
- * Accepts the same fields as createBusyBlock.
+ * Update a busy block's fields (new-style and legacy).
+ * All parameters except blockId / userId are optional.
  */
-export async function updateBusyBlock({ blockId, userId, title, start, end, isRecurring, recurrence }) {
+export async function updateBusyBlock({ blockId, userId, title, blockType,
+    date, daysOfWeek, recurrenceEndDate, times, weeklySchedule,
+    bufferBeforeMinutes, bufferAfterMinutes,
+    start, end, isRecurring, recurrence }) {
   const update = {};
-  if (title !== undefined) update.title = title;
-  if (start !== undefined) update.start = start;
-  if (end !== undefined) update.end = end;
+  // New-style fields
+  if (title              !== undefined) update.title              = title;
+  if (blockType          !== undefined) update.blockType          = blockType;
+  if (date               !== undefined) update.date               = date ? new Date(date) : null;
+  if (daysOfWeek         !== undefined) update.daysOfWeek         = daysOfWeek;
+  if (recurrenceEndDate  !== undefined) update.recurrenceEndDate  = recurrenceEndDate ? new Date(recurrenceEndDate) : null;
+  if (times              !== undefined) update.times              = times;
+  if (weeklySchedule     !== undefined) update.weeklySchedule     = weeklySchedule;
+  if (bufferBeforeMinutes !== undefined) update.bufferBeforeMinutes = Number(bufferBeforeMinutes) || 0;
+  if (bufferAfterMinutes  !== undefined) update.bufferAfterMinutes  = Number(bufferAfterMinutes)  || 0;
+  // Legacy fields
+  if (start       !== undefined) update.start       = start;
+  if (end         !== undefined) update.end         = end;
   if (isRecurring !== undefined) update.isRecurring = isRecurring;
-  if (recurrence !== undefined) update.recurrence = recurrence;
+  if (recurrence  !== undefined) update.recurrence  = recurrence;
 
-  // Validate time ordering when both ends of the range are present in the update
+  // Legacy time ordering validation
   if (update.start !== undefined && update.end !== undefined) {
     const effectiveRecurring = update.isRecurring !== undefined ? update.isRecurring : isRecurring;
     if (effectiveRecurring) {
