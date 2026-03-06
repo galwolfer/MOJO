@@ -14,6 +14,7 @@ import { User } from "../models/User.js";
 import { Task } from "../models/Task.js";
 import { SubTask } from "../models/SubTask.js";
 import { TaskSchedule } from "../models/TaskSchedule.js";
+import { SentReminder } from "../models/SentReminder.js";
 import { logger } from "../utils/logger.js";
 import { startOfDay, addDays } from "../utils/dateUtils.js";
 import { 
@@ -26,25 +27,51 @@ import {
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 
 /**
- * In-memory tracker for sent task reminders to prevent duplicate notifications.
- * Key format: "<taskId>-<minutesBefore>" (or "<taskId>-<subtaskIndex>-<minutesBefore>" for subtasks)
- * Value: timestamp (ms) when the reminder was sent.
- * Entries older than 6 hours are periodically pruned.
+ * Build the dedup key for a sent reminder.
+ * Includes the target time (rounded to minute) so rescheduling a task creates a fresh key.
+ * Key format: "<taskId>-<targetMinuteEpoch>-<windowMinutes>" (or with "-sub<index>" for subtasks)
  */
-const sentReminders = new Map();
-
-function getSentReminderKey(taskId, minutesBefore, subtaskIndex = null) {
+function getSentReminderKey(taskId, minutesBefore, subtaskIndex = null, targetTimeMs = 0) {
+  // Round target time to the nearest minute to keep key stable across cron ticks
+  const targetMinute = Math.round(targetTimeMs / 60000);
   return subtaskIndex != null
-    ? `${taskId}-sub${subtaskIndex}-${minutesBefore}`
-    : `${taskId}-${minutesBefore}`;
+    ? `${taskId}-sub${subtaskIndex}-${targetMinute}-${minutesBefore}`
+    : `${taskId}-${targetMinute}-${minutesBefore}`;
 }
 
-function pruneSentReminders() {
-  const sixHoursAgo = Date.now() - 6 * 60 * 60 * 1000;
-  for (const [key, timestamp] of sentReminders) {
-    if (timestamp < sixHoursAgo) {
-      sentReminders.delete(key);
-    }
+/**
+ * Check if a reminder has already been sent (persisted in MongoDB).
+ */
+async function hasReminderBeenSent(dedupeKey) {
+  const existing = await SentReminder.findOne({ key: dedupeKey }).lean();
+  return !!existing;
+}
+
+/**
+ * Record a sent reminder in MongoDB (auto-expires via TTL index after 6 hours).
+ */
+async function recordSentReminder({ dedupeKey, taskId, userId, taskName, subtaskIndex, subtaskTitle, windowMinutes, source, targetTime }) {
+  try {
+    await SentReminder.updateOne(
+      { key: dedupeKey },
+      {
+        $setOnInsert: {
+          key: dedupeKey,
+          taskId,
+          userId,
+          taskName: taskName ?? null,
+          subtaskIndex: subtaskIndex ?? null,
+          subtaskTitle: subtaskTitle ?? null,
+          windowMinutes,
+          targetTime: targetTime ? new Date(targetTime) : null,
+          source,
+          sentAt: new Date(),
+        },
+      },
+      { upsert: true },
+    );
+  } catch (error) {
+    logger.warn(`Failed to record sent reminder ${dedupeKey}:`, error.message);
   }
 }
 
@@ -777,9 +804,6 @@ async function buildNotificationWithOjo(user, task, options = {}) {
  */
 export async function sendTaskReminderNotifications() {
   const now = new Date();
-  
-  // Prune stale entries from the sent-reminders tracker
-  pruneSentReminders();
 
   logger.info("Running task reminder check (tasks + subtasks)");
 
@@ -944,8 +968,9 @@ export async function sendTaskReminderNotifications() {
           task._id.toString(),
           windowMinutes,
           isSubtask ? subtaskIndex : null,
+          targetTime,
         );
-        if (sentReminders.has(dedupeKey)) {
+        if (await hasReminderBeenSent(dedupeKey)) {
           continue;
         }
 
@@ -969,7 +994,17 @@ export async function sendTaskReminderNotifications() {
           sentForThisItem = true;
 
           // Record that this reminder was sent so it won't fire again
-          sentReminders.set(dedupeKey, now.getTime());
+          await recordSentReminder({
+            dedupeKey,
+            taskId: task._id,
+            userId: task.userId,
+            taskName: task.taskname,
+            subtaskIndex: isSubtask ? subtaskIndex : null,
+            subtaskTitle: isSubtask ? subtaskTitle : null,
+            windowMinutes,
+            source,
+            targetTime,
+          });
           
           // Update last reminder timestamp
           await User.updateOne(

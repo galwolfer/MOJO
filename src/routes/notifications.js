@@ -9,6 +9,7 @@
 
 import { Router } from "express";
 import { requireAuth } from "../middlewares/auth.js";
+import { SentReminder } from "../models/SentReminder.js";
 import {
   registerPushToken,
   unregisterPushToken,
@@ -400,6 +401,43 @@ router.post("/test/ojo-reminder", async (req, res) => {
     return res.status(500).json({ 
       success: false, 
       error: "Failed to test Ojo reminder notification" 
+    });
+  }
+});
+
+/**
+ * GET /api/notifications/sent-reminders
+ * View all sent reminders for the authenticated user (from MongoDB).
+ * Returns entries that haven't expired yet (TTL = 6 hours).
+ */
+router.get("/sent-reminders", async (req, res) => {
+  try {
+    const reminders = await SentReminder.find({ userId: req.user.userId })
+      .sort({ sentAt: -1 })
+      .populate("taskId", "taskname dueDate status predictedCompletionCategory")
+      .lean();
+
+    return res.json({
+      success: true,
+      count: reminders.length,
+      reminders: reminders.map(r => ({
+        key: r.key,
+        taskId: r.taskId?._id || r.taskId,
+        taskName: r.taskId?.taskname || null,
+        taskDueDate: r.taskId?.dueDate || null,
+        predictionCategory: r.taskId?.predictedCompletionCategory || null,
+        subtaskIndex: r.subtaskIndex,
+        windowMinutes: r.windowMinutes,
+        targetTime: r.targetTime,
+        source: r.source,
+        sentAt: r.sentAt,
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching sent reminders:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to fetch sent reminders",
     });
   }
 });
