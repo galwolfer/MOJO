@@ -25,6 +25,7 @@ import {
   NotificationData,
 } from "../services/notificationService";
 import { useAuth } from "./AuthContext";
+import { OjoNotificationBanner, OjoNotificationBannerData } from "../components/special/OjoNotificationBanner";
 
 // Expo project ID from app.json
 const EXPO_PROJECT_ID = "875a7d38-e45f-45b2-9bee-a15823df2f34";
@@ -70,6 +71,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
   const [error, setError] = useState<string | null>(null);
   const [lastNotification, setLastNotification] = useState<NotificationData | null>(null);
   const [testModeActive, setTestModeActive] = useState(false);
+  const [bannerData, setBannerData] = useState<OjoNotificationBannerData | null>(null);
 
   // Refs for listeners
   const notificationReceivedListener = useRef<{ remove: () => void } | null>(null);
@@ -108,8 +110,15 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
       notificationReceivedListener.current = await addNotificationReceivedListener(
         (notification: any) => {
           console.log("Notification received in foreground:", notification);
-          // You can handle foreground notifications here
-          // e.g., show an in-app banner, update task list, etc.
+          const content = notification?.request?.content;
+          const data = content?.data;
+          if (data?.ojoType) {
+            setBannerData({
+              ojoType: data.ojoType,
+              title: content?.title || "Reminder",
+              body: content?.body || "",
+            });
+          }
         }
       );
 
@@ -324,7 +333,12 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     clearLastNotification,
   };
 
-  return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;
+  return (
+    <NotificationContext.Provider value={value}>
+      {children}
+      <OjoNotificationBanner data={bannerData} onDismiss={() => setBannerData(null)} />
+    </NotificationContext.Provider>
+  );
 };
 
 export default NotificationContext;
