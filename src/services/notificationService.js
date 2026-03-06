@@ -219,7 +219,7 @@ export async function sendNotificationToUser(userId, notification) {
       data: notification.data || {},
       badge: notification.badge,
       priority: notification.priority || "high",
-      channelId: notification.channelId || "default",
+      channelId: notification.channelId || "general",
     };
 
     // Store in-app copy (fire-and-forget)

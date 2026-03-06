@@ -363,13 +363,18 @@ export async function setupNotificationChannels(): Promise<void> {
       sound: "default",
     });
 
-    // Default channel
-    await Notifications.setNotificationChannelAsync("default", {
+    // General channel — replaces the old "default" channel which Android cached
+    // at DEFAULT importance. A fresh channel ID ensures HIGH importance takes effect.
+    await Notifications.setNotificationChannelAsync("general", {
       name: "General Notifications",
       description: "General app notifications",
-      importance: Notifications.AndroidImportance.DEFAULT,
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
       sound: "default",
     });
+
+    // Clean up the old cached channel
+    try { await Notifications.deleteNotificationChannelAsync("default"); } catch {}
 
     console.log("Notification channels set up successfully");
   } catch (error) {
