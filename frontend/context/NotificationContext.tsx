@@ -28,7 +28,7 @@ import {
   getInboxNotifications,
 } from "../services/notificationService";
 import { useAuth } from "./AuthContext";
-import { OjoNotificationBanner, OjoNotificationBannerData } from "../components/special/OjoNotificationBanner";
+import { type OjoNotificationBannerData } from "../components/special/OjoNotificationBanner";
 
 // Expo project ID from app.json
 const EXPO_PROJECT_ID = "875a7d38-e45f-45b2-9bee-a15823df2f34";
@@ -44,6 +44,10 @@ type NotificationContextType = {
   error: string | null;
   testModeActive: boolean;
   unreadCount: number;
+
+  // Banner
+  bannerData: OjoNotificationBannerData | null;
+  dismissBanner: () => void;
 
   // Actions
   initialize: () => Promise<void>;
@@ -414,6 +418,8 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     error,
     testModeActive,
     unreadCount,
+    bannerData,
+    dismissBanner: () => setBannerData(null),
     initialize,
     updatePreferences,
     testNotification,
@@ -428,7 +434,6 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
   return (
     <NotificationContext.Provider value={value}>
       {children}
-      <OjoNotificationBanner data={bannerData} onDismiss={() => setBannerData(null)} />
     </NotificationContext.Provider>
   );
 };

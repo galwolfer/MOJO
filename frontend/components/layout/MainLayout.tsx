@@ -24,11 +24,14 @@ import { getOverdueTasks } from "../../services/taskService";
 import { COLORS, SPACING } from "../../theme";
 import { useKeyboard } from "../../hooks";
 import { useColors } from "../../context/ThemeContext";
+import { useNotifications } from "../../context/NotificationContext";
+import { OjoNotificationBanner } from "../special/OjoNotificationBanner";
 
 export default function MainLayout() {
   const { activeTab, headerConfig, navBarConfig, navigationParams, setActiveTab } = useNavigation();
   const { setHeaderHeight, setNavBarHeight } = useLayout();
   const colors = useColors();
+  const { bannerData, dismissBanner } = useNotifications();
   const { width, height } = useWindowDimensions();
   const isDesktopLike = Platform.OS === "web" ? width >= 900 : width >= 900;
   const { visible: keyboardVisible, height: keyboardHeight } = useKeyboard();
@@ -131,6 +134,9 @@ export default function MainLayout() {
         >
           <NavBar hideIcons={keyboardVisible && hasNavWidget} />
         </View>
+
+        {/* In-app notification banner — inside device frame so it respects the app bounds */}
+        <OjoNotificationBanner data={bannerData} onDismiss={dismissBanner} />
       </View>
     </View>
   );
