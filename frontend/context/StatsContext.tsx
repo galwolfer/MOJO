@@ -8,6 +8,7 @@
 import React, { createContext, useContext, useCallback, useRef, useMemo, useState, useEffect } from "react";
 import { getUserStats, UserStats } from "../services/userService";
 import { useAuth } from "./AuthContext";
+import { useTaskContext } from "./TaskContext";
 
 type StatsUpdateListener = (stats: UserStats) => void;
 
@@ -150,6 +151,24 @@ export function StatsProvider({ children }: { children: React.ReactNode }) {
       }
     };
   }, [user]); // Only depend on user, refreshStats is stable now
+
+  // Auto-refresh stats whenever ANY task update occurs (from any screen)
+  // This ensures stats always stay in sync even when individual screens
+  // don't explicitly call notifyStatsChange after task completion.
+  const { subscribeToTaskUpdates } = useTaskContext();
+  useEffect(() => {
+    const unsubscribe = subscribeToTaskUpdates(() => {
+      console.log("[StatsContext] Task update detected, scheduling stats refresh");
+      // Debounce the refresh to avoid multiple rapid calls
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+      refreshTimeoutRef.current = setTimeout(() => {
+        refreshStats();
+      }, 500);
+    });
+    return unsubscribe;
+  }, [subscribeToTaskUpdates, refreshStats]);
 
   const value = useMemo(
     () => ({
