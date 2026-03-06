@@ -565,16 +565,21 @@ async function calculateSmartReminderTiming(task, user) {
       urgency = urgency === "low" ? "normal" : urgency;
     }
 
-    // Build evenly-spaced reminder windows from minutesBefore down to a final reminder
-    // e.g. remindCount=3, minutesBefore=180 => [180, 90, 30] (last one always 30min or less)
+    // Build evenly-spaced reminder windows, each rounded to the nearest 30-min multiple.
+    // e.g. remindCount=3, minutesBefore=180 => [180, 90, 30]
+    // e.g. remindCount=4, minutesBefore=240 => [240, 150, 90, 30]
     const reminderWindows = [];
     if (remindCount === 1) {
       reminderWindows.push(minutesBefore);
     } else {
-      const finalReminder = Math.min(30, defaultMinutes); // last reminder is close to deadline
+      const finalReminder = Math.min(30, defaultMinutes);
       const step = (minutesBefore - finalReminder) / (remindCount - 1);
       for (let i = 0; i < remindCount; i++) {
-        reminderWindows.push(Math.round(minutesBefore - (step * i)));
+        const raw = minutesBefore - (step * i);
+        const rounded = Math.round(raw / 30) * 30 || 30; // snap to nearest 30, minimum 30
+        if (!reminderWindows.includes(rounded)) {
+          reminderWindows.push(rounded);
+        }
       }
     }
 
