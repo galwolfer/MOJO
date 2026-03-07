@@ -121,6 +121,9 @@ async function fetchWithTimeout(url: string, init: RequestInit, options?: Reques
  */
 export async function get<T>(endpoint: string, options?: RequestOptions): Promise<T> {
   const url = `${getApiBase()}${endpoint}`;
+  // Debug: log outgoing GET request URL
+  // eslint-disable-next-line no-console
+  console.log("[httpClient] GET", url);
   const res = await fetchWithTimeout(
     url,
     {
@@ -137,6 +140,9 @@ export async function get<T>(endpoint: string, options?: RequestOptions): Promis
  */
 export async function post<T>(endpoint: string, body?: any, options?: RequestOptions): Promise<T> {
   const url = `${getApiBase()}${endpoint}`;
+  // Debug: log outgoing POST request URL and body summary
+  // eslint-disable-next-line no-console
+  console.log("[httpClient] POST", url, body ? { bodySummary: Object.keys(body || {}).slice(0, 10) } : {});
   const res = await fetchWithTimeout(
     url,
     {
