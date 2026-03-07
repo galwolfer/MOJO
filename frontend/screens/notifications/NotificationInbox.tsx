@@ -7,12 +7,13 @@
  *
  * Rendered when `activeTab === "notifications"` in MainLayout.
  */
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, RefreshControl } from "react-native";
-import { COLORS, FONTS, FONT_SIZES, SPACING } from "../../theme";
+import { COLORS, FONTS, FONT_SIZES, ICON_SIZES, SPACING } from "../../theme";
 import { useColors } from "../../context/ThemeContext";
 import { useNavigation } from "../../context/NavigationContext";
 import { useNotifications } from "../../context/NotificationContext";
+import { useOjo } from "../../context/OjoContext";
 import { ICONS } from "../../components/icons/icons";
 import { getOjoType, getOjoTypeColor, type OjoTypeName } from "../../config/ojoTypeConfig";
 import ScrollableContent from "../../components/layout/ScrollableContent";
@@ -24,7 +25,9 @@ import {
   markNotificationRead,
   markAllNotificationsRead,
   deleteNotification,
+  getNotificationPreferences,
   type InAppNotification,
+  type OjoType,
 } from "../../services/notificationService";
 
 // -- Helpers ------------------------------------------------------------
@@ -66,12 +69,45 @@ export default function NotificationInbox() {
   const colors = useColors();
   const { setHeaderConfig, goBack } = useNavigation();
   const { refreshUnreadCount } = useNotifications();
+  const { ojoName: chatOjoName } = useOjo();
 
   const [notifications, setNotifications] = useState<InAppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [selectedOjoType, setSelectedOjoType] = useState<OjoType | null>(null);
+
+  // Fetch notification ojo preference on mount
+  useEffect(() => {
+    getNotificationPreferences().then((res) => {
+      if (res.success && res.preferences?.ojoNotifications?.enabled) {
+        setSelectedOjoType(res.preferences.ojoNotifications.selectedOjoType);
+      }
+    });
+  }, []);
+
+  // Resolve the selected ojo type to a concrete display config
+  const boxOjoConfig = useMemo(() => {
+    if (!selectedOjoType) return null;
+
+    // "chat" → resolve to whatever the user's chat ojo is
+    if (selectedOjoType === "chat") {
+      const name = (chatOjoName as OjoTypeName) ?? "mentorjo";
+      const cfg = getOjoType(name);
+      return { displayName: cfg.displayName, color: cfg.color, icon: cfg.icon };
+    }
+
+    // "auto" → for display purposes, show generic auto label
+    // but the actual resolved type is determined by the backend
+    if (selectedOjoType === "auto") {
+      return { displayName: "Auto", color: COLORS.primary4, icon: "puzzle" };
+    }
+
+    // Concrete ojo type
+    const cfg = getOjoType(selectedOjoType as OjoTypeName);
+    return { displayName: cfg.displayName, color: cfg.color, icon: cfg.icon };
+  }, [selectedOjoType, chatOjoName]);
 
   // -- Actions --------------------------------------------------------
 
@@ -105,6 +141,8 @@ export default function NotificationInbox() {
 
   useEffect(() => {
     const BackIcon = ICONS.left;
+    const OjoIcon = boxOjoConfig ? (ICONS[boxOjoConfig.icon as keyof typeof ICONS] ?? ICONS.ojo) : null;
+
     setHeaderConfig({
       show: true,
       title: "Notifications",
@@ -113,6 +151,7 @@ export default function NotificationInbox() {
           <BackIcon size={22} color={COLORS.primary1} />
         </TouchableOpacity>
       ) : undefined,
+      icon: OjoIcon && boxOjoConfig ? OjoIcon : undefined,
       rightElement: (
         <TouchableOpacity onPress={handleMarkAllRead} style={{ padding: SPACING.sm }}>
           <AppText variant="bodyText" style={{ color: COLORS.primary1 }}>
@@ -121,7 +160,7 @@ export default function NotificationInbox() {
         </TouchableOpacity>
       ),
     });
-  }, [handleMarkAllRead]);
+  }, [handleMarkAllRead, boxOjoConfig]);
 
   // -- Data fetching --------------------------------------------------
 
@@ -188,6 +227,8 @@ export default function NotificationInbox() {
     );
   }
 
+  const BoxIcon = boxOjoConfig ? (ICONS[boxOjoConfig.icon as keyof typeof ICONS] ?? ICONS.notifications) : null;
+
   return (
     <ScrollableContent
       respectHeader
@@ -206,7 +247,7 @@ export default function NotificationInbox() {
           </AppText>
         </View>
       ) : (
-        <Box innerPadding={false}>
+        <Box>
           <List data={listItems} />
           {hasMore && (
             <TouchableOpacity style={styles.loadMoreBtn} onPress={loadMore} disabled={loadingMore} activeOpacity={0.7}>
@@ -246,9 +287,6 @@ function NotificationRow({ item, colors, onTap, onDelete, isLast }: RowProps) {
       onLongPress={() => onDelete(item._id)}
       style={[styles.row, { borderBottomColor: colors.divider }, !isLast && styles.rowDivider]}
     >
-      {/* Colored accent bar on the left */}
-      <View style={[styles.accentBar, { backgroundColor: accentColor }]} />
-
       {/* Icon with colored circle */}
       <View style={[styles.iconCircle, { backgroundColor: accentColor + "20" }]}>
         {notificationIcon(item.type, item.ojoType as OjoTypeName | null, accentColor)}

@@ -45,6 +45,12 @@ type NotificationSettingsContextType = {
   smartRemindersEnabled: boolean;
   ojoEnabled: boolean;
 
+  // ── Notification Ojo Type ────────────────────────────────────────────────
+  // The user's current selection (can be "auto", "chat", or concrete type)
+  selectedNotificationOjoType: OjoType | null;
+  // The resolved concrete Ojo type that would be used for notifications
+  resolvedNotificationOjoType: string | null;
+
   // ── Save helper ──────────────────────────────────────────────────────────
   save: (fn: () => Promise<unknown>) => Promise<void>;
 

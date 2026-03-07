@@ -1,12 +1,12 @@
 /**
  * Push Notification Service
- * 
+ *
  * Handles Expo Push Notifications for:
  * - Morning task digest (8 AM daily)
  * - Smart task reminders based on ML predictions
  * - Deadline warnings
  * - Ojo-powered personalized notifications
- * 
+ *
  * Works with both development APKs and production builds.
  */
 
@@ -18,14 +18,85 @@ import { SentReminder } from "../models/SentReminder.js";
 import { InAppNotification } from "../models/InAppNotification.js";
 import { logger } from "../utils/logger.js";
 import { startOfDay, addDays } from "../utils/dateUtils.js";
-import { 
-  generateOjoNotification, 
+import {
+  generateOjoNotification,
   determineOjoTypeForNotification,
   getOjoTypeOptions,
 } from "./ojoNotificationService.js";
 
 // Expo Push Notification API endpoint
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
+
+/**
+ * Get emoji for Ojo type (for push notification titles)
+ * Only use for concrete resolved types (mentorjo, brojo, bestojo, strictojo)
+ * @param {string} ojoTypeName - Ojo type name (must be concrete)
+ * @returns {string} Emoji
+ */
+function getOjoTypeEmoji(ojoTypeName) {
+  const emojis = {
+    mentorjo: "🧙",
+    brojo: "💪",
+    bestojo: "💖",
+    strictojo: "⚡",
+  };
+  return emojis[ojoTypeName] || "✨";
+}
+
+/**
+ * Get display name for Ojo type (for push notification titles)
+ * Only use for concrete resolved types (mentorjo, brojo, bestojo, strictojo)
+ * @param {string} ojoTypeName - Ojo type name (must be concrete)
+ * @returns {string} Display name
+ */
+function getOjoTypeDisplayName(ojoTypeName) {
+  const names = {
+    mentorjo: "Mentorjo",
+    brojo: "Brojo",
+    bestojo: "Bestojo",
+    strictojo: "StrictOjo",
+  };
+  return names[ojoTypeName] || ojoTypeName;
+}
+
+/**
+ * Get the Android notification channel ID for an Ojo type.
+ * Each Ojo type gets its own channel with a distinct accent color.
+ */
+function getOjoChannelId(ojoTypeName) {
+  const channels = {
+    mentorjo: "ojo-mentorjo",
+    brojo: "ojo-brojo",
+    bestojo: "ojo-bestojo",
+    strictojo: "ojo-strictojo",
+  };
+  return channels[ojoTypeName] || "task-reminders";
+}
+
+/**
+ * Get the publicly accessible URL for an Ojo type's logo image.
+ * The backend serves frontend/assets/ at /notification-icons.
+ * The device must be able to reach this URL — uses DEFAULT_MACHINE_IP when set.
+ * @param {string} ojoTypeName - concrete Ojo type
+ * @returns {string|null} Absolute URL or null if BASE_URL is not configured
+ */
+function getOjoTypeIconUrl(ojoTypeName) {
+  const machineIp = process.env.DEFAULT_MACHINE_IP;
+  const port = process.env.PORT || 3000;
+  // Prefer an explicit override; fall back to local machine IP if available
+  const base = process.env.NOTIFICATION_ICON_BASE_URL || (machineIp ? `http://${machineIp}:${port}` : null);
+
+  if (!base) return null;
+
+  const files = {
+    mentorjo: "mentorojo-icon.png",
+    brojo: "brojo-icon.png",
+    bestojo: "bestojo-icon.png",
+    strictojo: "strictojo-icon.png",
+  };
+  const file = files[ojoTypeName];
+  return file ? `${base}/notification-icons/${file}` : null;
+}
 
 /**
  * Build the dedup key for a sent reminder.
@@ -51,7 +122,17 @@ async function hasReminderBeenSent(dedupeKey) {
 /**
  * Record a sent reminder in MongoDB (auto-expires via TTL index after 6 hours).
  */
-async function recordSentReminder({ dedupeKey, taskId, userId, taskName, subtaskIndex, subtaskTitle, windowMinutes, source, targetTime }) {
+async function recordSentReminder({
+  dedupeKey,
+  taskId,
+  userId,
+  taskName,
+  subtaskIndex,
+  subtaskTitle,
+  windowMinutes,
+  source,
+  targetTime,
+}) {
   try {
     await SentReminder.updateOne(
       { key: dedupeKey },
@@ -109,7 +190,7 @@ export function isValidExpoPushToken(token) {
 /**
  * Send push notifications using Expo Push API
  * Supports batching for multiple recipients
- * 
+ *
  * @param {Array<Object>} messages - Array of message objects
  * @returns {Promise<Object>} Response from Expo Push API
  */
@@ -119,8 +200,8 @@ export async function sendPushNotifications(messages) {
   }
 
   // Filter out invalid tokens
-  const validMessages = messages.filter(msg => isValidExpoPushToken(msg.to));
-  
+  const validMessages = messages.filter((msg) => isValidExpoPushToken(msg.to));
+
   if (validMessages.length === 0) {
     logger.warn("No valid push tokens in batch");
     return { success: true, data: [] };
@@ -130,7 +211,7 @@ export async function sendPushNotifications(messages) {
     const response = await fetch(EXPO_PUSH_URL, {
       method: "POST",
       headers: {
-        "Accept": "application/json",
+        Accept: "application/json",
         "Accept-Encoding": "gzip, deflate",
         "Content-Type": "application/json",
       },
@@ -138,7 +219,7 @@ export async function sendPushNotifications(messages) {
     });
 
     const result = await response.json();
-    
+
     if (!response.ok) {
       logger.error("Expo Push API error:", result);
       return { success: false, error: result };
@@ -149,7 +230,7 @@ export async function sendPushNotifications(messages) {
       result.data.forEach((ticket, index) => {
         if (ticket.status === "error") {
           logger.warn(`Push notification failed for token ${validMessages[index]?.to}: ${ticket.message}`);
-          
+
           // Handle device not registered error - should remove invalid token
           if (ticket.details?.error === "DeviceNotRegistered") {
             handleInvalidToken(validMessages[index]?.to);
@@ -174,12 +255,12 @@ async function handleInvalidToken(token) {
   try {
     await User.updateOne(
       { "pushNotifications.expoPushToken": token },
-      { 
-        $set: { 
+      {
+        $set: {
           "pushNotifications.expoPushToken": null,
-          "pushNotifications.enabled": false 
-        } 
-      }
+          "pushNotifications.enabled": false,
+        },
+      },
     );
     logger.info(`Removed invalid push token: ${token.substring(0, 30)}...`);
   } catch (error) {
@@ -189,7 +270,7 @@ async function handleInvalidToken(token) {
 
 /**
  * Send a single push notification to a user
- * 
+ *
  * @param {string} userId - User ID
  * @param {Object} notification - Notification content
  * @returns {Promise<Object>} Result of the send operation
@@ -197,23 +278,27 @@ async function handleInvalidToken(token) {
 export async function sendNotificationToUser(userId, notification) {
   try {
     const user = await User.findById(userId).lean();
-    
+
     if (!user) {
       return { success: false, error: "User not found" };
     }
 
     const token = user.pushNotifications?.expoPushToken;
 
-    const message = token && isValidExpoPushToken(token) ? {
-      to: token,
-      sound: notification.sound || "default",
-      title: notification.title,
-      body: notification.body,
-      data: notification.data || {},
-      badge: notification.badge,
-      priority: notification.priority || "high",
-      channelId: notification.channelId || "general",
-    } : null;
+    const message =
+      token && isValidExpoPushToken(token)
+        ? {
+            to: token,
+            sound: notification.sound || "default",
+            title: notification.title,
+            body: notification.body,
+            data: notification.data || {},
+            badge: notification.badge,
+            priority: notification.priority || "high",
+            channelId: notification.channelId || "general",
+            ...(notification.imageUrl ? { imageUrl: notification.imageUrl } : {}),
+          }
+        : null;
 
     // Always store an in-app copy so web users and users without push tokens
     // still receive notifications in the inbox.
@@ -255,17 +340,17 @@ export async function sendNotificationToUser(userId, notification) {
  */
 async function getTodaysTasks(userId) {
   // Get user to access their timezone
-  const user = await User.findById(userId).select('pushNotifications.timezone').lean();
-  const userTimezone = user?.pushNotifications?.timezone || 'UTC';
+  const user = await User.findById(userId).select("pushNotifications.timezone").lean();
+  const userTimezone = user?.pushNotifications?.timezone || "UTC";
 
   // Get today's date in user's local timezone
   const now = new Date();
-  const userLocalNow = new Date(now.toLocaleString('en-US', { timeZone: userTimezone }));
-  
+  const userLocalNow = new Date(now.toLocaleString("en-US", { timeZone: userTimezone }));
+
   // Get start and end of today in user's timezone as UTC times
   const todayLocalStart = new Date(userLocalNow);
   todayLocalStart.setHours(0, 0, 0, 0);
-  
+
   const todayLocalEnd = new Date(userLocalNow);
   todayLocalEnd.setHours(23, 59, 59, 999);
 
@@ -281,17 +366,17 @@ async function getTodaysTasks(userId) {
   }).lean();
 
   // Filter tasks that are due today or created today in user's local timezone
-  const todaysTasks = allTasks.filter(task => {
+  const todaysTasks = allTasks.filter((task) => {
     if (!task.dueDate) return false;
-    
+
     // Convert task's dueDate to user's local timezone
     const taskDueDate = new Date(task.dueDate);
-    const taskLocalDate = new Date(taskDueDate.toLocaleString('en-US', { timeZone: userTimezone }));
+    const taskLocalDate = new Date(taskDueDate.toLocaleString("en-US", { timeZone: userTimezone }));
     taskLocalDate.setHours(0, 0, 0, 0);
-    
+
     const todayLocalDate = new Date(userLocalNow);
     todayLocalDate.setHours(0, 0, 0, 0);
-    
+
     return taskLocalDate.getTime() === todayLocalDate.getTime();
   });
 
@@ -302,12 +387,12 @@ async function getTodaysTasks(userId) {
     status: { $ne: "completed" },
   }).lean();
 
-  const scheduledTaskIds = [...new Set(scheduledSessions.map(s => s.taskId.toString()))];
-  
+  const scheduledTaskIds = [...new Set(scheduledSessions.map((s) => s.taskId.toString()))];
+
   // Add scheduled tasks that aren't already in the list
-  const existingTaskIds = new Set(todaysTasks.map(t => t._id.toString()));
-  const additionalTaskIds = scheduledTaskIds.filter(id => !existingTaskIds.has(id));
-  
+  const existingTaskIds = new Set(todaysTasks.map((t) => t._id.toString()));
+  const additionalTaskIds = scheduledTaskIds.filter((id) => !existingTaskIds.has(id));
+
   if (additionalTaskIds.length > 0) {
     const additionalTasks = await Task.find({
       _id: { $in: additionalTaskIds },
@@ -338,14 +423,14 @@ function buildMorningDigestNotification(user, tasks) {
   }
 
   // Build task summary
-  const highPriorityTasks = tasks.filter(t => t.importance >= 4);
+  const highPriorityTasks = tasks.filter((t) => t.importance >= 4);
   const totalEstimatedMinutes = tasks.reduce((sum, t) => sum + (t.estimatedDuration || 30), 0);
   const hours = Math.floor(totalEstimatedMinutes / 60);
   const minutes = totalEstimatedMinutes % 60;
   const timeStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 
   let body = `You have ${taskCount} task${taskCount > 1 ? "s" : ""} today (~${timeStr} total).`;
-  
+
   if (highPriorityTasks.length > 0) {
     body += ` ${highPriorityTasks.length} high priority!`;
   }
@@ -365,7 +450,7 @@ function buildMorningDigestNotification(user, tasks) {
       type: "morning_digest",
       taskCount,
       highPriorityCount: highPriorityTasks.length,
-      taskIds: tasks.map(t => t._id.toString()),
+      taskIds: tasks.map((t) => t._id.toString()),
     },
   };
 }
@@ -373,7 +458,7 @@ function buildMorningDigestNotification(user, tasks) {
 /**
  * Send morning digest notification to all eligible users
  * Runs daily - called by the scheduler
- * 
+ *
  * @returns {Promise<Object>} Results summary
  */
 export async function sendMorningDigestNotifications() {
@@ -381,7 +466,7 @@ export async function sendMorningDigestNotifications() {
   const currentUTCHour = now.getUTCHours();
   const currentUTCMinute = now.getUTCMinutes();
 
-  logger.info(`Running morning digest check at ${currentUTCHour}:${String(currentUTCMinute).padStart(2, '0')} UTC`);
+  logger.info(`Running morning digest check at ${currentUTCHour}:${String(currentUTCMinute).padStart(2, "0")} UTC`);
 
   // Find users who should receive morning digest (include web users without push tokens)
   const users = await User.find({
@@ -413,14 +498,16 @@ export async function sendMorningDigestNotifications() {
       const userHour = user.pushNotifications?.morningDigest?.hour || 8;
       const userMinute = user.pushNotifications?.morningDigest?.minute || 0;
       const userTimezone = user.pushNotifications?.timezone || "UTC";
-      
+
       // Get current time in user's timezone
-      const userLocalTime = new Date(now.toLocaleString('en-US', { timeZone: userTimezone }));
+      const userLocalTime = new Date(now.toLocaleString("en-US", { timeZone: userTimezone }));
       const currentUserHour = userLocalTime.getHours();
       const currentUserMinute = userLocalTime.getMinutes();
-      
-      logger.info(`User ${user._id}: Local time ${currentUserHour}:${String(currentUserMinute).padStart(2, '0')} ${userTimezone}, Preferred ${userHour}:${String(userMinute).padStart(2, '0')}`);
-      
+
+      logger.info(
+        `User ${user._id}: Local time ${currentUserHour}:${String(currentUserMinute).padStart(2, "0")} ${userTimezone}, Preferred ${userHour}:${String(userMinute).padStart(2, "0")}`,
+      );
+
       // Check if current local time matches user's preferred time
       if (currentUserHour !== userHour || currentUserMinute !== userMinute) {
         results.skipped++;
@@ -429,10 +516,58 @@ export async function sendMorningDigestNotifications() {
 
       // Get today's tasks for this user
       const tasks = await getTodaysTasks(user._id);
-      const notification = buildMorningDigestNotification(user, tasks);
+      let notification = buildMorningDigestNotification(user, tasks);
+
+      // Apply Ojo personality if the user has it enabled
+      const ojoDecision = await determineOjoTypeForNotification(user, null);
+      if (ojoDecision.useOjo && ojoDecision.ojoType && tasks.length > 0) {
+        try {
+          const userName = user.profile?.name || user.username;
+          const syntheticTask = {
+            taskname: `${tasks.length} task${tasks.length > 1 ? "s" : ""} today`,
+            description: tasks
+              .map((t) => t.taskname)
+              .slice(0, 3)
+              .join(", "),
+            importance: Math.max(...tasks.map((t) => t.importance || 3)),
+            dueDate: tasks[0]?.dueDate,
+          };
+          const ojoNotification = await generateOjoNotification(ojoDecision.ojoType, syntheticTask, {
+            timing: { urgency: "normal" },
+            source: "morning_digest",
+            userName,
+          });
+
+          // Enhance title with Ojo type name and emoji for push notifications
+          const ojoEmoji = getOjoTypeEmoji(ojoDecision.ojoType);
+          const ojoName = getOjoTypeDisplayName(ojoDecision.ojoType);
+          const enhancedTitle = `${ojoEmoji} ${ojoNotification.title} (${ojoName})`;
+
+          notification = {
+            title: enhancedTitle,
+            body: ojoNotification.body,
+            channelId: getOjoChannelId(ojoDecision.ojoType),
+            imageUrl: getOjoTypeIconUrl(ojoDecision.ojoType),
+            data: {
+              ...notification.data,
+              ojoType: ojoDecision.ojoType,
+              ojoGenerated: ojoNotification.generated,
+            },
+          };
+        } catch (ojoError) {
+          logger.warn(`Ojo morning digest failed for user ${user._id}, using standard:`, ojoError.message);
+        }
+      }
 
       // Always queue an in-app copy (works for web + native)
-      inAppItems.push({ userId: user._id, title: notification.title, body: notification.body, type: "morning_digest", data: notification.data });
+      inAppItems.push({
+        userId: user._id,
+        title: notification.title,
+        body: notification.body,
+        type: "morning_digest",
+        data: notification.data,
+        ojoType: notification.data?.ojoType,
+      });
       userUpdates.push(user._id);
 
       // Only add to push batch if user has a valid Expo token (native)
@@ -445,7 +580,8 @@ export async function sendMorningDigestNotifications() {
           body: notification.body,
           data: notification.data,
           priority: "high",
-          channelId: "morning-digest",
+          channelId: notification.channelId || "morning-digest",
+          ...(notification.imageUrl ? { imageUrl: notification.imageUrl } : {}),
         });
       }
     } catch (error) {
@@ -470,10 +606,7 @@ export async function sendMorningDigestNotifications() {
 
   // Update lastMorningDigest for ALL processed users
   if (userUpdates.length > 0) {
-    await User.updateMany(
-      { _id: { $in: userUpdates } },
-      { $set: { "pushNotifications.lastMorningDigest": now } }
-    );
+    await User.updateMany({ _id: { $in: userUpdates } }, { $set: { "pushNotifications.lastMorningDigest": now } });
   }
 
   logger.info(`Morning digest results: ${JSON.stringify(results)}`);
@@ -483,7 +616,7 @@ export async function sendMorningDigestNotifications() {
 /**
  * Test morning digest notifications (ignores lastMorningDigest check)
  * Used for testing purposes to allow multiple sends in one day
- * 
+ *
  * @returns {Promise<Object>} Results object with sent, failed, skipped counts
  */
 export async function testMorningDigestNotifications() {
@@ -491,7 +624,7 @@ export async function testMorningDigestNotifications() {
   const currentUTCHour = now.getUTCHours();
   const currentUTCMinute = now.getUTCMinutes();
 
-  logger.info(`🧪 Running MORNING DIGEST TEST at ${currentUTCHour}:${String(currentUTCMinute).padStart(2, '0')} UTC`);
+  logger.info(`🧪 Running MORNING DIGEST TEST at ${currentUTCHour}:${String(currentUTCMinute).padStart(2, "0")} UTC`);
 
   // Find all users with morning digest enabled (no lastMorningDigest check, include web users)
   const users = await User.find({
@@ -517,22 +650,72 @@ export async function testMorningDigestNotifications() {
       const userHour = user.pushNotifications?.morningDigest?.hour || 8;
       const userMinute = user.pushNotifications?.morningDigest?.minute || 0;
       const userTimezone = user.pushNotifications?.timezone || "UTC";
-      
+
       // Get current time in user's timezone
-      const userLocalTime = new Date(now.toLocaleString('en-US', { timeZone: userTimezone }));
+      const userLocalTime = new Date(now.toLocaleString("en-US", { timeZone: userTimezone }));
       const currentUserHour = userLocalTime.getHours();
       const currentUserMinute = userLocalTime.getMinutes();
-      
-      logger.info(`🧪 User ${user._id}: Local time ${currentUserHour}:${String(currentUserMinute).padStart(2, '0')} ${userTimezone}, Preferred ${userHour}:${String(userMinute).padStart(2, '0')}`);
-      
+
+      logger.info(
+        `🧪 User ${user._id}: Local time ${currentUserHour}:${String(currentUserMinute).padStart(2, "0")} ${userTimezone}, Preferred ${userHour}:${String(userMinute).padStart(2, "0")}`,
+      );
+
       // For testing, skip the time check - send to all users with digest enabled
 
       // Get today's tasks for this user
       const tasks = await getTodaysTasks(user._id);
-      const notification = buildMorningDigestNotification(user, tasks);
+      let notification = buildMorningDigestNotification(user, tasks);
+
+      // Apply Ojo personality if the user has it enabled
+      const ojoDecision = await determineOjoTypeForNotification(user, null);
+      if (ojoDecision.useOjo && ojoDecision.ojoType && tasks.length > 0) {
+        try {
+          const userName = user.profile?.name || user.username;
+          const syntheticTask = {
+            taskname: `${tasks.length} task${tasks.length > 1 ? "s" : ""} today`,
+            description: tasks
+              .map((t) => t.taskname)
+              .slice(0, 3)
+              .join(", "),
+            importance: Math.max(...tasks.map((t) => t.importance || 3)),
+            dueDate: tasks[0]?.dueDate,
+          };
+          const ojoNotification = await generateOjoNotification(ojoDecision.ojoType, syntheticTask, {
+            timing: { urgency: "normal" },
+            source: "morning_digest",
+            userName,
+          });
+
+          // Enhance title with Ojo type name and emoji for push notifications
+          const ojoEmoji = getOjoTypeEmoji(ojoDecision.ojoType);
+          const ojoName = getOjoTypeDisplayName(ojoDecision.ojoType);
+          const enhancedTitle = `${ojoEmoji} ${ojoNotification.title} (${ojoName})`;
+
+          notification = {
+            title: enhancedTitle,
+            body: ojoNotification.body,
+            channelId: getOjoChannelId(ojoDecision.ojoType),
+            imageUrl: getOjoTypeIconUrl(ojoDecision.ojoType),
+            data: {
+              ...notification.data,
+              ojoType: ojoDecision.ojoType,
+              ojoGenerated: ojoNotification.generated,
+            },
+          };
+        } catch (ojoError) {
+          logger.warn(`🧪 Ojo morning digest failed for user ${user._id}, using standard:`, ojoError.message);
+        }
+      }
 
       // Always queue in-app copy (web + native)
-      inAppItems.push({ userId: user._id, title: notification.title, body: notification.body, type: "morning_digest", data: notification.data });
+      inAppItems.push({
+        userId: user._id,
+        title: notification.title,
+        body: notification.body,
+        type: "morning_digest",
+        data: notification.data,
+        ojoType: notification.data?.ojoType,
+      });
 
       // Only push if user has a valid Expo token
       const token = user.pushNotifications?.expoPushToken;
@@ -544,7 +727,8 @@ export async function testMorningDigestNotifications() {
           body: notification.body,
           data: notification.data,
           priority: "high",
-          channelId: "morning-digest",
+          channelId: notification.channelId || "morning-digest",
+          ...(notification.imageUrl ? { imageUrl: notification.imageUrl } : {}),
         });
       }
     } catch (error) {
@@ -575,14 +759,14 @@ export async function testMorningDigestNotifications() {
  * Calculate optimal reminder time based on ML prediction
  * Uses the pre-calculated predictedCompletionCategory from the task if available,
  * otherwise falls back to making a new ML prediction.
- * 
+ *
  * @param {Object} task - Task document
  * @param {Object} user - User document
  * @returns {Promise<Object>} Reminder timing info
  */
 async function calculateSmartReminderTiming(task, user) {
   const defaultMinutes = user.pushNotifications?.taskReminders?.defaultReminderMinutes || 60;
-  
+
   try {
     // Only use pre-calculated prediction stored on the task — never call the ML model at runtime
     const category = task.predictedCompletionCategory || null;
@@ -590,8 +774,8 @@ async function calculateSmartReminderTiming(task, user) {
 
     if (!category) {
       logger.info(`No pre-calculated prediction for task ${task._id}, using defaults`);
-      return { 
-        minutesBefore: defaultMinutes, 
+      return {
+        minutesBefore: defaultMinutes,
         urgency: "normal",
         remindCount: 1,
         reminderWindows: [defaultMinutes],
@@ -599,10 +783,10 @@ async function calculateSmartReminderTiming(task, user) {
     }
 
     logger.info(`Using pre-calculated prediction for task ${task._id}: category=${category}, score=${score}`);
-    
+
     // prediction category: 1=very quick completion, 5=unlikely to complete
     // Higher category = more reminders and earlier start
-    
+
     let minutesBefore = defaultMinutes;
     let remindCount = 1;
     let urgency = "normal";
@@ -651,7 +835,7 @@ async function calculateSmartReminderTiming(task, user) {
       const finalReminder = Math.min(30, defaultMinutes);
       const step = (minutesBefore - finalReminder) / (remindCount - 1);
       for (let i = 0; i < remindCount; i++) {
-        const raw = minutesBefore - (step * i);
+        const raw = minutesBefore - step * i;
         const rounded = Math.round(raw / 30) * 30 || 30; // snap to nearest 30, minimum 30
         if (!reminderWindows.includes(rounded)) {
           reminderWindows.push(rounded);
@@ -685,12 +869,12 @@ async function calculateSmartReminderTiming(task, user) {
  * @param {string} source - Source of the reminder date ('schedule' or 'dueDate')
  * @returns {Object} Notification content
  */
-function buildTaskReminderNotification(task, timing, source = 'dueDate') {
+function buildTaskReminderNotification(task, timing, source = "dueDate") {
   const { urgency, minutesBefore } = timing;
-  
+
   let emoji = "📝";
   let prefix = "";
-  
+
   switch (urgency) {
     case "critical":
       emoji = "🚨";
@@ -708,11 +892,10 @@ function buildTaskReminderNotification(task, timing, source = 'dueDate') {
       break;
   }
 
-  const timeStr = minutesBefore >= 60 
-    ? `${Math.floor(minutesBefore / 60)}h ${minutesBefore % 60}m`
-    : `${minutesBefore}m`;
+  const timeStr =
+    minutesBefore >= 60 ? `${Math.floor(minutesBefore / 60)}h ${minutesBefore % 60}m` : `${minutesBefore}m`;
 
-  const actionStr = source === 'schedule' ? 'scheduled' : 'due';
+  const actionStr = source === "schedule" ? "scheduled" : "due";
   const timeContext = ` ${actionStr} in ${timeStr}`;
 
   return {
@@ -737,12 +920,12 @@ function buildTaskReminderNotification(task, timing, source = 'dueDate') {
  * @param {string} source - Source of the reminder date ('schedule' or 'dueDate')
  * @returns {Object} Notification content
  */
-function buildSubtaskReminderNotification(task, subtaskIndex, subtaskTitle, timing, source = 'dueDate') {
+function buildSubtaskReminderNotification(task, subtaskIndex, subtaskTitle, timing, source = "dueDate") {
   const { urgency, minutesBefore } = timing;
-  
+
   let emoji = "📋";
   let prefix = "";
-  
+
   switch (urgency) {
     case "critical":
       emoji = "🚨";
@@ -760,11 +943,10 @@ function buildSubtaskReminderNotification(task, subtaskIndex, subtaskTitle, timi
       break;
   }
 
-  const timeStr = minutesBefore >= 60 
-    ? `${Math.floor(minutesBefore / 60)}h ${minutesBefore % 60}m`
-    : `${minutesBefore}m`;
+  const timeStr =
+    minutesBefore >= 60 ? `${Math.floor(minutesBefore / 60)}h ${minutesBefore % 60}m` : `${minutesBefore}m`;
 
-  const actionStr = source === 'schedule' ? 'scheduled' : 'due';
+  const actionStr = source === "schedule" ? "scheduled" : "due";
   const displayTitle = subtaskTitle || `Part ${subtaskIndex}`;
 
   return {
@@ -785,7 +967,7 @@ function buildSubtaskReminderNotification(task, subtaskIndex, subtaskTitle, timi
 /**
  * Build notification with Ojo personality if enabled
  * Falls back to standard notification if Ojo is disabled or generation fails
- * 
+ *
  * @param {Object} user - User document
  * @param {Object} task - Task document
  * @param {Object} options - Options for building notification
@@ -797,36 +979,43 @@ function buildSubtaskReminderNotification(task, subtaskIndex, subtaskTitle, timi
  */
 async function buildNotificationWithOjo(user, task, options = {}) {
   const { subtask, timing, source, isSubtask } = options;
-  
+
   // Determine if we should use Ojo and which type
   const ojoDecision = await determineOjoTypeForNotification(user, timing);
-  
+
   if (!ojoDecision.useOjo) {
     // Ojo disabled - use standard notification
     return isSubtask
       ? buildSubtaskReminderNotification(task, subtask?.index, subtask?.title, timing, source)
       : buildTaskReminderNotification(task, timing, source);
   }
-  
+
   // Generate Ojo-styled notification
   try {
     const userName = user.profile?.name || user.username;
-    
+
     const ojoNotification = await generateOjoNotification(ojoDecision.ojoType, task, {
       subtask: isSubtask ? subtask : null,
       timing,
       source,
       userName,
     });
-    
+
+    // Enhance title with Ojo type name and emoji for push notifications
+    const ojoEmoji = getOjoTypeEmoji(ojoDecision.ojoType);
+    const ojoName = getOjoTypeDisplayName(ojoDecision.ojoType);
+    const enhancedTitle = `${ojoEmoji} ${ojoNotification.title} (${ojoName})`;
+
     return {
-      title: ojoNotification.title,
+      title: enhancedTitle,
       body: ojoNotification.body,
+      channelId: getOjoChannelId(ojoDecision.ojoType),
+      imageUrl: getOjoTypeIconUrl(ojoDecision.ojoType),
       data: {
         type: isSubtask ? "subtask_reminder" : "task_reminder",
         taskId: task._id.toString(),
         subtaskIndex: isSubtask ? subtask?.index : undefined,
-        subtaskTitle: isSubtask ? (subtask?.title || `Part ${subtask?.index}`) : undefined,
+        subtaskTitle: isSubtask ? subtask?.title || `Part ${subtask?.index}` : undefined,
         urgency: timing?.urgency,
         source,
         ojoType: ojoDecision.ojoType,
@@ -848,7 +1037,7 @@ async function buildNotificationWithOjo(user, task, options = {}) {
  * Check and send task reminders for all users
  * Runs periodically - called by the scheduler
  * Supports both tasks and subtasks, prioritizes schedule date over due date
- * 
+ *
  * @returns {Promise<Object>} Results summary
  */
 export async function sendTaskReminderNotifications() {
@@ -857,15 +1046,17 @@ export async function sendTaskReminderNotifications() {
   logger.info("Running task reminder check (tasks + subtasks)");
 
   const fourHoursFromNow = new Date(now.getTime() + 4 * 60 * 60 * 1000);
-  
+
   // Get all scheduled sessions in the next 4 hours (these take priority)
   const upcomingSessions = await TaskSchedule.find({
-    start: { 
-      $gte: now, 
-      $lte: fourHoursFromNow 
+    start: {
+      $gte: now,
+      $lte: fourHoursFromNow,
     },
     status: { $ne: "completed" },
-  }).populate("taskId").lean();
+  })
+    .populate("taskId")
+    .lean();
 
   // Build reminder items from scheduled sessions
   // Each item has: task, subtaskIndex (optional), reminderDate (schedule start or due date)
@@ -876,10 +1067,10 @@ export async function sendTaskReminderNotifications() {
   // Process scheduled sessions first (they have explicit schedule dates)
   for (const session of upcomingSessions) {
     if (!session.taskId || session.taskId.status === "done") continue;
-    
+
     const task = session.taskId;
     const reminderDate = session.start; // Use schedule date
-    
+
     if (session.subtaskIndex) {
       // This is a subtask session
       const key = `${task._id}-${session.subtaskIndex}`;
@@ -912,9 +1103,9 @@ export async function sendTaskReminderNotifications() {
   // Find tasks with due dates in the next 4 hours that don't have schedule sessions
   const upcomingTasks = await Task.find({
     status: { $ne: "done" },
-    dueDate: { 
-      $gte: now, 
-      $lte: fourHoursFromNow 
+    dueDate: {
+      $gte: now,
+      $lte: fourHoursFromNow,
     },
   }).lean();
 
@@ -935,13 +1126,13 @@ export async function sendTaskReminderNotifications() {
   // but no specific schedule (they inherit from parent task dueDate)
   const subtasksWithUpcomingTasks = await SubTask.find({
     status: { $ne: "done" },
-    taskId: { $in: upcomingTasks.map(t => t._id) },
+    taskId: { $in: upcomingTasks.map((t) => t._id) },
   }).lean();
 
   for (const subtask of subtasksWithUpcomingTasks) {
     const key = `${subtask.taskId}-${subtask.index}`;
     if (!processedSubtaskKeys.has(key)) {
-      const parentTask = upcomingTasks.find(t => t._id.toString() === subtask.taskId.toString());
+      const parentTask = upcomingTasks.find((t) => t._id.toString() === subtask.taskId.toString());
       if (parentTask) {
         processedSubtaskKeys.add(key);
         reminderItems.push({
@@ -967,10 +1158,10 @@ export async function sendTaskReminderNotifications() {
 
   for (const item of reminderItems) {
     const { task, subtaskIndex, subtaskTitle, reminderDate, isSubtask, source } = item;
-    
+
     try {
       const user = await User.findById(task.userId).lean();
-      
+
       if (!user) {
         results.skipped++;
         continue;
@@ -988,9 +1179,9 @@ export async function sendTaskReminderNotifications() {
 
       // Calculate smart reminder timing (uses task's pre-calculated prediction)
       const useSmartReminders = user.pushNotifications?.taskReminders?.useSmartReminders !== false;
-      const timing = useSmartReminders 
+      const timing = useSmartReminders
         ? await calculateSmartReminderTiming(task, user)
-        : { 
+        : {
             minutesBefore: user.pushNotifications?.taskReminders?.defaultReminderMinutes || 60,
             remindCount: 1,
             urgency: "normal",
@@ -1003,7 +1194,7 @@ export async function sendTaskReminderNotifications() {
       let sentForThisItem = false;
 
       for (const windowMinutes of windows) {
-        const reminderTime = targetTime - (windowMinutes * 60 * 1000);
+        const reminderTime = targetTime - windowMinutes * 60 * 1000;
 
         // Allow 2 minute window (tight because cron runs every minute)
         if (now.getTime() < reminderTime - 2 * 60 * 1000 || now.getTime() > reminderTime + 2 * 60 * 1000) {
@@ -1030,7 +1221,7 @@ export async function sendTaskReminderNotifications() {
           source,
           isSubtask,
         });
-        
+
         const sendResult = await sendNotificationToUser(task.userId, {
           ...notification,
           channelId: "task-reminders",
@@ -1052,12 +1243,9 @@ export async function sendTaskReminderNotifications() {
             source,
             targetTime,
           });
-          
+
           // Update last reminder timestamp
-          await User.updateOne(
-            { _id: task.userId },
-            { $set: { "pushNotifications.lastTaskReminder": now } }
-          );
+          await User.updateOne({ _id: task.userId }, { $set: { "pushNotifications.lastTaskReminder": now } });
         } else {
           results.failed++;
         }
@@ -1067,7 +1255,7 @@ export async function sendTaskReminderNotifications() {
         results.skipped++;
       }
     } catch (error) {
-      logger.error(`Failed to send reminder for ${isSubtask ? 'subtask' : 'task'} ${task._id}:`, error);
+      logger.error(`Failed to send reminder for ${isSubtask ? "subtask" : "task"} ${task._id}:`, error);
       results.failed++;
     }
   }
@@ -1079,7 +1267,7 @@ export async function sendTaskReminderNotifications() {
 /**
  * Test task reminder for a specific user
  * Sends a reminder notification immediately, ignoring timing checks
- * 
+ *
  * @param {string} userId - User ID to test
  * @param {Object} options - Test options
  * @param {boolean} options.useSmartReminders - Whether to use ML-based smart reminders
@@ -1090,12 +1278,12 @@ export async function sendTaskReminderNotifications() {
 export async function testTaskReminderNotification(userId, options = {}) {
   // useOjo defaults to false - tests should explicitly enable Ojo if needed
   const { useSmartReminders = true, useOjo = false, ojoType: forceOjoType } = options;
-  
+
   logger.info(`🧪 Testing task reminder for user ${userId}, smartReminders=${useSmartReminders}, useOjo=${useOjo}`);
 
   try {
     const user = await User.findById(userId).lean();
-    
+
     if (!user) {
       return { success: false, error: "User not found" };
     }
@@ -1108,14 +1296,18 @@ export async function testTaskReminderNotification(userId, options = {}) {
       userId,
       status: { $ne: "done" },
       dueDate: { $gte: now },
-    }).sort({ dueDate: 1 }).lean();
+    })
+      .sort({ dueDate: 1 })
+      .lean();
 
     // If no upcoming task, find any incomplete task
     if (!task) {
       task = await Task.findOne({
         userId,
         status: { $ne: "done" },
-      }).sort({ createdAt: -1 }).lean();
+      })
+        .sort({ createdAt: -1 })
+        .lean();
     }
 
     // If still no task, create a mock task for testing
@@ -1150,7 +1342,9 @@ export async function testTaskReminderNotification(userId, options = {}) {
       taskId: task._id,
       start: { $gte: now },
       status: { $ne: "completed" },
-    }).sort({ start: 1 }).lean();
+    })
+      .sort({ start: 1 })
+      .lean();
 
     // Determine the reminder source: schedule takes priority over due date
     const source = nextSchedule ? "schedule" : "dueDate";
@@ -1158,8 +1352,8 @@ export async function testTaskReminderNotification(userId, options = {}) {
     // Determine Ojo settings for test
     // useOjo parameter takes precedence - if explicitly false, don't use Ojo
     const ojoDecision = await determineOjoTypeForNotification(user, timing);
-    const shouldUseOjo = useOjo === true ? true : (useOjo === false ? false : ojoDecision.useOjo);
-    const selectedOjoType = shouldUseOjo ? (forceOjoType || ojoDecision.ojoType) : null;
+    const shouldUseOjo = useOjo === true ? true : useOjo === false ? false : ojoDecision.useOjo;
+    const selectedOjoType = shouldUseOjo ? forceOjoType || ojoDecision.ojoType : null;
 
     let notification;
     if (shouldUseOjo && selectedOjoType) {
@@ -1170,7 +1364,7 @@ export async function testTaskReminderNotification(userId, options = {}) {
         source,
         userName,
       });
-      
+
       notification = {
         title: `🧪 TEST: ${ojoNotification.title}`,
         body: ojoNotification.body,
@@ -1205,8 +1399,8 @@ export async function testTaskReminderNotification(userId, options = {}) {
 
     return {
       success: sendResult.success,
-      message: sendResult.success 
-        ? `Task reminder test sent (${useSmartReminders ? 'smart' : 'default'} mode, Ojo: ${shouldUseOjo ? selectedOjoType : 'disabled'})`
+      message: sendResult.success
+        ? `Task reminder test sent (${useSmartReminders ? "smart" : "default"} mode, Ojo: ${shouldUseOjo ? selectedOjoType : "disabled"})`
         : "Failed to send test notification",
       task: {
         id: task._id,
@@ -1243,7 +1437,7 @@ export async function testTaskReminderNotification(userId, options = {}) {
 /**
  * Test subtask reminder for a specific user
  * Sends a subtask reminder notification immediately, ignoring timing checks
- * 
+ *
  * @param {string} userId - User ID to test
  * @param {Object} options - Test options
  * @param {boolean} options.useSmartReminders - Whether to use ML-based smart reminders
@@ -1251,12 +1445,12 @@ export async function testTaskReminderNotification(userId, options = {}) {
  */
 export async function testSubtaskReminderNotification(userId, options = {}) {
   const { useSmartReminders = true } = options;
-  
+
   logger.info(`🧪 Testing subtask reminder for user ${userId}, smartReminders=${useSmartReminders}`);
 
   try {
     const user = await User.findById(userId).lean();
-    
+
     if (!user) {
       return { success: false, error: "User not found" };
     }
@@ -1268,13 +1462,15 @@ export async function testSubtaskReminderNotification(userId, options = {}) {
     const subtask = await SubTask.findOne({
       userId,
       status: { $ne: "done" },
-    }).sort({ createdAt: -1 }).lean();
+    })
+      .sort({ createdAt: -1 })
+      .lean();
 
     if (!subtask) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: "No subtasks found",
-        hint: "Create a task with subtasks (taskType: 'in_parts' or 'leaky') first to test subtask reminders"
+        hint: "Create a task with subtasks (taskType: 'in_parts' or 'leaky') first to test subtask reminders",
       };
     }
 
@@ -1304,14 +1500,16 @@ export async function testSubtaskReminderNotification(userId, options = {}) {
       subtaskIndex: subtask.index,
       start: { $gte: now },
       status: { $ne: "completed" },
-    }).sort({ start: 1 }).lean();
+    })
+      .sort({ start: 1 })
+      .lean();
 
     // Determine the reminder source: schedule takes priority over due date
     const source = nextSchedule ? "schedule" : "dueDate";
 
     // Build subtask notification with source
     const notification = buildSubtaskReminderNotification(task, subtask.index, subtask.title, timing, source);
-    
+
     // Add test indicator to title
     notification.title = `🧪 TEST: ${notification.title}`;
     notification.data = {
@@ -1328,8 +1526,8 @@ export async function testSubtaskReminderNotification(userId, options = {}) {
 
     return {
       success: sendResult.success,
-      message: sendResult.success 
-        ? `Subtask reminder test sent (${useSmartReminders ? 'smart' : 'default'} mode)`
+      message: sendResult.success
+        ? `Subtask reminder test sent (${useSmartReminders ? "smart" : "default"} mode)`
         : "Failed to send test notification",
       parentTask: {
         id: task._id,
@@ -1365,7 +1563,7 @@ export async function testSubtaskReminderNotification(userId, options = {}) {
 /**
  * Test Ojo-powered notification for a specific user
  * Generates and sends an AI-crafted notification in the Ojo's personality style
- * 
+ *
  * @param {string} userId - User ID to test
  * @param {Object} options - Test options
  * @param {string} options.ojoType - Force specific Ojo type (optional)
@@ -1373,12 +1571,12 @@ export async function testSubtaskReminderNotification(userId, options = {}) {
  */
 export async function testOjoReminderNotification(userId, options = {}) {
   const { ojoType: forceOjoType } = options;
-  
-  logger.info(`🧪 Testing Ojo reminder for user ${userId}, forceOjoType=${forceOjoType || 'auto'}`);
+
+  logger.info(`🧪 Testing Ojo reminder for user ${userId}, forceOjoType=${forceOjoType || "auto"}`);
 
   try {
     const user = await User.findById(userId).lean();
-    
+
     if (!user) {
       return { success: false, error: "User not found" };
     }
@@ -1391,14 +1589,18 @@ export async function testOjoReminderNotification(userId, options = {}) {
       userId,
       status: { $ne: "done" },
       dueDate: { $gte: now },
-    }).sort({ dueDate: 1 }).lean();
+    })
+      .sort({ dueDate: 1 })
+      .lean();
 
     // If no upcoming task, find any incomplete task
     if (!task) {
       task = await Task.findOne({
         userId,
         status: { $ne: "done" },
-      }).sort({ createdAt: -1 }).lean();
+      })
+        .sort({ createdAt: -1 })
+        .lean();
     }
 
     // If still no task, create a mock task for testing
@@ -1422,35 +1624,32 @@ export async function testOjoReminderNotification(userId, options = {}) {
       remindCount: 1,
       urgency: "normal",
     };
-    
+
     // Check for scheduled sessions for this task
     const nextSchedule = await TaskSchedule.findOne({
       taskId: task._id,
       start: { $gte: now },
       status: { $ne: "completed" },
-    }).sort({ start: 1 }).lean();
+    })
+      .sort({ start: 1 })
+      .lean();
 
     // Determine the reminder source: schedule takes priority over due date
     const source = nextSchedule ? "schedule" : "dueDate";
 
     // Determine Ojo type
-    // For Ojo test: use forced type, user's selected type, or default to mentorjo
-    // We do NOT use prediction-based auto-selection here since this test is about Ojo content, not smart timing
+    // If a specific type is forced via the test parameter, use it directly.
+    // Otherwise delegate to determineOjoTypeForNotification so "auto" and "chat" resolve correctly.
     let selectedOjoType;
     let ojoSelectionMethod;
-    
+
     if (forceOjoType) {
-      // Use forced Ojo type (from test parameter)
       selectedOjoType = forceOjoType;
       ojoSelectionMethod = "forced";
-    } else if (user.pushNotifications?.ojoNotifications?.selectedOjoType) {
-      // Use user's selected Ojo type
-      selectedOjoType = user.pushNotifications.ojoNotifications.selectedOjoType;
-      ojoSelectionMethod = "user_selected";
     } else {
-      // Default to mentorjo
-      selectedOjoType = "mentorjo";
-      ojoSelectionMethod = "default";
+      const ojoDecision = await determineOjoTypeForNotification(user, timing);
+      selectedOjoType = ojoDecision.ojoType || "mentorjo";
+      ojoSelectionMethod = ojoDecision.source || "default";
     }
 
     // Generate Ojo notification
@@ -1485,7 +1684,7 @@ export async function testOjoReminderNotification(userId, options = {}) {
 
     return {
       success: sendResult.success,
-      message: sendResult.success 
+      message: sendResult.success
         ? `Ojo reminder test sent (${selectedOjoType})`
         : "Failed to send Ojo test notification",
       task: {
@@ -1516,7 +1715,7 @@ export async function testOjoReminderNotification(userId, options = {}) {
 /**
  * Test smart reminder calculation without sending notification
  * Returns the ML prediction and calculated timing for a task
- * 
+ *
  * @param {string} userId - User ID
  * @param {string} taskId - Optional task ID (uses first upcoming task if not provided)
  * @returns {Promise<Object>} Calculation result
@@ -1526,7 +1725,7 @@ export async function testSmartReminderCalculation(userId, taskId = null) {
 
   try {
     const user = await User.findById(userId).lean();
-    
+
     if (!user) {
       return { success: false, error: "User not found" };
     }
@@ -1545,21 +1744,25 @@ export async function testSmartReminderCalculation(userId, taskId = null) {
         userId,
         status: { $ne: "done" },
         dueDate: { $gte: now },
-      }).sort({ dueDate: 1 }).lean();
+      })
+        .sort({ dueDate: 1 })
+        .lean();
 
       if (!task) {
         task = await Task.findOne({
           userId,
           status: { $ne: "done" },
-        }).sort({ createdAt: -1 }).lean();
+        })
+          .sort({ createdAt: -1 })
+          .lean();
       }
     }
 
     if (!task) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: "No tasks found for testing",
-        hint: "Create a task first to test smart reminder calculation"
+        hint: "Create a task first to test smart reminder calculation",
       };
     }
 
@@ -1569,7 +1772,9 @@ export async function testSmartReminderCalculation(userId, taskId = null) {
       taskId: task._id,
       start: { $gte: now },
       status: { $ne: "completed" },
-    }).sort({ start: 1 }).lean();
+    })
+      .sort({ start: 1 })
+      .lean();
 
     // Determine the reminder date: schedule takes priority over due date
     const reminderDate = nextSchedule?.start || task.dueDate;
@@ -1580,7 +1785,7 @@ export async function testSmartReminderCalculation(userId, taskId = null) {
 
     // Calculate smart timing (uses pre-calculated prediction from task)
     const smartTiming = await calculateSmartReminderTiming(task, user);
-    
+
     // Calculate default timing for comparison
     const defaultTiming = {
       minutesBefore: user.pushNotifications?.taskReminders?.defaultReminderMinutes || 60,
@@ -1613,7 +1818,7 @@ export async function testSmartReminderCalculation(userId, taskId = null) {
         nextScheduleStart: nextSchedule?.start,
         nextScheduleEnd: nextSchedule?.end,
       },
-      subtasks: subtasks.map(st => ({
+      subtasks: subtasks.map((st) => ({
         index: st.index,
         title: st.title,
         status: st.status,
@@ -1664,7 +1869,7 @@ function getCategoryInterpretation(category) {
 
 /**
  * Register or update user's push token
- * 
+ *
  * @param {string} userId - User ID
  * @param {string} token - Expo Push Token
  * @param {string} platform - Device platform (ios/android)
@@ -1685,7 +1890,7 @@ export async function registerPushToken(userId, token, platform = null) {
           "pushNotifications.enabled": true,
         },
       },
-      { new: true }
+      { new: true },
     );
 
     if (!result) {
@@ -1702,7 +1907,7 @@ export async function registerPushToken(userId, token, platform = null) {
 
 /**
  * Update notification preferences for a user
- * 
+ *
  * @param {string} userId - User ID
  * @param {Object} preferences - Notification preferences to update
  * @returns {Promise<Object>} Update result
@@ -1710,11 +1915,11 @@ export async function registerPushToken(userId, token, platform = null) {
 export async function updateNotificationPreferences(userId, preferences) {
   try {
     const updateFields = {};
-    
+
     if (preferences.enabled !== undefined) {
       updateFields["pushNotifications.enabled"] = preferences.enabled;
     }
-    
+
     if (preferences.morningDigest !== undefined) {
       if (preferences.morningDigest.enabled !== undefined) {
         updateFields["pushNotifications.morningDigest.enabled"] = preferences.morningDigest.enabled;
@@ -1726,46 +1931,44 @@ export async function updateNotificationPreferences(userId, preferences) {
         updateFields["pushNotifications.morningDigest.minute"] = preferences.morningDigest.minute;
       }
     }
-    
+
     if (preferences.taskReminders !== undefined) {
       if (preferences.taskReminders.enabled !== undefined) {
         updateFields["pushNotifications.taskReminders.enabled"] = preferences.taskReminders.enabled;
       }
       if (preferences.taskReminders.defaultReminderMinutes !== undefined) {
-        updateFields["pushNotifications.taskReminders.defaultReminderMinutes"] = preferences.taskReminders.defaultReminderMinutes;
+        updateFields["pushNotifications.taskReminders.defaultReminderMinutes"] =
+          preferences.taskReminders.defaultReminderMinutes;
       }
       if (preferences.taskReminders.useSmartReminders !== undefined) {
         updateFields["pushNotifications.taskReminders.useSmartReminders"] = preferences.taskReminders.useSmartReminders;
       }
     }
-    
+
     // Handle Ojo notification settings
     if (preferences.ojoNotifications !== undefined) {
       if (preferences.ojoNotifications.enabled !== undefined) {
         updateFields["pushNotifications.ojoNotifications.enabled"] = preferences.ojoNotifications.enabled;
       }
       if (preferences.ojoNotifications.selectedOjoType !== undefined) {
-        updateFields["pushNotifications.ojoNotifications.selectedOjoType"] = preferences.ojoNotifications.selectedOjoType;
+        updateFields["pushNotifications.ojoNotifications.selectedOjoType"] =
+          preferences.ojoNotifications.selectedOjoType;
       }
     }
-    
+
     if (preferences.timezone !== undefined) {
       updateFields["pushNotifications.timezone"] = preferences.timezone;
     }
 
-    const result = await User.findByIdAndUpdate(
-      userId,
-      { $set: updateFields },
-      { new: true }
-    );
+    const result = await User.findByIdAndUpdate(userId, { $set: updateFields }, { new: true });
 
     if (!result) {
       return { success: false, error: "User not found" };
     }
 
-    return { 
-      success: true, 
-      preferences: result.pushNotifications 
+    return {
+      success: true,
+      preferences: result.pushNotifications,
     };
   } catch (error) {
     logger.error(`Failed to update notification preferences for user ${userId}:`, error);
@@ -1775,14 +1978,14 @@ export async function updateNotificationPreferences(userId, preferences) {
 
 /**
  * Get notification preferences for a user
- * 
+ *
  * @param {string} userId - User ID
  * @returns {Promise<Object>} User's notification preferences
  */
 export async function getNotificationPreferences(userId) {
   try {
     const user = await User.findById(userId).select("pushNotifications").lean();
-    
+
     if (!user) {
       return { success: false, error: "User not found" };
     }
@@ -1790,8 +1993,8 @@ export async function getNotificationPreferences(userId) {
     // Include Ojo type options in the response
     const ojoTypes = getOjoTypeOptions();
 
-    return { 
-      success: true, 
+    return {
+      success: true,
       preferences: user.pushNotifications || {
         enabled: false,
         morningDigest: { enabled: true, hour: 8, minute: 0 },
@@ -1809,7 +2012,7 @@ export async function getNotificationPreferences(userId) {
 
 /**
  * Unregister push token (disable notifications)
- * 
+ *
  * @param {string} userId - User ID
  * @returns {Promise<Object>} Update result
  */
@@ -1823,7 +2026,7 @@ export async function unregisterPushToken(userId) {
           "pushNotifications.enabled": false,
         },
       },
-      { new: true }
+      { new: true },
     );
 
     if (!result) {
@@ -1840,7 +2043,7 @@ export async function unregisterPushToken(userId) {
 
 /**
  * Send a test notification to verify setup
- * 
+ *
  * @param {string} userId - User ID
  * @returns {Promise<Object>} Send result
  */
@@ -1862,8 +2065,14 @@ export async function sendTestNotification(userId) {
     const errMsg = result && result.error ? String(result.error) : "Unknown error";
     const nonPushReasons = ["No valid push token", "Notifications disabled for user", "User not found"];
 
-    if (nonPushReasons.some(r => errMsg.includes(r))) {
-      await storeInAppNotification({ userId, title: payload.title, body: payload.body, data: payload.data, type: "test" });
+    if (nonPushReasons.some((r) => errMsg.includes(r))) {
+      await storeInAppNotification({
+        userId,
+        title: payload.title,
+        body: payload.body,
+        data: payload.data,
+        type: "test",
+      });
       return { success: true, message: `Stored in-app notification (push not sent): ${errMsg}` };
     }
 
@@ -1873,7 +2082,13 @@ export async function sendTestNotification(userId) {
     logger.error(`sendTestNotification error for user ${userId}:`, error);
     // As a best-effort fallback, store an in-app notification
     try {
-      await storeInAppNotification({ userId, title: payload.title, body: payload.body, data: payload.data, type: "test" });
+      await storeInAppNotification({
+        userId,
+        title: payload.title,
+        body: payload.body,
+        data: payload.data,
+        type: "test",
+      });
       return { success: true, message: "Stored in-app notification due to error while sending push" };
     } catch (e) {
       logger.error("Failed to store fallback in-app notification:", e);
@@ -1887,7 +2102,7 @@ const activeTestIntervals = new Map();
 
 /**
  * Start periodic test notifications (every 1 minute)
- * 
+ *
  * @param {string} userId - User ID
  * @returns {Promise<Object>} Start result
  */
@@ -1913,25 +2128,25 @@ export async function startPeriodicTestNotifications(userId) {
     count++;
     const now = new Date();
     const timeStr = now.toLocaleTimeString();
-    
+
     await sendNotificationToUser(userId, {
       title: `🧪 Test Notification #${count}`,
       body: `Sent at ${timeStr} - Testing push notifications every minute.`,
       data: { type: "periodic_test", count },
     });
-    
+
     logger.info(`Sent periodic test notification #${count} to user ${userId}`);
   }, 60000); // 1 minute
 
   activeTestIntervals.set(userId, intervalId);
-  
+
   logger.info(`Started periodic test notifications for user ${userId}`);
   return { success: true, message: "Periodic test notifications started (every 1 minute)" };
 }
 
 /**
  * Stop periodic test notifications
- * 
+ *
  * @param {string} userId - User ID
  * @returns {Object} Stop result
  */
@@ -1947,7 +2162,7 @@ export function stopPeriodicTestNotifications(userId) {
 
 /**
  * Check if periodic test notifications are active for a user
- * 
+ *
  * @param {string} userId - User ID
  * @returns {boolean} Whether test mode is active
  */

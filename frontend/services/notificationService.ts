@@ -349,13 +349,50 @@ export async function setupNotificationChannels(): Promise<void> {
       sound: "default",
     });
 
-    // Task reminders channel
+    // Task reminders channel (fallback for non-Ojo notifications)
     await Notifications.setNotificationChannelAsync("task-reminders", {
       name: "Task Reminders",
       description: "Reminders for upcoming tasks",
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: "#4ECDC4",
+      sound: "default",
+    });
+
+    // Per-Ojo-type channels — each has the Ojo's signature accent color
+    await Notifications.setNotificationChannelAsync("ojo-mentorjo", {
+      name: "Mentorjo Reminders",
+      description: "Smart reminders from your Mentorjo Ojo",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#4361EE",
+      sound: "default",
+    });
+
+    await Notifications.setNotificationChannelAsync("ojo-brojo", {
+      name: "Brojo Reminders",
+      description: "Smart reminders from your Brojo Ojo",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#4CC9F0",
+      sound: "default",
+    });
+
+    await Notifications.setNotificationChannelAsync("ojo-bestojo", {
+      name: "Bestojo Reminders",
+      description: "Smart reminders from your Bestojo Ojo",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#7209B7",
+      sound: "default",
+    });
+
+    await Notifications.setNotificationChannelAsync("ojo-strictojo", {
+      name: "StrictOjo Reminders",
+      description: "Smart reminders from your StrictOjo",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#F43E3E",
       sound: "default",
     });
 
@@ -389,14 +426,21 @@ export async function setNotificationHandler(handler?: (notification: PushNotifi
 
   if (!Notifications) return;
 
-  // Set default notification handler
+  // Set default notification handler.
+  // For Ojo-branded notifications (those with data.ojoType), suppress the
+  // system banner — the OjoNotificationBanner in NotificationContext already
+  // renders the correct coloured icon in-app. For all other notifications the
+  // system banner is shown as normal.
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
+    handleNotification: async (notification) => {
+      const hasOjoType = !!notification?.request?.content?.data?.ojoType;
+      return {
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+        shouldShowBanner: !hasOjoType,
+        shouldShowList: true,
+      };
+    },
   });
 }
 
