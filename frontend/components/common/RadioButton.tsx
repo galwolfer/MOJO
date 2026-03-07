@@ -17,19 +17,21 @@ export type RadioButtonOption = {
   label: string;
   description?: string;
   value: any;
+  icon?: React.ReactNode;
 };
 
 type RadioButtonProps = {
   selected: boolean;
   label: string;
   description?: string;
+  icon?: React.ReactNode;
   onPress: () => void;
 };
 
 /**
  * RadioButton - Individual radio button option
  */
-export function RadioButton({ selected, label, description, onPress }: RadioButtonProps) {
+export function RadioButton({ selected, label, description, icon, onPress }: RadioButtonProps) {
   const colors = useColors();
 
   return (
@@ -38,6 +40,9 @@ export function RadioButton({ selected, label, description, onPress }: RadioButt
       <View style={[styles.radioCircle, { borderColor: colors.gray1 }, selected && styles.radioCircleSelected]}>
         {selected && <View style={styles.radioDot} />}
       </View>
+
+      {/* Optional leading icon */}
+      {icon ? <View style={styles.iconWrap}>{icon}</View> : null}
 
       {/* Label and description */}
       <View style={styles.content}>
@@ -71,6 +76,7 @@ export function RadioButtonGroup({ options, selectedId, onSelect }: RadioButtonG
         selected={selectedId === option.id}
         label={option.label}
         description={option.description}
+        icon={option.icon}
         onPress={() => onSelect(option.id, option.value)}
       />
     ),
@@ -112,6 +118,11 @@ const styles = StyleSheet.create({
     height: moderateScale(12),
     borderRadius: moderateScale(6),
     backgroundColor: COLORS.primary1,
+  },
+
+  // Optional icon
+  iconWrap: {
+    flexShrink: 0,
   },
 
   // Content

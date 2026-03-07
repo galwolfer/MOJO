@@ -31,6 +31,7 @@ import { setChatAuthToken } from "../../services/chatService";
 import { useKeyboard, useContentInsets } from "../../hooks";
 import { getOjoType } from "../../config/ojoTypeConfig";
 import { useOjo } from "../../context/OjoContext";
+import NotificationBell from "../../components/common/NotificationBell";
 
 import { useChatSessions, useChatMessages } from "../../hooks";
 import { TimelineItem, buildTimelineItems } from "../../utils/chatUtils";
@@ -104,7 +105,7 @@ export default function ChatScreen() {
       </View>
     );
 
-    setHeaderConfig({ show: true, leftElement });
+    setHeaderConfig({ show: true, leftElement, rightElement: <NotificationBell /> });
   }, [ojoName, setHeaderConfig]);
 
   // Cleanup when leaving screen

@@ -19,7 +19,7 @@
  *   handleDeleteSubtask,
  *   getLocalDateString,
  *   getFilteredTaskGroups,
- * } = useCalendarTasks(selectedDate, notifyTaskUpdate, subscribeToTaskUpdates);
+ * } = useCalendarTasks(selectedDate, notifyTaskUpdate, subscribeToTaskUpdates, notifyStatsChange);
  * ```
  */
 import { useState, useEffect } from "react";
@@ -41,6 +41,7 @@ export function useCalendarTasks(
   selectedDate: Date,
   notifyTaskUpdate: () => void,
   subscribeToTaskUpdates: (callback: () => void) => () => void,
+  notifyStatsChange?: (gamificationData?: { points?: number; currentStreak?: number; completedTasks?: number }) => void,
 ) {
   const { preferences } = useAccessibilityPreferences();
   const [taskGroups, setTaskGroups] = useState<TaskGroup[]>([]);
@@ -175,7 +176,12 @@ export function useCalendarTasks(
       // accordingly. We ignore `checked` since toggle flips whatever the server has.
       // In the unlikely event the UI state and server drift, the optimistic update
       // above will keep things coherent until the silent refetch.
-      await toggleTaskCompletion(parentTaskId);
+      const toggleResult = await toggleTaskCompletion(parentTaskId);
+
+      // Notify stats change with gamification data for real-time profile updates
+      if (toggleResult.gamification && notifyStatsChange) {
+        notifyStatsChange(toggleResult.gamification);
+      }
 
       // Notify other components
       notifyTaskUpdate();
@@ -203,6 +209,10 @@ export function useCalendarTasks(
         // Silent refresh: TaskCard useEffect will sync local state back to server truth
         await fetchTasksForDate(selectedDate, true);
       } else {
+        // Trigger stats refresh for subtask completion (gamification may have changed)
+        if (notifyStatsChange) {
+          notifyStatsChange();
+        }
         notifyTaskUpdate();
       }
     } catch (err) {

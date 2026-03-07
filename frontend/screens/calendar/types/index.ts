@@ -24,7 +24,7 @@ export interface Task {
   endTime?: string;
   title: string;
   emoji: string;
-  tags: string[];
+  tags?: string[];
   dueDate: string;
   description: string;
   completed: boolean;

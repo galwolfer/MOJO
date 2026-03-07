@@ -22,6 +22,10 @@ if (!fs.existsSync(uploadsDir)) {
 }
 app.use("/uploads", express.static(uploadsDir));
 
+// Serve frontend Ojo notification icons so push notifications can reference them by URL
+const notificationIconsDir = path.join(process.cwd(), "frontend", "assets");
+app.use("/notification-icons", express.static(notificationIconsDir));
+
 // Core middlewares
 app.use(helmet()); // Secure headers
 app.use(cors()); // CORS

@@ -17,11 +17,8 @@
     },
     "ios": {
       "supportsTablet": true,
-      "infoPlist": {
-        "UIBackgroundModes": [
-          "remote-notification"
-        ]
-      }
+      "infoPlist": {},
+      "bundleIdentifier": "com.galwolfer.Mojo"
     },
     "android": {
       "adaptiveIcon": {
@@ -31,6 +28,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.mojo.Mojo",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE",

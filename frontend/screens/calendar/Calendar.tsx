@@ -33,12 +33,15 @@ import TaskGroup from "./components/TaskGroup";
 import FloatingButton from "../../components/common/FloatingButton";
 import { useCalendarTasks } from "./hooks/useCalendarTasks";
 import { Task } from "./types";
+import { useOptionalStatsContext } from "../../context/StatsContext";
+import NotificationBell from "../../components/common/NotificationBell";
 
 export default function CalendarScreen() {
   const { setHeaderConfig, setActiveTab, setActiveTabWithParams, calendarSelectedDate, setCalendarSelectedDate } =
     useNavigation();
   const colors = useColors();
   const { notifyTaskUpdate, subscribeToTaskUpdates } = useTaskContext();
+  const { notifyStatsChange } = useOptionalStatsContext();
 
   // Use context-persisted date so the selection survives tab switches
   const selectedDate = calendarSelectedDate;
@@ -72,9 +75,12 @@ export default function CalendarScreen() {
         </TouchableOpacity>
       ),
       rightElement: (
-        <TouchableOpacity onPress={() => setActiveTab("alltasks")} activeOpacity={0.7}>
-          <ICONS.list size={ICON_SIZES.md} color={colors.primary1} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: SPACING.sm }}>
+          <NotificationBell />
+          <TouchableOpacity onPress={() => setActiveTab("alltasks")} activeOpacity={0.7}>
+            <ICONS.list size={ICON_SIZES.md} color={colors.primary1} />
+          </TouchableOpacity>
+        </View>
       ),
       element: bottomElement,
     });
@@ -92,7 +98,7 @@ export default function CalendarScreen() {
     handleDeleteTask,
     handleDeleteSubtask,
     getFilteredTaskGroups,
-  } = useCalendarTasks(selectedDate, notifyTaskUpdate, subscribeToTaskUpdates);
+  } = useCalendarTasks(selectedDate, notifyTaskUpdate, subscribeToTaskUpdates, notifyStatsChange);
 
   const filteredTaskGroups = getFilteredTaskGroups();
 

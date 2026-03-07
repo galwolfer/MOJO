@@ -48,6 +48,19 @@ function initializeApiBase(): string {
     // ignore — fall back to default
   }
 
+  // Prefer Expo runtime config if available (Constants.manifest.extra)
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const Constants = require("expo-constants");
+    const extras = (Constants && (Constants.manifest && Constants.manifest.extra)) || (Constants && Constants.expoConfig && Constants.expoConfig.extra) || null;
+    const expoApiBase = extras && (extras.EXPO_PUBLIC_API_BASE || extras.API_BASE);
+    if (expoApiBase && typeof expoApiBase === "string") {
+      base = expoApiBase.replace(/\/$/, "");
+    }
+  } catch (_) {
+    // not running in Expo environment or expo-constants not installed — continue
+  }
+
   // On Android devices/emulators, prefer an explicit machine IP so physical
   // devices and emulators can reach the server. If Metro provides a scriptURL
   // with a host, override with that.

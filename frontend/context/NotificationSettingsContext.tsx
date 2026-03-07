@@ -45,6 +45,12 @@ type NotificationSettingsContextType = {
   smartRemindersEnabled: boolean;
   ojoEnabled: boolean;
 
+  // ── Notification Ojo Type ────────────────────────────────────────────────
+  // The user's current selection (can be "auto", "chat", or concrete type)
+  selectedNotificationOjoType: OjoType | null;
+  // The resolved concrete Ojo type that would be used for notifications
+  resolvedNotificationOjoType: string | null;
+
   // ── Save helper ──────────────────────────────────────────────────────────
   save: (fn: () => Promise<unknown>) => Promise<void>;
 
@@ -205,12 +211,12 @@ export function NotificationSettingsProvider({ children }: { children: React.Rea
       save(() =>
         updatePreferences({
           ojoNotifications: {
-            enabled: preferences?.ojoNotifications?.enabled ?? true,
+            enabled: true, // selecting a type always enables Ojo personality
             selectedOjoType: ojoType,
           },
         }),
       ),
-    [save, updatePreferences, preferences],
+    [save, updatePreferences],
   );
 
   const handleTestNotification = useCallback(async () => {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { View, StyleSheet, ActivityIndicator } from "react-native";
 import { useTaskContext } from "../context/TaskContext";
+import { useOptionalStatsContext } from "../context/StatsContext";
 import AppText from "../components/common/AppText";
 import AppButton from "../components/common/AppButton";
 import PopupBox from "../components/common/PopupBox";
@@ -34,6 +35,7 @@ interface OverdueTasksModalProps {
 
 export default function OverdueTasksModal({ visible, onClose }: OverdueTasksModalProps) {
   const { notifyTaskUpdate } = useTaskContext();
+  const { notifyStatsChange } = useOptionalStatsContext();
 
   const [tasks, setTasks] = useState<OverdueTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -85,7 +87,11 @@ export default function OverdueTasksModal({ visible, onClose }: OverdueTasksModa
       const result = await completeTask(task._id);
       setActionInProgress(null);
 
-      if (result) {
+      if (result.task) {
+        // Notify stats change with gamification data for real-time profile updates
+        if (result.gamification && notifyStatsChange) {
+          notifyStatsChange(result.gamification);
+        }
         setSuccessPopup({
           title: "Task Completed",
           body: `Great work! "${task.taskname}" completed.`,
@@ -97,7 +103,7 @@ export default function OverdueTasksModal({ visible, onClose }: OverdueTasksModa
         setErrorMsg("Failed to mark task as completed. Please try again.");
       }
     },
-    [removeTask],
+    [removeTask, notifyStatsChange],
   );
 
   // ── Extend ─────────────────────────────────────────────────────────────────
