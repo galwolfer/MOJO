@@ -13,7 +13,7 @@ import { Platform } from "react-native";
 import { post, get, put, del, patch } from "./httpClient";
 
 // Types
-export type OjoType = "mentorjo" | "brojo" | "bestojo" | "strictojo" | "chat";
+export type OjoType = "mentorjo" | "brojo" | "bestojo" | "strictojo" | "chat" | "auto";
 
 export type OjoTypeOption = {
   name: OjoType;
@@ -157,17 +157,19 @@ export async function getExpoPushToken(projectId?: string): Promise<string | nul
     return tokenData.data;
   } catch (error: any) {
     // Check if this is a Firebase configuration error
-    const errorMessage = error?.message || '';
-    if (errorMessage.includes('FirebaseApp is not initialized') || 
-        errorMessage.includes('FCM') || 
-        errorMessage.includes('Firebase')) {
+    const errorMessage = error?.message || "";
+    if (
+      errorMessage.includes("FirebaseApp is not initialized") ||
+      errorMessage.includes("FCM") ||
+      errorMessage.includes("Firebase")
+    ) {
       console.warn(
-        '⚠️ Firebase/FCM is not configured. Push notifications will not work.\n' +
-        'To enable push notifications:\n' +
-        '1. Create a Firebase project at https://console.firebase.google.com\n' +
-        '2. Add an Android app with package name: com.mojo.Mojo\n' +
-        '3. Download google-services.json to frontend/services/secrets/google-services.json\n' +
-        '4. Rebuild the app with: npx expo prebuild --clean && npx expo run:android'
+        "⚠️ Firebase/FCM is not configured. Push notifications will not work.\n" +
+          "To enable push notifications:\n" +
+          "1. Create a Firebase project at https://console.firebase.google.com\n" +
+          "2. Add an Android app with package name: com.mojo.Mojo\n" +
+          "3. Download google-services.json to frontend/services/secrets/google-services.json\n" +
+          "4. Rebuild the app with: npx expo prebuild --clean && npx expo run:android",
       );
       return null;
     }
@@ -185,10 +187,10 @@ export async function registerPushToken(token: string): Promise<{ success: boole
   try {
     const platform = Platform.OS as "ios" | "android" | "web";
 
-    const response = await post<{ success: boolean; message?: string; error?: string }>(
-      "/notifications/register",
-      { token, platform }
-    );
+    const response = await post<{ success: boolean; message?: string; error?: string }>("/notifications/register", {
+      token,
+      platform,
+    });
 
     return { success: response.success };
   } catch (error: any) {
@@ -205,7 +207,7 @@ export async function unregisterPushToken(): Promise<{ success: boolean; error?:
   try {
     const response = await post<{ success: boolean; message?: string; error?: string }>(
       "/notifications/unregister",
-      {}
+      {},
     );
 
     return { success: response.success };
@@ -242,9 +244,7 @@ export async function getNotificationPreferences(): Promise<{
  * @param preferences - Partial preferences to update
  * @returns Updated preferences
  */
-export async function updateNotificationPreferences(
-  preferences: Partial<NotificationPreferences>
-): Promise<{
+export async function updateNotificationPreferences(preferences: Partial<NotificationPreferences>): Promise<{
   success: boolean;
   preferences?: NotificationPreferences;
   error?: string;
@@ -268,10 +268,7 @@ export async function updateNotificationPreferences(
  */
 export async function sendTestNotification(): Promise<{ success: boolean; error?: string }> {
   try {
-    const response = await post<{ success: boolean; message?: string; error?: string }>(
-      "/notifications/test",
-      {}
-    );
+    const response = await post<{ success: boolean; message?: string; error?: string }>("/notifications/test", {});
 
     return { success: response.success };
   } catch (error: any) {
@@ -284,11 +281,15 @@ export async function sendTestNotification(): Promise<{ success: boolean; error?
  * Start periodic test notifications (every 1 minute)
  * @returns Success status
  */
-export async function startPeriodicTestNotifications(): Promise<{ success: boolean; message?: string; error?: string }> {
+export async function startPeriodicTestNotifications(): Promise<{
+  success: boolean;
+  message?: string;
+  error?: string;
+}> {
   try {
     const response = await post<{ success: boolean; message?: string; error?: string }>(
       "/notifications/test/start",
-      {}
+      {},
     );
 
     return { success: response.success, message: response.message };
@@ -304,10 +305,7 @@ export async function startPeriodicTestNotifications(): Promise<{ success: boole
  */
 export async function stopPeriodicTestNotifications(): Promise<{ success: boolean; message?: string; error?: string }> {
   try {
-    const response = await post<{ success: boolean; message?: string; error?: string }>(
-      "/notifications/test/stop",
-      {}
-    );
+    const response = await post<{ success: boolean; message?: string; error?: string }>("/notifications/test/stop", {});
 
     return { success: response.success, message: response.message };
   } catch (error: any) {
@@ -322,9 +320,7 @@ export async function stopPeriodicTestNotifications(): Promise<{ success: boolea
  */
 export async function getTestModeStatus(): Promise<{ success: boolean; testModeActive?: boolean; error?: string }> {
   try {
-    const response = await get<{ success: boolean; testModeActive: boolean }>(
-      "/notifications/test/status"
-    );
+    const response = await get<{ success: boolean; testModeActive: boolean }>("/notifications/test/status");
 
     return { success: true, testModeActive: response.testModeActive };
   } catch (error: any) {
@@ -374,7 +370,9 @@ export async function setupNotificationChannels(): Promise<void> {
     });
 
     // Clean up the old cached channel
-    try { await Notifications.deleteNotificationChannelAsync("default"); } catch {}
+    try {
+      await Notifications.deleteNotificationChannelAsync("default");
+    } catch {}
 
     console.log("Notification channels set up successfully");
   } catch (error) {
@@ -386,9 +384,7 @@ export async function setupNotificationChannels(): Promise<void> {
  * Configure notification handler for when app is in foreground
  * @param handler - Function to handle incoming notifications
  */
-export async function setNotificationHandler(
-  handler?: (notification: PushNotification) => void
-): Promise<void> {
+export async function setNotificationHandler(handler?: (notification: PushNotification) => void): Promise<void> {
   const { Notifications } = await loadNotificationModules();
 
   if (!Notifications) return;
@@ -410,7 +406,7 @@ export async function setNotificationHandler(
  * @returns Subscription object to remove listener
  */
 export async function addNotificationReceivedListener(
-  callback: (notification: any) => void
+  callback: (notification: any) => void,
 ): Promise<{ remove: () => void } | null> {
   const { Notifications } = await loadNotificationModules();
 
@@ -426,7 +422,7 @@ export async function addNotificationReceivedListener(
  * @returns Subscription object to remove listener
  */
 export async function addNotificationResponseListener(
-  callback: (response: any) => void
+  callback: (response: any) => void,
 ): Promise<{ remove: () => void } | null> {
   const { Notifications } = await loadNotificationModules();
 
@@ -461,7 +457,7 @@ export async function getLastNotificationResponse(): Promise<any | null> {
  */
 export async function scheduleLocalNotification(
   content: { title: string; body: string; data?: any },
-  trigger?: { seconds?: number } | null
+  trigger?: { seconds?: number } | null,
 ): Promise<string | null> {
   const { Notifications } = await loadNotificationModules();
 
@@ -562,11 +558,15 @@ export function startWebNotificationPolling(pollIntervalMs = 60000) {
             }
             _shownWebNotificationIds.add(n._id);
             // Optionally mark as read so it doesn't show repeatedly
-            try { await markNotificationRead(n._id); } catch {}
+            try {
+              await markNotificationRead(n._id);
+            } catch {}
           }
         }
       }
-    } catch (e) { console.warn("Web notification poll error:", e); }
+    } catch (e) {
+      console.warn("Web notification poll error:", e);
+    }
   })();
 
   const id = window.setInterval(async () => {
@@ -581,11 +581,15 @@ export function startWebNotificationPolling(pollIntervalMs = 60000) {
               console.warn("Failed to show browser notification:", e);
             }
             _shownWebNotificationIds.add(n._id);
-            try { await markNotificationRead(n._id); } catch {}
+            try {
+              await markNotificationRead(n._id);
+            } catch {}
           }
         }
       }
-    } catch (e) { console.warn("Web notification poll error:", e); }
+    } catch (e) {
+      console.warn("Web notification poll error:", e);
+    }
   }, pollIntervalMs);
 
   _webNotificationIntervalId = id as unknown as number;
@@ -608,7 +612,6 @@ export function stopWebNotificationPolling() {
 export function isWebNotificationPollingActive(): boolean {
   return !!_webNotificationIntervalId;
 }
-
 
 /**
  * Initialize push notifications
@@ -755,9 +758,7 @@ export async function getInboxNotifications(options?: {
  */
 export async function getUnreadCount(): Promise<{ success: boolean; unreadCount: number }> {
   try {
-    const response = await get<{ success: boolean; unreadCount: number }>(
-      "/notifications/inbox/unread-count",
-    );
+    const response = await get<{ success: boolean; unreadCount: number }>("/notifications/inbox/unread-count");
     return { success: true, unreadCount: response.unreadCount ?? 0 };
   } catch (error: any) {
     console.error("Error fetching unread count:", error);
@@ -768,9 +769,7 @@ export async function getUnreadCount(): Promise<{ success: boolean; unreadCount:
 /**
  * Mark a single notification as read.
  */
-export async function markNotificationRead(
-  notificationId: string,
-): Promise<{ success: boolean }> {
+export async function markNotificationRead(notificationId: string): Promise<{ success: boolean }> {
   try {
     await patch<{ success: boolean }>(`/notifications/inbox/${notificationId}/read`, {});
     return { success: true };
@@ -796,9 +795,7 @@ export async function markAllNotificationsRead(): Promise<{ success: boolean }> 
 /**
  * Delete a single in-app notification.
  */
-export async function deleteNotification(
-  notificationId: string,
-): Promise<{ success: boolean }> {
+export async function deleteNotification(notificationId: string): Promise<{ success: boolean }> {
   try {
     await del<{ success: boolean }>(`/notifications/inbox/${notificationId}`);
     return { success: true };

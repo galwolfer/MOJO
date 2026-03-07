@@ -205,12 +205,12 @@ export function NotificationSettingsProvider({ children }: { children: React.Rea
       save(() =>
         updatePreferences({
           ojoNotifications: {
-            enabled: preferences?.ojoNotifications?.enabled ?? true,
+            enabled: true, // selecting a type always enables Ojo personality
             selectedOjoType: ojoType,
           },
         }),
       ),
-    [save, updatePreferences, preferences],
+    [save, updatePreferences],
   );
 
   const handleTestNotification = useCallback(async () => {

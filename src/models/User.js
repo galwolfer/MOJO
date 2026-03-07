@@ -266,10 +266,10 @@ const userSchema = new mongoose.Schema(
             enabled: { type: Boolean, default: false },
             // Selected Ojo type for notifications (when smartReminders is OFF)
             // "chat" = use the same Ojo type as the user's chat personality
-            selectedOjoType: { 
-              type: String, 
-              enum: ["mentorjo", "brojo", "bestojo", "strictojo", "chat", null], 
-              default: null 
+            selectedOjoType: {
+              type: String,
+              enum: ["mentorjo", "brojo", "bestojo", "strictojo", "chat", "auto", null],
+              default: null,
             },
           },
           // Timezone for scheduling (IANA format, e.g., 'America/New_York')
