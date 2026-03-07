@@ -1,5 +1,8 @@
 {
   "android": {
     "package": "com.galwolfer.teammojoserver"
+  },
+  "ios": {
+    "bundleIdentifier": "com.galwolfer.teammojoserver"
   }
 }
