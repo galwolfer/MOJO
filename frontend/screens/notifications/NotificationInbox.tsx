@@ -1,24 +1,14 @@
-/**
+﻿/**
  * NotificationInbox
  *
- * Full-screen list of in-app notifications. Each item shows the notification
- * title, body, timestamp, and an optional Ojo personality badge.
- * Supports pull-to-refresh, cursor-based pagination, swipe-to-delete,
- * and a "mark all read" action in the header.
+ * Full-screen list of in-app notifications rendered inside a Box+List.
+ * Supports pull-to-refresh, cursor-based pagination, tap-to-read, and
+ * long-press-to-delete. "Mark all read" action lives in the header.
  *
  * Rendered when `activeTab === "notifications"` in MainLayout.
  */
-import React, { useCallback, useEffect, useState, useRef } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  ActivityIndicator,
-  Animated,
-  RefreshControl,
-} from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, RefreshControl } from "react-native";
 import { COLORS, FONTS, FONT_SIZES, SPACING } from "../../theme";
 import { useColors } from "../../context/ThemeContext";
 import { useNavigation } from "../../context/NavigationContext";
@@ -27,6 +17,8 @@ import { ICONS } from "../../components/icons/icons";
 import { getOjoType, getOjoTypeColor, type OjoTypeName } from "../../config/ojoTypeConfig";
 import ScrollableContent from "../../components/layout/ScrollableContent";
 import AppText from "../../components/common/AppText";
+import Box from "../../components/layout/Box";
+import List, { type ListCellProps } from "../../components/layout/List";
 import {
   getInboxNotifications,
   markNotificationRead,
@@ -35,14 +27,12 @@ import {
   type InAppNotification,
 } from "../../services/notificationService";
 
-// ── Helpers ────────────────────────────────────────────────────────────
+// -- Helpers ------------------------------------------------------------
 
-/** Friendly relative timestamp (e.g. "3m ago", "2h ago", "Yesterday") */
 function timeAgo(dateStr: string): string {
   const now = Date.now();
   const then = new Date(dateStr).getTime();
   const diffSec = Math.round((now - then) / 1000);
-
   if (diffSec < 60) return "Just now";
   const mins = Math.floor(diffSec / 60);
   if (mins < 60) return `${mins}m ago`;
@@ -54,14 +44,12 @@ function timeAgo(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString();
 }
 
-/** Icon component to show for a notification type */
 function notificationIcon(type: string, ojoType: OjoTypeName | null, color: string) {
   if (ojoType) {
     const cfg = getOjoType(ojoType);
     const OjoIcon = ICONS[cfg.icon as keyof typeof ICONS];
     if (OjoIcon) return <OjoIcon size={28} color={getOjoTypeColor(ojoType)} />;
   }
-
   switch (type) {
     case "morning_digest":
       return ICONS.sun ? <ICONS.sun size={28} color={color} /> : <ICONS.calendar size={28} color={color} />;
@@ -72,12 +60,12 @@ function notificationIcon(type: string, ojoType: OjoTypeName | null, color: stri
   }
 }
 
-// ── Component ──────────────────────────────────────────────────────────
+// -- Component ----------------------------------------------------------
 
 export default function NotificationInbox() {
   const colors = useColors();
   const { setHeaderConfig, goBack } = useNavigation();
-  const { unreadCount, refreshUnreadCount } = useNotifications();
+  const { refreshUnreadCount } = useNotifications();
 
   const [notifications, setNotifications] = useState<InAppNotification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,7 +73,36 @@ export default function NotificationInbox() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
-  // ── Header config ──────────────────────────────────────────────────
+  // -- Actions --------------------------------------------------------
+
+  const handleMarkAllRead = useCallback(async () => {
+    await markAllNotificationsRead();
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    refreshUnreadCount();
+  }, [refreshUnreadCount]);
+
+  const handleTap = useCallback(
+    async (item: InAppNotification) => {
+      if (!item.read) {
+        markNotificationRead(item._id);
+        setNotifications((prev) => prev.map((n) => (n._id === item._id ? { ...n, read: true } : n)));
+        refreshUnreadCount();
+      }
+    },
+    [refreshUnreadCount],
+  );
+
+  const handleDelete = useCallback(
+    async (id: string) => {
+      await deleteNotification(id);
+      setNotifications((prev) => prev.filter((n) => n._id !== id));
+      refreshUnreadCount();
+    },
+    [refreshUnreadCount],
+  );
+
+  // -- Header config --------------------------------------------------
+
   useEffect(() => {
     const BackIcon = ICONS.left;
     setHeaderConfig({
@@ -104,19 +121,23 @@ export default function NotificationInbox() {
         </TouchableOpacity>
       ),
     });
-  }, []);
+  }, [handleMarkAllRead]);
 
-  // ── Data fetching ──────────────────────────────────────────────────
-  const fetchNotifications = useCallback(async (reset = true) => {
-    if (reset) setLoading(true);
-    const result = await getInboxNotifications({ limit: 30 });
-    if (result.success) {
-      setNotifications(result.notifications);
-      setHasMore(result.notifications.length >= 30);
-    }
-    setLoading(false);
-    refreshUnreadCount();
-  }, []);
+  // -- Data fetching --------------------------------------------------
+
+  const fetchNotifications = useCallback(
+    async (reset = true) => {
+      if (reset) setLoading(true);
+      const result = await getInboxNotifications({ limit: 30 });
+      if (result.success) {
+        setNotifications(result.notifications);
+        setHasMore(result.notifications.length >= 30);
+      }
+      setLoading(false);
+      refreshUnreadCount();
+    },
+    [refreshUnreadCount],
+  );
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || notifications.length === 0) return;
@@ -128,7 +149,7 @@ export default function NotificationInbox() {
       setHasMore(result.notifications.length >= 30);
     }
     setLoadingMore(false);
-  }, [loadingMore, hasMore, notifications]);
+  }, [loadingMore, hasMore, notifications, refreshUnreadCount]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -140,49 +161,24 @@ export default function NotificationInbox() {
     fetchNotifications();
   }, []);
 
-  // ── Actions ────────────────────────────────────────────────────────
-  const handleMarkAllRead = useCallback(async () => {
-    await markAllNotificationsRead();
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    refreshUnreadCount();
-  }, []);
+  // -- List cells -----------------------------------------------------
 
-  const handleTap = useCallback(
-    async (item: InAppNotification) => {
-      if (!item.read) {
-        markNotificationRead(item._id);
-        setNotifications((prev) =>
-          prev.map((n) => (n._id === item._id ? { ...n, read: true } : n)),
-        );
-        refreshUnreadCount();
-      }
-    },
-    [],
-  );
-
-  const handleDelete = useCallback(
-    async (id: string) => {
-      await deleteNotification(id);
-      setNotifications((prev) => prev.filter((n) => n._id !== id));
-      refreshUnreadCount();
-    },
-    [],
-  );
-
-  // ── Render ─────────────────────────────────────────────────────────
-  const renderItem = useCallback(
-    ({ item }: { item: InAppNotification }) => (
+  const listItems: ListCellProps[] = notifications.map((item, index) => ({
+    id: item._id,
+    // No onPress on the cell  - NotificationRow handles its own touch
+    content: (
       <NotificationRow
         item={item}
         colors={colors}
         onTap={handleTap}
         onDelete={handleDelete}
+        isLast={index === notifications.length - 1}
       />
     ),
-    [colors, handleTap, handleDelete],
-  );
+    divider: false,
+  }));
 
-  const keyExtractor = useCallback((item: InAppNotification) => item._id, []);
+  // -- Render ---------------------------------------------------------
 
   if (loading) {
     return (
@@ -192,51 +188,54 @@ export default function NotificationInbox() {
     );
   }
 
-  if (notifications.length === 0) {
-    return (
-      <ScrollableContent respectHeader respectNavBar>
-        <View style={[styles.emptyContainer]}>
+  return (
+    <ScrollableContent
+      respectHeader
+      respectNavBar
+      scrollKey="notification-inbox"
+      extraTopPadding={SPACING.lg}
+      extraBottomPadding={SPACING.xlg * 3}
+      contentContainerStyle={styles.contentContainer}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary1} />}
+    >
+      {notifications.length === 0 ? (
+        <View style={styles.emptyContainer}>
           <ICONS.notifications size={48} color={colors.gray1} />
           <AppText variant="bodyText" style={{ color: colors.gray1, marginTop: SPACING.md }}>
             No notifications yet
           </AppText>
         </View>
-      </ScrollableContent>
-    );
-  }
-
-  return (
-    <View style={[styles.root, { backgroundColor: colors.bg3 }]}>
-      <FlatList
-        data={notifications}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary1} />
-        }
-        onEndReached={loadMore}
-        onEndReachedThreshold={0.3}
-        ListFooterComponent={
-          loadingMore ? (
-            <ActivityIndicator size="small" color={COLORS.primary1} style={{ marginVertical: SPACING.md }} />
-          ) : null
-        }
-      />
-    </View>
+      ) : (
+        <Box innerPadding={false}>
+          <List data={listItems} />
+          {hasMore && (
+            <TouchableOpacity style={styles.loadMoreBtn} onPress={loadMore} disabled={loadingMore} activeOpacity={0.7}>
+              {loadingMore ? (
+                <ActivityIndicator size="small" color={COLORS.primary1} />
+              ) : (
+                <AppText variant="notes" style={{ color: COLORS.primary1 }}>
+                  Load more
+                </AppText>
+              )}
+            </TouchableOpacity>
+          )}
+        </Box>
+      )}
+    </ScrollableContent>
   );
 }
 
-// ── Row sub-component ─────────────────────────────────────────────────
+// -- Row sub-component -------------------------------------------------
 
 type RowProps = {
   item: InAppNotification;
   colors: any;
   onTap: (item: InAppNotification) => void;
   onDelete: (id: string) => void;
+  isLast: boolean;
 };
 
-function NotificationRow({ item, colors, onTap, onDelete }: RowProps) {
+function NotificationRow({ item, colors, onTap, onDelete, isLast }: RowProps) {
   const accentColor = item.ojoType ? getOjoTypeColor(item.ojoType as OjoTypeName) : COLORS.primary1;
   const isUnread = !item.read;
 
@@ -245,16 +244,12 @@ function NotificationRow({ item, colors, onTap, onDelete }: RowProps) {
       activeOpacity={0.85}
       onPress={() => onTap(item)}
       onLongPress={() => onDelete(item._id)}
-      style={[
-        styles.row,
-        { backgroundColor: colors.bg2, shadowColor: colors.shadow },
-        isUnread && styles.rowUnread,
-      ]}
+      style={[styles.row, { borderBottomColor: colors.divider }, !isLast && styles.rowDivider]}
     >
       {/* Colored accent bar on the left */}
       <View style={[styles.accentBar, { backgroundColor: accentColor }]} />
 
-      {/* Ojo icon with colored circle */}
+      {/* Icon with colored circle */}
       <View style={[styles.iconCircle, { backgroundColor: accentColor + "20" }]}>
         {notificationIcon(item.type, item.ojoType as OjoTypeName | null, accentColor)}
       </View>
@@ -284,16 +279,19 @@ function NotificationRow({ item, colors, onTap, onDelete }: RowProps) {
   );
 }
 
-// ── Styles ─────────────────────────────────────────────────────────────
+// -- Styles -------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
   center: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  contentContainer: {
+    alignItems: "center",
+    gap: SPACING.lg,
+    paddingBottom: SPACING.xlg * 6,
+    paddingHorizontal: SPACING.md,
   },
   emptyContainer: {
     flex: 1,
@@ -301,28 +299,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingTop: 120,
   },
-  listContent: {
-    paddingTop: 100, // leave room for floating header
-    paddingBottom: 120, // leave room for floating navbar
-    paddingHorizontal: SPACING.md,
-    gap: SPACING.sm,
+  loadMoreBtn: {
+    alignItems: "center",
+    paddingVertical: SPACING.md,
   },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 16,
     padding: SPACING.md,
     gap: SPACING.md,
     overflow: "hidden",
-    // Shadow
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
   },
-  rowUnread: {
-    shadowOpacity: 0.3,
-    elevation: 10,
+  rowDivider: {
+    borderBottomWidth: 1,
   },
   accentBar: {
     position: "absolute",
@@ -330,8 +319,6 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: 4,
-    borderTopLeftRadius: 16,
-    borderBottomLeftRadius: 16,
   },
   iconCircle: {
     width: 44,
