@@ -135,6 +135,11 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
             title: content?.title || "Notification",
             body: content?.body || "",
           });
+          // Mark this notification as seen so polling won't duplicate it
+          try {
+            const possibleId = data?._id || data?.id || data?.notificationId || null;
+            if (possibleId) lastSeenNotificationIdRef.current = String(possibleId);
+          } catch {}
         }
       );
 
@@ -407,6 +412,61 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
       clearInterval(interval);
     };
   }, [user, token]);
+
+  // ── Native fallback polling: when push token or native listeners aren't available,
+  // poll the server for new in-app notifications and show the banner. This helps
+  // ensure users still see banners on physical devices when push delivery isn't
+  // configured or temporarily unavailable.
+  useEffect(() => {
+    if (Platform.OS === "web" || !user || !token) return;
+
+    // Enable fallback polling on native devices to surface server-side in-app
+    // notifications in case push delivery isn't configured or temporarily
+    // unavailable. Polling is safe because we track last seen notification IDs
+    // to avoid duplicates.
+
+    let cancelled = false;
+
+    const pollForNewNotificationsNative = async () => {
+      try {
+        const result = await getInboxNotifications({ limit: 1 });
+        if (cancelled || !result.success || result.notifications.length === 0) return;
+
+        const newest = result.notifications[0];
+
+        if (lastSeenNotificationIdRef.current === null) {
+          lastSeenNotificationIdRef.current = newest._id;
+          return;
+        }
+
+        if (newest._id !== lastSeenNotificationIdRef.current) {
+          lastSeenNotificationIdRef.current = newest._id;
+          setUnreadCount((prev) => Math.max(prev, 1));
+          const validOjoTypes = ["mentorjo", "brojo", "bestojo", "strictojo"];
+          const ojoType = newest.ojoType && validOjoTypes.includes(newest.ojoType)
+            ? (newest.ojoType as OjoNotificationBannerData["ojoType"])
+            : null;
+          setBannerData({
+            ojoType,
+            title: newest.title || "Notification",
+            body: newest.body || "",
+          });
+          // Refresh the unread count
+          refreshUnreadCount();
+        }
+      } catch (err) {
+        // silently ignore polling errors
+      }
+    };
+
+    // Seed immediately then poll every 15s
+    pollForNewNotificationsNative();
+    const interval = setInterval(pollForNewNotificationsNative, 15_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [user, token, pushToken, refreshUnreadCount]);
 
   const value: NotificationContextType = {
     isInitialized,
