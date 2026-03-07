@@ -112,7 +112,7 @@ export const NavigationProvider = ({ children }: { children: ReactNode }) => {
 
     // Default tab-level back logic
     const tab = activeTabRef.current;
-    if (tab === "add" || tab === "create") {
+    if (tab === "create") {
       setActiveTab("calendar");
     } else if (tab === "edit") {
       setActiveTab(previousTabRef.current ?? "calendar");

@@ -73,6 +73,7 @@ export type Task = {
   maxMinutes?: number | null;
   earliestStart?: string | null;
   priorityScore?: number;
+  tags?: string[];
   progressPercentage?: number;
   subtasks?: SubTask[];
   scheduledSessions?: ScheduledSession[];

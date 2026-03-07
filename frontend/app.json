@@ -17,11 +17,8 @@
     },
     "ios": {
       "supportsTablet": true,
-      "infoPlist": {
-        "UIBackgroundModes": [
-          "remote-notification"
-        ]
-      }
+      "infoPlist": {},
+      "bundleIdentifier": "com.galwolfer.Mojo"
     },
     "android": {
       "adaptiveIcon": {
