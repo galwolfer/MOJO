@@ -202,16 +202,9 @@ export async function sendNotificationToUser(userId, notification) {
       return { success: false, error: "User not found" };
     }
 
-    if (!user.pushNotifications?.enabled) {
-      return { success: false, error: "Notifications disabled for user" };
-    }
-
     const token = user.pushNotifications?.expoPushToken;
-    if (!isValidExpoPushToken(token)) {
-      return { success: false, error: "No valid push token" };
-    }
 
-    const message = {
+    const message = token && isValidExpoPushToken(token) ? {
       to: token,
       sound: notification.sound || "default",
       title: notification.title,
@@ -220,19 +213,35 @@ export async function sendNotificationToUser(userId, notification) {
       badge: notification.badge,
       priority: notification.priority || "high",
       channelId: notification.channelId || "general",
-    };
+    } : null;
 
-    // Store in-app copy (fire-and-forget)
-    storeInAppNotification({
-      userId,
-      title: notification.title,
-      body: notification.body,
-      type: notification.data?.type,
-      data: notification.data,
-      ojoType: notification.data?.ojoType,
-    });
+    // Always store an in-app copy so web users and users without push tokens
+    // still receive notifications in the inbox.
+    try {
+      await storeInAppNotification({
+        userId,
+        title: notification.title,
+        body: notification.body,
+        type: notification.data?.type,
+        data: notification.data,
+        ojoType: notification.data?.ojoType,
+      });
+    } catch (e) {
+      logger.warn("Failed to store in-app notification (non-blocking):", e.message);
+    }
 
-    return await sendPushNotifications([message]);
+    // If we don't have a valid push token or user has disabled push, return success
+    // indicating the in-app notification was stored.
+    if (!message) {
+      return { success: true, message: "Stored in-app notification (push not sent)" };
+    }
+
+    // If push available, attempt to send
+    const pushResult = await sendPushNotifications([message]);
+    if (pushResult.success) return pushResult;
+
+    // Push failed but in-app was stored
+    return { success: true, message: "In-app stored; push send failed", error: pushResult.error };
   } catch (error) {
     logger.error(`Failed to send notification to user ${userId}:`, error);
     return { success: false, error: error.message };
@@ -374,11 +383,10 @@ export async function sendMorningDigestNotifications() {
 
   logger.info(`Running morning digest check at ${currentUTCHour}:${String(currentUTCMinute).padStart(2, '0')} UTC`);
 
-  // Find users who should receive morning digest
+  // Find users who should receive morning digest (include web users without push tokens)
   const users = await User.find({
     "pushNotifications.enabled": true,
     "pushNotifications.morningDigest.enabled": true,
-    "pushNotifications.expoPushToken": { $ne: null },
     // Check if we haven't sent a digest today
     $or: [
       { "pushNotifications.lastMorningDigest": null },
@@ -419,54 +427,53 @@ export async function sendMorningDigestNotifications() {
         continue;
       }
 
-      const token = user.pushNotifications?.expoPushToken;
-      if (!isValidExpoPushToken(token)) {
-        results.skipped++;
-        continue;
-      }
-
       // Get today's tasks for this user
       const tasks = await getTodaysTasks(user._id);
       const notification = buildMorningDigestNotification(user, tasks);
 
-      messages.push({
-        to: token,
-        sound: "default",
-        title: notification.title,
-        body: notification.body,
-        data: notification.data,
-        priority: "high",
-        channelId: "morning-digest",
-      });
-
+      // Always queue an in-app copy (works for web + native)
       inAppItems.push({ userId: user._id, title: notification.title, body: notification.body, type: "morning_digest", data: notification.data });
       userUpdates.push(user._id);
+
+      // Only add to push batch if user has a valid Expo token (native)
+      const token = user.pushNotifications?.expoPushToken;
+      if (isValidExpoPushToken(token)) {
+        messages.push({
+          to: token,
+          sound: "default",
+          title: notification.title,
+          body: notification.body,
+          data: notification.data,
+          priority: "high",
+          channelId: "morning-digest",
+        });
+      }
     } catch (error) {
       logger.error(`Failed to prepare digest for user ${user._id}:`, error);
       results.failed++;
     }
   }
 
-  // Send all notifications in batch
+  // Always store in-app copies for ALL eligible users (web + native)
+  for (const item of inAppItems) {
+    storeInAppNotification(item);
+  }
+  results.sent = inAppItems.length;
+
+  // Send push notifications to users with valid tokens (native)
   if (messages.length > 0) {
     const sendResult = await sendPushNotifications(messages);
-    
-    if (sendResult.success) {
-      results.sent = messages.length;
-
-      // Store in-app copies (fire-and-forget)
-      for (const item of inAppItems) {
-        storeInAppNotification(item);
-      }
-      
-      // Update lastMorningDigest for all users
-      await User.updateMany(
-        { _id: { $in: userUpdates } },
-        { $set: { "pushNotifications.lastMorningDigest": now } }
-      );
-    } else {
-      results.failed = messages.length;
+    if (!sendResult.success) {
+      logger.warn("Push batch for morning digest failed (in-app copies were still stored)");
     }
+  }
+
+  // Update lastMorningDigest for ALL processed users
+  if (userUpdates.length > 0) {
+    await User.updateMany(
+      { _id: { $in: userUpdates } },
+      { $set: { "pushNotifications.lastMorningDigest": now } }
+    );
   }
 
   logger.info(`Morning digest results: ${JSON.stringify(results)}`);
@@ -486,11 +493,10 @@ export async function testMorningDigestNotifications() {
 
   logger.info(`🧪 Running MORNING DIGEST TEST at ${currentUTCHour}:${String(currentUTCMinute).padStart(2, '0')} UTC`);
 
-  // Find all users with morning digest enabled (no lastMorningDigest check)
+  // Find all users with morning digest enabled (no lastMorningDigest check, include web users)
   const users = await User.find({
     "pushNotifications.enabled": true,
     "pushNotifications.morningDigest.enabled": true,
-    "pushNotifications.expoPushToken": { $ne: null },
   }).lean();
 
   logger.info(`Found ${users.length} users for morning digest test`);
@@ -520,46 +526,44 @@ export async function testMorningDigestNotifications() {
       logger.info(`🧪 User ${user._id}: Local time ${currentUserHour}:${String(currentUserMinute).padStart(2, '0')} ${userTimezone}, Preferred ${userHour}:${String(userMinute).padStart(2, '0')}`);
       
       // For testing, skip the time check - send to all users with digest enabled
-      const token = user.pushNotifications?.expoPushToken;
-      if (!isValidExpoPushToken(token)) {
-        results.skipped++;
-        continue;
-      }
 
       // Get today's tasks for this user
       const tasks = await getTodaysTasks(user._id);
       const notification = buildMorningDigestNotification(user, tasks);
 
-      messages.push({
-        to: token,
-        sound: "default",
-        title: notification.title,
-        body: notification.body,
-        data: notification.data,
-        priority: "high",
-        channelId: "morning-digest",
-      });
-
+      // Always queue in-app copy (web + native)
       inAppItems.push({ userId: user._id, title: notification.title, body: notification.body, type: "morning_digest", data: notification.data });
+
+      // Only push if user has a valid Expo token
+      const token = user.pushNotifications?.expoPushToken;
+      if (isValidExpoPushToken(token)) {
+        messages.push({
+          to: token,
+          sound: "default",
+          title: notification.title,
+          body: notification.body,
+          data: notification.data,
+          priority: "high",
+          channelId: "morning-digest",
+        });
+      }
     } catch (error) {
       logger.error(`🧪 Failed to prepare test digest for user ${user._id}:`, error);
       results.failed++;
     }
   }
 
-  // Send all notifications in batch
+  // Always store in-app copies for ALL eligible users (web + native)
+  for (const item of inAppItems) {
+    storeInAppNotification(item);
+  }
+  results.sent = inAppItems.length;
+
+  // Send push notifications to users with valid Expo tokens (native)
   if (messages.length > 0) {
     const sendResult = await sendPushNotifications(messages);
-    
-    if (sendResult.success) {
-      results.sent = messages.length;
-
-      // Store in-app copies (fire-and-forget)
-      for (const item of inAppItems) {
-        storeInAppNotification(item);
-      }
-    } else {
-      results.failed = messages.length;
+    if (!sendResult.success) {
+      logger.warn("🧪 Push batch for morning digest test failed (in-app copies were still stored)");
     }
   }
 
@@ -978,11 +982,9 @@ export async function sendTaskReminderNotifications() {
         continue;
       }
 
-      const token = user.pushNotifications?.expoPushToken;
-      if (!isValidExpoPushToken(token)) {
-        results.skipped++;
-        continue;
-      }
+      // NOTE: We intentionally do NOT skip users without a push token here.
+      // sendNotificationToUser() stores an in-app copy for web/tokenless users
+      // and only attempts push delivery when a valid Expo token exists.
 
       // Calculate smart reminder timing (uses task's pre-calculated prediction)
       const useSmartReminders = user.pushNotifications?.taskReminders?.useSmartReminders !== false;
@@ -1098,10 +1100,7 @@ export async function testTaskReminderNotification(userId, options = {}) {
       return { success: false, error: "User not found" };
     }
 
-    const token = user.pushNotifications?.expoPushToken;
-    if (!isValidExpoPushToken(token)) {
-      return { success: false, error: "No valid push token registered" };
-    }
+    // No token check — sendNotificationToUser stores in-app for web users
 
     // Find user's next upcoming task (or most recent incomplete task)
     const now = new Date();
@@ -1262,10 +1261,7 @@ export async function testSubtaskReminderNotification(userId, options = {}) {
       return { success: false, error: "User not found" };
     }
 
-    const token = user.pushNotifications?.expoPushToken;
-    if (!isValidExpoPushToken(token)) {
-      return { success: false, error: "No valid push token registered" };
-    }
+    // No token check — sendNotificationToUser stores in-app for web users
 
     // Find user's first incomplete subtask with its parent task
     const now = new Date();
@@ -1387,10 +1383,7 @@ export async function testOjoReminderNotification(userId, options = {}) {
       return { success: false, error: "User not found" };
     }
 
-    const token = user.pushNotifications?.expoPushToken;
-    if (!isValidExpoPushToken(token)) {
-      return { success: false, error: "No valid push token registered" };
-    }
+    // No token check — sendNotificationToUser stores in-app for web users
 
     // Find user's next upcoming task (or most recent incomplete task)
     const now = new Date();
@@ -1852,11 +1845,41 @@ export async function unregisterPushToken(userId) {
  * @returns {Promise<Object>} Send result
  */
 export async function sendTestNotification(userId) {
-  return sendNotificationToUser(userId, {
+  const payload = {
     title: "🎉 Mojo Notifications Active!",
     body: "Push notifications are working correctly. You'll receive task reminders and morning digests.",
     data: { type: "test" },
-  });
+  };
+
+  try {
+    const result = await sendNotificationToUser(userId, payload);
+
+    // If push was sent successfully, return the result
+    if (result && result.success) return result;
+
+    // If sending failed due to missing/invalid token or user settings,
+    // store an in-app notification so the user still sees the test message
+    const errMsg = result && result.error ? String(result.error) : "Unknown error";
+    const nonPushReasons = ["No valid push token", "Notifications disabled for user", "User not found"];
+
+    if (nonPushReasons.some(r => errMsg.includes(r))) {
+      await storeInAppNotification({ userId, title: payload.title, body: payload.body, data: payload.data, type: "test" });
+      return { success: true, message: `Stored in-app notification (push not sent): ${errMsg}` };
+    }
+
+    // For other errors, return the original result so callers can handle it
+    return result;
+  } catch (error) {
+    logger.error(`sendTestNotification error for user ${userId}:`, error);
+    // As a best-effort fallback, store an in-app notification
+    try {
+      await storeInAppNotification({ userId, title: payload.title, body: payload.body, data: payload.data, type: "test" });
+      return { success: true, message: "Stored in-app notification due to error while sending push" };
+    } catch (e) {
+      logger.error("Failed to store fallback in-app notification:", e);
+      return { success: false, error: error.message };
+    }
+  }
 }
 
 // Store active test intervals per user

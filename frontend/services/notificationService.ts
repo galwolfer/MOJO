@@ -512,6 +512,104 @@ export function getDeviceTimezone(): string {
   }
 }
 
+// --- Web notification polling helpers -------------------------------------
+let _webNotificationIntervalId: number | null = null;
+const _shownWebNotificationIds = new Set<string>();
+
+/**
+ * Request browser Notification permission (web only)
+ */
+export async function requestBrowserNotificationPermission(): Promise<NotificationPermission | "unavailable"> {
+  if (typeof window === "undefined" || typeof Notification === "undefined") {
+    return "unavailable";
+  }
+
+  try {
+    const current = Notification.permission;
+    if (current === "granted") return "granted";
+    const result = await Notification.requestPermission();
+    return result;
+  } catch (error) {
+    console.error("Error requesting browser notification permission:", error);
+    return "unavailable";
+  }
+}
+
+/**
+ * Start polling the backend for unread in-app notifications and show them
+ * using the browser Notification API. Polling runs only on web.
+ *
+ * This is a simple fallback to surface server-sent notifications to web users
+ * without requiring a full Web Push / VAPID setup. Polling shows notifications
+ * while the user has the app open in a tab.
+ */
+export function startWebNotificationPolling(pollIntervalMs = 60000) {
+  if (Platform.OS !== "web") return;
+  if (_webNotificationIntervalId) return;
+
+  // Immediate poll
+  (async () => {
+    try {
+      const res = await getInboxNotifications({ unreadOnly: true, limit: 20 });
+      if (res.success) {
+        for (const n of res.notifications) {
+          if (!_shownWebNotificationIds.has(n._id)) {
+            try {
+              // Show browser notification
+              new Notification(n.title || "", { body: n.body || "" });
+            } catch (e) {
+              console.warn("Failed to show browser notification:", e);
+            }
+            _shownWebNotificationIds.add(n._id);
+            // Optionally mark as read so it doesn't show repeatedly
+            try { await markNotificationRead(n._id); } catch {}
+          }
+        }
+      }
+    } catch (e) { console.warn("Web notification poll error:", e); }
+  })();
+
+  const id = window.setInterval(async () => {
+    try {
+      const res = await getInboxNotifications({ unreadOnly: true, limit: 20 });
+      if (res.success) {
+        for (const n of res.notifications) {
+          if (!_shownWebNotificationIds.has(n._id)) {
+            try {
+              new Notification(n.title || "", { body: n.body || "" });
+            } catch (e) {
+              console.warn("Failed to show browser notification:", e);
+            }
+            _shownWebNotificationIds.add(n._id);
+            try { await markNotificationRead(n._id); } catch {}
+          }
+        }
+      }
+    } catch (e) { console.warn("Web notification poll error:", e); }
+  }, pollIntervalMs);
+
+  _webNotificationIntervalId = id as unknown as number;
+}
+
+/**
+ * Stop web notification polling
+ */
+export function stopWebNotificationPolling() {
+  if (_webNotificationIntervalId) {
+    window.clearInterval(_webNotificationIntervalId);
+    _webNotificationIntervalId = null;
+  }
+  _shownWebNotificationIds.clear();
+}
+
+/**
+ * Whether web polling is active
+ */
+export function isWebNotificationPollingActive(): boolean {
+  return !!_webNotificationIntervalId;
+}
+
+
 /**
  * Initialize push notifications
  * Complete setup including permissions, token registration, and channels
@@ -543,27 +641,46 @@ export async function initializePushNotifications(projectId?: string): Promise<{
       };
     }
 
-    // Get push token
-    const token = await getExpoPushToken(projectId);
+    // Platform-specific registration
+    let token: string | null = null;
+    if (Platform.OS === "web") {
+      // For web we rely on the browser Notification API and the in-app inbox.
+      // Start polling for new in-app notifications and show them via the
+      // browser `Notification` API while the user has the app open.
+      const browserPerm = await requestBrowserNotificationPermission();
+      if (browserPerm !== "granted") {
+        return {
+          success: false,
+          permissionStatus: browserPerm,
+          error: "Notification permission not granted (web)",
+        };
+      }
 
-    if (!token) {
-      return {
-        success: false,
-        permissionStatus: status,
-        error: "Could not get push token",
-      };
-    }
+      // Start polling in background to surface server-side in-app notifications
+      startWebNotificationPolling();
+    } else {
+      // Get push token for native devices and register with backend
+      token = await getExpoPushToken(projectId);
 
-    // Register token with backend
-    const registerResult = await registerPushToken(token);
+      if (!token) {
+        return {
+          success: false,
+          permissionStatus: status,
+          error: "Could not get push token",
+        };
+      }
 
-    if (!registerResult.success) {
-      return {
-        success: false,
-        token,
-        permissionStatus: status,
-        error: registerResult.error || "Failed to register token",
-      };
+      // Register token with backend
+      const registerResult = await registerPushToken(token);
+
+      if (!registerResult.success) {
+        return {
+          success: false,
+          token,
+          permissionStatus: status,
+          error: registerResult.error || "Failed to register token",
+        };
+      }
     }
 
     // Update timezone preference
