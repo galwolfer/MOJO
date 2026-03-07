@@ -35,6 +35,7 @@ import UserAvatar from "../../components/common/UserAvatar";
 import { SettingsScreen } from "../settings";
 import { useBackHandler } from "../../hooks/useBackHandler";
 import { useStatsContext } from "../../context/StatsContext";
+import NotificationBell from "../../components/common/NotificationBell";
 
 /**
  * UserProfileScreen
@@ -161,9 +162,12 @@ export default function UserProfileScreen() {
 
   const headerRight = useMemo(
     () => (
-      <TouchableOpacity onPress={() => setCurrentScreen("settings")} style={styles.headerRightTouchable}>
-        <SettingsIcon size={ICON_SIZES.md} color={COLORS.primary1} />
-      </TouchableOpacity>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: SPACING.sm }}>
+        <NotificationBell />
+        <TouchableOpacity onPress={() => setCurrentScreen("settings")} style={styles.headerRightTouchable}>
+          <SettingsIcon size={ICON_SIZES.md} color={COLORS.primary1} />
+        </TouchableOpacity>
+      </View>
     ),
     [setCurrentScreen],
   );

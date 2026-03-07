@@ -7,6 +7,7 @@ import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import AuthScreen from "./screens/auth/Auth";
 import { COLORS } from "./theme";
+import { setApiBase, getApiBase } from "./services/config";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider, useColors, useTheme } from "./context/ThemeContext";
 import { AccessibilityProvider } from "./context/AccessibilityContext";
@@ -99,6 +100,18 @@ function AppContent() {
 }
 
 export default function App() {
+  try {
+    const envBase = (process && process.env && process.env.EXPO_PUBLIC_API_BASE) || null;
+    if (envBase) {
+      setApiBase(envBase);
+    }
+    // Log resolved API base for easier debugging on device
+    // eslint-disable-next-line no-console
+    console.log("[App] Using API_BASE:", getApiBase());
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn("[App] Failed to set API base", e);
+  }
   return (
     <AuthProvider>
       <AccessibilityProvider>

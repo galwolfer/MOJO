@@ -1,17 +1,17 @@
 /**
  * Ojo Notification Service
- * 
+ *
  * Generates personalized notification content using the Ojo personality system.
  * The Ojo types provide different tones and personas for notifications:
  * - mentorjo: A wise mentor (thoughtful, professional, supportive)
  * - brojo: Your bro/friend (friendly, motivating, funny)
  * - bestojo: A supportive best friend (warm, caring, positive)
  * - strictojo: A no-nonsense mentor (firm, focused, honest)
- * 
+ *
  * When smart reminders are ON:
  *   - Ojo type is automatically selected based on ML prediction score
  *   - Higher urgency = stricter Ojo
- * 
+ *
  * When smart reminders are OFF:
  *   - User can enable Ojo notifications manually
  *   - User selects which Ojo type to use
@@ -58,7 +58,7 @@ const OJO_DEFINITIONS = {
 /**
  * Map ML prediction category to Ojo type
  * Higher category = slower completion expected = need stricter Ojo
- * 
+ *
  * @param {number} predictionCategory - ML prediction category (1-5)
  * @param {string} urgency - Urgency level from timing calculation
  * @returns {string} Ojo type name
@@ -68,11 +68,11 @@ export function mapPredictionToOjoType(predictionCategory, urgency) {
   // Category 1-2: Easy tasks, use friendly Ojo
   // Category 3: Moderate, use mentor
   // Category 4-5: Difficult, use strict or best friend depending on urgency
-  
+
   if (urgency === "critical") {
     return "strictojo"; // Critical urgency = strict accountability
   }
-  
+
   switch (predictionCategory) {
     case 1:
       return "bestojo"; // Easy task = warm encouragement
@@ -91,7 +91,7 @@ export function mapPredictionToOjoType(predictionCategory, urgency) {
 
 /**
  * Build the system prompt for Ojo notification generation
- * 
+ *
  * @param {Object} ojoType - Ojo type definition
  * @returns {string} System prompt for notification generation
  */
@@ -114,7 +114,7 @@ BODY: Time to crush that task!`;
 
 /**
  * Build context about the task/subtask for the LLM
- * 
+ *
  * @param {Object} task - Task document
  * @param {Object} subtask - Subtask info (optional)
  * @param {Object} timing - Timing information
@@ -123,47 +123,48 @@ BODY: Time to crush that task!`;
  */
 function buildTaskContext(task, subtask, timing, source) {
   const parts = [];
-  
+
   parts.push(`Task: "${task.taskname}"`);
-  
+
   if (task.description) {
     parts.push(`Description: ${task.description}`);
   }
-  
+
   if (subtask) {
     parts.push(`Subtask: "${subtask.title || `Part ${subtask.index}`}"`);
     if (subtask.description) {
       parts.push(`Subtask details: ${subtask.description}`);
     }
   }
-  
+
   if (task.category) {
     parts.push(`Category: ${task.category}`);
   }
-  
+
   if (task.importance) {
     const importanceLabels = { 1: "Low", 2: "Low-Medium", 3: "Medium", 4: "High", 5: "Critical" };
     parts.push(`Importance: ${importanceLabels[task.importance] || task.importance}`);
   }
-  
+
   if (timing?.minutesBefore) {
-    const timeStr = timing.minutesBefore >= 60 
-      ? `${Math.floor(timing.minutesBefore / 60)} hours ${timing.minutesBefore % 60} minutes`
-      : `${timing.minutesBefore} minutes`;
-    const actionStr = source === 'schedule' ? 'scheduled' : 'due';
+    const timeStr =
+      timing.minutesBefore >= 60
+        ? `${Math.floor(timing.minutesBefore / 60)} hours ${timing.minutesBefore % 60} minutes`
+        : `${timing.minutesBefore} minutes`;
+    const actionStr = source === "schedule" ? "scheduled" : "due";
     parts.push(`Time: ${actionStr} in ${timeStr}`);
   }
-  
+
   if (timing?.urgency) {
     parts.push(`Urgency: ${timing.urgency}`);
   }
-  
+
   return parts.join("\n");
 }
 
 /**
  * Generate an Ojo-styled notification using the LLM
- * 
+ *
  * @param {string} ojoTypeName - Name of the Ojo type (mentorjo, brojo, etc.)
  * @param {Object} task - Task document
  * @param {Object} options - Additional options
@@ -175,9 +176,9 @@ function buildTaskContext(task, subtask, timing, source) {
  */
 export async function generateOjoNotification(ojoTypeName, task, options = {}) {
   const { subtask, timing, source, userName } = options;
-  
+
   const ojoType = OJO_DEFINITIONS[ojoTypeName] || OJO_DEFINITIONS.mentorjo;
-  
+
   try {
     // Use LangChain ChatGoogleGenerativeAI - same as chat (AgentController)
     const notificationModel = config.geminiModel || "gemini-3.0-flash";
@@ -187,51 +188,51 @@ export async function generateOjoNotification(ojoTypeName, task, options = {}) {
       temperature: 0.7, // Slightly higher than chat (0.2) for varied notifications
       maxOutputTokens: 768, // Same as chat
     });
-    
+
     const systemPrompt = buildOjoNotificationPrompt(ojoType);
     const taskContext = buildTaskContext(task, subtask, timing, source);
-    
+
     let userPrompt = `Generate a notification for this task:\n\n${taskContext}`;
     if (userName) {
       userPrompt += `\n\nUser's name: ${userName}`;
     }
-    
+
     // Log prompt length
     const promptLength = (systemPrompt + "\n\n" + userPrompt).length;
     logger.info(`🤖 Ojo prompt length: ${promptLength} chars, model: ${notificationModel}`);
-    
+
     // Use LangChain message format
-    const messages = [
-      new SystemMessage(systemPrompt),
-      new HumanMessage(userPrompt),
-    ];
-    
+    const messages = [new SystemMessage(systemPrompt), new HumanMessage(userPrompt)];
+
     const response = await llm.invoke(messages);
-    
+
     // Extract the text response
     const textContent = response?.content;
-    
+
     if (!textContent) {
       throw new Error("No text content in response");
     }
-    
+
     // Log raw AI response for debugging
     logger.info(`🤖 Ojo AI raw response (${ojoTypeName}): ${textContent}`);
-    
+
     // Parse the response - expect "TITLE: ...\nBODY: ..." format
     let title = "";
     let body = "";
-    
+
     // Try to extract TITLE: and BODY: lines
     const titleMatch = textContent.match(/TITLE:\s*(.+)/i);
     const bodyMatch = textContent.match(/BODY:\s*(.+)/i);
-    
+
     if (titleMatch && bodyMatch) {
       title = titleMatch[1].trim();
       body = bodyMatch[1].trim();
     } else {
       // Fallback: try JSON parsing
-      const cleanedText = textContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      const cleanedText = textContent
+        .replace(/```json\n?/g, "")
+        .replace(/```\n?/g, "")
+        .trim();
       const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const notification = JSON.parse(jsonMatch[0]);
@@ -239,16 +240,16 @@ export async function generateOjoNotification(ojoTypeName, task, options = {}) {
         body = notification.body;
       }
     }
-    
+
     if (!title || !body) {
       throw new Error("Could not parse title/body from response");
     }
-    
+
     // Add Ojo branding
     const ojoEmoji = getOjoEmoji(ojoTypeName);
-    
+
     logger.info(`✅ Ojo AI SUCCESS (${ojoTypeName}): Generated notification for task "${task.taskname}" - "${title}"`);
-    
+
     return {
       title: `${ojoEmoji} ${title}`,
       body: body,
@@ -264,7 +265,7 @@ export async function generateOjoNotification(ojoTypeName, task, options = {}) {
 
 /**
  * Get emoji for Ojo type
- * @param {string} ojoTypeName 
+ * @param {string} ojoTypeName
  * @returns {string} Emoji
  */
 function getOjoEmoji(ojoTypeName) {
@@ -282,15 +283,16 @@ function getOjoEmoji(ojoTypeName) {
  * Uses personality-appropriate templates
  */
 function getFallbackNotification(ojoTypeName, task, subtask, timing, source) {
-  const timeStr = timing?.minutesBefore >= 60 
-    ? `${Math.floor(timing.minutesBefore / 60)}h ${timing.minutesBefore % 60}m`
-    : `${timing.minutesBefore || 60}m`;
-  
-  const actionStr = source === 'schedule' ? 'scheduled' : 'due';
+  const timeStr =
+    timing?.minutesBefore >= 60
+      ? `${Math.floor(timing.minutesBefore / 60)}h ${timing.minutesBefore % 60}m`
+      : `${timing.minutesBefore || 60}m`;
+
+  const actionStr = source === "schedule" ? "scheduled" : "due";
   const taskName = task.taskname;
   const subtaskName = subtask?.title || (subtask?.index ? `Part ${subtask.index}` : null);
   const itemName = subtaskName ? `${taskName} - ${subtaskName}` : taskName;
-  
+
   const templates = {
     mentorjo: {
       title: "🧙 Time for Progress",
@@ -309,9 +311,9 @@ function getFallbackNotification(ojoTypeName, task, subtask, timing, source) {
       body: `"${itemName}" - ${timeStr} until ${actionStr}. No excuses. Get it done.`,
     },
   };
-  
+
   const template = templates[ojoTypeName] || templates.mentorjo;
-  
+
   return {
     ...template,
     ojoType: ojoTypeName,
@@ -320,16 +322,33 @@ function getFallbackNotification(ojoTypeName, task, subtask, timing, source) {
 }
 
 /**
+ * Resolve the user's chat Ojo type from their profile.ojoTypeId
+ * @param {Object} user - User document (must have profile.ojoTypeId)
+ * @returns {Promise<string>} Ojo type name (defaults to "mentorjo")
+ */
+async function resolveChatOjoType(user) {
+  try {
+    const ojoTypeId = user.profile?.ojoTypeId;
+    if (!ojoTypeId) return "mentorjo";
+    const ojoDoc = await OjoType.findById(ojoTypeId).lean();
+    return ojoDoc?.name || "mentorjo";
+  } catch (error) {
+    logger.warn("Failed to resolve chat Ojo type:", error.message);
+    return "mentorjo";
+  }
+}
+
+/**
  * Determine which Ojo type to use for a notification
- * 
+ *
  * @param {Object} user - User document
  * @param {Object} timing - Timing info with prediction data
- * @returns {Object} { useOjo: boolean, ojoType: string|null, source: string }
+ * @returns {Promise<Object>} { useOjo: boolean, ojoType: string|null, source: string }
  */
-export function determineOjoTypeForNotification(user, timing) {
+export async function determineOjoTypeForNotification(user, timing) {
   const prefs = user.pushNotifications;
   const ojoEnabled = prefs?.ojoNotifications?.enabled === true;
-  
+
   // If Ojo toggle is OFF, always use fixed notifications
   if (!ojoEnabled) {
     return {
@@ -338,39 +357,37 @@ export function determineOjoTypeForNotification(user, timing) {
       source: "disabled",
     };
   }
-  
-  // Ojo is enabled - determine which type to use
-  const useSmartReminders = prefs?.taskReminders?.useSmartReminders !== false;
-  
-  if (useSmartReminders) {
-    // Smart reminders ON: auto-select Ojo based on prediction
+
+  // Ojo is enabled - determine which type to use based on selectedOjoType
+  const selectedOjoType = prefs?.ojoNotifications?.selectedOjoType;
+
+  // "auto" = use ML prediction to pick the Ojo type (decoupled from Smart Reminders timing)
+  if (!selectedOjoType || selectedOjoType === "auto") {
     const predictionCategory = timing?.predictionCategory || 3;
     const urgency = timing?.urgency || "normal";
-    
     return {
       useOjo: true,
       ojoType: mapPredictionToOjoType(predictionCategory, urgency),
-      source: "smart_prediction",
-    };
-  } else {
-    // Smart reminders OFF: use user's selected Ojo type
-    const selectedOjoType = prefs?.ojoNotifications?.selectedOjoType;
-    
-    if (selectedOjoType) {
-      return {
-        useOjo: true,
-        ojoType: selectedOjoType,
-        source: "user_selected",
-      };
-    }
-    
-    // Ojo enabled but no type selected - use default mentorjo
-    return {
-      useOjo: true,
-      ojoType: "mentorjo",
-      source: "default",
+      source: selectedOjoType === "auto" ? "auto_prediction" : "default_prediction",
     };
   }
+
+  // "chat" = use the same Ojo type as the user's chat personality
+  if (selectedOjoType === "chat") {
+    const chatOjoType = await resolveChatOjoType(user);
+    return {
+      useOjo: true,
+      ojoType: chatOjoType,
+      source: "chat_synced",
+    };
+  }
+
+  // Specific Ojo type selected by the user
+  return {
+    useOjo: true,
+    ojoType: selectedOjoType,
+    source: "user_selected",
+  };
 }
 
 /**
@@ -378,7 +395,7 @@ export function determineOjoTypeForNotification(user, timing) {
  * @returns {Array} Array of Ojo type options
  */
 export function getOjoTypeOptions() {
-  return Object.values(OJO_DEFINITIONS).map(ojo => ({
+  return Object.values(OJO_DEFINITIONS).map((ojo) => ({
     name: ojo.name,
     displayName: ojo.displayName,
     persona: ojo.persona,

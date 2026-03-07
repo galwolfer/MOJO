@@ -9,6 +9,7 @@
  */
 
 import React, { createContext, useState, useEffect, useContext, useCallback, useRef } from "react";
+import { Platform } from "react-native";
 import {
   initializePushNotifications,
   getNotificationPreferences,
@@ -23,8 +24,11 @@ import {
   isPhysicalDevice,
   NotificationPreferences,
   NotificationData,
+  getUnreadCount,
+  getInboxNotifications,
 } from "../services/notificationService";
 import { useAuth } from "./AuthContext";
+import { type OjoNotificationBannerData } from "../components/special/OjoNotificationBanner";
 
 // Expo project ID from app.json
 const EXPO_PROJECT_ID = "875a7d38-e45f-45b2-9bee-a15823df2f34";
@@ -39,6 +43,11 @@ type NotificationContextType = {
   isPhysicalDevice: boolean;
   error: string | null;
   testModeActive: boolean;
+  unreadCount: number;
+
+  // Banner
+  bannerData: OjoNotificationBannerData | null;
+  dismissBanner: () => void;
 
   // Actions
   initialize: () => Promise<void>;
@@ -47,6 +56,7 @@ type NotificationContextType = {
   startPeriodicTest: () => Promise<boolean>;
   stopPeriodicTest: () => Promise<boolean>;
   refreshPreferences: () => Promise<void>;
+  refreshUnreadCount: () => Promise<void>;
 
   // Last notification (if app opened from notification)
   lastNotification: NotificationData | null;
@@ -70,10 +80,15 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
   const [error, setError] = useState<string | null>(null);
   const [lastNotification, setLastNotification] = useState<NotificationData | null>(null);
   const [testModeActive, setTestModeActive] = useState(false);
+  const [bannerData, setBannerData] = useState<OjoNotificationBannerData | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Refs for listeners
   const notificationReceivedListener = useRef<{ remove: () => void } | null>(null);
   const notificationResponseListener = useRef<{ remove: () => void } | null>(null);
+
+  /** Tracks the newest notification id we've already seen, so the web poller can detect new ones. */
+  const lastSeenNotificationIdRef = useRef<string | null>(null);
 
   // Check if running on physical device
   useEffect(() => {
@@ -108,8 +123,23 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
       notificationReceivedListener.current = await addNotificationReceivedListener(
         (notification: any) => {
           console.log("Notification received in foreground:", notification);
-          // You can handle foreground notifications here
-          // e.g., show an in-app banner, update task list, etc.
+          const content = notification?.request?.content;
+          const data = content?.data;
+
+          // Bump unread count for the in-app inbox
+          setUnreadCount((prev) => prev + 1);
+
+          // Show in-app banner for ALL foreground notifications
+          setBannerData({
+            ojoType: data?.ojoType || null,
+            title: content?.title || "Notification",
+            body: content?.body || "",
+          });
+          // Mark this notification as seen so polling won't duplicate it
+          try {
+            const possibleId = data?._id || data?.id || data?.notificationId || null;
+            if (possibleId) lastSeenNotificationIdRef.current = String(possibleId);
+          } catch {}
         }
       );
 
@@ -206,6 +236,8 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     } catch (err: any) {
       setError(err.message);
       console.error("Error initializing notifications:", err);
+      // Still mark as initialized so the inbox / unread polling works (esp. on web)
+      setIsInitialized(true);
     } finally {
       setIsLoading(false);
     }
@@ -305,6 +337,137 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     setLastNotification(null);
   }, []);
 
+  /**
+   * Refresh unread notification count from the server
+   */
+  const refreshUnreadCount = useCallback(async () => {
+    if (!user || !token) return;
+    try {
+      const result = await getUnreadCount();
+      if (result.success) {
+        setUnreadCount(result.unreadCount);
+      }
+    } catch (err) {
+      console.error("Error refreshing unread count:", err);
+    }
+  }, [user, token]);
+
+  // Poll unread count once on init, then periodically (covers web where push listeners don't fire)
+  useEffect(() => {
+    if (!user || !token) return;
+
+    // Initial fetch
+    refreshUnreadCount();
+
+    // Periodic refresh every 30 seconds so the badge stays current on web
+    const interval = setInterval(refreshUnreadCount, 30_000);
+    return () => clearInterval(interval);
+  }, [user, token, refreshUnreadCount]);
+
+  // ── Web-specific polling: detect new notifications and show the banner ──
+  useEffect(() => {
+    if (Platform.OS !== "web" || !user || !token) return;
+
+    let cancelled = false;
+
+    const pollForNewNotifications = async () => {
+      try {
+        const result = await getInboxNotifications({ limit: 1 });
+        if (cancelled || !result.success || result.notifications.length === 0) return;
+
+        const newest = result.notifications[0];
+
+        // On the very first poll just seed the ref — don't show a stale banner.
+        if (lastSeenNotificationIdRef.current === null) {
+          lastSeenNotificationIdRef.current = newest._id;
+          return;
+        }
+
+        // If the newest notification id changed, a new notification arrived.
+        if (newest._id !== lastSeenNotificationIdRef.current) {
+          lastSeenNotificationIdRef.current = newest._id;
+          setUnreadCount((prev) => Math.max(prev, 1));
+          const validOjoTypes = ["mentorjo", "brojo", "bestojo", "strictojo"];
+          const ojoType = newest.ojoType && validOjoTypes.includes(newest.ojoType)
+            ? (newest.ojoType as OjoNotificationBannerData["ojoType"])
+            : null;
+          setBannerData({
+            ojoType,
+            title: newest.title || "Notification",
+            body: newest.body || "",
+          });
+          // Also refresh the real count from server
+          refreshUnreadCount();
+        }
+      } catch {
+        // Silently ignore polling failures
+      }
+    };
+
+    // Seed immediately, then poll every 15s
+    pollForNewNotifications();
+    const interval = setInterval(pollForNewNotifications, 15_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [user, token]);
+
+  // ── Native fallback polling: when push token or native listeners aren't available,
+  // poll the server for new in-app notifications and show the banner. This helps
+  // ensure users still see banners on physical devices when push delivery isn't
+  // configured or temporarily unavailable.
+  useEffect(() => {
+    if (Platform.OS === "web" || !user || !token) return;
+
+    // Enable fallback polling on native devices to surface server-side in-app
+    // notifications in case push delivery isn't configured or temporarily
+    // unavailable. Polling is safe because we track last seen notification IDs
+    // to avoid duplicates.
+
+    let cancelled = false;
+
+    const pollForNewNotificationsNative = async () => {
+      try {
+        const result = await getInboxNotifications({ limit: 1 });
+        if (cancelled || !result.success || result.notifications.length === 0) return;
+
+        const newest = result.notifications[0];
+
+        if (lastSeenNotificationIdRef.current === null) {
+          lastSeenNotificationIdRef.current = newest._id;
+          return;
+        }
+
+        if (newest._id !== lastSeenNotificationIdRef.current) {
+          lastSeenNotificationIdRef.current = newest._id;
+          setUnreadCount((prev) => Math.max(prev, 1));
+          const validOjoTypes = ["mentorjo", "brojo", "bestojo", "strictojo"];
+          const ojoType = newest.ojoType && validOjoTypes.includes(newest.ojoType)
+            ? (newest.ojoType as OjoNotificationBannerData["ojoType"])
+            : null;
+          setBannerData({
+            ojoType,
+            title: newest.title || "Notification",
+            body: newest.body || "",
+          });
+          // Refresh the unread count
+          refreshUnreadCount();
+        }
+      } catch (err) {
+        // silently ignore polling errors
+      }
+    };
+
+    // Seed immediately then poll every 15s
+    pollForNewNotificationsNative();
+    const interval = setInterval(pollForNewNotificationsNative, 15_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [user, token, pushToken, refreshUnreadCount]);
+
   const value: NotificationContextType = {
     isInitialized,
     isLoading,
@@ -314,17 +477,25 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     isPhysicalDevice: isPhysicalDeviceState,
     error,
     testModeActive,
+    unreadCount,
+    bannerData,
+    dismissBanner: () => setBannerData(null),
     initialize,
     updatePreferences,
     testNotification,
     startPeriodicTest,
     stopPeriodicTest,
     refreshPreferences,
+    refreshUnreadCount,
     lastNotification,
     clearLastNotification,
   };
 
-  return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;
+  return (
+    <NotificationContext.Provider value={value}>
+      {children}
+    </NotificationContext.Provider>
+  );
 };
 
 export default NotificationContext;

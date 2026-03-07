@@ -10,10 +10,10 @@
  */
 
 import { Platform } from "react-native";
-import { post, get, put } from "./httpClient";
+import { post, get, put, del, patch } from "./httpClient";
 
 // Types
-export type OjoType = "mentorjo" | "brojo" | "bestojo" | "strictojo";
+export type OjoType = "mentorjo" | "brojo" | "bestojo" | "strictojo" | "chat" | "auto";
 
 export type OjoTypeOption = {
   name: OjoType;
@@ -157,17 +157,19 @@ export async function getExpoPushToken(projectId?: string): Promise<string | nul
     return tokenData.data;
   } catch (error: any) {
     // Check if this is a Firebase configuration error
-    const errorMessage = error?.message || '';
-    if (errorMessage.includes('FirebaseApp is not initialized') || 
-        errorMessage.includes('FCM') || 
-        errorMessage.includes('Firebase')) {
+    const errorMessage = error?.message || "";
+    if (
+      errorMessage.includes("FirebaseApp is not initialized") ||
+      errorMessage.includes("FCM") ||
+      errorMessage.includes("Firebase")
+    ) {
       console.warn(
-        '⚠️ Firebase/FCM is not configured. Push notifications will not work.\n' +
-        'To enable push notifications:\n' +
-        '1. Create a Firebase project at https://console.firebase.google.com\n' +
-        '2. Add an Android app with package name: com.mojo.Mojo\n' +
-        '3. Download google-services.json to frontend/services/secrets/google-services.json\n' +
-        '4. Rebuild the app with: npx expo prebuild --clean && npx expo run:android'
+        "⚠️ Firebase/FCM is not configured. Push notifications will not work.\n" +
+          "To enable push notifications:\n" +
+          "1. Create a Firebase project at https://console.firebase.google.com\n" +
+          "2. Add an Android app with package name: com.mojo.Mojo\n" +
+          "3. Download google-services.json to frontend/services/secrets/google-services.json\n" +
+          "4. Rebuild the app with: npx expo prebuild --clean && npx expo run:android",
       );
       return null;
     }
@@ -185,10 +187,10 @@ export async function registerPushToken(token: string): Promise<{ success: boole
   try {
     const platform = Platform.OS as "ios" | "android" | "web";
 
-    const response = await post<{ success: boolean; message?: string; error?: string }>(
-      "/notifications/register",
-      { token, platform }
-    );
+    const response = await post<{ success: boolean; message?: string; error?: string }>("/notifications/register", {
+      token,
+      platform,
+    });
 
     return { success: response.success };
   } catch (error: any) {
@@ -205,7 +207,7 @@ export async function unregisterPushToken(): Promise<{ success: boolean; error?:
   try {
     const response = await post<{ success: boolean; message?: string; error?: string }>(
       "/notifications/unregister",
-      {}
+      {},
     );
 
     return { success: response.success };
@@ -242,9 +244,7 @@ export async function getNotificationPreferences(): Promise<{
  * @param preferences - Partial preferences to update
  * @returns Updated preferences
  */
-export async function updateNotificationPreferences(
-  preferences: Partial<NotificationPreferences>
-): Promise<{
+export async function updateNotificationPreferences(preferences: Partial<NotificationPreferences>): Promise<{
   success: boolean;
   preferences?: NotificationPreferences;
   error?: string;
@@ -268,10 +268,7 @@ export async function updateNotificationPreferences(
  */
 export async function sendTestNotification(): Promise<{ success: boolean; error?: string }> {
   try {
-    const response = await post<{ success: boolean; message?: string; error?: string }>(
-      "/notifications/test",
-      {}
-    );
+    const response = await post<{ success: boolean; message?: string; error?: string }>("/notifications/test", {});
 
     return { success: response.success };
   } catch (error: any) {
@@ -284,11 +281,15 @@ export async function sendTestNotification(): Promise<{ success: boolean; error?
  * Start periodic test notifications (every 1 minute)
  * @returns Success status
  */
-export async function startPeriodicTestNotifications(): Promise<{ success: boolean; message?: string; error?: string }> {
+export async function startPeriodicTestNotifications(): Promise<{
+  success: boolean;
+  message?: string;
+  error?: string;
+}> {
   try {
     const response = await post<{ success: boolean; message?: string; error?: string }>(
       "/notifications/test/start",
-      {}
+      {},
     );
 
     return { success: response.success, message: response.message };
@@ -304,10 +305,7 @@ export async function startPeriodicTestNotifications(): Promise<{ success: boole
  */
 export async function stopPeriodicTestNotifications(): Promise<{ success: boolean; message?: string; error?: string }> {
   try {
-    const response = await post<{ success: boolean; message?: string; error?: string }>(
-      "/notifications/test/stop",
-      {}
-    );
+    const response = await post<{ success: boolean; message?: string; error?: string }>("/notifications/test/stop", {});
 
     return { success: response.success, message: response.message };
   } catch (error: any) {
@@ -322,9 +320,7 @@ export async function stopPeriodicTestNotifications(): Promise<{ success: boolea
  */
 export async function getTestModeStatus(): Promise<{ success: boolean; testModeActive?: boolean; error?: string }> {
   try {
-    const response = await get<{ success: boolean; testModeActive: boolean }>(
-      "/notifications/test/status"
-    );
+    const response = await get<{ success: boolean; testModeActive: boolean }>("/notifications/test/status");
 
     return { success: true, testModeActive: response.testModeActive };
   } catch (error: any) {
@@ -353,7 +349,7 @@ export async function setupNotificationChannels(): Promise<void> {
       sound: "default",
     });
 
-    // Task reminders channel
+    // Task reminders channel (fallback for non-Ojo notifications)
     await Notifications.setNotificationChannelAsync("task-reminders", {
       name: "Task Reminders",
       description: "Reminders for upcoming tasks",
@@ -363,13 +359,57 @@ export async function setupNotificationChannels(): Promise<void> {
       sound: "default",
     });
 
-    // Default channel
-    await Notifications.setNotificationChannelAsync("default", {
-      name: "General Notifications",
-      description: "General app notifications",
-      importance: Notifications.AndroidImportance.DEFAULT,
+    // Per-Ojo-type channels — each has the Ojo's signature accent color
+    await Notifications.setNotificationChannelAsync("ojo-mentorjo", {
+      name: "Mentorjo Reminders",
+      description: "Smart reminders from your Mentorjo Ojo",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#4361EE",
       sound: "default",
     });
+
+    await Notifications.setNotificationChannelAsync("ojo-brojo", {
+      name: "Brojo Reminders",
+      description: "Smart reminders from your Brojo Ojo",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#4CC9F0",
+      sound: "default",
+    });
+
+    await Notifications.setNotificationChannelAsync("ojo-bestojo", {
+      name: "Bestojo Reminders",
+      description: "Smart reminders from your Bestojo Ojo",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#7209B7",
+      sound: "default",
+    });
+
+    await Notifications.setNotificationChannelAsync("ojo-strictojo", {
+      name: "StrictOjo Reminders",
+      description: "Smart reminders from your StrictOjo",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#F43E3E",
+      sound: "default",
+    });
+
+    // General channel — replaces the old "default" channel which Android cached
+    // at DEFAULT importance. A fresh channel ID ensures HIGH importance takes effect.
+    await Notifications.setNotificationChannelAsync("general", {
+      name: "General Notifications",
+      description: "General app notifications",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      sound: "default",
+    });
+
+    // Clean up the old cached channel
+    try {
+      await Notifications.deleteNotificationChannelAsync("default");
+    } catch {}
 
     console.log("Notification channels set up successfully");
   } catch (error) {
@@ -381,21 +421,26 @@ export async function setupNotificationChannels(): Promise<void> {
  * Configure notification handler for when app is in foreground
  * @param handler - Function to handle incoming notifications
  */
-export async function setNotificationHandler(
-  handler?: (notification: PushNotification) => void
-): Promise<void> {
+export async function setNotificationHandler(handler?: (notification: PushNotification) => void): Promise<void> {
   const { Notifications } = await loadNotificationModules();
 
   if (!Notifications) return;
 
-  // Set default notification handler
+  // Set default notification handler.
+  // For Ojo-branded notifications (those with data.ojoType), suppress the
+  // system banner — the OjoNotificationBanner in NotificationContext already
+  // renders the correct coloured icon in-app. For all other notifications the
+  // system banner is shown as normal.
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
+    handleNotification: async (notification) => {
+      const hasOjoType = !!notification?.request?.content?.data?.ojoType;
+      return {
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+        shouldShowBanner: !hasOjoType,
+        shouldShowList: true,
+      };
+    },
   });
 }
 
@@ -405,7 +450,7 @@ export async function setNotificationHandler(
  * @returns Subscription object to remove listener
  */
 export async function addNotificationReceivedListener(
-  callback: (notification: any) => void
+  callback: (notification: any) => void,
 ): Promise<{ remove: () => void } | null> {
   const { Notifications } = await loadNotificationModules();
 
@@ -421,7 +466,7 @@ export async function addNotificationReceivedListener(
  * @returns Subscription object to remove listener
  */
 export async function addNotificationResponseListener(
-  callback: (response: any) => void
+  callback: (response: any) => void,
 ): Promise<{ remove: () => void } | null> {
   const { Notifications } = await loadNotificationModules();
 
@@ -456,7 +501,7 @@ export async function getLastNotificationResponse(): Promise<any | null> {
  */
 export async function scheduleLocalNotification(
   content: { title: string; body: string; data?: any },
-  trigger?: { seconds?: number } | null
+  trigger?: { seconds?: number } | null,
 ): Promise<string | null> {
   const { Notifications } = await loadNotificationModules();
 
@@ -507,6 +552,111 @@ export function getDeviceTimezone(): string {
   }
 }
 
+// --- Web notification polling helpers -------------------------------------
+let _webNotificationIntervalId: number | null = null;
+const _shownWebNotificationIds = new Set<string>();
+
+/**
+ * Request browser Notification permission (web only)
+ */
+export async function requestBrowserNotificationPermission(): Promise<NotificationPermission | "unavailable"> {
+  if (typeof window === "undefined" || typeof Notification === "undefined") {
+    return "unavailable";
+  }
+
+  try {
+    const current = Notification.permission;
+    if (current === "granted") return "granted";
+    const result = await Notification.requestPermission();
+    return result;
+  } catch (error) {
+    console.error("Error requesting browser notification permission:", error);
+    return "unavailable";
+  }
+}
+
+/**
+ * Start polling the backend for unread in-app notifications and show them
+ * using the browser Notification API. Polling runs only on web.
+ *
+ * This is a simple fallback to surface server-sent notifications to web users
+ * without requiring a full Web Push / VAPID setup. Polling shows notifications
+ * while the user has the app open in a tab.
+ */
+export function startWebNotificationPolling(pollIntervalMs = 60000) {
+  if (Platform.OS !== "web") return;
+  if (_webNotificationIntervalId) return;
+
+  // Immediate poll
+  (async () => {
+    try {
+      const res = await getInboxNotifications({ unreadOnly: true, limit: 20 });
+      if (res.success) {
+        for (const n of res.notifications) {
+          if (!_shownWebNotificationIds.has(n._id)) {
+            try {
+              // Show browser notification
+              new Notification(n.title || "", { body: n.body || "" });
+            } catch (e) {
+              console.warn("Failed to show browser notification:", e);
+            }
+            _shownWebNotificationIds.add(n._id);
+            // Optionally mark as read so it doesn't show repeatedly
+            try {
+              await markNotificationRead(n._id);
+            } catch {}
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Web notification poll error:", e);
+    }
+  })();
+
+  const id = window.setInterval(async () => {
+    try {
+      const res = await getInboxNotifications({ unreadOnly: true, limit: 20 });
+      if (res.success) {
+        for (const n of res.notifications) {
+          if (!_shownWebNotificationIds.has(n._id)) {
+            try {
+              new Notification(n.title || "", { body: n.body || "" });
+            } catch (e) {
+              console.warn("Failed to show browser notification:", e);
+            }
+            _shownWebNotificationIds.add(n._id);
+            try {
+              await markNotificationRead(n._id);
+            } catch {}
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Web notification poll error:", e);
+    }
+  }, pollIntervalMs);
+
+  _webNotificationIntervalId = id as unknown as number;
+}
+
+/**
+ * Stop web notification polling
+ */
+export function stopWebNotificationPolling() {
+  if (_webNotificationIntervalId) {
+    window.clearInterval(_webNotificationIntervalId);
+    _webNotificationIntervalId = null;
+  }
+  _shownWebNotificationIds.clear();
+}
+
+/**
+ * Whether web polling is active
+ */
+export function isWebNotificationPollingActive(): boolean {
+  return !!_webNotificationIntervalId;
+}
+
 /**
  * Initialize push notifications
  * Complete setup including permissions, token registration, and channels
@@ -538,27 +688,46 @@ export async function initializePushNotifications(projectId?: string): Promise<{
       };
     }
 
-    // Get push token
-    const token = await getExpoPushToken(projectId);
+    // Platform-specific registration
+    let token: string | null = null;
+    if (Platform.OS === "web") {
+      // For web we rely on the browser Notification API and the in-app inbox.
+      // Start polling for new in-app notifications and show them via the
+      // browser `Notification` API while the user has the app open.
+      const browserPerm = await requestBrowserNotificationPermission();
+      if (browserPerm !== "granted") {
+        return {
+          success: false,
+          permissionStatus: browserPerm,
+          error: "Notification permission not granted (web)",
+        };
+      }
 
-    if (!token) {
-      return {
-        success: false,
-        permissionStatus: status,
-        error: "Could not get push token",
-      };
-    }
+      // Start polling in background to surface server-side in-app notifications
+      startWebNotificationPolling();
+    } else {
+      // Get push token for native devices and register with backend
+      token = await getExpoPushToken(projectId);
 
-    // Register token with backend
-    const registerResult = await registerPushToken(token);
+      if (!token) {
+        return {
+          success: false,
+          permissionStatus: status,
+          error: "Could not get push token",
+        };
+      }
 
-    if (!registerResult.success) {
-      return {
-        success: false,
-        token,
-        permissionStatus: status,
-        error: registerResult.error || "Failed to register token",
-      };
+      // Register token with backend
+      const registerResult = await registerPushToken(token);
+
+      if (!registerResult.success) {
+        return {
+          success: false,
+          token,
+          permissionStatus: status,
+          error: registerResult.error || "Failed to register token",
+        };
+      }
     }
 
     // Update timezone preference
@@ -577,5 +746,105 @@ export async function initializePushNotifications(projectId?: string): Promise<{
       permissionStatus: "error",
       error: error.message,
     };
+  }
+}
+
+// ─── In-App Notification Inbox ─────────────────────────────────────────
+
+export type InAppNotification = {
+  _id: string;
+  userId: string;
+  type: string;
+  title: string;
+  body: string;
+  data: Record<string, any>;
+  read: boolean;
+  ojoType: OjoType | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/**
+ * Fetch in-app notifications for the current user.
+ * Supports cursor-based pagination via `before` (ISO date).
+ */
+export async function getInboxNotifications(options?: {
+  limit?: number;
+  before?: string;
+  unreadOnly?: boolean;
+}): Promise<{ success: boolean; notifications: InAppNotification[]; unreadCount: number }> {
+  try {
+    const params = new URLSearchParams();
+    if (options?.limit) params.set("limit", String(options.limit));
+    if (options?.before) params.set("before", options.before);
+    if (options?.unreadOnly) params.set("unreadOnly", "true");
+
+    const qs = params.toString();
+    const response = await get<{
+      success: boolean;
+      notifications: InAppNotification[];
+      unreadCount: number;
+    }>(`/notifications/inbox${qs ? `?${qs}` : ""}`);
+
+    return {
+      success: true,
+      notifications: response.notifications ?? [],
+      unreadCount: response.unreadCount ?? 0,
+    };
+  } catch (error: any) {
+    console.error("Error fetching inbox notifications:", error);
+    return { success: false, notifications: [], unreadCount: 0 };
+  }
+}
+
+/**
+ * Get the unread notification count (lightweight endpoint).
+ */
+export async function getUnreadCount(): Promise<{ success: boolean; unreadCount: number }> {
+  try {
+    const response = await get<{ success: boolean; unreadCount: number }>("/notifications/inbox/unread-count");
+    return { success: true, unreadCount: response.unreadCount ?? 0 };
+  } catch (error: any) {
+    console.error("Error fetching unread count:", error);
+    return { success: false, unreadCount: 0 };
+  }
+}
+
+/**
+ * Mark a single notification as read.
+ */
+export async function markNotificationRead(notificationId: string): Promise<{ success: boolean }> {
+  try {
+    await patch<{ success: boolean }>(`/notifications/inbox/${notificationId}/read`, {});
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error marking notification as read:", error);
+    return { success: false };
+  }
+}
+
+/**
+ * Mark all notifications as read.
+ */
+export async function markAllNotificationsRead(): Promise<{ success: boolean }> {
+  try {
+    await patch<{ success: boolean }>("/notifications/inbox/read-all", {});
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error marking all notifications as read:", error);
+    return { success: false };
+  }
+}
+
+/**
+ * Delete a single in-app notification.
+ */
+export async function deleteNotification(notificationId: string): Promise<{ success: boolean }> {
+  try {
+    await del<{ success: boolean }>(`/notifications/inbox/${notificationId}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error deleting notification:", error);
+    return { success: false };
   }
 }

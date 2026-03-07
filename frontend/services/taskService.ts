@@ -73,6 +73,7 @@ export type Task = {
   maxMinutes?: number | null;
   earliestStart?: string | null;
   priorityScore?: number;
+  tags?: string[];
   progressPercentage?: number;
   subtasks?: SubTask[];
   scheduledSessions?: ScheduledSession[];
@@ -773,18 +774,39 @@ export async function suggestCategory(taskname: string): Promise<{
  * Complete a task
  * POST /api/tasks/:id/complete
  */
-export async function completeTask(id: string): Promise<Task | null> {
+export type CompleteTaskResult = {
+  task: Task | null;
+  gamification?: GamificationResult;
+};
+
+export async function completeTask(id: string): Promise<CompleteTaskResult> {
   try {
     console.log(`[taskService] Completing task: ${id}`);
-    const response = await post<{ success: boolean; task: Task; gamification?: any }>(`/tasks/${id}/complete`, {});
+    const response = await post<{
+      success: boolean;
+      task: Task;
+      gamification?: { points?: number; currentStreak?: number; completedTasks?: number };
+      pointsAwarded?: number;
+    }>(`/tasks/${id}/complete`, {});
     console.log(`[taskService] Complete response:`, response);
     if (response.gamification) {
       console.log(`[taskService] Gamification updated:`, response.gamification);
     }
-    return response.task || null;
+    return {
+      task: response.task || null,
+      gamification: response.gamification
+        ? {
+            points: response.gamification.points,
+            currentStreak: response.gamification.currentStreak,
+            completedTasks: response.gamification.completedTasks,
+            pointsAwarded: response.pointsAwarded,
+            wasCompletion: true,
+          }
+        : undefined,
+    };
   } catch (error) {
     console.error("[taskService] Failed to complete task:", error);
-    return null;
+    return { task: null };
   }
 }
 

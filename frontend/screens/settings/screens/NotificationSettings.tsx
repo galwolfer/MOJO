@@ -6,14 +6,13 @@
  * Uses SettingsSubScreen for consistent header/scroll layout across all settings screens.
  * Business logic delegated to NotificationSettingsContext.
  */
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { View, StyleSheet } from "react-native";
-import { moderateScale } from "react-native-size-matters";
 import { TimePicker } from "../../../components/inputs/TimePicker";
 import { useNotificationSettings } from "../../../context/NotificationSettingsContext";
+import { useOjo } from "../../../context/OjoContext";
 import { useColors } from "../../../context/ThemeContext";
 import { COLORS, SPACING, ICON_SIZES } from "../../../theme";
-import { OjoType } from "../../../services/notificationService";
 import { getOjoType, OjoTypeName } from "../../../config/ojoTypeConfig";
 import { ICONS } from "../../../components/icons/icons";
 import { Checkbox } from "../../../components/icons/Checkbox";
@@ -24,13 +23,17 @@ import ErrorText from "../../../components/common/ErrorText";
 import List, { type ListCellProps } from "../../../components/layout/List";
 import ListItem, { makeListCell } from "../../../components/layout/ListItem";
 import SettingsSubScreen from "./components/SettingsSubScreen";
+import OjoNotificationPersonalitySettings from "./OjoNotificationPersonalitySettings";
 
 type Props = { onBack: () => void };
+type CurrentScreen = "main" | "ojo-personality";
 
 // ── Screen ───────────────────────────────────────────────────────────────────
 
 export default function NotificationSettingsScreen({ onBack }: Props) {
   const colors = useColors();
+  const { ojoName: chatOjoName } = useOjo();
+  const [currentScreen, setCurrentScreen] = useState<CurrentScreen>("main");
   const {
     isInitialized,
     isLoading,
@@ -49,7 +52,6 @@ export default function NotificationSettingsScreen({ onBack }: Props) {
     isTestingDefaultReminder,
     isTestingOjo,
     smartReminderResult,
-    availableOjoTypes,
     allEnabled,
     digestEnabled,
     digestHour,
@@ -62,8 +64,6 @@ export default function NotificationSettingsScreen({ onBack }: Props) {
     changeDigestTime,
     handleToggleTaskReminders,
     handleToggleSmartReminders,
-    handleToggleOjoNotifications,
-    handleSelectOjoType,
     handleTestNotification,
     handleTestMorningDigest,
     handleTestSmartReminder,
@@ -90,68 +90,6 @@ export default function NotificationSettingsScreen({ onBack }: Props) {
     },
     [changeDigestTime],
   );
-
-  // ── Not initialized ───────────────────────────────────────────────────────
-
-  if (!isInitialized) {
-    return (
-      <SettingsSubScreen
-        title="Notifications"
-        iconName="notifications"
-        scrollKey="notification-settings"
-        onBack={onBack}
-      >
-        <Box title="Push Notifications" titleColor={COLORS.primary1}>
-          <View style={styles.boxContent}>
-            {!isPhysicalDevice && (
-              <View style={[styles.infoBox, { backgroundColor: COLORS.primary5 + "25" }]}>
-                <NotificationIcon size={ICON_SIZES.sm} color={COLORS.darkP5} />
-                <AppText variant="notes" style={{ color: COLORS.darkP5, flex: 1 }}>
-                  Push notifications only work on physical devices, not simulators.
-                </AppText>
-              </View>
-            )}
-            {error && <ErrorText>{error}</ErrorText>}
-            <AppText variant="bodyText" style={{ color: colors.gray2 }}>
-              Enable push notifications to receive morning task digests and smart reminders.
-            </AppText>
-            <AppButton
-              title={isLoading ? "Enabling..." : "Enable Notifications"}
-              onPress={initialize}
-              mode="filled"
-              color="primary3"
-              disabled={isLoading}
-            />
-          </View>
-        </Box>
-      </SettingsSubScreen>
-    );
-  }
-
-  // ── Permission denied ─────────────────────────────────────────────────────
-
-  if (permissionStatus !== "granted") {
-    return (
-      <SettingsSubScreen
-        title="Notifications"
-        iconName="notifications"
-        scrollKey="notification-settings"
-        onBack={onBack}
-      >
-        <Box title="Push Notifications" titleColor={COLORS.primary1}>
-          <View style={styles.boxContent}>
-            <View style={[styles.infoBox, { backgroundColor: COLORS.primary5 + "25" }]}>
-              <AppText variant="notes" style={{ color: COLORS.darkP5 }}>
-                Notifications are disabled. Please enable them in your device settings.
-              </AppText>
-            </View>
-          </View>
-        </Box>
-      </SettingsSubScreen>
-    );
-  }
-
-  // ── Main render ───────────────────────────────────────────────────────────
 
   // Child disabled states — each level gates on its parent being active
   const childDisabled = !allEnabled || isSaving;
@@ -224,7 +162,7 @@ export default function NotificationSettingsScreen({ onBack }: Props) {
       // ── Smart Reminders ────────────────────────────────────────────────────
       makeListCell("smart-reminders", {
         title: "Smart Reminders",
-        subtitle: "Use AI to optimize reminder timing",
+        subtitle: "Optimize reminder timing with AI predictions",
         logo: <PuzzleIcon size={ICON_SIZES.sm} color={COLORS.primary4} />,
         disabled: taskChildDisabled,
         onPress: taskChildDisabled ? undefined : () => handleToggleSmartReminders(!smartRemindersEnabled),
@@ -237,20 +175,21 @@ export default function NotificationSettingsScreen({ onBack }: Props) {
         ),
       }),
 
-      // ── Ojo Personality ────────────────────────────────────────────────────
+      // ── Ojo Personality (navigates to sub-screen) ─────────────────────────
       makeListCell("ojo-personality", {
         title: "Ojo Personality",
-        subtitle: "AI-crafted notifications with personality",
+        subtitle: (() => {
+          if (!ojoEnabled) return "Off";
+          const t = preferences?.ojoNotifications?.selectedOjoType;
+          if (!t || t === "auto") return "Auto · Smart AI selection";
+          if (t === "chat")
+            return `Same as Chat · ${chatOjoName ? getOjoType((chatOjoName as OjoTypeName) ?? "mentorjo").displayName : "Mentorjo"}`;
+          return getOjoType(t as OjoTypeName).displayName;
+        })(),
         logo: <OjoIcon size={ICON_SIZES.sm} color={COLORS.primary3} />,
         disabled: taskChildDisabled,
-        onPress: taskChildDisabled ? undefined : () => handleToggleOjoNotifications(!ojoEnabled),
-        rightElement: (
-          <Checkbox
-            checked={ojoEnabled}
-            onChange={taskChildDisabled ? undefined : handleToggleOjoNotifications}
-            size={ICON_SIZES.sm}
-          />
-        ),
+        onPress: taskChildDisabled ? undefined : () => setCurrentScreen("ojo-personality"),
+        divider: false,
       }),
     ],
     [
@@ -265,14 +204,82 @@ export default function NotificationSettingsScreen({ onBack }: Props) {
       taskRemindersEnabled,
       smartRemindersEnabled,
       ojoEnabled,
+      preferences?.ojoNotifications?.selectedOjoType,
+      chatOjoName,
       handleToggleNotifications,
       handleToggleMorningDigest,
       handleDigestTimeChange,
       handleToggleTaskReminders,
       handleToggleSmartReminders,
-      handleToggleOjoNotifications,
     ],
   );
+
+  // ── Early returns (after all hooks) ──────────────────────────────────────
+
+  if (currentScreen === "ojo-personality")
+    return <OjoNotificationPersonalitySettings onBack={() => setCurrentScreen("main")} />;
+
+  // ── Not initialized ───────────────────────────────────────────────────────
+
+  if (!isInitialized) {
+    return (
+      <SettingsSubScreen
+        title="Notifications"
+        iconName="notifications"
+        scrollKey="notification-settings"
+        onBack={onBack}
+      >
+        <Box title="Push Notifications" titleColor={COLORS.primary1}>
+          <View style={styles.boxContent}>
+            {!isPhysicalDevice && (
+              <View style={[styles.infoBox, { backgroundColor: COLORS.primary5 + "25" }]}>
+                <NotificationIcon size={ICON_SIZES.sm} color={COLORS.darkP5} />
+                <AppText variant="notes" style={{ color: COLORS.darkP5, flex: 1 }}>
+                  Push notifications only work on physical devices, not simulators.
+                </AppText>
+              </View>
+            )}
+            {error && <ErrorText>{error}</ErrorText>}
+            <AppText variant="bodyText" style={{ color: colors.gray2 }}>
+              Enable push notifications to receive morning task digests and smart reminders.
+            </AppText>
+            <AppButton
+              title={isLoading ? "Enabling..." : "Enable Notifications"}
+              onPress={initialize}
+              mode="filled"
+              color="primary3"
+              disabled={isLoading}
+            />
+          </View>
+        </Box>
+      </SettingsSubScreen>
+    );
+  }
+
+  // ── Permission denied ─────────────────────────────────────────────────────
+
+  if (permissionStatus !== "granted") {
+    return (
+      <SettingsSubScreen
+        title="Notifications"
+        iconName="notifications"
+        scrollKey="notification-settings"
+        onBack={onBack}
+      >
+        <Box title="Push Notifications" titleColor={COLORS.primary1}>
+          <View style={styles.boxContent}>
+            <View style={[styles.infoBox, { backgroundColor: COLORS.primary5 + "25" }]}>
+              <AppText variant="notes" style={{ color: COLORS.darkP5 }}>
+                Notifications are disabled. Please enable them in your device settings.
+              </AppText>
+            </View>
+          </View>
+        </Box>
+      </SettingsSubScreen>
+    );
+  }
+
+  // ── Main render ───────────────────────────────────────────────────────────
 
   return (
     <SettingsSubScreen title="Notifications" iconName="notifications" scrollKey="notification-settings" onBack={onBack}>
@@ -485,7 +492,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: SPACING.sm,
-    borderRadius: moderateScale(8),
+    borderRadius: SPACING.md,
     padding: SPACING.md,
   },
 
@@ -496,32 +503,6 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
 
-  // Ojo type selector
-  ojoContainer: {
-    borderRadius: moderateScale(12),
-    padding: SPACING.md,
-    marginTop: SPACING.xs,
-    gap: SPACING.xs,
-  },
-  ojoGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: SPACING.sm,
-    marginTop: SPACING.sm,
-  },
-  ojoCard: {
-    width: "47%",
-    padding: SPACING.sm,
-    borderRadius: moderateScale(10),
-    borderWidth: 2,
-    alignItems: "center",
-    gap: SPACING.xs,
-  },
-  ojoIconCircle: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
   // Test section
   btnRow: {
     flexDirection: "row",
@@ -529,7 +510,7 @@ const styles = StyleSheet.create({
   },
   flex1: { flex: 1 },
   subSection: {
-    borderRadius: moderateScale(10),
+    borderRadius: SPACING.md,
     padding: SPACING.md,
     gap: SPACING.sm,
   },
@@ -539,14 +520,14 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   activeBadge: {
-    borderRadius: moderateScale(10),
+    borderRadius: SPACING.md,
     paddingHorizontal: SPACING.sm,
     paddingVertical: 2,
     marginLeft: "auto",
   },
   calcResult: {
     padding: SPACING.sm,
-    borderRadius: moderateScale(8),
+    borderRadius: SPACING.md,
     gap: SPACING.xs,
   },
 });
