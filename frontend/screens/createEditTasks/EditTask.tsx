@@ -48,13 +48,15 @@ import {
 } from "../../services/taskService";
 import { fetchSubcategoriesForCategory, type Subcategory } from "../../services/subcategoryService";
 import { combineLocalDateTime, combineEndDateTime, validateEditableSessions } from "../../components/special/task/TaskScheduleEditor";
+import type { BusyBlock } from "../../services/busyBlockService";
+import BusyBlockPreviewCard from "../../components/special/BusyBlockPreviewCard";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
 
 const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
-  const { setHeaderConfig, setActiveTab } = useNavigation();
+  const { setHeaderConfig, setActiveTab, setActiveTabWithParams } = useNavigation();
   const { notifyTaskUpdate } = useTaskContext();
   const colors = useColors();
 
@@ -96,6 +98,9 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
     message: string;
     navigateOnClose?: boolean;
     confirmAction?: () => void;
+    secondaryAction?: () => void;
+    secondaryLabel?: string;
+    blockingBusyBlocks?: BusyBlock[];
   } | null>(null);
 
   // ── Header ────────────────────────────────────────────────────────────────
@@ -585,9 +590,16 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
           if (originalTaskRef.current) {
             await updateTask(taskId, originalTaskRef.current).catch(() => {});
           }
+          const blocks = schedResult.blockingBusyBlocks;
+          const hasBusyBlocks = blocks && blocks.length > 0;
           setPopupInfo({
-            title: "Schedule Conflict",
+            title: hasBusyBlocks ? "Busy Block Conflict" : "Schedule Conflict",
             message: schedResult.error ?? "The selected time is not available. It may conflict with a busy block, another task, or the task deadline. Please choose a different time.",
+            blockingBusyBlocks: hasBusyBlocks ? blocks : undefined,
+            secondaryAction: hasBusyBlocks
+              ? () => setActiveTabWithParams("user", { screen: "edit-preferences", subScreen: "scheduling" })
+              : undefined,
+            secondaryLabel: hasBusyBlocks ? "Go to Busy Blocks" : undefined,
           });
           return;
         }
@@ -601,11 +613,17 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
           if (originalTaskRef.current) {
             await updateTask(taskId, originalTaskRef.current).catch(() => {});
           }
+          const blocks = scheduleResult?.blockingBusyBlocks;
+          const hasBusyBlocks = blocks && blocks.length > 0;
+          const fallbackMsg = "The auto-scheduler couldn't find a long enough free window before the deadline. Try extending the deadline, reducing the estimated duration, or freeing time by adjusting your busy blocks.";
           setPopupInfo({
             title: "Could Not Schedule Task",
-            message:
-              scheduleResult?.message
-                ?? "This task could not be scheduled — it may conflict with your busy blocks or there are no available slots before the deadline. Your task was not updated. Try adjusting the deadline, estimated duration, or your availability.",
+            message: scheduleResult?.message || fallbackMsg,
+            blockingBusyBlocks: hasBusyBlocks ? blocks : undefined,
+            secondaryAction: hasBusyBlocks
+              ? () => setActiveTabWithParams("user", { screen: "edit-preferences", subScreen: "scheduling" })
+              : undefined,
+            secondaryLabel: hasBusyBlocks ? "Go to Busy Blocks" : undefined,
           });
           return;
         }
@@ -738,6 +756,13 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
         titleColor={COLORS.primary1}
       >
         <AppText style={[styles.popupMessage, { color: colors.gray2 }]}>{popupInfo?.message}</AppText>
+        {popupInfo?.blockingBusyBlocks && popupInfo.blockingBusyBlocks.length > 0 ? (
+          <View style={styles.busyBlocksList}>
+            {popupInfo.blockingBusyBlocks.map((block, i) => (
+              <BusyBlockPreviewCard key={block._id ?? `block-${i}`} block={block} />
+            ))}
+          </View>
+        ) : null}
         {popupInfo?.confirmAction ? (
           <View style={styles.confirmRow}>
             <AppButton title="Cancel" mode="filled" color="lightGray" onPress={() => setPopupInfo(null)} width="48%" />
@@ -747,6 +772,31 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
               color="primary7"
               onPress={() => {
                 const action = popupInfo?.confirmAction;
+                setPopupInfo(null);
+                if (action) action();
+              }}
+              width="48%"
+            />
+          </View>
+        ) : popupInfo?.secondaryAction ? (
+          <View style={styles.confirmRow}>
+            <AppButton
+              title="OK"
+              mode="filled"
+              color="lightGray"
+              onPress={() => {
+                const nav = popupInfo?.navigateOnClose;
+                setPopupInfo(null);
+                if (nav) setActiveTab("calendar");
+              }}
+              width="48%"
+            />
+            <AppButton
+              title={popupInfo?.secondaryLabel ?? "Go to Busy Blocks"}
+              mode="filled"
+              color="primary5"
+              onPress={() => {
+                const action = popupInfo?.secondaryAction;
                 setPopupInfo(null);
                 if (action) action();
               }}
@@ -784,6 +834,11 @@ const styles = StyleSheet.create({
   popupMessage: {
     color: COLORS.darkGray,
     marginBottom: SPACING.lg,
+  },
+  busyBlocksList: {
+    width: "100%",
+    marginBottom: SPACING.lg,
+    gap: SPACING.sm,
   },
   buttonContainer: {
     width: "100%",

@@ -98,11 +98,23 @@ def normalize_busy_blocks(busy_blocks_by_date: Dict) -> Dict:
 
 
 def build_working_window(day: datetime, working_hours: Dict) -> Dict:
-    # Build start/end datetimes for the given day according to working hours
-    # Preserve timezone from input day
+    # Build start/end datetimes for the given day according to working hours.
+    # When the end hour/minute is less than or equal to the start (e.g. 00:00–23:59)
+    # and the window already covers the full day, the end is set to midnight of the
+    # NEXT day so that long tasks can spill past 23:59 into the early hours.
     tz = day.tzinfo if day.tzinfo else timezone.utc
     start = datetime(day.year, day.month, day.day, working_hours.get("startHour", 9), working_hours.get("startMinute", 0), tzinfo=tz)
-    end = datetime(day.year, day.month, day.day, working_hours.get("endHour", 18), working_hours.get("endMinute", 0), tzinfo=tz)
+    end_hour = working_hours.get("endHour", 18)
+    end_minute = working_hours.get("endMinute", 0)
+    end = datetime(day.year, day.month, day.day, end_hour, end_minute, tzinfo=tz)
+    # If the window spans nearly a full day (startHour 0 and endHour 23) or endHour+
+    # endMinute > 23:00, extend end to 06:00 of the next day so overnight sessions
+    # are possible. The busy-block overlap check will still prevent scheduling over
+    # user-defined blocks (sleep, etc.) in those early-morning hours.
+    start_total = working_hours.get("startHour", 9) * 60 + working_hours.get("startMinute", 0)
+    end_total = end_hour * 60 + end_minute
+    if end_total - start_total >= 23 * 60:  # ≥ 23 h working window
+        end = datetime(day.year, day.month, day.day, tzinfo=tz) + timedelta(days=1, hours=6)
     return {"start": start, "end": end}
 
 
@@ -452,12 +464,15 @@ def generate_domain(variable: dict, today: datetime, horizon_end: datetime, busy
     current_day = start_of_day(today)
     while current_day <= deadline:
         date_key = current_day.date().isoformat()
+        next_date_key = add_days(current_day, 1).date().isoformat()
         working_window = build_working_window(current_day, working_hours)
         busy_blocks = busy_blocks_by_date.get(date_key, [])
+        # For overnight windows, also include the next day's busy blocks
+        next_day_blocks = busy_blocks_by_date.get(next_date_key, [])
         
         # Parse busy blocks if they contain ISO strings instead of datetime objects
         parsed_busy_blocks = []
-        for b in busy_blocks:
+        for b in list(busy_blocks) + list(next_day_blocks):
             parsed_block = {}
             for key, val in b.items():
                 if key in ["start", "end"] and isinstance(val, str):
@@ -564,7 +579,11 @@ def backtrack_search(variables: List[dict], variable_domains: Dict[str, List[dic
             slots_tried += 1
             candidate_slot = {"start": slot["start"], "end": slot["end"], "minutes": variable["chunkMinutes"], "dateKey": slot.get("dateKey"), "taskId": variable["taskId"], "variableId": variable["id"]}
             working_window = build_working_window(slot["start"], working_hours)
-            busy_blocks = parsed_busy_blocks_by_date.get(slot.get("dateKey"), [])
+            busy_blocks = list(parsed_busy_blocks_by_date.get(slot.get("dateKey"), []))
+            # For overnight slots, also include the next day's busy blocks
+            if slot["end"].date() > slot["start"].date():
+                next_dk = slot["end"].date().isoformat()
+                busy_blocks = busy_blocks + list(parsed_busy_blocks_by_date.get(next_dk, []))
 
             if not satisfies_hard_constraints(candidate_slot=candidate_slot, existing_assignments=assigned_slots, busy_blocks_for_day=busy_blocks, working_window=working_window, deadline=variable.get("deadline"), variable_id=variable["id"], min_gap_minutes=gap_minutes):
                 log_debug(f"[BACKTRACK] ❌ Hard constraint failed: {variable.get('id')} -> {slot['start']} (day={slot.get('dateKey')})")

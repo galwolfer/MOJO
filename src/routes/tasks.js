@@ -14,7 +14,7 @@ import { Subcategory } from "../models/Subcategory.js";
 import { logger } from "../utils/logger.js";
 import { isValidCategory, getDisplayName } from "../config/categories.js";
 import { BusyBlock } from "../models/BusyBlock.js";
-import { computeSessionHash, withUserScheduleLock } from "../services/schedulingService.js";
+import { computeSessionHash, withUserScheduleLock, expandBusyBlock } from "../services/schedulingService.js";
 import {
   addSubcategoryToUser,
   findOrCreateSubcategory,
@@ -962,8 +962,11 @@ router.patch("/:id/sessions", requireAuth, async (req, res, next) => {
     // Check sessions against the task deadline
     if (task.dueDate) {
       const deadline = new Date(task.dueDate);
+      // Allow sessions to start any time on the due date itself — only block sessions
+      // that start on a day strictly after the deadline day.
+      deadline.setHours(23, 59, 59, 999);
       for (let i = 0; i < parsed.length; i++) {
-        if (parsed[i].start >= deadline) {
+        if (parsed[i].start > deadline) {
           return res.status(422).json({
             success: false,
             error: `Session ${i + 1} starts at or after the task deadline (${deadline.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}). Please move the session before the deadline.`,
@@ -981,38 +984,45 @@ router.patch("/:id/sessions", requireAuth, async (req, res, next) => {
       const busyBlocks = await BusyBlock.find({
         userId,
         $or: [
-          { isRecurring: { $ne: true }, start: { $lt: globalEnd }, end: { $gt: globalStart } },
-          { isRecurring: true },
+          // Legacy one-time blocks in range
+          { blockType: null, isRecurring: { $ne: true }, start: { $lt: globalEnd }, end: { $gt: globalStart } },
+          // Legacy recurring blocks
+          { blockType: null, isRecurring: true },
+          // New-style blocks — expandBusyBlock handles date filtering
+          { blockType: { $in: ["DAILY", "WEEKLY", "ONCE", "FULL_DAY"] } },
         ],
       }).lean();
 
       for (const session of parsed) {
+        const sessionDayStart = new Date(session.start);
+        sessionDayStart.setUTCHours(0, 0, 0, 0);
+        const sessionDayEnd = new Date(session.end);
+        sessionDayEnd.setUTCHours(23, 59, 59, 999);
+
         for (const block of busyBlocks) {
-          let blockStart, blockEnd;
-          if (block.isRecurring && block.recurrence?.daysOfWeek?.length) {
-            const sessionDow = session.start.getUTCDay();
-            if (!block.recurrence.daysOfWeek.includes(sessionDow)) continue;
-            // Re-anchor recurring block times to the session's date (UTC)
-            const refStart = new Date(block.start);
-            const refEnd = new Date(block.end);
-            const sessionMidnight = new Date(session.start);
-            sessionMidnight.setUTCHours(0, 0, 0, 0);
-            blockStart = new Date(sessionMidnight.getTime());
-            blockStart.setUTCHours(refStart.getUTCHours(), refStart.getUTCMinutes(), 0, 0);
-            blockEnd = new Date(sessionMidnight.getTime());
-            blockEnd.setUTCHours(refEnd.getUTCHours(), refEnd.getUTCMinutes(), 0, 0);
-          } else {
-            blockStart = new Date(block.start);
-            blockEnd = new Date(block.end);
-          }
-          const buffStart = blockStart.getTime() - minGapMs;
-          const buffEnd = blockEnd.getTime() + minGapMs;
-          if (session.start.getTime() < buffEnd && session.end.getTime() > buffStart) {
-            return res.status(409).json({
-              success: false,
-              error: `Session starting at ${session.start.toLocaleString()} conflicts with busy block "${block.title || "Busy"}"`,
-              conflicts: [{ type: "busy_block", sessionStart: session.start, blockTitle: block.title }],
-            });
+          const occurrences = expandBusyBlock(block, sessionDayStart, sessionDayEnd);
+          for (const occ of occurrences) {
+            // For manual scheduling, only block actual overlap — don't add the
+            // auto-scheduler's minGap buffer since the user chose this time explicitly.
+            if (session.start.getTime() < occ.end.getTime() && session.end.getTime() > occ.start.getTime()) {
+              const blockingBusyBlocks = [{
+                _id: block._id?.toString() ?? null,
+                title: block.title || "Untitled Block",
+                blockType: block.blockType ?? null,
+                times: block.times ?? [],
+                daysOfWeek: block.daysOfWeek ?? [],
+                date: block.date ? new Date(block.date).toISOString() : null,
+                weeklySchedule: block.weeklySchedule ?? [],
+                start: block.start ? new Date(block.start).toISOString() : undefined,
+                end: block.end ? new Date(block.end).toISOString() : undefined,
+              }];
+              return res.status(409).json({
+                success: false,
+                error: `Session starting at ${session.start.toLocaleString()} conflicts with the following busy block:`,
+                conflicts: [{ type: "busy_block", sessionStart: session.start, blockTitle: block.title }],
+                blockingBusyBlocks,
+              });
+            }
           }
         }
       }
@@ -1222,10 +1232,26 @@ router.post("/:id/schedule", async (req, res, next) => {
       if (originalManualSchedule) {
         await Task.updateOne({ _id: taskId }, { $set: { manualSchedule: true } });
       }
+      // Fetch all user busy blocks so the client can preview them in the error popup.
+      const userBusyBlocks = await BusyBlock.find({ userId })
+        .select("title blockType times daysOfWeek date weeklySchedule start end")
+        .lean();
+      const blockingBusyBlocks = userBusyBlocks.map((b) => ({
+        _id: b._id?.toString() ?? null,
+        title: b.title || "Untitled Block",
+        blockType: b.blockType ?? null,
+        times: b.times ?? [],
+        daysOfWeek: b.daysOfWeek ?? [],
+        date: b.date ? b.date.toISOString() : null,
+        weeklySchedule: b.weeklySchedule ?? [],
+        start: b.start ? b.start.toISOString() : undefined,
+        end: b.end ? b.end.toISOString() : undefined,
+      }));
       const reason = taskUnscheduledEntry.reason || "no available time slots before the deadline";
       return res.status(422).json({
         success: false,
         error: `This task could not be scheduled: ${reason}. Check your busy blocks, available time, and deadline.`,
+        blockingBusyBlocks,
         unscheduled,
       });
     }

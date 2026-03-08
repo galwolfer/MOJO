@@ -9,11 +9,10 @@ import GoalsPrioritiesSettingsScreen from "./GoalsPrioritiesSettings";
 import SchedulingSettingsScreen from "./SchedulingSettings";
 import SettingsSubScreen from "./components/SettingsSubScreen";
 
-type EditPreferencesScreenProps = { onBack: () => void; onSave?: () => void };
 type CurrentScreen = "main" | "priorities" | "scheduling";
-
-export default function EditPreferencesScreen({ onBack }: EditPreferencesScreenProps) {
-  const [currentScreen, setCurrentScreen] = useState<CurrentScreen>("main");
+type EditPreferencesScreenProps = { onBack: () => void; onSave?: () => void; initialScreen?: CurrentScreen };
+export default function EditPreferencesScreen({ onBack, initialScreen }: EditPreferencesScreenProps) {
+  const [currentScreen, setCurrentScreen] = useState<CurrentScreen>(initialScreen ?? "main");
 
   if (currentScreen === "priorities") return <GoalsPrioritiesSettingsScreen onBack={() => setCurrentScreen("main")} />;
   if (currentScreen === "scheduling") return <SchedulingSettingsScreen       onBack={() => setCurrentScreen("main")} />;

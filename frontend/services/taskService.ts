@@ -7,6 +7,7 @@
 
 import { get, post, patch, del } from "./httpClient";
 import { getCategoryMeta } from "../config/categoryMeta";
+import type { BusyBlock } from "./busyBlockService";
 
 // Types
 export type TaskStatus = "todo" | "in_progress" | "done";
@@ -1298,13 +1299,15 @@ export async function updateTaskSchedule(
     subtaskTitle: string | null;
     status: string;
   }>;
+  blockingBusyBlocks?: BusyBlock[];
 }> {
   try {
     const response = await patch<any>(`/tasks/${taskId}/sessions`, { sessions });
     return { success: true, sessions: response.sessions ?? [] };
   } catch (error: any) {
-    const message = error?.response?.data?.error ?? error?.message ?? "Failed to update schedule";
-    return { success: false, error: message, sessions: [] };
+    const message = error?.data?.error ?? error?.response?.data?.error ?? error?.message ?? "Failed to update schedule";
+    const blocks = error?.data?.blockingBusyBlocks ?? error?.response?.data?.blockingBusyBlocks;
+    return { success: false, error: message, sessions: [], blockingBusyBlocks: blocks };
   }
 }
 
@@ -1783,6 +1786,7 @@ export async function createTaskSchedule(
   success: boolean;
   message: string;
   scheduledCount: number;
+  blockingBusyBlocks?: BusyBlock[];
   plan?: Array<{
     start: string;
     end: string;
@@ -1809,11 +1813,13 @@ export async function createTaskSchedule(
   } catch (error: any) {
     // Use warn (not error) — callers handle this gracefully; console.error triggers LogBox overlays in dev
     console.warn("Failed to create task schedule:", error);
-    // Extract the backend error message from a 4xx response body if available
-    const backendMessage: string | undefined =
-      error?.response?.data?.error ?? error?.response?.data?.message;
+    // Extract the backend error message and busy block list from a 4xx response body if available.
+    // httpClient attaches the full response body as error.data (not error.response.data like Axios).
+    const responseData: any = (error as any)?.data ?? (error as any)?.response?.data;
+    const backendMessage: string | undefined = responseData?.error ?? responseData?.message;
+    const blockingBusyBlocks: BusyBlock[] | undefined = responseData?.blockingBusyBlocks;
     if (backendMessage) {
-      return { success: false, message: backendMessage, scheduledCount: 0 };
+      return { success: false, message: backendMessage, scheduledCount: 0, blockingBusyBlocks };
     }
     // Return null to signal a network/server error (distinct from scheduler returning empty)
     return null;

@@ -26,7 +26,9 @@ def respects_busy_blocks(session: dict, busy_blocks: List[dict]) -> bool:
 def respects_deadline(session: dict, deadline: Optional[datetime]) -> bool:
     if deadline is None:
         return True
-    return session["end"] <= deadline
+    # A session is valid as long as it STARTS on or before the deadline day.
+    # This allows overnight sessions that begin before midnight but end after it.
+    return session["start"] <= deadline
 
 
 # Check that a session lies entirely inside the working window

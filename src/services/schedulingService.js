@@ -686,11 +686,14 @@ async function _persistPlanLocked(userId, plan) {
     await TaskSchedule.deleteMany({ _id: { $in: orphanIds } });
   }
 
-  // ── Step 3: clear remaining future planned sessions for tasks NOT in this plan
+  // ── Step 3: clear remaining planned sessions for tasks NOT in this plan
   // (handles tasks that were previously scheduled but are now complete/removed).
+  // Use `end > now` instead of `start >= now` so that sessions which have
+  // already started but are still running are also cleaned up — otherwise a
+  // stale session whose start < now would survive and overlap with the new plan.
   await TaskSchedule.deleteMany({
     userId,
-    start: { $gte: now },
+    end: { $gt: now },
     status: { $ne: "completed" },
     manuallyScheduled: { $ne: true },
   });
@@ -821,9 +824,15 @@ export async function generatePlan({ userId, profile = {}, planningHorizonDays =
   );
 
   for (const session of completedSessions) {
-    const key = session.start.toISOString().slice(0, 10);
-    if (!busyBlocksByDate[key]) busyBlocksByDate[key] = [];
-    busyBlocksByDate[key].push({ start: new Date(session.start), end: new Date(session.end) });
+    // For overnight sessions that span midnight, register on both start and end dates
+    const startKey = session.start.toISOString().slice(0, 10);
+    const endKey = session.end.toISOString().slice(0, 10);
+    if (!busyBlocksByDate[startKey]) busyBlocksByDate[startKey] = [];
+    busyBlocksByDate[startKey].push({ start: new Date(session.start), end: new Date(session.end) });
+    if (endKey !== startKey) {
+      if (!busyBlocksByDate[endKey]) busyBlocksByDate[endKey] = [];
+      busyBlocksByDate[endKey].push({ start: new Date(session.start), end: new Date(session.end) });
+    }
 
     const taskId = session.taskId?.toString();
     if (taskId && remainingByTaskId.has(taskId)) {
@@ -834,16 +843,25 @@ export async function generatePlan({ userId, profile = {}, planningHorizonDays =
 
   // Also treat future manual sessions (of OTHER tasks with manualSchedule=true) as occupied time
   // so the auto-scheduler doesn't double-book those slots.
+  // Use end > now (not start >= now) so sessions that started before 'now' but are still
+  // running are included — otherwise the scheduler can double-book their remaining time.
   const manualSessions = await TaskSchedule.find({
     userId,
-    start: { $gte: now, $lt: horizonEnd },
+    end: { $gt: now },
+    start: { $lt: horizonEnd },
     status: "planned",
     manuallyScheduled: true,
   }).lean();
   for (const session of manualSessions) {
-    const key = session.start.toISOString().slice(0, 10);
-    if (!busyBlocksByDate[key]) busyBlocksByDate[key] = [];
-    busyBlocksByDate[key].push({ start: new Date(session.start), end: new Date(session.end) });
+    // For overnight sessions that span midnight, register on both start and end dates
+    const startKey = session.start.toISOString().slice(0, 10);
+    const endKey = session.end.toISOString().slice(0, 10);
+    if (!busyBlocksByDate[startKey]) busyBlocksByDate[startKey] = [];
+    busyBlocksByDate[startKey].push({ start: new Date(session.start), end: new Date(session.end) });
+    if (endKey !== startKey) {
+      if (!busyBlocksByDate[endKey]) busyBlocksByDate[endKey] = [];
+      busyBlocksByDate[endKey].push({ start: new Date(session.start), end: new Date(session.end) });
+    }
   }
 
   const busyBlocks = await BusyBlock.find({
