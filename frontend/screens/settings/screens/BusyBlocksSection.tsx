@@ -783,17 +783,13 @@ export default function BusyBlocksSection({ style }: { style?: ViewStyle }) {
           </View>
 
           {/* ── Shared: title ────────────────────────────────── */}
-          {form.blockType !== "WEEKLY" && (
-            <>
-              <AppText style={[formStyles.fieldLabel, { marginTop: SPACING.md }]}>Title (optional)</AppText>
-              <Input
-                type="text"
-                value={form.title}
-                onChangeText={(v) => setForm((f) => ({ ...f, title: v }))}
-                placeholder="e.g. Morning workout"
-              />
-            </>
-          )}
+          <AppText style={[formStyles.fieldLabel, { marginTop: SPACING.md }]}>Title (optional)</AppText>
+          <Input
+            type="text"
+            value={form.title}
+            onChangeText={(v) => setForm((f) => ({ ...f, title: v }))}
+            placeholder="e.g. Morning workout"
+          />
 
           {/* ── WEEKLY ─────────────────────────────────────────── */}
           {form.blockType === "WEEKLY" && (
