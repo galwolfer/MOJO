@@ -1250,7 +1250,7 @@ router.post("/:id/schedule", async (req, res, next) => {
       const reason = taskUnscheduledEntry.reason || "no available time slots before the deadline";
       return res.status(422).json({
         success: false,
-        error: `This task could not be scheduled: ${reason}. Check your busy blocks, available time, and deadline.`,
+        error: `Your busy blocks don't leave enough free time to fit this task before the deadline. Try shortening the task, extending the deadline, or freeing up time in your busy blocks.`,
         blockingBusyBlocks,
         unscheduled,
       });
@@ -1263,7 +1263,7 @@ router.post("/:id/schedule", async (req, res, next) => {
       }
       return res.status(422).json({
         success: false,
-        error: "Unable to generate schedule. No available time slots found before the deadline.",
+        error: "Your busy blocks don't leave enough free time to fit this task before the deadline. Try shortening the task, extending the deadline, or freeing up time in your busy blocks.",
         unscheduled,
       });
     }

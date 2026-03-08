@@ -615,7 +615,7 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
           }
           const blocks = scheduleResult?.blockingBusyBlocks;
           const hasBusyBlocks = blocks && blocks.length > 0;
-          const fallbackMsg = "The auto-scheduler couldn't find a long enough free window before the deadline. Try extending the deadline, reducing the estimated duration, or freeing time by adjusting your busy blocks.";
+          const fallbackMsg = "Your busy blocks don't leave enough free time to fit this task before the deadline. Try shortening the task, extending the deadline, or freeing up time in your busy blocks.";
           setPopupInfo({
             title: "Could Not Schedule Task",
             message: scheduleResult?.message || fallbackMsg,

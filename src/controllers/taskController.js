@@ -7,6 +7,7 @@ import * as taskService from "../services/taskService.js";
 import { logger } from "../utils/logger.js";
 import { Task } from "../models/Task.js";
 import { SubTask } from "../models/SubTask.js";
+import { BusyBlock } from "../models/BusyBlock.js";
 import { isValidCategory } from "../config/categories.js";
 import { hasIllegalDisplayChars } from "../utils/illegalChars.js";
 import { triggerSchedulerUpdate, generatePlan, savePlan } from "../services/schedulingService.js";
@@ -362,11 +363,32 @@ export async function createTask(req, res) {
       if (!taskHasSessions) {
         // Roll back — delete the task that was just created
         await taskService.deleteTask({ taskId: String(task._id), userId });
+
+        // Fetch all user busy blocks so the client can preview them in the error popup
+        let blockingBusyBlocks = [];
+        try {
+          const userBusyBlocks = await BusyBlock.find({ userId })
+            .select("title blockType times daysOfWeek date weeklySchedule start end")
+            .lean();
+          blockingBusyBlocks = userBusyBlocks.map((b) => ({
+            _id: b._id?.toString() ?? null,
+            title: b.title || "Untitled Block",
+            blockType: b.blockType ?? null,
+            times: b.times ?? [],
+            daysOfWeek: b.daysOfWeek ?? [],
+            date: b.date ? b.date.toISOString() : null,
+            weeklySchedule: b.weeklySchedule ?? [],
+            start: b.start ? b.start.toISOString() : undefined,
+            end: b.end ? b.end.toISOString() : undefined,
+          }));
+        } catch (_) { /* ignore – popup will just lack block previews */ }
+
         return res.status(422).json({
           success: false,
           schedulingFailed: true,
           error:
-            "Task could not be scheduled — there are no available time slots before the deadline. The task was not created. Try adjusting the deadline, estimated duration, or your availability.",
+            "Your busy blocks don't leave enough free time to fit this task before the deadline. Try shortening the task, extending the deadline, or freeing up time in your busy blocks:",
+          blockingBusyBlocks,
         });
       }
 
