@@ -35,8 +35,8 @@ Controls **what** the notification says:
 |-----------------|-----------------|--------|---------|-------------------|
 | OFF | OFF | Fixed default | Fixed text | N/A |
 | ON | OFF | ML prediction | Fixed text | N/A |
-| OFF | ON | Fixed default | AI-generated | User-selected |
-| ON | ON | ML prediction | AI-generated | Auto-selected by prediction |
+| OFF | ON | Fixed default | AI-generated | User-selected (Auto hidden) |
+| ON | ON | ML prediction | AI-generated | User-selected or Auto |
 
 ### When Ojo Toggle is OFF (`ojoNotifications.enabled: false`)
 
@@ -47,7 +47,8 @@ Standard fixed notifications are used - no AI generation occurs. The notificatio
 #### With Smart Reminders ON (`useSmartReminders: true`)
 
 - **Timing**: Uses ML prediction for optimal reminder timing
-- **Ojo Type**: Automatically selected based on the ML prediction score:
+- **Ojo Type**: User can select "Auto", "Same as Chat", or a specific Ojo type
+- **Auto mode**: ML prediction category determines the Ojo type per task:
 
 | Condition | Ojo Type | Reasoning |
 |-----------|----------|-----------|
@@ -61,8 +62,21 @@ Standard fixed notifications are used - no AI generation occurs. The notificatio
 #### With Smart Reminders OFF (`useSmartReminders: false`)
 
 - **Timing**: Uses fixed default timing (no prediction)
-- **Ojo Type**: Uses the user's **selected Ojo type** (`selectedOjoType`)
+- **Ojo Type**: The "Auto" option is **hidden** from the selection screen
+- If the user previously had "Auto" selected, it is automatically switched to "Same as Chat"
+- The `_autoDowngraded` flag tracks this automatic switch
 - If no Ojo type selected: defaults to `mentorjo`
+
+### Auto-Downgrade Behavior
+
+When smart reminders is turned **OFF** and the Ojo type is "Auto":
+1. The Ojo type is automatically changed to "Same as Chat"
+2. The `_autoDowngraded` flag is set to `true`
+3. The "Auto" option is hidden from the selection screen
+
+When smart reminders is turned back **ON**:
+- If `_autoDowngraded` is `true` (user never manually changed the type) → "Auto" is **restored** automatically
+- If the user manually changed the Ojo type at any point (even back to "Same as Chat") → `_autoDowngraded` was cleared, so "Auto" is **not** restored
 
 ## User Settings
 
@@ -72,8 +86,9 @@ User preferences are stored in `User.pushNotifications.ojoNotifications`:
 {
   pushNotifications: {
     ojoNotifications: {
-      enabled: Boolean,       // Toggle to enable/disable Ojo-styled notifications
-      selectedOjoType: String // mentorjo | brojo | bestojo | strictojo | null
+      enabled: Boolean,        // Toggle to enable/disable Ojo-styled notifications
+      selectedOjoType: String, // mentorjo | brojo | bestojo | strictojo | chat | auto | null
+      _autoDowngraded: Boolean // Internal: tracks auto→chat downgrade from smart reminders off
     }
   }
 }

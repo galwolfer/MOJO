@@ -271,6 +271,10 @@ const userSchema = new mongoose.Schema(
               enum: ["mentorjo", "brojo", "bestojo", "strictojo", "chat", "auto", null],
               default: null,
             },
+            // Internal: true when "auto" was automatically downgraded to "chat"
+            // because smart reminders was turned off. Allows restoring "auto"
+            // when smart reminders is re-enabled (if the user didn't manually change it).
+            _autoDowngraded: { type: Boolean, default: false },
           },
           // Timezone for scheduling (IANA format, e.g., 'America/New_York')
           timezone: { type: String, default: "UTC" },
@@ -286,7 +290,7 @@ const userSchema = new mongoose.Schema(
         enabled: true,
         morningDigest: { enabled: true, hour: 8, minute: 0 },
         taskReminders: { enabled: true, defaultReminderMinutes: 60, useSmartReminders: true },
-        ojoNotifications: { enabled: false, selectedOjoType: null },
+        ojoNotifications: { enabled: false, selectedOjoType: null, _autoDowngraded: false },
         timezone: "UTC",
         lastMorningDigest: null,
         lastTaskReminder: null,
