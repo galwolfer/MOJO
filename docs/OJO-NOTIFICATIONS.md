@@ -244,11 +244,18 @@ GET /api/notifications/sent-reminders           # View sent reminder history (TT
 
 ## Test Buttons in App
 
+The notification settings screen shows test buttons for verifying notification delivery:
+
 | Button | Smart Reminders | Ojo | Description |
 |--------|-----------------|-----|-------------|
-| **🧠 Smart** | ✅ ON | ❌ OFF | Uses ML prediction for timing, fixed text |
-| **📋 Default** | ❌ OFF | ❌ OFF | No prediction, fixed text |
-| **🤖 Test Ojo** | ❌ OFF | ✅ ON | No prediction, AI-generated text |
+| **Test Push** | — | — | Generic test push notification |
+| **Test Digest** | — | — | Trigger morning digest |
+| **Smart Reminder** | ✅ ON | ❌ OFF | Uses ML prediction for timing, fixed text |
+| **Default Reminder** | ❌ OFF | ❌ OFF | No prediction, fixed text |
+| **Test Ojo Notification** | — | ✅ ON | AI-generated text (only shown when Ojo is enabled) |
+| **View Smart Calculation** | — | — | Shows ML timing breakdown without sending |
+
+> **Note:** The **Periodic Test Mode** section and **Debug Info** panel are hidden from the UI. They remain in the codebase but are not rendered.
 
 ## Test Script Commands
 
