@@ -254,7 +254,8 @@ const TaskScheduleEditor: React.FC<Props> = ({
         // null means a network/server error (createTaskSchedule swallows throw)
         setScheduleError("Auto-scheduling request failed. Please check your connection and try again.");
       } else {
-        setScheduleError("Auto-scheduling found no available time slots within the planning horizon.");
+        // success:false — backend returned a specific reason (e.g. busy block / no slots)
+        setScheduleError(result.message ?? "Auto-scheduling found no available time slots within the planning horizon.");
       }
     } catch (err: any) {
       setScheduleError(err?.message ?? "Auto-scheduling failed");

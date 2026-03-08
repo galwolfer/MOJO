@@ -579,7 +579,18 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
 
       // Save manual sessions if any
       if (manualSessions.length > 0) {
-        await updateTaskSchedule(taskId, manualSessions);
+        const schedResult = await updateTaskSchedule(taskId, manualSessions);
+        if (!schedResult.success) {
+          // Roll back the task update so the DB is not left in a partially-updated state
+          if (originalTaskRef.current) {
+            await updateTask(taskId, originalTaskRef.current).catch(() => {});
+          }
+          setPopupInfo({
+            title: "Schedule Conflict",
+            message: schedResult.error ?? "The selected time is not available. It may conflict with a busy block, another task, or the task deadline. Please choose a different time.",
+          });
+          return;
+        }
       }
 
       // Trigger auto-scheduling for remaining subtasks
@@ -593,7 +604,8 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
           setPopupInfo({
             title: "Could Not Schedule Task",
             message:
-              "The task could not be scheduled with these changes — there are no available time slots before the deadline. Your task was not updated. Try adjusting the deadline, estimated duration, or your availability.",
+              scheduleResult?.message
+                ?? "This task could not be scheduled — it may conflict with your busy blocks or there are no available slots before the deadline. Your task was not updated. Try adjusting the deadline, estimated duration, or your availability.",
           });
           return;
         }

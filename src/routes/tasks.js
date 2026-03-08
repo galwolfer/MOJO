@@ -959,6 +959,20 @@ router.patch("/:id/sessions", requireAuth, async (req, res, next) => {
       }
     }
 
+    // Check sessions against the task deadline
+    if (task.dueDate) {
+      const deadline = new Date(task.dueDate);
+      for (let i = 0; i < parsed.length; i++) {
+        if (parsed[i].start >= deadline) {
+          return res.status(422).json({
+            success: false,
+            error: `Session ${i + 1} starts at or after the task deadline (${deadline.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}). Please move the session before the deadline.`,
+            conflicts: [{ type: "after_deadline", sessionStart: parsed[i].start, deadline }],
+          });
+        }
+      }
+    }
+
     if (parsed.length > 0) {
       // Check against BusyBlocks
       const globalStart = sortedParsed[0].start;
@@ -1164,14 +1178,20 @@ router.post("/:id/schedule", async (req, res, next) => {
       });
     }
 
-    // Clear manual-schedule flag so the auto-scheduler will include this task
-    // and delete any existing manual sessions for it
-    await Task.updateOne({ _id: taskId }, { $set: { manualSchedule: false } });
-    await TaskSchedule.deleteMany({ taskId, status: { $nin: ["completed"] } });
+    // Temporarily clear the manual-schedule flag so generatePlan includes this task.
+    // We save the original value so we can restore it if scheduling fails.
+    const originalManualSchedule = task.manualSchedule ?? false;
+    if (originalManualSchedule) {
+      await Task.updateOne({ _id: taskId }, { $set: { manualSchedule: false } });
+    }
 
     // Get user profile for scheduling preferences
     const user = await User.findById(userId).select("profile subCategories schedulingPreferences").lean();
     if (!user) {
+      // Restore flag before returning
+      if (originalManualSchedule) {
+        await Task.updateOne({ _id: taskId }, { $set: { manualSchedule: true } });
+      }
       return res.status(404).json({
         success: false,
         error: "User not found",
@@ -1184,20 +1204,47 @@ router.post("/:id/schedule", async (req, res, next) => {
       minGapMinutes: user.schedulingPreferences?.minGapMinutes ?? 10,
     };
 
-    // Generate plan
+    // Generate plan — DO NOT delete sessions yet; wait until we confirm this
+    // task actually gets scheduled before mutating the database.
     const { plan, unscheduled } = await generatePlan({
       userId,
       profile: profileWithGap,
       planningHorizonDays,
     });
 
-    if (!plan || plan.length === 0) {
-      return res.status(400).json({
+    // Check whether THIS specific task was schedulable.
+    const taskUnscheduledEntry = unscheduled.find(
+      (u) => u.taskId && u.taskId.toString() === taskId.toString()
+    );
+
+    if (taskUnscheduledEntry) {
+      // Restore manual-schedule flag to its original value — nothing was changed.
+      if (originalManualSchedule) {
+        await Task.updateOne({ _id: taskId }, { $set: { manualSchedule: true } });
+      }
+      const reason = taskUnscheduledEntry.reason || "no available time slots before the deadline";
+      return res.status(422).json({
         success: false,
-        error: "Unable to generate schedule. Task may already be fully scheduled or no available time slots.",
+        error: `This task could not be scheduled: ${reason}. Check your busy blocks, available time, and deadline.`,
         unscheduled,
       });
     }
+
+    if (!plan || plan.length === 0) {
+      // Restore flag — nothing scheduled at all
+      if (originalManualSchedule) {
+        await Task.updateOne({ _id: taskId }, { $set: { manualSchedule: true } });
+      }
+      return res.status(422).json({
+        success: false,
+        error: "Unable to generate schedule. No available time slots found before the deadline.",
+        unscheduled,
+      });
+    }
+
+    // Scheduling succeeded — now it is safe to clear old sessions and persist.
+    await Task.updateOne({ _id: taskId }, { $set: { manualSchedule: false } });
+    await TaskSchedule.deleteMany({ taskId, status: { $nin: ["completed"] } });
 
     // Save plan to database
     await savePlan({ userId, plan, unscheduled });

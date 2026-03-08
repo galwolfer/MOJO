@@ -1809,6 +1809,12 @@ export async function createTaskSchedule(
   } catch (error: any) {
     // Use warn (not error) — callers handle this gracefully; console.error triggers LogBox overlays in dev
     console.warn("Failed to create task schedule:", error);
+    // Extract the backend error message from a 4xx response body if available
+    const backendMessage: string | undefined =
+      error?.response?.data?.error ?? error?.response?.data?.message;
+    if (backendMessage) {
+      return { success: false, message: backendMessage, scheduledCount: 0 };
+    }
     // Return null to signal a network/server error (distinct from scheduler returning empty)
     return null;
   }
