@@ -404,41 +404,43 @@ export default function NotificationSettingsScreen({ onBack }: Props) {
                 </View>
               )}
 
-              {/* Periodic Test Mode */}
-              <View style={[styles.subSection, { backgroundColor: colors.bg3 }]}>
-                <View style={styles.subSectionHeader}>
-                  <RepeatIcon size={ICON_SIZES.sm} color={testModeActive ? COLORS.primary6 : COLORS.primary1} />
-                  <AppText variant="boldText" style={{ color: colors.text1 }}>
-                    Periodic Test Mode
+              {/* Periodic Test Mode — hidden */}
+              {false && (
+                <View style={[styles.subSection, { backgroundColor: colors.bg3 }]}>
+                  <View style={styles.subSectionHeader}>
+                    <RepeatIcon size={ICON_SIZES.sm} color={testModeActive ? COLORS.primary6 : COLORS.primary1} />
+                    <AppText variant="boldText" style={{ color: colors.text1 }}>
+                      Periodic Test Mode
+                    </AppText>
+                    {testModeActive && (
+                      <View style={[styles.activeBadge, { backgroundColor: COLORS.primary6 }]}>
+                        <AppText variant="notes" style={{ color: COLORS.colorWhite, fontWeight: "700" }}>
+                          ACTIVE
+                        </AppText>
+                      </View>
+                    )}
+                  </View>
+                  <AppText variant="notes" style={{ color: colors.gray1 }}>
+                    {testModeActive
+                      ? "Sending a test notification every minute. Tap to stop."
+                      : "Start to receive a test notification every minute."}
                   </AppText>
-                  {testModeActive && (
-                    <View style={[styles.activeBadge, { backgroundColor: COLORS.primary6 }]}>
-                      <AppText variant="notes" style={{ color: COLORS.colorWhite, fontWeight: "700" }}>
-                        ACTIVE
-                      </AppText>
-                    </View>
-                  )}
+                  <AppButton
+                    title={isTogglingTestMode ? "..." : testModeActive ? "Stop Test Mode" : "Start Test Mode"}
+                    onPress={handleToggleTestMode}
+                    mode="filled"
+                    color={testModeActive ? "primary5" : "primary4"}
+                    disabled={isTogglingTestMode}
+                    style={{ marginTop: SPACING.xs }}
+                  />
                 </View>
-                <AppText variant="notes" style={{ color: colors.gray1 }}>
-                  {testModeActive
-                    ? "Sending a test notification every minute. Tap to stop."
-                    : "Start to receive a test notification every minute."}
-                </AppText>
-                <AppButton
-                  title={isTogglingTestMode ? "..." : testModeActive ? "Stop Test Mode" : "Start Test Mode"}
-                  onPress={handleToggleTestMode}
-                  mode="filled"
-                  color={testModeActive ? "primary5" : "primary4"}
-                  disabled={isTogglingTestMode}
-                  style={{ marginTop: SPACING.xs }}
-                />
-              </View>
+              )}
             </View>
           </Box>
         )}
 
-        {/* Debug Info (dev only) */}
-        {__DEV__ && (
+        {/* Debug Info — hidden */}
+        {false && (
           <Box title="Debug Info" titleColor={COLORS.lightGray}>
             <View style={styles.boxContent}>
               <AppText variant="notes" style={{ color: colors.gray1, fontFamily: "monospace" }}>

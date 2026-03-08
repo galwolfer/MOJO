@@ -1954,6 +1954,10 @@ export async function updateNotificationPreferences(userId, preferences) {
         updateFields["pushNotifications.ojoNotifications.selectedOjoType"] =
           preferences.ojoNotifications.selectedOjoType;
       }
+      if (preferences.ojoNotifications._autoDowngraded !== undefined) {
+        updateFields["pushNotifications.ojoNotifications._autoDowngraded"] =
+          preferences.ojoNotifications._autoDowngraded;
+      }
     }
 
     if (preferences.timezone !== undefined) {

@@ -180,16 +180,54 @@ export function NotificationSettingsProvider({ children }: { children: React.Rea
   );
 
   const handleToggleSmartReminders = useCallback(
-    (useSmartReminders: boolean) =>
-      save(() =>
-        updatePreferences({
-          taskReminders: {
-            enabled: preferences?.taskReminders?.enabled ?? true,
-            defaultReminderMinutes: preferences?.taskReminders?.defaultReminderMinutes ?? 60,
-            useSmartReminders,
-          },
-        }),
-      ),
+    async (useSmartReminders: boolean) => {
+      const currentOjoType = preferences?.ojoNotifications?.selectedOjoType;
+      const ojoIsEnabled = preferences?.ojoNotifications?.enabled ?? false;
+
+      if (!useSmartReminders && currentOjoType === "auto" && ojoIsEnabled) {
+        // Smart reminders turned OFF while Ojo is "auto" → downgrade to "chat"
+        await save(() =>
+          updatePreferences({
+            taskReminders: {
+              enabled: preferences?.taskReminders?.enabled ?? true,
+              defaultReminderMinutes: preferences?.taskReminders?.defaultReminderMinutes ?? 60,
+              useSmartReminders: false,
+            },
+            ojoNotifications: {
+              enabled: true,
+              selectedOjoType: "chat",
+              _autoDowngraded: true,
+            },
+          }),
+        );
+      } else if (useSmartReminders && preferences?.ojoNotifications?._autoDowngraded && ojoIsEnabled) {
+        // Smart reminders turned ON and ojo was auto-downgraded (user never changed it) → restore "auto"
+        await save(() =>
+          updatePreferences({
+            taskReminders: {
+              enabled: preferences?.taskReminders?.enabled ?? true,
+              defaultReminderMinutes: preferences?.taskReminders?.defaultReminderMinutes ?? 60,
+              useSmartReminders: true,
+            },
+            ojoNotifications: {
+              enabled: true,
+              selectedOjoType: "auto",
+              _autoDowngraded: false,
+            },
+          }),
+        );
+      } else {
+        await save(() =>
+          updatePreferences({
+            taskReminders: {
+              enabled: preferences?.taskReminders?.enabled ?? true,
+              defaultReminderMinutes: preferences?.taskReminders?.defaultReminderMinutes ?? 60,
+              useSmartReminders,
+            },
+          }),
+        );
+      }
+    },
     [save, updatePreferences, preferences],
   );
 
@@ -200,6 +238,7 @@ export function NotificationSettingsProvider({ children }: { children: React.Rea
           ojoNotifications: {
             enabled,
             selectedOjoType: preferences?.ojoNotifications?.selectedOjoType ?? null,
+            _autoDowngraded: false, // manual toggle clears auto-downgrade flag
           },
         }),
       ),
@@ -213,6 +252,7 @@ export function NotificationSettingsProvider({ children }: { children: React.Rea
           ojoNotifications: {
             enabled: true, // selecting a type always enables Ojo personality
             selectedOjoType: ojoType,
+            _autoDowngraded: false, // manual selection clears auto-downgrade flag
           },
         }),
       ),

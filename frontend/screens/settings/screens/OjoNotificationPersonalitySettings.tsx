@@ -29,7 +29,8 @@ const OJO_TYPES: OjoTypeName[] = ["mentorjo", "brojo", "bestojo", "strictojo"];
 export default function OjoNotificationPersonalitySettings({ onBack }: Props) {
   const colors = useColors();
   const { ojoName: chatOjoName } = useOjo();
-  const { ojoEnabled, preferences, handleToggleOjoNotifications, handleSelectOjoType } = useNotificationSettings();
+  const { ojoEnabled, preferences, smartRemindersEnabled, handleToggleOjoNotifications, handleSelectOjoType } =
+    useNotificationSettings();
 
   const selectedType = preferences?.ojoNotifications?.selectedOjoType;
   const chatCfg = chatOjoName ? getOjoType((chatOjoName as OjoTypeName) ?? "mentorjo") : null;
@@ -40,7 +41,7 @@ export default function OjoNotificationPersonalitySettings({ onBack }: Props) {
   // The currently active radio id
   const selectedId: string = !ojoEnabled ? "off" : !selectedType || selectedType === "auto" ? "auto" : selectedType;
 
-  const options: RadioButtonOption[] = [
+  const allOptions: RadioButtonOption[] = [
     {
       id: "off",
       label: "Off",
@@ -74,6 +75,9 @@ export default function OjoNotificationPersonalitySettings({ onBack }: Props) {
       };
     }),
   ];
+
+  // Hide "Auto" when smart reminders is off (it requires ML prediction)
+  const options = smartRemindersEnabled ? allOptions : allOptions.filter((o) => o.id !== "auto");
 
   const handleSelect = async (_id: string, value: string) => {
     if (value === "off") {
