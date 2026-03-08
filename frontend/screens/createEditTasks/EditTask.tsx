@@ -457,7 +457,7 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
 
     setPopupInfo({
       title: "Delete Task",
-      message: "Are you sure you want to delete this task? This action cannot be undone.",
+      message: "Are you sure you want to delete this task?",
       confirmAction: async () => {
         setIsLoading(true);
         try {

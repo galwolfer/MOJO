@@ -267,6 +267,18 @@ function TaskCard({
           </View>
         </View>
       </TouchableOpacity>
+
+      <PopupBox visible={deleteVisible} onClose={handleCancelDelete} title="Delete Task">
+        <View style={{ paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm }}>
+          <AppText style={styles.popupMessage}>
+            Are you sure you want to delete this task? This will also remove all subtasks and scheduled sessions.
+          </AppText>
+          <View style={styles.popupActions}>
+            <AppButton title="Cancel" onPress={handleCancelDelete} mode="outlined" style={styles.popupBtn} />
+            <AppButton title="Delete" onPress={handleDelete} mode="filled" style={styles.popupBtn} />
+          </View>
+        </View>
+      </PopupBox>
     </>
   );
 }
