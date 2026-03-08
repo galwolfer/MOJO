@@ -47,7 +47,7 @@ import {
   createTaskSchedule,
 } from "../../services/taskService";
 import { fetchSubcategoriesForCategory, type Subcategory } from "../../services/subcategoryService";
-import { combineLocalDateTime, validateEditableSessions } from "../../components/special/task/TaskScheduleEditor";
+import { combineLocalDateTime, combineEndDateTime, validateEditableSessions } from "../../components/special/task/TaskScheduleEditor";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
@@ -548,7 +548,9 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
             manualSessions.push({
               id: st.sessionId,
               start: combineLocalDateTime(st.sessionDate, st.sessionStartTime).toISOString(),
-              end: combineLocalDateTime(st.sessionDate, st.sessionEndTime).toISOString(),
+              // combineEndDateTime auto-detects overnight: if endTime ≤ startTime the
+              // end falls on the next calendar day (e.g. 21:00 → 05:00 next day).
+              end: combineEndDateTime(st.sessionDate, st.sessionStartTime, st.sessionEndTime).toISOString(),
               subtaskIndex: st.index ?? idx + 1,
             });
           } else {
@@ -566,7 +568,8 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
           manualSessions.push({
             id: singleTaskSchedule.sessionId,
             start: combineLocalDateTime(singleTaskSchedule.date, singleTaskSchedule.startTime).toISOString(),
-            end: combineLocalDateTime(singleTaskSchedule.date, singleTaskSchedule.endTime).toISOString(),
+            // Auto-detect overnight: if endTime ≤ startTime the end is next calendar day.
+            end: combineEndDateTime(singleTaskSchedule.date, singleTaskSchedule.startTime, singleTaskSchedule.endTime).toISOString(),
             subtaskIndex: null,
           });
         } else {

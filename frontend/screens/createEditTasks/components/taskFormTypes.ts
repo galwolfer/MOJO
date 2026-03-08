@@ -45,10 +45,16 @@ export interface TaskFormState {
 export interface EditableSession {
   /** Backend _id when the session already exists in the DB */
   id?: string;
-  /** YYYY-MM-DD in user local time */
+  /** YYYY-MM-DD in user local time — the day the session starts */
   date: string;
   /** HH:MM in user local time (24-hour) */
   startTime: string;
+  /**
+   * YYYY-MM-DD in user local time — the day the session ends.
+   * Defaults to `date` (same day) when undefined.
+   * Set explicitly for overnight sessions (e.g. 21:00 → 05:00 next day).
+   */
+  endDate?: string;
   /** HH:MM in user local time (24-hour) */
   endTime: string;
   subtaskIndex?: number | null;

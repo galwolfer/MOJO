@@ -926,7 +926,7 @@ export async function generatePlan({ userId, profile = {}, planningHorizonDays =
   const { plan, unscheduled } = await callPythonScheduler(tasksForPlanning, {
     busyBlocksByDate,
     planningHorizonDays,
-    workingHours: profile.workingHours || { startHour: 9, startMinute: 0, endHour: 18, endMinute: 0 },
+    workingHours: profile.workingHours || { startHour: 0, startMinute: 0, endHour: 23, endMinute: 59 },
     dailyCapMinutes: profile.dailyCapMinutes || 240,
     gapMinutes: profile.minGapMinutes ?? 10,
   });

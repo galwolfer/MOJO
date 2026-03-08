@@ -37,6 +37,15 @@ const ScheduleToggle: React.FC<Props> = ({ schedule, onChange }) => {
   const [showCalendar, setShowCalendar] = useState(false);
   const isManual = schedule.mode === "manual";
 
+  // Detect overnight: if both times are set and endTime ≤ startTime the session
+  // crosses midnight (e.g. 21:00 → 05:00). We show a hint so the user knows.
+  const isOvernight: boolean = (() => {
+    if (!schedule.startTime || !schedule.endTime) return false;
+    const [sh, sm] = schedule.startTime.split(":").map(Number);
+    const [eh, em] = schedule.endTime.split(":").map(Number);
+    return (eh * 60 + em) <= (sh * 60 + sm);
+  })();
+
   return (
     <View style={styles.container}>
       <AppText variant="boldText" style={styles.label}>
@@ -94,6 +103,15 @@ const ScheduleToggle: React.FC<Props> = ({ schedule, onChange }) => {
             onEndChange={(v) => onChange("endTime", v)}
             color="primary1"
           />
+
+          {/* Overnight hint — shown automatically when endTime ≤ startTime */}
+          {isOvernight && (
+            <View style={styles.overnightBadge}>
+              <AppText style={styles.overnightText}>
+                🌙 Overnight — ends the next day
+              </AppText>
+            </View>
+          )}
         </View>
       ) : (
         <View style={styles.autoBadge}>
@@ -163,6 +181,20 @@ const styles = StyleSheet.create({
   autoCurrentTime: {
     color: COLORS.lightGray,
     fontSize: FONT_SIZES.sm,
+  },
+  overnightBadge: {
+    backgroundColor: "#FFF3E0",
+    borderRadius: 8,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.primary7,
+    marginTop: SPACING.xs,
+  },
+  overnightText: {
+    color: COLORS.primary7,
+    fontSize: FONT_SIZES.sm,
+    fontFamily: FONTS.fredokaMedium,
   },
 });
 

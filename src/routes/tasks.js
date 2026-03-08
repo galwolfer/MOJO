@@ -751,9 +751,12 @@ router.get("/schedule/sessions", requireAuth, async (req, res, next) => {
       });
     }
 
-    // Fetch scheduled sessions for the date range, filtering by user via the task reference
+    // Fetch scheduled sessions that overlap the requested date range.
+    // A session overlaps if it starts before the range ends AND ends after the range starts.
+    // This correctly includes overnight sessions on both the start day and the end day.
     const sessions = await TaskSchedule.find({
-      start: { $gte: start, $lte: end },
+      start: { $lt: end },
+      end: { $gt: start },
     })
       .populate({
         path: "taskId",

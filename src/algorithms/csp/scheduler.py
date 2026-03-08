@@ -13,7 +13,7 @@ import sys
 from .constraints import satisfies_hard_constraints, compute_soft_score, respects_deadline
 from .heuristics import select_variable_mrv, order_values_lcv, forward_check
 
-DEFAULT_WORKING_HOURS = {"startHour": 9, "startMinute": 0, "endHour": 18, "endMinute": 0}
+DEFAULT_WORKING_HOURS = {"startHour": 0, "startMinute": 0, "endHour": 23, "endMinute": 59}
 DEFAULT_DAILY_CAP_MINUTES = 240
 SLOT_GRANULARITY_MINUTES = 10
 MAX_BACKTRACK_ITERATIONS = 10000

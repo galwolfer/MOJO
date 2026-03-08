@@ -1322,6 +1322,9 @@ export async function getScheduledSessionsForDate(date: Date, timeFormat: "12h" 
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
+    // Canonical local YYYY-MM-DD string for the requested day (used to detect overnight continuations)
+    const queriedDateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
     // Build URL with query parameters for THIS DATE
     const params = new URLSearchParams({
       startDate: startOfDay.toISOString(),
@@ -1411,7 +1414,22 @@ export async function getScheduledSessionsForDate(date: Date, timeFormat: "12h" 
 
       // Format times
       const use12h = timeFormat === "12h";
-      const timeStr = startTime.toLocaleTimeString("en-US", {
+
+      // Detect overnight continuation: the session starts on a previous day and
+      // carries into the queried date (e.g. start=Mar8 21:00, end=Mar9 05:00, queried=Mar9).
+      const sessionStartDateStr = `${startTime.getFullYear()}-${String(startTime.getMonth() + 1).padStart(2, "0")}-${String(startTime.getDate()).padStart(2, "0")}`;
+      const sessionEndDateStr = `${endTime.getFullYear()}-${String(endTime.getMonth() + 1).padStart(2, "0")}-${String(endTime.getDate()).padStart(2, "0")}`;
+      const isOvernightContinuation = sessionStartDateStr !== queriedDateStr;
+      // True when this is the starting day but the session ends after midnight
+      const isOvernightStart = !isOvernightContinuation && sessionEndDateStr !== sessionStartDateStr;
+
+      // When this is a continuation, show 12:00 AM (start of queried day) as the display start
+      // so the card orders and reads naturally on the following day.
+      const displayStartTime = isOvernightContinuation
+        ? new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0)
+        : startTime;
+
+      const timeStr = displayStartTime.toLocaleTimeString("en-US", {
         hour: "2-digit",
         minute: "2-digit",
         hour12: use12h,
@@ -1536,9 +1554,12 @@ export async function getScheduledSessionsForDate(date: Date, timeFormat: "12h" 
         // Expose authoritative progress percentage for frontend to use (0-100)
         // Use the computed taskProgress so the UI (title + icon) are consistent
         progressPercentage: taskProgress,
-        // Use local date string (YYYY-MM-DD) so grouping aligns with user local date selection
-        dateString: `${startTime.getFullYear()}-${String(startTime.getMonth() + 1).padStart(2, "0")}-${String(startTime.getDate()).padStart(2, "0")}`,
-        isScheduled: true,
+        // Use local date string (YYYY-MM-DD) so grouping aligns with user local date selection.
+        // For overnight continuations the session.start is on the previous day, so we use
+        // queriedDateStr instead so the card groups under the correct (following) day.
+        dateString: isOvernightContinuation ? queriedDateStr : sessionStartDateStr,
+        isOvernightContinuation,
+        isOvernightStart,
         taskId: taskId,
         partNumber,
         totalParts,

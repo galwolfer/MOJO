@@ -136,6 +136,16 @@ function TaskCard({
   const isMultiDay =
     !!task.subtasks && task.subtasks.length > 0 && !!task.partNumber && !!task.totalParts && task.totalParts > 1;
 
+  // For overnight continuations, derive the previous day's display label (e.g. "Sun, Mar 8")
+  const prevDayLabel =
+    task.isOvernightContinuation && task.dateString
+      ? (() => {
+          const [y, m, d] = task.dateString.split("-").map(Number);
+          const prev = new Date(y, m - 1, d - 1);
+          return prev.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+        })()
+      : "";
+
   return (
     <>
       <TouchableOpacity
@@ -155,9 +165,12 @@ function TaskCard({
         )}
 
         <View style={styles.row}>
-          <SessionTime startLabel={task.time} endLabel={task.endTime} categoryColor={categoryColor} />
+          <SessionTime startLabel={task.time} endLabel={task.endTime} categoryColor={categoryColor} isOvernight={task.isOvernightStart} />
 
           <View style={styles.right}>
+            {task.isOvernightContinuation && (
+              <AppText style={styles.overnightBadge}>🌙 Continues from {prevDayLabel}</AppText>
+            )}
             <TaskTitle
               title={task.title}
               category={task.category}
@@ -295,6 +308,12 @@ const styles = StyleSheet.create({
   titleRowExpanded: {
     // Reserve space so title text doesn't bleed under the absolute-positioned edit/delete buttons
     paddingRight: SPACING.xlg * 2 + SPACING.md,
+  },
+  overnightBadge: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.primary5,
+    fontFamily: FONTS.fredokaMedium,
+    marginBottom: 2,
   },
   editBtn: {
     position: "absolute",
