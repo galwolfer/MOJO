@@ -99,11 +99,7 @@ const addTaskMission = new GuidedMission({
               const title = typeof st.title === "string" ? st.title.trim() : "";
               if (!title) return null;
               const rawMinutes =
-                typeof st.minutes === "number"
-                  ? st.minutes
-                  : typeof st.duration === "number"
-                    ? st.duration
-                    : null;
+                typeof st.minutes === "number" ? st.minutes : typeof st.duration === "number" ? st.duration : null;
               const minutes =
                 typeof rawMinutes === "number" && isFinite(rawMinutes) && rawMinutes > 0
                   ? Math.round(rawMinutes)
@@ -117,9 +113,7 @@ const addTaskMission = new GuidedMission({
             .filter(Boolean)
         : [];
       const hasSubtasks = normalizedSubtasks.length > 0;
-      const derivedDuration = hasSubtasks
-        ? normalizedSubtasks.reduce((sum, st) => sum + (st.minutes || 0), 0)
-        : null;
+      const derivedDuration = hasSubtasks ? normalizedSubtasks.reduce((sum, st) => sum + (st.minutes || 0), 0) : null;
 
       // Infer properties from task title if not provided
       const inferred = inferTaskProperties(taskname);
@@ -176,8 +170,7 @@ const addTaskMission = new GuidedMission({
         ? { label: finalSubcategory, source: "user", confidence: 1, updatedAt: new Date() }
         : null;
 
-      const finalCanSplit =
-        canSplit !== undefined ? canSplit : hasSubtasks ? true : TASK_CONFIG.defaults.splitable;
+      const finalCanSplit = canSplit !== undefined ? canSplit : hasSubtasks ? true : TASK_CONFIG.defaults.splitable;
 
       // Compute splitting defaults and validation
       const finalMinChunk = typeof minChunk === "number" && minChunk > 0 ? minChunk : TASK_CONFIG.defaults.minChunk;
@@ -260,8 +253,9 @@ const addTaskMission = new GuidedMission({
       // Create task through controller (which automatically triggers scheduling)
       const task = await createTaskViaController(userId, taskData);
 
-      if (!task) {
-        return okFalse("task_creation_failed", { msg: "Failed to create task" });
+      if (!task || task.__error) {
+        const reason = task?.__error || "Failed to create task";
+        return okFalse("task_creation_failed", { msg: reason });
       }
 
       console.log(`[LOG] Task created: ${task._id} ${recurrence ? "(recurring)" : ""}`);

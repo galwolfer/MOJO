@@ -89,12 +89,13 @@ export async function createTaskViaController(userId, taskData) {
       logger.info(`[MISSION] Created task via controller: ${responseBody.task._id}`);
       return responseBody.task;
     } else {
-      logger.error(`[MISSION] Controller failed to create task: ${responseBody?.error || "unknown error"}`);
-      return null;
+      const errorMsg = responseBody?.error || "unknown error";
+      logger.error(`[MISSION] Controller failed to create task: ${errorMsg}`);
+      return { __error: errorMsg };
     }
   } catch (error) {
     logger.error("[MISSION] Exception in createTaskViaController:", error);
-    return null;
+    return { __error: error.message || "unknown error" };
   }
 }
 

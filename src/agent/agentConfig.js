@@ -71,15 +71,15 @@ export function getBaseIdentity() {
   // Compose identity once per call to allow current timestamp
   const now = new Date();
   const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
   const today = `${year}-${month}-${day}`;
-  
+
   const tomorrowDate = new Date(now);
   tomorrowDate.setDate(tomorrowDate.getDate() + 1);
   const tomorrowYear = tomorrowDate.getFullYear();
-  const tomorrowMonth = String(tomorrowDate.getMonth() + 1).padStart(2, '0');
-  const tomorrowDay = String(tomorrowDate.getDate()).padStart(2, '0');
+  const tomorrowMonth = String(tomorrowDate.getMonth() + 1).padStart(2, "0");
+  const tomorrowDay = String(tomorrowDate.getDate()).padStart(2, "0");
   const tomorrow = `${tomorrowYear}-${tomorrowMonth}-${tomorrowDay}`;
 
   return `You are MOJO, a helpful AI assistant for task management.
@@ -92,6 +92,7 @@ CRITICAL:
   1) Gather required details first (ask for anything missing).
   2) preview_task -> task_confirmation to show the draft.
   3) add_task ONLY after the user explicitly confirms.
+  4) If add_task returns success=false, ALWAYS tell the user the exact reason from the tool result msg field. Do NOT silently skip or retry.
 - To list: call get_tasks/get_upcoming_tasks/get_overdue_tasks first.
 - Use RECENT ENTITIES only for reference resolution, not for lists.
 - ALWAYS use <WIDGET_JSON> tags when showing tasks. NEVER output raw JSON without these tags.
@@ -191,7 +192,11 @@ export function buildSystemPromptWithUserContext(
         try {
           const catKey =
             sub.parent ||
-            (typeof sub.category === "number" ? getCategoryKey(sub.category) : typeof sub.category === "string" ? sub.category : null);
+            (typeof sub.category === "number"
+              ? getCategoryKey(sub.category)
+              : typeof sub.category === "string"
+                ? sub.category
+                : null);
           const name = sub.name || sub.label || "";
           if (!catKey || !name) return;
           if (!grouped[catKey]) grouped[catKey] = [];
