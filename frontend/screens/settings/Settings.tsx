@@ -41,14 +41,18 @@ type CurrentScreen =
 
 type SettingsScreenProps = {
   onBack: () => void;
+  /** When provided, opens directly at this sub-screen instead of "main". */
+  initialScreen?: CurrentScreen;
+  /** When provided, passed down to EditPreferences to open a specific sub-screen. */
+  initialSubScreen?: string;
 };
 
-export default function SettingsScreen({ onBack }: SettingsScreenProps) {
+export default function SettingsScreen({ onBack, initialScreen, initialSubScreen }: SettingsScreenProps) {
   const colors = useColors();
   const { user, signOut, signIn, token } = useAuth();
   const { setHeaderConfig } = useNavigation();
 
-  const [currentScreen, setCurrentScreen] = useState<CurrentScreen>("main");
+  const [currentScreen, setCurrentScreen] = useState<CurrentScreen>(initialScreen ?? "main");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -127,7 +131,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
     }),
   ];
 
-  if (currentScreen === "edit-preferences") return <EditPreferencesScreen onBack={() => setCurrentScreen("main")} />;
+  if (currentScreen === "edit-preferences") return <EditPreferencesScreen onBack={() => setCurrentScreen("main")} initialScreen={initialSubScreen as any} />;
   if (currentScreen === "chat-settings") return <ChatSettingsScreen onBack={() => setCurrentScreen("main")} />;
   if (currentScreen === "notification-settings")
     return (

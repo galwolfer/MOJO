@@ -13,14 +13,19 @@ import sys
 from .constraints import satisfies_hard_constraints, compute_soft_score, respects_deadline
 from .heuristics import select_variable_mrv, order_values_lcv, forward_check
 
-DEFAULT_WORKING_HOURS = {"startHour": 9, "startMinute": 0, "endHour": 18, "endMinute": 0}
+DEFAULT_WORKING_HOURS = {"startHour": 0, "startMinute": 0, "endHour": 23, "endMinute": 59}
 DEFAULT_DAILY_CAP_MINUTES = 240
 SLOT_GRANULARITY_MINUTES = 10
 MAX_BACKTRACK_ITERATIONS = 10000
 
+# Set LOG_CSP_DEBUG=1 (or "true" / "yes") to enable verbose scheduling diagnostics.
+# Logs are written to stderr so they appear in the Node debug log file
+# (csp_scheduler_node_debug.log in the system temp directory).
+_DEBUG = os.environ.get("LOG_CSP_DEBUG", "").lower() in ("1", "true", "yes")
+
 def log_debug(msg: str):
-    # Debug logging disabled in production - kept as no-op so calls remain safe
-    return None
+    if _DEBUG:
+        print(f"[CSP] {msg}", file=sys.stderr, flush=True)
 
 
 def start_of_day(dt: datetime) -> datetime:
@@ -93,11 +98,23 @@ def normalize_busy_blocks(busy_blocks_by_date: Dict) -> Dict:
 
 
 def build_working_window(day: datetime, working_hours: Dict) -> Dict:
-    # Build start/end datetimes for the given day according to working hours
-    # Preserve timezone from input day
+    # Build start/end datetimes for the given day according to working hours.
+    # When the end hour/minute is less than or equal to the start (e.g. 00:00–23:59)
+    # and the window already covers the full day, the end is set to midnight of the
+    # NEXT day so that long tasks can spill past 23:59 into the early hours.
     tz = day.tzinfo if day.tzinfo else timezone.utc
     start = datetime(day.year, day.month, day.day, working_hours.get("startHour", 9), working_hours.get("startMinute", 0), tzinfo=tz)
-    end = datetime(day.year, day.month, day.day, working_hours.get("endHour", 18), working_hours.get("endMinute", 0), tzinfo=tz)
+    end_hour = working_hours.get("endHour", 18)
+    end_minute = working_hours.get("endMinute", 0)
+    end = datetime(day.year, day.month, day.day, end_hour, end_minute, tzinfo=tz)
+    # If the window spans nearly a full day (startHour 0 and endHour 23) or endHour+
+    # endMinute > 23:00, extend end to 06:00 of the next day so overnight sessions
+    # are possible. The busy-block overlap check will still prevent scheduling over
+    # user-defined blocks (sleep, etc.) in those early-morning hours.
+    start_total = working_hours.get("startHour", 9) * 60 + working_hours.get("startMinute", 0)
+    end_total = end_hour * 60 + end_minute
+    if end_total - start_total >= 23 * 60:  # ≥ 23 h working window
+        end = datetime(day.year, day.month, day.day, tzinfo=tz) + timedelta(days=1, hours=6)
     return {"start": start, "end": end}
 
 
@@ -119,6 +136,9 @@ def schedule_tasks_csp(tasks: List[dict], options: Dict = None) -> Dict:
     
     log_debug(f"Today: {today}")
     log_debug(f"Horizon end: {horizon_end}")
+    log_debug(f"Planning window: {today.date()} → {horizon_end.date()} ({planning_horizon_days} days)")
+    log_debug(f"Working hours: {working_hours.get('startHour'):02d}:{working_hours.get('startMinute',0):02d} – {working_hours.get('endHour'):02d}:{working_hours.get('endMinute',0):02d}")
+    log_debug(f"Daily cap: {daily_cap_minutes} min | Gap: {gap_minutes} min")
 
     # Controlled randomness: set rng when randomize enabled (for deterministic ties)
     randomize = options.get("randomize", False)
@@ -145,6 +165,18 @@ def schedule_tasks_csp(tasks: List[dict], options: Dict = None) -> Dict:
             variables_with_domains.append(variable)
         else:
             variables_without_domains.append(variable)
+
+    # ── Debug: per-day candidate slot counts ──────────────────────────
+    if _DEBUG:
+        day_candidate_counts: Dict[str, int] = {}
+        for var_id, dom in variable_domains.items():
+            for slot in dom:
+                dk = slot["dateKey"]
+                day_candidate_counts[dk] = day_candidate_counts.get(dk, 0) + 1
+        log_debug("=== CANDIDATE SLOTS PER DAY (across all variables) ===")
+        for dk in sorted(day_candidate_counts):
+            log_debug(f"  {dk}: {day_candidate_counts[dk]} candidate slots")
+        log_debug(f"Variables with domains: {len(variables_with_domains)}, without: {len(variables_without_domains)}")
 
     result = backtrack_search(variables_with_domains, variable_domains, busy_blocks_by_date, working_hours, daily_cap_minutes, today, rng, gap_minutes)
 
@@ -265,9 +297,13 @@ def generate_variables(tasks: List[dict], horizon_end: datetime, rng: Optional[r
 
         # Check if task has explicit subtasks with durations
         subtasks = task.get("subTasks") or task.get("subtasks") or []
+        # Always sort by the subtask's own `index` field so that chunk_0 → subtaskIndex=1
+        # regardless of the order the JS caller serialised the array.
+        subtasks = sorted(subtasks, key=lambda s: s.get("index", 0))
         log_debug(f"  Found {len(subtasks)} subtasks")
         if subtasks and len(subtasks) > 0:
-            # Use subtask durations directly
+            # Use subtask durations directly, preserving each subtask's original index
+            # so that chunkIndex i always maps to the subtask at position i (1-based index i+1).
             for idx, subtask in enumerate(subtasks):
                 # Get duration from subtask (could be "minutes", "estimatedMinutes", or "duration")
                 duration = subtask.get("minutes") or subtask.get("estimatedMinutes") or subtask.get("duration") or 0
@@ -428,12 +464,15 @@ def generate_domain(variable: dict, today: datetime, horizon_end: datetime, busy
     current_day = start_of_day(today)
     while current_day <= deadline:
         date_key = current_day.date().isoformat()
+        next_date_key = add_days(current_day, 1).date().isoformat()
         working_window = build_working_window(current_day, working_hours)
         busy_blocks = busy_blocks_by_date.get(date_key, [])
+        # For overnight windows, also include the next day's busy blocks
+        next_day_blocks = busy_blocks_by_date.get(next_date_key, [])
         
         # Parse busy blocks if they contain ISO strings instead of datetime objects
         parsed_busy_blocks = []
-        for b in busy_blocks:
+        for b in list(busy_blocks) + list(next_day_blocks):
             parsed_block = {}
             for key, val in b.items():
                 if key in ["start", "end"] and isinstance(val, str):
@@ -474,6 +513,11 @@ def generate_domain(variable: dict, today: datetime, horizon_end: datetime, busy
         current_day = add_days(current_day, 1)
 
     log_debug(f"Total slots generated: {len(slots)}")
+    if _DEBUG:
+        from collections import Counter
+        per_day = Counter(s["dateKey"] for s in slots)
+        for dk in sorted(per_day):
+            log_debug(f"  {dk}: {per_day[dk]} slots")
     log_debug(f"=== END DOMAIN GENERATION ===\n")
     return slots
 
@@ -525,8 +569,9 @@ def backtrack_search(variables: List[dict], variable_domains: Dict[str, List[dic
         # Get chunk index and reference date for earliness scoring
         chunk_index = variable.get("chunkIndex", 0)
         reference_date = today.date() if chunk_index is not None else None
+        task_deadline = variable.get("deadline")
 
-        ordered = order_values_lcv(selected["domain"], lambda slot: compute_soft_score(candidate_slot={**slot, "minutes": variable["chunkMinutes"]}, task_id=variable["taskId"], existing_assignments=assigned_slots, daily_cap_minutes=daily_cap_minutes, chunk_index=chunk_index, reference_date=reference_date), rng)
+        ordered = order_values_lcv(selected["domain"], lambda slot: compute_soft_score(candidate_slot={**slot, "minutes": variable["chunkMinutes"]}, task_id=variable["taskId"], existing_assignments=assigned_slots, daily_cap_minutes=daily_cap_minutes, chunk_index=chunk_index, reference_date=reference_date, min_gap_minutes=gap_minutes, task_deadline=task_deadline), rng)
 
         slots_tried = 0
         slots_passed_hard = 0
@@ -534,9 +579,14 @@ def backtrack_search(variables: List[dict], variable_domains: Dict[str, List[dic
             slots_tried += 1
             candidate_slot = {"start": slot["start"], "end": slot["end"], "minutes": variable["chunkMinutes"], "dateKey": slot.get("dateKey"), "taskId": variable["taskId"], "variableId": variable["id"]}
             working_window = build_working_window(slot["start"], working_hours)
-            busy_blocks = parsed_busy_blocks_by_date.get(slot.get("dateKey"), [])
+            busy_blocks = list(parsed_busy_blocks_by_date.get(slot.get("dateKey"), []))
+            # For overnight slots, also include the next day's busy blocks
+            if slot["end"].date() > slot["start"].date():
+                next_dk = slot["end"].date().isoformat()
+                busy_blocks = busy_blocks + list(parsed_busy_blocks_by_date.get(next_dk, []))
 
             if not satisfies_hard_constraints(candidate_slot=candidate_slot, existing_assignments=assigned_slots, busy_blocks_for_day=busy_blocks, working_window=working_window, deadline=variable.get("deadline"), variable_id=variable["id"], min_gap_minutes=gap_minutes):
+                log_debug(f"[BACKTRACK] ❌ Hard constraint failed: {variable.get('id')} -> {slot['start']} (day={slot.get('dateKey')})")
                 continue
 
             slots_passed_hard += 1
@@ -544,9 +594,9 @@ def backtrack_search(variables: List[dict], variable_domains: Dict[str, List[dic
             assignments.append(assignment)
             assigned_slots.append(candidate_slot)
             
-            log_debug(f"[BACKTRACK] ✅ Assigned {variable.get('id')} to slot: {candidate_slot['start']} → {candidate_slot['end']} ({candidate_slot['minutes']} min)")
+            log_debug(f"[BACKTRACK] ✅ Assigned {variable.get('id')} to slot: {candidate_slot['start']} → {candidate_slot['end']} ({candidate_slot['minutes']} min) | day={candidate_slot.get('dateKey')}")
 
-            pruned = forward_check(candidate_slot, domains, variable["id"])
+            pruned = forward_check(candidate_slot, domains, variable["id"], gap_minutes)
             if pruned is not None:
                 saved = domains
                 domains = pruned

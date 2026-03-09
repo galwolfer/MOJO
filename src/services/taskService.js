@@ -55,7 +55,7 @@ import {
 async function _saveUserSubCategory(userId, categoryName, subCategory) {
   if (!userId || !categoryName || !subCategory) return;
 
-  if (typeof subCategory === "string" && /^[a-fA-F0-9]{ICON_SIZES.sm}$/.test(subCategory)) {
+  if (typeof subCategory === "string" && /^[a-fA-F0-9]{24}$/.test(subCategory)) {
     return;
   }
 
@@ -151,7 +151,7 @@ export async function createTask({
     throw new Error(buildIllegalCharsError(illegalFields));
   }
 
-  const isSubcategoryIdString = typeof subCategory === "string" && /^[a-fA-F0-9]{ICON_SIZES.sm}$/.test(subCategory);
+  const isSubcategoryIdString = typeof subCategory === "string" && /^[a-fA-F0-9]{24}$/.test(subCategory);
   const resolvedSubCategoryId = subCategory
     ? await resolveSubcategoryId({
         userId,
@@ -756,7 +756,7 @@ export async function updateTask({ userId, taskId, updates }) {
   // If user provided a subCategory, resolve to ID and record telemetry
   if (sanitizedUpdates.subCategory) {
     const rawSub = sanitizedUpdates.subCategory;
-    const isSubIdString = typeof rawSub === "string" && /^[a-fA-F0-9]{ICON_SIZES.sm}$/.test(rawSub);
+    const isSubIdString = typeof rawSub === "string" && /^[a-fA-F0-9]{24}$/.test(rawSub);
 
     const resolvedSubCategoryId = await resolveSubcategoryId({
       userId,
@@ -828,7 +828,8 @@ export async function updateTask({ userId, taskId, updates }) {
         // If an id was provided, update the existing subtask
         if (s.id) {
           const updateFields = {};
-          if (s.title !== undefined) updateFields.title = String(s.title).trim();
+          // Only update title if a non-empty value is provided; preserve existing auto-generated title otherwise
+          if (s.title !== undefined && String(s.title).trim().length > 0) updateFields.title = String(s.title).trim();
           if (s.description !== undefined) updateFields.description = String(s.description);
           if (s.minutes !== undefined) updateFields.minutes = Number(s.minutes);
           if (s.index !== undefined) updateFields.index = Number(s.index);
@@ -1579,35 +1580,69 @@ export async function createBusyBlock({ userId, title = "", start, end, isRecurr
  */
 export async function getUpcomingBusyBlocks(userId) {
   const now = new Date();
+  // For ONCE blocks, compare against the start of today (UTC midnight) so
+  // a block stored for today (2026-03-06T00:00:00Z) isn't filtered out by
+  // the current time being later in the same day.
+  const todayUTCMidnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   return BusyBlock.find({
     userId,
     $or: [
-      // One-time: not yet ended (isRecurring absent/false both match $ne:true)
-      { isRecurring: { $ne: true }, end: { $gte: now } },
+      // ── New-style blocks (blockType is set) ────────────────────────────
+      // DAILY / WEEKLY: repeating forever or not yet expired
+      {
+        blockType: { $in: ["DAILY", "WEEKLY"] },
+        $or: [
+          { recurrenceEndDate: null },
+          { recurrenceEndDate: { $exists: false } },
+          { recurrenceEndDate: { $gte: now } },
+        ],
+      },
+      // ONCE: target date is today or future (compare UTC midnight)
+      { blockType: "ONCE", date: { $gte: todayUTCMidnight } },
+      // FULL_DAY: always show (one-time future or recurring)
+      { blockType: "FULL_DAY" },
+
+      // ── Legacy blocks ───────────────────────────────────────────────────
+      // One-time: not yet ended
+      { blockType: { $exists: false }, isRecurring: { $ne: true }, end: { $gte: now } },
       // Recurring: not expired
       {
+        blockType: { $exists: false },
         isRecurring: true,
         $or: [{ "recurrence.endDate": null }, { "recurrence.endDate": { $gte: now } }],
       },
     ],
   })
-    .sort({ isRecurring: -1, start: 1 }) // recurring rules first, then by start
+    .sort({ blockType: 1, isRecurring: -1, start: 1 })
     .lean();
 }
 
 /**
- * Update a busy block's fields.  All parameters except blockId/userId are optional.
- * Accepts the same fields as createBusyBlock.
+ * Update a busy block's fields (new-style and legacy).
+ * All parameters except blockId / userId are optional.
  */
-export async function updateBusyBlock({ blockId, userId, title, start, end, isRecurring, recurrence }) {
+export async function updateBusyBlock({ blockId, userId, title, blockType,
+    date, daysOfWeek, recurrenceEndDate, times, weeklySchedule,
+    bufferBeforeMinutes, bufferAfterMinutes,
+    start, end, isRecurring, recurrence }) {
   const update = {};
-  if (title !== undefined) update.title = title;
-  if (start !== undefined) update.start = start;
-  if (end !== undefined) update.end = end;
+  // New-style fields
+  if (title              !== undefined) update.title              = title;
+  if (blockType          !== undefined) update.blockType          = blockType;
+  if (date               !== undefined) update.date               = date ? new Date(date) : null;
+  if (daysOfWeek         !== undefined) update.daysOfWeek         = daysOfWeek;
+  if (recurrenceEndDate  !== undefined) update.recurrenceEndDate  = recurrenceEndDate ? new Date(recurrenceEndDate) : null;
+  if (times              !== undefined) update.times              = times;
+  if (weeklySchedule     !== undefined) update.weeklySchedule     = weeklySchedule;
+  if (bufferBeforeMinutes !== undefined) update.bufferBeforeMinutes = Number(bufferBeforeMinutes) || 0;
+  if (bufferAfterMinutes  !== undefined) update.bufferAfterMinutes  = Number(bufferAfterMinutes)  || 0;
+  // Legacy fields
+  if (start       !== undefined) update.start       = start;
+  if (end         !== undefined) update.end         = end;
   if (isRecurring !== undefined) update.isRecurring = isRecurring;
-  if (recurrence !== undefined) update.recurrence = recurrence;
+  if (recurrence  !== undefined) update.recurrence  = recurrence;
 
-  // Validate time ordering when both ends of the range are present in the update
+  // Legacy time ordering validation
   if (update.start !== undefined && update.end !== undefined) {
     const effectiveRecurring = update.isRecurring !== undefined ? update.isRecurring : isRecurring;
     if (effectiveRecurring) {

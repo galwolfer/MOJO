@@ -14,7 +14,7 @@ import { Subcategory } from "../models/Subcategory.js";
 import { logger } from "../utils/logger.js";
 import { isValidCategory, getDisplayName } from "../config/categories.js";
 import { BusyBlock } from "../models/BusyBlock.js";
-import { computeSessionHash, withUserScheduleLock } from "../services/schedulingService.js";
+import { computeSessionHash, withUserScheduleLock, expandBusyBlock } from "../services/schedulingService.js";
 import {
   addSubcategoryToUser,
   findOrCreateSubcategory,
@@ -325,7 +325,7 @@ router.delete("/subcategories/:id", async (req, res, next) => {
       return res.status(400).json({ success: false, error: "Subcategory id is required" });
     }
 
-    const isId = /^[a-fA-F0-9]{ICON_SIZES.sm}$/.test(id);
+    const isId = /^[a-fA-F0-9]{24}$/.test(id);
     let subcategoryDoc = null;
 
     if (isId) {
@@ -405,7 +405,7 @@ router.patch("/subcategories/:id", async (req, res, next) => {
     const { name, icon, color } = req.body;
     const userId = req.user.userId;
 
-    if (!id || !/^[a-fA-F0-9]{ICON_SIZES.sm}$/.test(id)) {
+    if (!id || !/^[a-fA-F0-9]{24}$/.test(id)) {
       return res.status(400).json({ success: false, error: "Valid subcategory id is required" });
     }
 
@@ -751,9 +751,12 @@ router.get("/schedule/sessions", requireAuth, async (req, res, next) => {
       });
     }
 
-    // Fetch scheduled sessions for the date range, filtering by user via the task reference
+    // Fetch scheduled sessions that overlap the requested date range.
+    // A session overlaps if it starts before the range ends AND ends after the range starts.
+    // This correctly includes overnight sessions on both the start day and the end day.
     const sessions = await TaskSchedule.find({
-      start: { $gte: start, $lte: end },
+      start: { $lt: end },
+      end: { $gt: start },
     })
       .populate({
         path: "taskId",
@@ -956,6 +959,23 @@ router.patch("/:id/sessions", requireAuth, async (req, res, next) => {
       }
     }
 
+    // Check sessions against the task deadline
+    if (task.dueDate) {
+      const deadline = new Date(task.dueDate);
+      // Allow sessions to start any time on the due date itself — only block sessions
+      // that start on a day strictly after the deadline day.
+      deadline.setHours(23, 59, 59, 999);
+      for (let i = 0; i < parsed.length; i++) {
+        if (parsed[i].start > deadline) {
+          return res.status(422).json({
+            success: false,
+            error: `Session ${i + 1} starts at or after the task deadline (${deadline.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}). Please move the session before the deadline.`,
+            conflicts: [{ type: "after_deadline", sessionStart: parsed[i].start, deadline }],
+          });
+        }
+      }
+    }
+
     if (parsed.length > 0) {
       // Check against BusyBlocks
       const globalStart = sortedParsed[0].start;
@@ -964,38 +984,45 @@ router.patch("/:id/sessions", requireAuth, async (req, res, next) => {
       const busyBlocks = await BusyBlock.find({
         userId,
         $or: [
-          { isRecurring: { $ne: true }, start: { $lt: globalEnd }, end: { $gt: globalStart } },
-          { isRecurring: true },
+          // Legacy one-time blocks in range
+          { blockType: null, isRecurring: { $ne: true }, start: { $lt: globalEnd }, end: { $gt: globalStart } },
+          // Legacy recurring blocks
+          { blockType: null, isRecurring: true },
+          // New-style blocks — expandBusyBlock handles date filtering
+          { blockType: { $in: ["DAILY", "WEEKLY", "ONCE", "FULL_DAY"] } },
         ],
       }).lean();
 
       for (const session of parsed) {
+        const sessionDayStart = new Date(session.start);
+        sessionDayStart.setUTCHours(0, 0, 0, 0);
+        const sessionDayEnd = new Date(session.end);
+        sessionDayEnd.setUTCHours(23, 59, 59, 999);
+
         for (const block of busyBlocks) {
-          let blockStart, blockEnd;
-          if (block.isRecurring && block.recurrence?.daysOfWeek?.length) {
-            const sessionDow = session.start.getUTCDay();
-            if (!block.recurrence.daysOfWeek.includes(sessionDow)) continue;
-            // Re-anchor recurring block times to the session's date (UTC)
-            const refStart = new Date(block.start);
-            const refEnd = new Date(block.end);
-            const sessionMidnight = new Date(session.start);
-            sessionMidnight.setUTCHours(0, 0, 0, 0);
-            blockStart = new Date(sessionMidnight.getTime());
-            blockStart.setUTCHours(refStart.getUTCHours(), refStart.getUTCMinutes(), 0, 0);
-            blockEnd = new Date(sessionMidnight.getTime());
-            blockEnd.setUTCHours(refEnd.getUTCHours(), refEnd.getUTCMinutes(), 0, 0);
-          } else {
-            blockStart = new Date(block.start);
-            blockEnd = new Date(block.end);
-          }
-          const buffStart = blockStart.getTime() - minGapMs;
-          const buffEnd = blockEnd.getTime() + minGapMs;
-          if (session.start.getTime() < buffEnd && session.end.getTime() > buffStart) {
-            return res.status(409).json({
-              success: false,
-              error: `Session starting at ${session.start.toLocaleString()} conflicts with busy block "${block.title || "Busy"}"`,
-              conflicts: [{ type: "busy_block", sessionStart: session.start, blockTitle: block.title }],
-            });
+          const occurrences = expandBusyBlock(block, sessionDayStart, sessionDayEnd);
+          for (const occ of occurrences) {
+            // For manual scheduling, only block actual overlap — don't add the
+            // auto-scheduler's minGap buffer since the user chose this time explicitly.
+            if (session.start.getTime() < occ.end.getTime() && session.end.getTime() > occ.start.getTime()) {
+              const blockingBusyBlocks = [{
+                _id: block._id?.toString() ?? null,
+                title: block.title || "Untitled Block",
+                blockType: block.blockType ?? null,
+                times: block.times ?? [],
+                daysOfWeek: block.daysOfWeek ?? [],
+                date: block.date ? new Date(block.date).toISOString() : null,
+                weeklySchedule: block.weeklySchedule ?? [],
+                start: block.start ? new Date(block.start).toISOString() : undefined,
+                end: block.end ? new Date(block.end).toISOString() : undefined,
+              }];
+              return res.status(409).json({
+                success: false,
+                error: `Session starting at ${session.start.toLocaleString()} conflicts with the following busy block:`,
+                conflicts: [{ type: "busy_block", sessionStart: session.start, blockTitle: block.title }],
+                blockingBusyBlocks,
+              });
+            }
           }
         }
       }
@@ -1161,14 +1188,20 @@ router.post("/:id/schedule", async (req, res, next) => {
       });
     }
 
-    // Clear manual-schedule flag so the auto-scheduler will include this task
-    // and delete any existing manual sessions for it
-    await Task.updateOne({ _id: taskId }, { $set: { manualSchedule: false } });
-    await TaskSchedule.deleteMany({ taskId, status: { $nin: ["completed"] } });
+    // Temporarily clear the manual-schedule flag so generatePlan includes this task.
+    // We save the original value so we can restore it if scheduling fails.
+    const originalManualSchedule = task.manualSchedule ?? false;
+    if (originalManualSchedule) {
+      await Task.updateOne({ _id: taskId }, { $set: { manualSchedule: false } });
+    }
 
     // Get user profile for scheduling preferences
     const user = await User.findById(userId).select("profile subCategories schedulingPreferences").lean();
     if (!user) {
+      // Restore flag before returning
+      if (originalManualSchedule) {
+        await Task.updateOne({ _id: taskId }, { $set: { manualSchedule: true } });
+      }
       return res.status(404).json({
         success: false,
         error: "User not found",
@@ -1181,20 +1214,63 @@ router.post("/:id/schedule", async (req, res, next) => {
       minGapMinutes: user.schedulingPreferences?.minGapMinutes ?? 10,
     };
 
-    // Generate plan
+    // Generate plan — DO NOT delete sessions yet; wait until we confirm this
+    // task actually gets scheduled before mutating the database.
     const { plan, unscheduled } = await generatePlan({
       userId,
       profile: profileWithGap,
       planningHorizonDays,
     });
 
-    if (!plan || plan.length === 0) {
-      return res.status(400).json({
+    // Check whether THIS specific task was schedulable.
+    const taskUnscheduledEntry = unscheduled.find(
+      (u) => u.taskId && u.taskId.toString() === taskId.toString()
+    );
+
+    if (taskUnscheduledEntry) {
+      // Restore manual-schedule flag to its original value — nothing was changed.
+      if (originalManualSchedule) {
+        await Task.updateOne({ _id: taskId }, { $set: { manualSchedule: true } });
+      }
+      // Fetch all user busy blocks so the client can preview them in the error popup.
+      const userBusyBlocks = await BusyBlock.find({ userId })
+        .select("title blockType times daysOfWeek date weeklySchedule start end")
+        .lean();
+      const blockingBusyBlocks = userBusyBlocks.map((b) => ({
+        _id: b._id?.toString() ?? null,
+        title: b.title || "Untitled Block",
+        blockType: b.blockType ?? null,
+        times: b.times ?? [],
+        daysOfWeek: b.daysOfWeek ?? [],
+        date: b.date ? b.date.toISOString() : null,
+        weeklySchedule: b.weeklySchedule ?? [],
+        start: b.start ? b.start.toISOString() : undefined,
+        end: b.end ? b.end.toISOString() : undefined,
+      }));
+      const reason = taskUnscheduledEntry.reason || "no available time slots before the deadline";
+      return res.status(422).json({
         success: false,
-        error: "Unable to generate schedule. Task may already be fully scheduled or no available time slots.",
+        error: `Your busy blocks don't leave enough free time to fit this task before the deadline. Try shortening the task, extending the deadline, or freeing up time in your busy blocks.`,
+        blockingBusyBlocks,
         unscheduled,
       });
     }
+
+    if (!plan || plan.length === 0) {
+      // Restore flag — nothing scheduled at all
+      if (originalManualSchedule) {
+        await Task.updateOne({ _id: taskId }, { $set: { manualSchedule: true } });
+      }
+      return res.status(422).json({
+        success: false,
+        error: "Your busy blocks don't leave enough free time to fit this task before the deadline. Try shortening the task, extending the deadline, or freeing up time in your busy blocks.",
+        unscheduled,
+      });
+    }
+
+    // Scheduling succeeded — now it is safe to clear old sessions and persist.
+    await Task.updateOne({ _id: taskId }, { $set: { manualSchedule: false } });
+    await TaskSchedule.deleteMany({ taskId, status: { $nin: ["completed"] } });
 
     // Save plan to database
     await savePlan({ userId, plan, unscheduled });

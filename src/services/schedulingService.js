@@ -190,6 +190,169 @@ function expandRecurringBlock(block, fromDate, toDate) {
 }
 
 /**
+ * Expand ANY BusyBlock (new schema or legacy) into concrete
+ * { key: "YYYY-MM-DD", start: Date, end: Date } occurrences
+ * over [fromDate, toDate].  Buffers are applied at expansion time
+ * so the Python CSP receives already-padded intervals.
+ *
+ * blockType dispatch:
+ *  ONCE           — single occurrence on block.date
+ *  FULL_DAY       — whole day(s); one-time when only date set,
+ *                   recurring when daysOfWeek set
+ *  DAILY          — every day in horizon (optional recurrenceEndDate)
+ *  WEEKLY         — matching daysOfWeek (optional recurrenceEndDate)
+ *  null (legacy)  — delegates to expandRecurringBlock() or start/end
+ *
+ * @param {object} block     - Mongoose lean BusyBlock document
+ * @param {Date}   fromDate  - Inclusive start of expansion window
+ * @param {Date}   toDate    - Inclusive end of expansion window
+ * @returns {{ key: string, start: Date, end: Date }[]}
+ */
+export function expandBusyBlock(block, fromDate, toDate) {
+  const bufBefore = (block.bufferBeforeMinutes || 0) * 60_000;
+  const bufAfter  = (block.bufferAfterMinutes  || 0) * 60_000;
+
+  function applyBuffer(s, e) {
+    return {
+      start: new Date(s.getTime() - bufBefore),
+      end:   new Date(e.getTime() + bufAfter),
+    };
+  }
+
+  function hhmmToMinutes(hhmm) {
+    const [h, m] = hhmm.split(":").map(Number);
+    return h * 60 + m;
+  }
+
+  /** Build one occurrence for a calendar day given start/end minutes-since-midnight.
+   * Uses LOCAL time so that user-entered HH:MM values (e.g. "12:00") land on
+   * the correct local clock position regardless of the server's UTC offset.
+   * For example on a UTC+2 server, "12:00" → local noon → UTC 10:00, which
+   * correctly matches slots that Python schedules in the same UTC band. */
+  function buildOccurrence(dayDate, startMin, endMin) {
+    const s = new Date(dayDate);
+    s.setHours(0, startMin, 0, 0);   // local time — preserves user's clock intent
+    const e = new Date(dayDate);
+    e.setHours(0, endMin, 0, 0);     // local time
+    const { start, end } = applyBuffer(s, e);
+    return { key: dayDate.toISOString().slice(0, 10), start, end };
+  }
+
+  const type = block.blockType;
+
+  // ── ONCE ─────────────────────────────────────────────────────────────────
+  if (type === "ONCE") {
+    const d = new Date(block.date);
+    if (d < fromDate || d > toDate) return [];
+    const ranges = block.times ?? [];
+    return ranges.map((r) =>
+      buildOccurrence(d, hhmmToMinutes(r.startTime), hhmmToMinutes(r.endTime))
+    );
+  }
+
+  // ── FULL_DAY ───────────────────────────────────────────────────────────
+  if (type === "FULL_DAY") {
+    const results = [];
+    const isOneTime = block.date && (!block.daysOfWeek || !block.daysOfWeek.length);
+    if (isOneTime) {
+      const d = new Date(block.date);
+      if (d >= fromDate && d <= toDate) {
+        const key = d.toISOString().slice(0, 10);
+        const s = new Date(key + "T00:00:00.000Z");
+        const e = new Date(key + "T23:59:59.999Z");
+        const b = applyBuffer(s, e);
+        results.push({ key, start: b.start, end: b.end });
+      }
+      return results;
+    }
+    // Recurring full days
+    const expiry = block.recurrenceEndDate ? new Date(block.recurrenceEndDate) : toDate;
+    const windowEnd = expiry < toDate ? expiry : toDate;
+    let cursor = new Date(fromDate);
+    while (cursor <= windowEnd) {
+      const dow = block.daysOfWeek;
+      if (!dow || !dow.length || dow.includes(cursor.getUTCDay())) {
+        const key = cursor.toISOString().slice(0, 10);
+        const s = new Date(key + "T00:00:00.000Z");
+        const e = new Date(key + "T23:59:59.999Z");
+        const b = applyBuffer(s, e);
+        results.push({ key, start: b.start, end: b.end });
+      }
+      cursor = addDays(cursor, 1);
+    }
+    return results;
+  }
+
+  // ── DAILY ───────────────────────────────────────────────────────────────
+  if (type === "DAILY") {
+    const timeSpans = block.times ?? [];
+    const expiry = block.recurrenceEndDate ? new Date(block.recurrenceEndDate) : toDate;
+    const windowEnd = expiry < toDate ? expiry : toDate;
+    const results = [];
+    let cursor = new Date(fromDate);
+    while (cursor <= windowEnd) {
+      for (const span of timeSpans) {
+        results.push(buildOccurrence(cursor, hhmmToMinutes(span.startTime), hhmmToMinutes(span.endTime)));
+      }
+      cursor = addDays(cursor, 1);
+    }
+    return results;
+  }
+
+  // ── WEEKLY ──────────────────────────────────────────────────────────────
+  if (type === "WEEKLY") {
+    const expiry = block.recurrenceEndDate ? new Date(block.recurrenceEndDate) : toDate;
+    const windowEnd = expiry < toDate ? expiry : toDate;
+    const results = [];
+    let cursor = new Date(fromDate);
+    if (block.weeklySchedule?.length) {
+      // Per-day schedule: each entry carries its own times[]
+      while (cursor <= windowEnd) {
+        const dow = cursor.getUTCDay();
+        const dayEntry = block.weeklySchedule.find((e) => e.dayOfWeek === dow);
+        if (dayEntry) {
+          for (const span of dayEntry.times ?? []) {
+            results.push(buildOccurrence(cursor, hhmmToMinutes(span.startTime), hhmmToMinutes(span.endTime)));
+          }
+        }
+        cursor = addDays(cursor, 1);
+      }
+    } else {
+      // Legacy: flat daysOfWeek + times[]
+      const timeSpans = block.times ?? [];
+      while (cursor <= windowEnd) {
+        if (block.daysOfWeek && block.daysOfWeek.includes(cursor.getUTCDay())) {
+          for (const span of timeSpans) {
+            results.push(buildOccurrence(cursor, hhmmToMinutes(span.startTime), hhmmToMinutes(span.endTime)));
+          }
+        }
+        cursor = addDays(cursor, 1);
+      }
+    }
+    return results;
+  }
+
+  // ── Legacy fallback ────────────────────────────────────────────────────────────
+  if (block.isRecurring && block.recurrence?.daysOfWeek?.length) {
+    return expandRecurringBlock(block, fromDate, toDate).map(({ key, start, end }) => {
+      const b = applyBuffer(start, end);
+      return { key, start: b.start, end: b.end };
+    });
+  }
+  // Single one-time block
+  if (block.start && block.end) {
+    const s = new Date(block.start);
+    const e = new Date(block.end);
+    if (s < toDate && e > fromDate) {
+      const key = s.toISOString().slice(0, 10);
+      const b = applyBuffer(s, e);
+      return [{ key, start: b.start, end: b.end }];
+    }
+  }
+  return [];
+}
+
+/**
  * Helper: Trigger scheduler update after task operations
  * Centralizes the scheduling trigger logic to avoid duplication
  * across missions and controllers
@@ -350,9 +513,9 @@ const splitIntervalByDay = (start, end, accumulator) => {
 const addRoutineBlockForDate = (date, block, accumulator) => {
   const dayStart = startOfDay(date);
   const start = new Date(dayStart);
-  start.setHours(block.startHour, block.startMinute, 0, 0);
+  start.setUTCHours(block.startHour, block.startMinute, 0, 0);
   let end = new Date(dayStart);
-  end.setHours(block.endHour, block.endMinute, 0, 0);
+  end.setUTCHours(block.endHour, block.endMinute, 0, 0);
   if (block.wrapsToNextDay && end <= start) {
     end = addDays(end, 1);
   }
@@ -500,7 +663,21 @@ async function _persistPlanLocked(userId, plan) {
     );
   }
 
-  // Clean up orphan schedules (taskId references deleted tasks)
+  // ── Step 1: wipe ALL planned/non-manual sessions for every task that appears in
+  // the new plan, regardless of start time.  This prevents a stale session whose
+  // start time is just before `now` from surviving (the time-gated delete below
+  // would miss it, causing two sessions for the same subtaskIndex).
+  const planTaskIds = Array.from(new Set(dedupedPlan.map((p) => p.taskId.toString())));
+  if (planTaskIds.length > 0) {
+    await TaskSchedule.deleteMany({
+      userId,
+      taskId: { $in: planTaskIds },
+      status: { $nin: ["completed"] },
+      manuallyScheduled: { $ne: true },
+    });
+  }
+
+  // ── Step 2: clean up orphan schedules (taskId references deleted tasks)
   const existingTaskIds = await Task.find({ userId }).distinct("_id");
   const existingTaskIdSet = new Set(existingTaskIds.map((id) => id.toString()));
   const allSchedules = await TaskSchedule.find({ userId, start: { $gte: now } }).lean();
@@ -509,10 +686,14 @@ async function _persistPlanLocked(userId, plan) {
     await TaskSchedule.deleteMany({ _id: { $in: orphanIds } });
   }
 
-  // Clear future planned/skipped sessions (not completed ones, not manually-set ones)
+  // ── Step 3: clear remaining planned sessions for tasks NOT in this plan
+  // (handles tasks that were previously scheduled but are now complete/removed).
+  // Use `end > now` instead of `start >= now` so that sessions which have
+  // already started but are still running are also cleaned up — otherwise a
+  // stale session whose start < now would survive and overlap with the new plan.
   await TaskSchedule.deleteMany({
     userId,
-    start: { $gte: now },
+    end: { $gt: now },
     status: { $ne: "completed" },
     manuallyScheduled: { $ne: true },
   });
@@ -522,13 +703,26 @@ async function _persistPlanLocked(userId, plan) {
   // Fetch all tasks to get subtask titles and descriptions for the schedule
   const taskIds = Array.from(new Set(dedupedPlan.map((p) => p.taskId.toString())));
   const tasks = await Task.find({ _id: { $in: taskIds } }).populate('subTasks');
-  const taskMap = new Map(tasks.map((t) => [t._id.toString(), t]));
+  // Build taskMap with subTasks sorted by index so that array-position lookup
+  // (subTasks[subtaskIndex - 1]) always maps to the correct subtask regardless
+  // of the order MongoDB returns them from the virtual populate.
+  const taskMap = new Map(tasks.map((t) => [
+    t._id.toString(),
+    {
+      ...t.toObject ? t.toObject({ virtuals: true }) : t,
+      subTasks: Array.isArray(t.subTasks)
+        ? [...t.subTasks].sort((a, b) => (a.index || 0) - (b.index || 0))
+        : [],
+    },
+  ]));
 
   const docs = dedupedPlan.map((slot) => {
     let subtaskTitle = null;
     let description = null;
-    
-    // If this slot has a subtaskIndex, get the subtask title and description
+
+    // If this slot has a subtaskIndex, get the subtask title and description.
+    // subTasks is already sorted ascending by index, so position (subtaskIndex-1)
+    // correctly maps to the subtask with index === subtaskIndex.
     if (slot.subtaskIndex !== null && slot.subtaskIndex !== undefined) {
       const task = taskMap.get(slot.taskId.toString());
       if (task && task.subTasks && task.subTasks[slot.subtaskIndex - 1]) {
@@ -630,9 +824,15 @@ export async function generatePlan({ userId, profile = {}, planningHorizonDays =
   );
 
   for (const session of completedSessions) {
-    const key = session.start.toISOString().slice(0, 10);
-    if (!busyBlocksByDate[key]) busyBlocksByDate[key] = [];
-    busyBlocksByDate[key].push({ start: new Date(session.start), end: new Date(session.end) });
+    // For overnight sessions that span midnight, register on both start and end dates
+    const startKey = session.start.toISOString().slice(0, 10);
+    const endKey = session.end.toISOString().slice(0, 10);
+    if (!busyBlocksByDate[startKey]) busyBlocksByDate[startKey] = [];
+    busyBlocksByDate[startKey].push({ start: new Date(session.start), end: new Date(session.end) });
+    if (endKey !== startKey) {
+      if (!busyBlocksByDate[endKey]) busyBlocksByDate[endKey] = [];
+      busyBlocksByDate[endKey].push({ start: new Date(session.start), end: new Date(session.end) });
+    }
 
     const taskId = session.taskId?.toString();
     if (taskId && remainingByTaskId.has(taskId)) {
@@ -643,29 +843,68 @@ export async function generatePlan({ userId, profile = {}, planningHorizonDays =
 
   // Also treat future manual sessions (of OTHER tasks with manualSchedule=true) as occupied time
   // so the auto-scheduler doesn't double-book those slots.
+  // Use end > now (not start >= now) so sessions that started before 'now' but are still
+  // running are included — otherwise the scheduler can double-book their remaining time.
   const manualSessions = await TaskSchedule.find({
     userId,
-    start: { $gte: now, $lt: horizonEnd },
+    end: { $gt: now },
+    start: { $lt: horizonEnd },
     status: "planned",
     manuallyScheduled: true,
   }).lean();
   for (const session of manualSessions) {
-    const key = session.start.toISOString().slice(0, 10);
-    if (!busyBlocksByDate[key]) busyBlocksByDate[key] = [];
-    busyBlocksByDate[key].push({ start: new Date(session.start), end: new Date(session.end) });
+    // For overnight sessions that span midnight, register on both start and end dates
+    const startKey = session.start.toISOString().slice(0, 10);
+    const endKey = session.end.toISOString().slice(0, 10);
+    if (!busyBlocksByDate[startKey]) busyBlocksByDate[startKey] = [];
+    busyBlocksByDate[startKey].push({ start: new Date(session.start), end: new Date(session.end) });
+    if (endKey !== startKey) {
+      if (!busyBlocksByDate[endKey]) busyBlocksByDate[endKey] = [];
+      busyBlocksByDate[endKey].push({ start: new Date(session.start), end: new Date(session.end) });
+    }
   }
 
   const busyBlocks = await BusyBlock.find({
     userId,
     $or: [
-      // One-time blocks that overlap the planning horizon
+      // ── New-style: one-time blocks within horizon ────────────────────────────
       {
+        blockType: { $in: ["ONCE"] },
+        date: { $gte: todayStart, $lt: horizonEnd },
+      },
+      // ── New-style: one-time FULL_DAY (has date, empty daysOfWeek) ───────────
+      {
+        blockType: "FULL_DAY",
+        date: { $gte: todayStart, $lt: horizonEnd },
+        $or: [{ daysOfWeek: { $size: 0 } }, { daysOfWeek: { $exists: false } }],
+      },
+      // ── New-style: recurring blocks (DAILY / WEEKLY / FULL_DAY recurring) ──
+      {
+        blockType: { $in: ["DAILY", "WEEKLY"] },
+        $or: [
+          { recurrenceEndDate: null },
+          { recurrenceEndDate: { $gt: todayStart } },
+        ],
+      },
+      // FULL_DAY with daysOfWeek set (recurring)
+      {
+        blockType: "FULL_DAY",
+        daysOfWeek: { $exists: true, $not: { $size: 0 } },
+        $or: [
+          { recurrenceEndDate: null },
+          { recurrenceEndDate: { $gt: todayStart } },
+        ],
+      },
+      // ── Legacy one-time blocks that overlap the planning horizon ──────────
+      {
+        blockType: null,
         isRecurring: { $ne: true },
         start: { $lt: horizonEnd },
         end: { $gt: todayStart },
       },
-      // Recurring rules that are still active during the horizon
+      // ── Legacy recurring rules that are still active during the horizon ──
       {
+        blockType: null,
         isRecurring: true,
         $or: [
           { "recurrence.endDate": null },
@@ -676,24 +915,23 @@ export async function generatePlan({ userId, profile = {}, planningHorizonDays =
   }).lean();
 
   for (const block of busyBlocks) {
-    if (block.isRecurring && block.recurrence?.daysOfWeek?.length) {
-      // Expand recurring rule over the entire planning horizon
-      for (const { key, start, end } of expandRecurringBlock(block, todayStart, horizonEnd)) {
-        if (!busyBlocksByDate[key]) busyBlocksByDate[key] = [];
-        busyBlocksByDate[key].push({ start, end });
-      }
-    } else {
-      // One-time block — original behaviour
-      const key = block.start.toISOString().slice(0, 10);
+    for (const { key, start, end } of expandBusyBlock(block, todayStart, horizonEnd)) {
       if (!busyBlocksByDate[key]) busyBlocksByDate[key] = [];
-      busyBlocksByDate[key].push({ start: new Date(block.start), end: new Date(block.end) });
+      busyBlocksByDate[key].push({ start, end });
     }
   }
 
   const tasksForPlanning = tasksWithOrderedSubtasks
     .map((task) => {
       const remaining = remainingByTaskId.get(task._id.toString());
-      return { ...task, estimatedDuration: remaining };
+
+      // Strip out already-completed subtasks so Python doesn't schedule ghost slots
+      // for work that is already done.
+      const pendingSubTasks = Array.isArray(task.subTasks)
+        ? task.subTasks.filter((st) => st.status !== "done")
+        : task.subTasks;
+
+      return { ...task, estimatedDuration: remaining, subTasks: pendingSubTasks };
     })
     .filter((task) => (task.estimatedDuration || 0) > 0);
 
@@ -706,7 +944,7 @@ export async function generatePlan({ userId, profile = {}, planningHorizonDays =
   const { plan, unscheduled } = await callPythonScheduler(tasksForPlanning, {
     busyBlocksByDate,
     planningHorizonDays,
-    workingHours: profile.workingHours || { startHour: 9, startMinute: 0, endHour: 18, endMinute: 0 },
+    workingHours: profile.workingHours || { startHour: 0, startMinute: 0, endHour: 23, endMinute: 59 },
     dailyCapMinutes: profile.dailyCapMinutes || 240,
     gapMinutes: profile.minGapMinutes ?? 10,
   });
@@ -751,6 +989,64 @@ export async function getUpcomingSessions(userId, { limit = 50 } = {}) {
 // PRIORITY SCHEDULER (BACKGROUND JOB)
 // =============================================================================
 
+/**
+ * Transition every planned session whose `end` is in the past to "missed".
+ * Called on every scheduler tick so the DB reflects reality without requiring
+ * the frontend to infer status from timestamps.
+ */
+async function markMissedSessions() {
+  const now = new Date();
+  const result = await TaskSchedule.updateMany(
+    { end: { $lt: now }, status: "planned" },
+    { $set: { status: "missed" } }
+  );
+  if (result.modifiedCount > 0) {
+    logger.info(`[SCHEDULER] Marked ${result.modifiedCount} past session(s) as "missed"`);
+  }
+  return result.modifiedCount;
+}
+
+/**
+ * One-time startup cleanup: for each (userId, taskId, subtaskIndex) group of
+ * planned (non-manual) sessions, keep only the session with the latest start
+ * time and delete the rest.
+ *
+ * These duplicates can arise if a reschedule ran while the task-level wipe
+ * (Step 1 of _persistPlanLocked) was not yet in place, or if a past session
+ * slipped through the time-gated delete before that guard was added.
+ */
+async function removeDuplicatePlannedSessions() {
+  const groups = await TaskSchedule.aggregate([
+    { $match: { status: "planned", manuallyScheduled: { $ne: true } } },
+    {
+      $group: {
+        _id: {
+          userId: "$userId",
+          taskId: "$taskId",
+          subtaskIndex: { $ifNull: ["$subtaskIndex", null] },
+        },
+        docs: { $push: { id: "$_id", start: "$start" } },
+        count: { $sum: 1 },
+      },
+    },
+    { $match: { count: { $gt: 1 } } },
+  ]);
+
+  let deletedTotal = 0;
+  for (const group of groups) {
+    // Sort newest-first — keep the most recently scheduled session (index 0)
+    group.docs.sort((a, b) => new Date(b.start) - new Date(a.start));
+    const toDelete = group.docs.slice(1).map((d) => d.id);
+    const res = await TaskSchedule.deleteMany({ _id: { $in: toDelete } });
+    deletedTotal += res.deletedCount;
+  }
+
+  if (deletedTotal > 0) {
+    logger.info(`[SCHEDULER] Startup cleanup: removed ${deletedTotal} duplicate planned session(s)`);
+  }
+  return deletedTotal;
+}
+
 const DEFAULT_INTERVAL_MS = 60 * 60 * 1000; // every hour
 let intervalHandle = null;
 let isRunning = false;
@@ -759,10 +1055,11 @@ const runOnce = async () => {
   if (isRunning) return;
   isRunning = true;
   try {
-    logger.info("Priority scheduler: refreshing scores");
+    logger.info("Priority scheduler: refreshing scores and expiring past sessions");
+    await markMissedSessions();
     await updateAllScores();
   } catch (error) {
-    logger.error("Priority scheduler failed to update scores:", error);
+    logger.error("Priority scheduler failed:", error);
   } finally {
     isRunning = false;
   }
@@ -770,11 +1067,16 @@ const runOnce = async () => {
 
 /**
  * Start the priority scheduler background job.
+ * On startup: runs a one-time duplicate-session cleanup, then begins the
+ * regular hourly tick (score refresh + missed-session expiry).
  */
 export function startPriorityScheduler() {
   if (intervalHandle) return;
   const intervalMs = Number(env.PRIORITY_SCHEDULER_INTERVAL_MS) || DEFAULT_INTERVAL_MS;
-  runOnce();
+  // Startup: clean up any legacy duplicate sessions, then run the first tick
+  removeDuplicatePlannedSessions()
+    .catch((err) => logger.error("[SCHEDULER] Startup dedup cleanup failed:", err))
+    .finally(() => runOnce());
   intervalHandle = setInterval(runOnce, intervalMs);
   logger.info(`Priority scheduler enabled (interval: ${intervalMs} ms)`);
 }

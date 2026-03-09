@@ -61,7 +61,7 @@ const AppButton: React.FC<AppButtonProps> = ({
   ];
 
   const textStyle = [
-    { color: isFilled ? COLORS.colorWhite : resolvedColor, fontFamily: (TYPOGRAPHY.boldText as any).fontFamily },
+    { color: isFilled ? COLORS.colorWhite : resolvedColor, fontFamily: (TYPOGRAPHY.boldText as any).fontFamily, textAlign: "center" as const },
   ];
 
   const anim = useRef(new Animated.Value(1)).current;

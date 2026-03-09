@@ -97,7 +97,7 @@ function TaskCard({
 
   const isSingleSubtask = task.subtasks?.length === 1;
   const hasNoSubtasks = !task.subtasks || task.subtasks.length === 0;
-  const showCheckbox = hasNoSubtasks || isSingleSubtask;
+  const showCheckbox = hasNoSubtasks;
   const singleSubtask = isSingleSubtask ? task.subtasks![0] : null;
   const singleSubtaskCompleted = singleSubtask ? localSubtasks.has(singleSubtask.id || "") : false;
   const checkboxChecked = hasNoSubtasks ? isCompleted : singleSubtaskCompleted;
@@ -136,6 +136,16 @@ function TaskCard({
   const isMultiDay =
     !!task.subtasks && task.subtasks.length > 0 && !!task.partNumber && !!task.totalParts && task.totalParts > 1;
 
+  // For overnight continuations, derive the previous day's display label (e.g. "Sun, Mar 8")
+  const prevDayLabel =
+    task.isOvernightContinuation && task.dateString
+      ? (() => {
+          const [y, m, d] = task.dateString.split("-").map(Number);
+          const prev = new Date(y, m - 1, d - 1);
+          return prev.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+        })()
+      : "";
+
   return (
     <>
       <TouchableOpacity
@@ -155,9 +165,12 @@ function TaskCard({
         )}
 
         <View style={styles.row}>
-          <SessionTime startLabel={task.time} endLabel={task.endTime} categoryColor={categoryColor} />
+          <SessionTime startLabel={task.time} endLabel={task.endTime} categoryColor={categoryColor} isOvernight={task.isOvernightStart} />
 
           <View style={styles.right}>
+            {task.isOvernightContinuation && (
+              <AppText style={styles.overnightBadge}>🌙 Continues from {prevDayLabel}</AppText>
+            )}
             <TaskTitle
               title={task.title}
               category={task.category}
@@ -254,6 +267,18 @@ function TaskCard({
           </View>
         </View>
       </TouchableOpacity>
+
+      <PopupBox visible={deleteVisible} onClose={handleCancelDelete} title="Delete Task">
+        <View style={{ paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm }}>
+          <AppText style={styles.popupMessage}>
+            Are you sure you want to delete this task? This will also remove all subtasks and scheduled sessions.
+          </AppText>
+          <View style={styles.popupActions}>
+            <AppButton title="Cancel" onPress={handleCancelDelete} mode="outlined" style={styles.popupBtn} />
+            <AppButton title="Delete" onPress={handleDelete} mode="filled" style={styles.popupBtn} />
+          </View>
+        </View>
+      </PopupBox>
     </>
   );
 }
@@ -295,6 +320,12 @@ const styles = StyleSheet.create({
   titleRowExpanded: {
     // Reserve space so title text doesn't bleed under the absolute-positioned edit/delete buttons
     paddingRight: SPACING.xlg * 2 + SPACING.md,
+  },
+  overnightBadge: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.primary5,
+    fontFamily: FONTS.fredokaMedium,
+    marginBottom: 2,
   },
   editBtn: {
     position: "absolute",

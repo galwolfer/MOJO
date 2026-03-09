@@ -7,9 +7,11 @@ import * as taskService from "../services/taskService.js";
 import { logger } from "../utils/logger.js";
 import { Task } from "../models/Task.js";
 import { SubTask } from "../models/SubTask.js";
+import { BusyBlock } from "../models/BusyBlock.js";
 import { isValidCategory } from "../config/categories.js";
 import { hasIllegalDisplayChars } from "../utils/illegalChars.js";
-import { triggerSchedulerUpdate } from "../services/schedulingService.js";
+import { triggerSchedulerUpdate, generatePlan, savePlan } from "../services/schedulingService.js";
+import { User } from "../models/User.js";
 import { findOrCreateSubcategory } from "../services/subcategoryService.js";
 
 /**
@@ -252,7 +254,7 @@ export async function createTask(req, res) {
     }
 
     const rawSubcategory = subcategoryId || subCategoryId || subcategory;
-    const isSubcategoryId = typeof rawSubcategory === "string" && /^[a-fA-F0-9]{ICON_SIZES.sm}$/.test(rawSubcategory);
+    const isSubcategoryId = typeof rawSubcategory === "string" && /^[a-fA-F0-9]{24}$/.test(rawSubcategory);
 
     if (typeof rawSubcategory === "string" && !isSubcategoryId && hasIllegalDisplayChars(rawSubcategory)) {
       return res.status(400).json({ success: false, error: "Subcategory cannot include angle brackets." });
@@ -342,8 +344,67 @@ export async function createTask(req, res) {
       subtasks: subtasks || undefined,
     });
 
-    // Trigger scheduler to update the plan after creating a task
-    await triggerSchedulerUpdate(userId, "creation", "API");
+    // ── Atomic scheduling: if this task cannot be scheduled, roll back ────
+    try {
+      const user = await User.findById(userId).select("profile schedulingPreferences").lean();
+      const profileWithGap = {
+        ...(user?.profile || {}),
+        minGapMinutes: user?.schedulingPreferences?.minGapMinutes ?? 10,
+      };
+
+      const { plan, unscheduled } = await generatePlan({
+        userId,
+        profile: profileWithGap,
+        planningHorizonDays: 14,
+      });
+
+      const taskHasSessions = plan.some((s) => String(s.taskId) === String(task._id));
+
+      if (!taskHasSessions) {
+        // Roll back — delete the task that was just created
+        await taskService.deleteTask({ taskId: String(task._id), userId });
+
+        // Fetch all user busy blocks so the client can preview them in the error popup
+        let blockingBusyBlocks = [];
+        try {
+          const userBusyBlocks = await BusyBlock.find({ userId })
+            .select("title blockType times daysOfWeek date weeklySchedule start end")
+            .lean();
+          blockingBusyBlocks = userBusyBlocks.map((b) => ({
+            _id: b._id?.toString() ?? null,
+            title: b.title || "Untitled Block",
+            blockType: b.blockType ?? null,
+            times: b.times ?? [],
+            daysOfWeek: b.daysOfWeek ?? [],
+            date: b.date ? b.date.toISOString() : null,
+            weeklySchedule: b.weeklySchedule ?? [],
+            start: b.start ? b.start.toISOString() : undefined,
+            end: b.end ? b.end.toISOString() : undefined,
+          }));
+        } catch (_) { /* ignore – popup will just lack block previews */ }
+
+        return res.status(422).json({
+          success: false,
+          schedulingFailed: true,
+          error:
+            "Your busy blocks don't leave enough free time to fit this task before the deadline. Try shortening the task, extending the deadline, or freeing up time in your busy blocks:",
+          blockingBusyBlocks,
+        });
+      }
+
+      // Persist the generated plan
+      await savePlan({ userId, plan, unscheduled });
+    } catch (scheduleErr) {
+      // Scheduling check threw unexpectedly — roll back to keep DB clean
+      await taskService.deleteTask({ taskId: String(task._id), userId }).catch(() => {});
+      logger.error("[createTask] Scheduling failed after task creation, rolled back:", scheduleErr);
+      return res.status(422).json({
+        success: false,
+        schedulingFailed: true,
+        error:
+          "Task could not be scheduled — an error occurred while generating the schedule. The task was not created.",
+      });
+    }
 
     return res.status(201).json({
       success: true,
@@ -515,7 +576,7 @@ export async function updateTask(req, res) {
     // Subcategory
     const rawSubcategory = raw.subcategoryId || raw.subCategoryId || raw.subcategory;
     if (rawSubcategory !== undefined) {
-      const isSubcategoryId = typeof rawSubcategory === "string" && /^[a-fA-F0-9]{ICON_SIZES.sm}$/.test(rawSubcategory);
+      const isSubcategoryId = typeof rawSubcategory === "string" && /^[a-fA-F0-9]{24}$/.test(rawSubcategory);
       if (typeof rawSubcategory === "string" && !isSubcategoryId && hasIllegalDisplayChars(rawSubcategory)) {
         return res.status(400).json({ success: false, error: "Subcategory cannot include angle brackets." });
       }
@@ -724,10 +785,9 @@ export async function updateTask(req, res) {
             id: sub.id || undefined,
             title: sub.title ? String(sub.title).trim() : "",
             description: sub.description ? String(sub.description).trim() : "",
-            minutes: sub.minutes ? Number(sub.minutes) : 30,
+            minutes: sub.minutes !== undefined && sub.minutes !== null && sub.minutes !== "" ? Number(sub.minutes) : undefined,
             index: sub.index !== undefined ? Number(sub.index) : undefined,
-          }))
-          .filter((sub) => sub.title.length > 0);
+          }));
 
         if (validSubtasks.length > 0) {
           updates.subtasks = validSubtasks;

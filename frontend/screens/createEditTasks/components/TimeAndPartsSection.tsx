@@ -129,8 +129,8 @@ const TimeAndPartsSection: React.FC<Props> = ({
         />
       </View>
 
-      {/* Estimated Minutes (only when not splitting) */}
-      {numSubtasks === 1 && (
+      {/* Estimated Minutes (only when not splitting; hidden in manual-schedule edit mode) */}
+      {numSubtasks === 1 && (!editMode || singleTaskSchedule?.mode !== "manual") && (
         <View style={styles.formField}>
           <Input
             label="Estimated Minutes"

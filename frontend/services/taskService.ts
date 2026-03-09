@@ -7,6 +7,7 @@
 
 import { get, post, patch, del } from "./httpClient";
 import { getCategoryMeta } from "../config/categoryMeta";
+import type { BusyBlock } from "./busyBlockService";
 
 // Types
 export type TaskStatus = "todo" | "in_progress" | "done";
@@ -1298,13 +1299,15 @@ export async function updateTaskSchedule(
     subtaskTitle: string | null;
     status: string;
   }>;
+  blockingBusyBlocks?: BusyBlock[];
 }> {
   try {
     const response = await patch<any>(`/tasks/${taskId}/sessions`, { sessions });
     return { success: true, sessions: response.sessions ?? [] };
   } catch (error: any) {
-    const message = error?.response?.data?.error ?? error?.message ?? "Failed to update schedule";
-    return { success: false, error: message, sessions: [] };
+    const message = error?.data?.error ?? error?.response?.data?.error ?? error?.message ?? "Failed to update schedule";
+    const blocks = error?.data?.blockingBusyBlocks ?? error?.response?.data?.blockingBusyBlocks;
+    return { success: false, error: message, sessions: [], blockingBusyBlocks: blocks };
   }
 }
 
@@ -1314,13 +1317,16 @@ export async function updateTaskSchedule(
  * Shows what the user is scheduled to work on for that day
  * For multi-day tasks, shows subtask name with parent task context and progress
  */
-export async function getScheduledSessionsForDate(date: Date): Promise<CalendarTaskGroup[]> {
+export async function getScheduledSessionsForDate(date: Date, timeFormat: "12h" | "24h" = "12h"): Promise<CalendarTaskGroup[]> {
   try {
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
 
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
+
+    // Canonical local YYYY-MM-DD string for the requested day (used to detect overnight continuations)
+    const queriedDateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
     // Build URL with query parameters for THIS DATE
     const params = new URLSearchParams({
@@ -1410,15 +1416,31 @@ export async function getScheduledSessionsForDate(date: Date): Promise<CalendarT
       const endTime = new Date(session.end);
 
       // Format times
-      const timeStr = startTime.toLocaleTimeString("en-US", {
+      const use12h = timeFormat === "12h";
+
+      // Detect overnight continuation: the session starts on a previous day and
+      // carries into the queried date (e.g. start=Mar8 21:00, end=Mar9 05:00, queried=Mar9).
+      const sessionStartDateStr = `${startTime.getFullYear()}-${String(startTime.getMonth() + 1).padStart(2, "0")}-${String(startTime.getDate()).padStart(2, "0")}`;
+      const sessionEndDateStr = `${endTime.getFullYear()}-${String(endTime.getMonth() + 1).padStart(2, "0")}-${String(endTime.getDate()).padStart(2, "0")}`;
+      const isOvernightContinuation = sessionStartDateStr !== queriedDateStr;
+      // True when this is the starting day but the session ends after midnight
+      const isOvernightStart = !isOvernightContinuation && sessionEndDateStr !== sessionStartDateStr;
+
+      // When this is a continuation, show 12:00 AM (start of queried day) as the display start
+      // so the card orders and reads naturally on the following day.
+      const displayStartTime = isOvernightContinuation
+        ? new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0)
+        : startTime;
+
+      const timeStr = displayStartTime.toLocaleTimeString("en-US", {
         hour: "2-digit",
         minute: "2-digit",
-        hour12: true,
+        hour12: use12h,
       });
       const endTimeStr = endTime.toLocaleTimeString("en-US", {
         hour: "2-digit",
         minute: "2-digit",
-        hour12: true,
+        hour12: use12h,
       });
 
       // Map icon to emoji
@@ -1535,9 +1557,12 @@ export async function getScheduledSessionsForDate(date: Date): Promise<CalendarT
         // Expose authoritative progress percentage for frontend to use (0-100)
         // Use the computed taskProgress so the UI (title + icon) are consistent
         progressPercentage: taskProgress,
-        // Use local date string (YYYY-MM-DD) so grouping aligns with user local date selection
-        dateString: `${startTime.getFullYear()}-${String(startTime.getMonth() + 1).padStart(2, "0")}-${String(startTime.getDate()).padStart(2, "0")}`,
-        isScheduled: true,
+        // Use local date string (YYYY-MM-DD) so grouping aligns with user local date selection.
+        // For overnight continuations the session.start is on the previous day, so we use
+        // queriedDateStr instead so the card groups under the correct (following) day.
+        dateString: isOvernightContinuation ? queriedDateStr : sessionStartDateStr,
+        isOvernightContinuation,
+        isOvernightStart,
         taskId: taskId,
         partNumber,
         totalParts,
@@ -1761,6 +1786,7 @@ export async function createTaskSchedule(
   success: boolean;
   message: string;
   scheduledCount: number;
+  blockingBusyBlocks?: BusyBlock[];
   plan?: Array<{
     start: string;
     end: string;
@@ -1785,7 +1811,16 @@ export async function createTaskSchedule(
     // Backend returned success:false — scheduler ran but produced no slots
     return { success: false, message: response.message ?? "No slots found", scheduledCount: 0 };
   } catch (error: any) {
-    console.error("Failed to create task schedule:", error);
+    // Use warn (not error) — callers handle this gracefully; console.error triggers LogBox overlays in dev
+    console.warn("Failed to create task schedule:", error);
+    // Extract the backend error message and busy block list from a 4xx response body if available.
+    // httpClient attaches the full response body as error.data (not error.response.data like Axios).
+    const responseData: any = (error as any)?.data ?? (error as any)?.response?.data;
+    const backendMessage: string | undefined = responseData?.error ?? responseData?.message;
+    const blockingBusyBlocks: BusyBlock[] | undefined = responseData?.blockingBusyBlocks;
+    if (backendMessage) {
+      return { success: false, message: backendMessage, scheduledCount: 0, blockingBusyBlocks };
+    }
     // Return null to signal a network/server error (distinct from scheduler returning empty)
     return null;
   }

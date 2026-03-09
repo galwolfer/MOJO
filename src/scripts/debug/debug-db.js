@@ -37,7 +37,8 @@ for (const session of sessions) {
   });
   
   if (session.taskId?.subTasks && session.subtaskIndex) {
-    const subtask = session.taskId.subTasks[session.subtaskIndex - 1];
+    const sortedSubTasks = [...session.taskId.subTasks].sort((a, b) => (a.index || 0) - (b.index || 0));
+    const subtask = sortedSubTasks[session.subtaskIndex - 1];
     console.log('  Subtask info from task doc:', {
       index: session.subtaskIndex,
       title: subtask?.title,

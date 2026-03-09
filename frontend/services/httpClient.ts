@@ -48,8 +48,10 @@ async function handleResponse<T>(res: Response): Promise<T> {
     // Log server error details to device logs for debugging
     // eslint-disable-next-line no-console
     console.warn("[httpClient] Server responded with error", { status: res.status, statusText: res.statusText, body: data });
-    const error = new Error(data?.error || data?.message || res.statusText || "Request failed");
+    const error = new Error(data?.error || data?.message || res.statusText || "Request failed") as Error & { data: any; status: number };
     error.name = "ServerError";
+    error.data = data;    // attach full response body so callers can read extra fields
+    error.status = res.status;
     throw error;
   }
 

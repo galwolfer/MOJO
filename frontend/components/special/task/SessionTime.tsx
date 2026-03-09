@@ -1,7 +1,7 @@
 import React from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, Text } from "react-native";
 import TimeDisplay from "../../common/TimeDisplay";
-import { SPACING, COLORS } from "../../../theme";
+import { SPACING, COLORS, FONT_SIZES, FONTS } from "../../../theme";
 
 interface SessionTimeProps {
   /** ISO datetime string – parsed automatically into time + AM/PM parts. */
@@ -11,6 +11,8 @@ interface SessionTimeProps {
   startLabel?: string;
   endLabel?: string;
   categoryColor?: string;
+  /** When true the session starts today but crosses midnight into the next day. */
+  isOvernight?: boolean;
 }
 
 /** Split a pre-formatted label like "9:00 AM" into time + ampm parts. */
@@ -27,6 +29,7 @@ export const SessionTime: React.FC<SessionTimeProps> = ({
   startLabel,
   endLabel,
   categoryColor,
+  isOvernight,
 }) => {
   const hasStart = !!(timeStart || startLabel);
   const hasEnd = !!(timeEnd || endLabel);
@@ -35,16 +38,24 @@ export const SessionTime: React.FC<SessionTimeProps> = ({
   const labelStart = !timeStart ? parseLabel(startLabel) : undefined;
   const labelEnd = !timeEnd ? parseLabel(endLabel) : undefined;
 
+  // Bar always uses the category color; amber is reserved for the +1 day text label only
+  const barColor = categoryColor || COLORS.primary1;
+
   return (
     <View style={styles.sessionTimeBlock}>
-      <View style={[styles.sessionTimeLine, { backgroundColor: categoryColor || COLORS.primary1 }]} />
+      <View style={[styles.sessionTimeLine, { backgroundColor: barColor }]} />
       <View style={styles.sessionTimeColumn}>
         {hasStart ? (
           <TimeDisplay isoString={timeStart} time={labelStart?.time} ampm={labelStart?.ampm} />
         ) : (
           <TimeDisplay time="Time" />
         )}
-        {hasEnd ? <TimeDisplay isoString={timeEnd} time={labelEnd?.time} ampm={labelEnd?.ampm} /> : null}
+        <View style={styles.endTimeGroup}>
+          {hasEnd ? <TimeDisplay isoString={timeEnd} time={labelEnd?.time} ampm={labelEnd?.ampm} /> : null}
+          {isOvernight ? (
+            <Text style={styles.overnightLabel}>🌙 +1 day</Text>
+          ) : null}
+        </View>
       </View>
     </View>
   );
@@ -59,9 +70,18 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
   },
   sessionTimeColumn: {
-    alignItems: "flex-end",
+    alignItems: "flex-start",
     gap: SPACING.xs,
     justifyContent: "space-between",
+  },
+  endTimeGroup: {
+    alignItems: "flex-start",
+    gap: 2,
+  },
+  overnightLabel: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.primary5,
+    fontFamily: FONTS.fredokaMedium,
   },
   sessionTimeLine: {
     width: SPACING.xs,

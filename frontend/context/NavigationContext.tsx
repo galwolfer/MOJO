@@ -45,6 +45,7 @@ type NavigationContextType = {
   setActiveTab: (tab: TabName) => void;
   navigationParams: NavigationParams;
   setActiveTabWithParams: (tab: TabName, params: NavigationParams) => void;
+  clearNavigationParams: () => void;
   headerConfig: HeaderConfig;
   setHeaderConfig: (config: HeaderConfig) => void;
   navBarConfig: NavBarConfig;
@@ -92,6 +93,10 @@ export const NavigationProvider = ({ children }: { children: ReactNode }) => {
     },
     [setActiveTab],
   );
+
+  const clearNavigationParams = useCallback(() => {
+    setNavigationParams({});
+  }, []);
 
   // ── Back handler stack (LIFO) ───────────────────────────────────────────
   const backHandlersRef = useRef<Array<() => boolean>>([]);
@@ -166,6 +171,7 @@ export const NavigationProvider = ({ children }: { children: ReactNode }) => {
         setActiveTab,
         navigationParams,
         setActiveTabWithParams,
+        clearNavigationParams,
         headerConfig,
         setHeaderConfig,
         navBarConfig,

@@ -32,7 +32,8 @@ sessions.forEach((s, idx) => {
   console.log(`   subtaskTitle: "${s.subtaskTitle}"`);
   console.log(`   description: "${s.description}"`);
   if (s.subtaskIndex) {
-    const subtask = task.subTasks[s.subtaskIndex - 1];
+    const sortedSubTasks = [...(task.subTasks || [])].sort((a, b) => (a.index || 0) - (b.index || 0));
+    const subtask = sortedSubTasks[s.subtaskIndex - 1];
     console.log(`   → Expected: title="${subtask?.title}", desc="${subtask?.description}"`);
   }
 });

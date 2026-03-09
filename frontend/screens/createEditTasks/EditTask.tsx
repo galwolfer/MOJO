@@ -14,7 +14,7 @@
  *   - TaskActionButtons  (UPDATE / Discard / DELETE)
  */
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { View, StyleSheet, SafeAreaView, TouchableOpacity, ActivityIndicator } from "react-native";
 import { COLORS, SPACING, FONT_SIZES, ICON_SIZES } from "../../theme";
 import { useColors } from "../../context/ThemeContext";
@@ -47,14 +47,16 @@ import {
   createTaskSchedule,
 } from "../../services/taskService";
 import { fetchSubcategoriesForCategory, type Subcategory } from "../../services/subcategoryService";
-import { combineLocalDateTime, validateEditableSessions } from "../../components/special/task/TaskScheduleEditor";
+import { combineLocalDateTime, combineEndDateTime, validateEditableSessions } from "../../components/special/task/TaskScheduleEditor";
+import type { BusyBlock } from "../../services/busyBlockService";
+import BusyBlockPreviewCard from "../../components/special/BusyBlockPreviewCard";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
 
 const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
-  const { setHeaderConfig, setActiveTab } = useNavigation();
+  const { setHeaderConfig, setActiveTab, setActiveTabWithParams } = useNavigation();
   const { notifyTaskUpdate } = useTaskContext();
   const colors = useColors();
 
@@ -72,7 +74,10 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
     subtasks: [],
   });
 
-  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
+  // ── Snapshot of the original task data for rollback on scheduling failure ──
+  const originalTaskRef = useRef<any>(null);
+
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);;
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
 
   // ── Single-task schedule (numSubtasks === 1) ──────────────────────────────
@@ -93,6 +98,9 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
     message: string;
     navigateOnClose?: boolean;
     confirmAction?: () => void;
+    secondaryAction?: () => void;
+    secondaryLabel?: string;
+    blockingBusyBlocks?: BusyBlock[];
   } | null>(null);
 
   // ── Header ────────────────────────────────────────────────────────────────
@@ -184,6 +192,27 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
           numSubtasks,
           subtasks: formSubtasks,
         });
+
+        // Store original task data for rollback if scheduling fails after an update
+        originalTaskRef.current = {
+          taskname: task.taskname || "",
+          description: task.description || "",
+          category: task.category || "",
+          subcategoryId: subCategoryId || undefined,
+          importance: task.importance ?? 3,
+          effort: task.effort ?? 3,
+          dueDate: dateStr,
+          estimatedDuration: task.estimatedDuration ?? undefined,
+          taskType: (task as any).taskType || "perfect",
+          chunkCount: (task as any).chunkCount ?? undefined,
+          subtasks: formSubtasks.map((st, idx) => ({
+            id: st.id,
+            title: st.title,
+            description: st.description || undefined,
+            minutes: st.minutes ? parseInt(st.minutes, 10) : undefined,
+            index: idx + 1,
+          })),
+        };
 
         // Fetch subcategories for the loaded category
         if (task.category) {
@@ -428,7 +457,7 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
 
     setPopupInfo({
       title: "Delete Task",
-      message: "Are you sure you want to delete this task? This action cannot be undone.",
+      message: "Are you sure you want to delete this task?",
       confirmAction: async () => {
         setIsLoading(true);
         try {
@@ -469,7 +498,6 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
     try {
       // ── 1. Build & send task update ─────────────────────────────────────
       const subtasksData = formState.subtasks
-        .filter((st) => st.title.trim())
         .map((st, idx) => ({
           id: st.id,
           title: st.title,
@@ -525,7 +553,9 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
             manualSessions.push({
               id: st.sessionId,
               start: combineLocalDateTime(st.sessionDate, st.sessionStartTime).toISOString(),
-              end: combineLocalDateTime(st.sessionDate, st.sessionEndTime).toISOString(),
+              // combineEndDateTime auto-detects overnight: if endTime ≤ startTime the
+              // end falls on the next calendar day (e.g. 21:00 → 05:00 next day).
+              end: combineEndDateTime(st.sessionDate, st.sessionStartTime, st.sessionEndTime).toISOString(),
               subtaskIndex: st.index ?? idx + 1,
             });
           } else {
@@ -543,7 +573,8 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
           manualSessions.push({
             id: singleTaskSchedule.sessionId,
             start: combineLocalDateTime(singleTaskSchedule.date, singleTaskSchedule.startTime).toISOString(),
-            end: combineLocalDateTime(singleTaskSchedule.date, singleTaskSchedule.endTime).toISOString(),
+            // Auto-detect overnight: if endTime ≤ startTime the end is next calendar day.
+            end: combineEndDateTime(singleTaskSchedule.date, singleTaskSchedule.startTime, singleTaskSchedule.endTime).toISOString(),
             subtaskIndex: null,
           });
         } else {
@@ -553,12 +584,49 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
 
       // Save manual sessions if any
       if (manualSessions.length > 0) {
-        await updateTaskSchedule(taskId, manualSessions);
+        const schedResult = await updateTaskSchedule(taskId, manualSessions);
+        if (!schedResult.success) {
+          // Roll back the task update so the DB is not left in a partially-updated state
+          if (originalTaskRef.current) {
+            await updateTask(taskId, originalTaskRef.current).catch(() => {});
+          }
+          const blocks = schedResult.blockingBusyBlocks;
+          const hasBusyBlocks = blocks && blocks.length > 0;
+          setPopupInfo({
+            title: hasBusyBlocks ? "Busy Block Conflict" : "Schedule Conflict",
+            message: schedResult.error ?? "The selected time is not available. It may conflict with a busy block, another task, or the task deadline. Please choose a different time.",
+            blockingBusyBlocks: hasBusyBlocks ? blocks : undefined,
+            secondaryAction: hasBusyBlocks
+              ? () => setActiveTabWithParams("user", { screen: "edit-preferences", subScreen: "scheduling" })
+              : undefined,
+            secondaryLabel: hasBusyBlocks ? "Go to Busy Blocks" : undefined,
+          });
+          return;
+        }
       }
 
       // Trigger auto-scheduling for remaining subtasks
       if (hasAutoSubtasks) {
-        await createTaskSchedule(taskId, { planningHorizonDays: 14 }).catch(() => {});
+        const scheduleResult = await createTaskSchedule(taskId, { planningHorizonDays: 14 });
+        if (!scheduleResult?.success) {
+          // Roll back the task update so the DB is not left in a partially-updated state
+          if (originalTaskRef.current) {
+            await updateTask(taskId, originalTaskRef.current).catch(() => {});
+          }
+          const blocks = scheduleResult?.blockingBusyBlocks;
+          const hasBusyBlocks = blocks && blocks.length > 0;
+          const fallbackMsg = "Your busy blocks don't leave enough free time to fit this task before the deadline. Try shortening the task, extending the deadline, or freeing up time in your busy blocks.";
+          setPopupInfo({
+            title: "Could Not Schedule Task",
+            message: scheduleResult?.message || fallbackMsg,
+            blockingBusyBlocks: hasBusyBlocks ? blocks : undefined,
+            secondaryAction: hasBusyBlocks
+              ? () => setActiveTabWithParams("user", { screen: "edit-preferences", subScreen: "scheduling" })
+              : undefined,
+            secondaryLabel: hasBusyBlocks ? "Go to Busy Blocks" : undefined,
+          });
+          return;
+        }
       }
 
       notifyTaskUpdate({ taskId });
@@ -574,7 +642,6 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
   if (isFetching) {
     return (
       <SafeAreaView style={[styles.loadingWrapper, { backgroundColor: colors.bg3 }]}>
-        \
         <ActivityIndicator size="large" color={COLORS.primary1} />
         <AppText style={[styles.loadingText, { color: colors.gray2 }]}>Loading task...</AppText>
       </SafeAreaView>
@@ -689,6 +756,13 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
         titleColor={COLORS.primary1}
       >
         <AppText style={[styles.popupMessage, { color: colors.gray2 }]}>{popupInfo?.message}</AppText>
+        {popupInfo?.blockingBusyBlocks && popupInfo.blockingBusyBlocks.length > 0 ? (
+          <View style={styles.busyBlocksList}>
+            {popupInfo.blockingBusyBlocks.map((block, i) => (
+              <BusyBlockPreviewCard key={block._id ?? `block-${i}`} block={block} />
+            ))}
+          </View>
+        ) : null}
         {popupInfo?.confirmAction ? (
           <View style={styles.confirmRow}>
             <AppButton title="Cancel" mode="filled" color="lightGray" onPress={() => setPopupInfo(null)} width="48%" />
@@ -698,6 +772,31 @@ const EditTask: React.FC<{ taskId?: string }> = ({ taskId = "" }) => {
               color="primary7"
               onPress={() => {
                 const action = popupInfo?.confirmAction;
+                setPopupInfo(null);
+                if (action) action();
+              }}
+              width="48%"
+            />
+          </View>
+        ) : popupInfo?.secondaryAction ? (
+          <View style={styles.confirmRow}>
+            <AppButton
+              title="OK"
+              mode="filled"
+              color="lightGray"
+              onPress={() => {
+                const nav = popupInfo?.navigateOnClose;
+                setPopupInfo(null);
+                if (nav) setActiveTab("calendar");
+              }}
+              width="48%"
+            />
+            <AppButton
+              title={popupInfo?.secondaryLabel ?? "Go to Busy Blocks"}
+              mode="filled"
+              color="primary5"
+              onPress={() => {
+                const action = popupInfo?.secondaryAction;
                 setPopupInfo(null);
                 if (action) action();
               }}
@@ -735,6 +834,11 @@ const styles = StyleSheet.create({
   popupMessage: {
     color: COLORS.darkGray,
     marginBottom: SPACING.lg,
+  },
+  busyBlocksList: {
+    width: "100%",
+    marginBottom: SPACING.lg,
+    gap: SPACING.sm,
   },
   buttonContainer: {
     width: "100%",

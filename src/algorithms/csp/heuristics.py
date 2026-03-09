@@ -104,8 +104,13 @@ def compute_degree(variable: Dict) -> float:
     return score
 
 
-def forward_check(assigned_slot: dict, variable_domains: Dict[str, List[dict]], assigned_var_id: str) -> Optional[Dict[str, List[dict]]]:
-    # Remove conflicting domain values after assigning a slot (forward checking)
+def forward_check(assigned_slot: dict, variable_domains: Dict[str, List[dict]], assigned_var_id: str, gap_minutes: int = 0) -> Optional[Dict[str, List[dict]]]:
+    # Remove conflicting domain values after assigning a slot (forward checking).
+    # Prunes both overlapping slots AND slots within the minimum-gap window so
+    # the backtracking search does not waste iterations trying slots that will
+    # fail satisfies_hard_constraints anyway.
+    from datetime import timedelta
+    gap_td = timedelta(minutes=gap_minutes)
     pruned = {}
 
     for var_id, domain in variable_domains.items():
@@ -113,7 +118,11 @@ def forward_check(assigned_slot: dict, variable_domains: Dict[str, List[dict]], 
             pruned[var_id] = [assigned_slot]
             continue
 
-        filtered = [slot for slot in domain if slot["end"] <= assigned_slot["start"] or slot["start"] >= assigned_slot["end"]]
+        filtered = [
+            slot for slot in domain
+            if (slot["end"] + gap_td) <= assigned_slot["start"]
+               or slot["start"] >= (assigned_slot["end"] + gap_td)
+        ]
 
         if not filtered:
             return None

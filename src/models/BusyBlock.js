@@ -1,29 +1,32 @@
 /*
  * File: src/models/BusyBlock.js
- * Purpose: Represents user busy blocks (calendar or manual).
+ * Purpose: Represents user busy blocks / time-off rules.
  *
- * Two block types are supported:
+ * blockType discriminator:
+ *  DAILY    – every day (no daysOfWeek needed), optional recurrenceEndDate
+ *  WEEKLY   – selected daysOfWeek each week, optional recurrenceEndDate
+ *  ONCE     – single window on a specific date
+ *  FULL_DAY – entire day(s) off; one-time when only `date` is set,
+ *             recurring when `daysOfWeek` is set (e.g. every Friday)
  *
- *  ONE-TIME  (isRecurring = false, default)
- *    • start / end  — absolute UTC datetimes for the unavailable window.
+ * Time values are stored in the `times` array as { startTime, endTime }
+ * HH:MM UTC strings, making them timezone-floating.
  *
- *  RECURRING (isRecurring = true)
- *    • start — reference datetime whose DATE component marks when the rule
- *              begins and whose TIME component is the daily start time.
- *    • end   — same reference DATE as start; TIME component is the daily
- *              end time (end time must be after start time within the day).
- *    • recurrence.daysOfWeek — weekday numbers [0=Sun … 6=Sat] on which
- *                              the block repeats.
- *    • recurrence.endDate    — when the rule expires (null = ongoing).
+ * Buffers expand the blocked window outward: tasks cannot be placed within
+ * bufferBeforeMinutes before any window or bufferAfterMinutes after it.
  *
- * Backward compatibility: existing documents without isRecurring are treated
- * as one-time blocks (isRecurring is falsy → $ne: true queries match them).
+ * Backward compatibility: documents without blockType (blockType = null) are
+ * treated as legacy and handled by the legacy branch in expandBusyBlock():
+ *   isRecurring = true  → expanded via the original expandRecurringBlock()
+ *   isRecurring = false → treated as a one-time start/end block
  */
 import mongoose from "mongoose";
 
+const HH_MM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+// Legacy recurrence sub-schema — kept so old documents still validate.
 const recurrenceSchema = new mongoose.Schema(
   {
-    /** Weekday indices: 0 = Sunday, 1 = Monday, …, 6 = Saturday */
     daysOfWeek: {
       type: [Number],
       required: true,
@@ -32,7 +35,6 @@ const recurrenceSchema = new mongoose.Schema(
         message: "daysOfWeek must be integers 0–6",
       },
     },
-    /** null = recurring forever */
     endDate: { type: Date, default: null },
   },
   { _id: false }
@@ -42,25 +44,103 @@ const busyBlockSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     title: { type: String, default: "" },
+
+    // ── Primary discriminator ───────────────────────────────────────────────
+    /** null = legacy document (isRecurring / start / end still used) */
+    blockType: {
+      type: String,
+      enum: ["DAILY", "WEEKLY", "ONCE", "FULL_DAY", null],
+      default: null,
+    },
+
+    // ── Date targeting ──────────────────────────────────────────────────────
+    /** ONCE / one-time FULL_DAY: UTC midnight of the target date */
+    date: { type: Date, default: null },
+
+    /** WEEKLY / recurring FULL_DAY: weekday indices 0 (Sun) – 6 (Sat) */
+    daysOfWeek: {
+      type: [Number],
+      default: [],
+      validate: {
+        validator: (arr) => arr.every((d) => Number.isInteger(d) && d >= 0 && d <= 6),
+        message: "daysOfWeek must be integers 0–6",
+      },
+    },
+
+    /** DAILY / WEEKLY / FULL_DAY recurring: when the rule expires (null = forever) */
+    recurrenceEndDate: { type: Date, default: null },
+
+    // ── Time fields — HH:MM UTC; absent for FULL_DAY ────────────────────────
     /**
-     * One-time : absolute start datetime.
-     * Recurring: reference date (= recurrence activation date) + daily start time.
+     * Primary: array of { startTime, endTime } tuples (HH:MM UTC).
+     * Each tuple becomes a separate blocked interval during scheduling.
      */
-    start: { type: Date, required: true },
+    times: {
+      type: [
+        {
+          startTime: {
+            type: String,
+            required: true,
+            validate: { validator: (v) => HH_MM_RE.test(v), message: "startTime must be HH:MM" },
+          },
+          endTime: {
+            type: String,
+            required: true,
+            validate: { validator: (v) => HH_MM_RE.test(v), message: "endTime must be HH:MM" },
+          },
+        },
+      ],
+      default: [],
+    },
+
     /**
-     * One-time : absolute end datetime.
-     * Recurring: same reference date as start + daily end time.
+     * WEEKLY only: per-day schedule. When present, supersedes daysOfWeek + times[].
+     * Each entry covers one weekday (0=Sun … 6=Sat) with its own times[].
      */
-    end: { type: Date, required: true },
-    source: { type: String, enum: ["manual", "calendar"], default: "manual" },
-    /** Discriminator: true = recurring rule; false/absent = one-time block */
+    weeklySchedule: {
+      type: [
+        {
+          dayOfWeek: { type: Number, required: true, min: 0, max: 6 },
+          times: {
+            type: [
+              {
+                startTime: {
+                  type: String,
+                  required: true,
+                  validate: { validator: (v) => HH_MM_RE.test(v), message: "startTime must be HH:MM" },
+                },
+                endTime: {
+                  type: String,
+                  required: true,
+                  validate: { validator: (v) => HH_MM_RE.test(v), message: "endTime must be HH:MM" },
+                },
+              },
+            ],
+            default: [],
+          },
+        },
+      ],
+      default: [],
+    },
+
+    // Backward-compat mirrors of times[0] — kept so legacy expand code still works
+    // ── Buffer ──────────────────────────────────────────────────────────────
+    /** Minutes of padding _before_ the block — tasks cannot land in this window */
+    bufferBeforeMinutes: { type: Number, default: 0, min: 0, max: 120 },
+    /** Minutes of padding _after_ the block */
+    bufferAfterMinutes: { type: Number, default: 0, min: 0, max: 120 },
+
+    // ── Legacy fields (kept for backward compat — not used for new docs) ────
+    start: { type: Date },
+    end: { type: Date },
     isRecurring: { type: Boolean, default: false },
-    /** Populated only when isRecurring = true */
     recurrence: { type: recurrenceSchema, default: null, required: false },
+    source: { type: String, enum: ["manual", "calendar"], default: "manual" },
   },
   { timestamps: true }
 );
 
-busyBlockSchema.index({ userId: 1, isRecurring: 1, start: 1 });
+busyBlockSchema.index({ userId: 1, blockType: 1, date: 1 });
+busyBlockSchema.index({ userId: 1, isRecurring: 1, start: 1 }); // legacy index preserved
 
 export const BusyBlock = mongoose.model("BusyBlock", busyBlockSchema);

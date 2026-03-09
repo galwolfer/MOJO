@@ -3,7 +3,7 @@ import { View } from "react-native";
 import Tag from "../../inputs/tag";
 import { getCategoryMeta } from "../../../config/categoryMeta";
 import { StyleSheet } from "react-native";
-import { SPACING, paletteIndexFromColorToken } from "../../../theme";
+import { SPACING, paletteIndexFromColorToken, paletteIndexFromKey } from "../../../theme";
 import { getImportanceLabel, getEffortLabel } from "../../widgets/taskHelpers";
 
 export const TaskTagsRow: React.FC<{
@@ -94,12 +94,12 @@ export const TaskTagsRow: React.FC<{
               );
             }
 
-            // Fallback: use generated color index
+            // Fallback: deterministically map label to a stable color index
             return (
               <Tag
                 label={subLabel}
                 leftIcon={subCategory?.icon || undefined}
-                colorIndex={Math.max(0, Math.min(17, subLabel.length % 9))}
+                colorIndex={paletteIndexFromKey(subLabel)}
                 style={styles.tagItem}
               />
             );

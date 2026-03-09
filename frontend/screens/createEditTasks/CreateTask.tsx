@@ -24,10 +24,12 @@ import { ICONS } from "../../components/icons/icons";
 import { TaskDetailsSection, TimeAndPartsSection } from "../../components/special/task";
 import type { TaskFormState, Subtask } from "../../components/special/task";
 import { CATEGORY_KEYS } from "../../config/categoryMeta";
-import { createTask, createTaskSchedule } from "../../services/taskService";
+import { createTask } from "../../services/taskService";
 import { fetchSubcategoriesForCategory, type Subcategory } from "../../services/subcategoryService";
 import { useNavigation } from "../../context/NavigationContext";
 import { useTaskContext } from "../../context/TaskContext";
+import BusyBlockPreviewCard from "../../components/special/BusyBlockPreviewCard";
+import type { BusyBlock } from "../../services/busyBlockService";
 
 // --- Default form state ---
 
@@ -47,7 +49,7 @@ const DEFAULT_FORM: TaskFormState = {
 // --- Component ---
 
 const CreateTask: React.FC = () => {
-  const { setHeaderConfig, setActiveTab } = useNavigation();
+  const { setHeaderConfig, setActiveTab, setActiveTabWithParams } = useNavigation();
   const { notifyTaskUpdate } = useTaskContext();
   const colors = useColors();
 
@@ -59,6 +61,9 @@ const CreateTask: React.FC = () => {
     title: string;
     message: string;
     resetOnClose?: boolean;
+    secondaryAction?: () => void;
+    secondaryLabel?: string;
+    blockingBusyBlocks?: BusyBlock[];
   } | null>(null);
   const [formErrors, setFormErrors] = useState<string[]>([]);
 
@@ -252,7 +257,6 @@ const CreateTask: React.FC = () => {
     setIsLoading(true);
     try {
       const subtasksData = formState.subtasks
-        .filter((st) => st.title.trim())
         .map((st) => ({
           title: st.title,
           description: st.description || undefined,
@@ -282,16 +286,28 @@ const CreateTask: React.FC = () => {
       });
 
       if (result) {
+        // Backend already verified scheduling and saved the plan atomically.
         notifyTaskUpdate();
-        await createTaskSchedule(result._id, { planningHorizonDays: 14 }).catch(() => {});
         setPopupInfo({ title: "Success", message: "Task created successfully.", resetOnClose: true });
       } else {
         setPopupInfo({ title: "Error", message: "Failed to create task. Please try again." });
       }
-    } catch (error) {
+    } catch (error: any) {
+      // The backend rolls back the task if scheduling fails and returns a clear message.
+      const errorData = error?.data;
+      const msg = errorData?.error || (error instanceof Error ? error.message : "Unknown error");
+      const isSchedulingError = !!errorData?.schedulingFailed || msg.toLowerCase().includes("could not be scheduled") || msg.toLowerCase().includes("no available time slots");
+      const blocks: BusyBlock[] | undefined = errorData?.blockingBusyBlocks;
+      const hasBusyBlocks = blocks && blocks.length > 0;
+      const fallbackMsg = "The auto-scheduler couldn't find a long enough free window before the deadline. Try extending the deadline, reducing the estimated duration, or freeing time by adjusting your busy blocks.";
       setPopupInfo({
-        title: "Error",
-        message: `Failed to create task: ${error instanceof Error ? error.message : "Unknown error"}`,
+        title: isSchedulingError ? "Could Not Schedule Task" : "Error",
+        message: isSchedulingError ? (msg || fallbackMsg) : `Failed to create task: ${msg}`,
+        blockingBusyBlocks: hasBusyBlocks ? blocks : undefined,
+        secondaryAction: hasBusyBlocks
+          ? () => setActiveTabWithParams("user", { screen: "edit-preferences", subScreen: "scheduling" })
+          : undefined,
+        secondaryLabel: hasBusyBlocks ? "Go to Busy Blocks" : undefined,
       });
     } finally {
       setIsLoading(false);
@@ -364,7 +380,37 @@ const CreateTask: React.FC = () => {
 
       <PopupBox visible={!!popupInfo} onClose={closePopup} title={popupInfo?.title ?? ""} titleColor={COLORS.primary1}>
         <AppText style={[styles.popupMessage, { color: colors.gray2 }]}>{popupInfo?.message}</AppText>
-        <AppButton title="OK" mode="filled" color="primary1" onPress={closePopup} width="100%" />
+        {popupInfo?.blockingBusyBlocks && popupInfo.blockingBusyBlocks.length > 0 ? (
+          <View style={styles.busyBlocksList}>
+            {popupInfo.blockingBusyBlocks.map((block, i) => (
+              <BusyBlockPreviewCard key={block._id ?? `block-${i}`} block={block} />
+            ))}
+          </View>
+        ) : null}
+        {popupInfo?.secondaryAction ? (
+          <View style={styles.confirmRow}>
+            <AppButton
+              title="OK"
+              mode="filled"
+              color="lightGray"
+              onPress={closePopup}
+              width="48%"
+            />
+            <AppButton
+              title={popupInfo?.secondaryLabel ?? "Go to Busy Blocks"}
+              mode="filled"
+              color="primary5"
+              onPress={() => {
+                const action = popupInfo?.secondaryAction;
+                setPopupInfo(null);
+                if (action) action();
+              }}
+              width="48%"
+            />
+          </View>
+        ) : (
+          <AppButton title="OK" mode="filled" color="primary1" onPress={closePopup} width="100%" />
+        )}
       </PopupBox>
     </ScrollableContent>
   );
@@ -388,6 +434,15 @@ const styles = StyleSheet.create({
   popupMessage: {
     color: COLORS.darkGray,
     marginBottom: SPACING.lg,
+  },
+  busyBlocksList: {
+    marginBottom: SPACING.md,
+    gap: SPACING.sm,
+  },
+  confirmRow: {
+    flexDirection: "row" as const,
+    gap: SPACING.md,
+    justifyContent: "space-between" as const,
   },
 });
 

@@ -84,7 +84,7 @@ const MOCK_FRIENDS = [
 
 export default function UserProfileScreen() {
   const { user, signOut } = useAuth();
-  const { setHeaderConfig } = useNavigation();
+  const { setHeaderConfig, navigationParams, activeTab, clearNavigationParams } = useNavigation();
   const colors = useColors();
   const { width } = useWindowDimensions();
   const { subscribeToTaskUpdates } = useTaskContext();
@@ -92,6 +92,18 @@ export default function UserProfileScreen() {
 
   // Screen navigation state
   const [currentScreen, setCurrentScreen] = useState<"profile" | "settings">("profile");
+  // Desired sub-screen to open inside Settings (set when navigating via deep link)
+  const pendingSettingsScreenRef = useRef<string | undefined>(undefined);
+
+  // React to deep-link navigation params (e.g. from "Go to Busy Blocks" button)
+  useEffect(() => {
+    if (activeTab === "user" && navigationParams?.screen === "edit-preferences") {
+      pendingSettingsScreenRef.current = "edit-preferences";
+      (pendingSettingsScreenRef as any).subScreen = navigationParams?.subScreen;
+      setCurrentScreen("settings");
+      clearNavigationParams();
+    }
+  }, [navigationParams, activeTab, clearNavigationParams]);
 
   // When settings is open, back navigates to profile (sub-screens supersede this via their own handlers)
   useBackHandler(() => {
@@ -324,7 +336,11 @@ export default function UserProfileScreen() {
   const graphWidth = Math.min(width - SPACING.xlg * 2 - SPACING.md * 2, 500);
 
   if (currentScreen === "settings") {
-    return <SettingsScreen onBack={() => setCurrentScreen("profile")} />;
+    const pending = pendingSettingsScreenRef.current;
+    const pendingSub = (pendingSettingsScreenRef as any).subScreen as string | undefined;
+    pendingSettingsScreenRef.current = undefined;
+    (pendingSettingsScreenRef as any).subScreen = undefined;
+    return <SettingsScreen onBack={() => setCurrentScreen("profile")} initialScreen={pending as any} initialSubScreen={pendingSub} />;
   }
 
   return (

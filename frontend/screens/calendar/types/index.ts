@@ -39,6 +39,8 @@ export interface Task {
   taskId?: string; // Actual MongoDB task _id (session id lives in `id`)
   status?: string; // "todo" | "in_progress" | "done"
   isScheduled?: boolean; // True when sourced from a TaskSchedule document
+  isOvernightContinuation?: boolean; // True when the session started the previous day and continues into this day
+  isOvernightStart?: boolean;        // True when the session starts today but ends after midnight (next day)
   progressPercentage?: number; // Server-side completion 0-100
   mainTaskDescription?: string; // Parent task description for multi-part sessions
   importance?: number; // 1-5 importance level
