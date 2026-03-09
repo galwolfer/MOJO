@@ -133,7 +133,7 @@ You will need **two terminal windows** open at the same time.
 ### Terminal 1 — Start the Backend
 
 ```bash
-npm run dev
+npm start
 ```
 
 You should see:
@@ -144,9 +144,17 @@ MongoDB connected
 
 ### Terminal 2 — Start the Frontend
 
+You have 2 options available for running the frontend of the project:
+#### Option 1:
 ```bash
 cd frontend
-npx expo start
+npx expo run:android -d
+```
+
+#### Option 2:
+```bash
+cd frontend
+npx expo start --clear
 ```
 
 Then:
