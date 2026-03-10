@@ -21,6 +21,7 @@ import {
   StatusBar,
 } from "react-native";
 import { COLORS, FONTS, FONT_SIZES, SPACING } from "../../theme";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "../../context/ThemeContext";
 import { ICONS } from "../icons/icons";
 import { getOjoType, getOjoTypeColor, type OjoTypeName } from "../../config/ojoTypeConfig";
@@ -44,19 +45,20 @@ type Props = {
 
 const BANNER_HEIGHT = 100;
 const ANIM_DURATION = 300;
-const STATUS_BAR_HEIGHT = Platform.OS === "android" ? StatusBar.currentHeight || 30 : 50;
 
 /**
  * Animated in-app notification banner with Ojo personality icon.
  */
 export function OjoNotificationBanner({ data, duration = 5000, onDismiss }: Props) {
-  const translateY = useRef(new Animated.Value(-BANNER_HEIGHT - STATUS_BAR_HEIGHT)).current;
+  const insets = useSafeAreaInsets();
+  const statusBarHeight = insets.top || (Platform.OS === "android" ? StatusBar.currentHeight || 30 : 50);
+  const translateY = useRef(new Animated.Value(-BANNER_HEIGHT - statusBarHeight)).current;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [visible, setVisible] = useState(false);
 
   const dismiss = useCallback(() => {
     Animated.timing(translateY, {
-      toValue: -BANNER_HEIGHT - STATUS_BAR_HEIGHT,
+      toValue: -BANNER_HEIGHT - statusBarHeight,
       duration: ANIM_DURATION,
       useNativeDriver: true,
     }).start(() => {
@@ -100,7 +102,7 @@ export function OjoNotificationBanner({ data, duration = 5000, onDismiss }: Prop
     <Animated.View
       style={[
         styles.container,
-        { transform: [{ translateY }], paddingTop: STATUS_BAR_HEIGHT },
+        { transform: [{ translateY }], paddingTop: statusBarHeight },
       ]}
     >
       <TouchableOpacity

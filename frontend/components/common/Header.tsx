@@ -14,6 +14,7 @@ import { COLORS, SPACING, TYPOGRAPHY, SHADOWS, ICON_SIZES, COMPONENT_STYLES, FON
 import { useColors } from "../../context/ThemeContext";
 import GlassSurface from "./GlassSurface";
 import { moderateScale } from "react-native-size-matters";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppText from "./AppText";
 
 /**
@@ -42,6 +43,7 @@ export default function Header({ title, Icon, show = true, rightElement, leftEle
   const { width } = useWindowDimensions();
   const [overflowOpen, setOverflowOpen] = useState(false);
   const colors = useColors();
+  const insets = useSafeAreaInsets();
 
   if (!show) return null;
 
@@ -74,7 +76,7 @@ export default function Header({ title, Icon, show = true, rightElement, leftEle
 
   return (
     <View style={[styles.wrapper, style]}>
-      <GlassSurface intensity={60} style={styles.blurSurface}>
+      <GlassSurface intensity={60} style={[styles.blurSurface, { paddingTop: insets.top + SPACING.sm }]}>
         <View style={styles.container}>
           {/* Left Section (arrow/icon + title) */}
           <View style={styles.leftSection}>
@@ -117,7 +119,7 @@ const styles = StyleSheet.create({
   },
   blurSurface: {
     paddingHorizontal: SPACING.lg,
-    paddingTop: Platform.OS === "android" ? SPACING.xlg + SPACING.md : SPACING.lg,
+    paddingTop: SPACING.lg,
     paddingBottom: SPACING.lg,
     borderBottomLeftRadius: SPACING.xlg,
     borderBottomRightRadius: SPACING.xlg,

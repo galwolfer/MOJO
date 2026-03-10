@@ -3,6 +3,7 @@ import React, { useCallback, useState, useEffect } from "react";
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet, View, useWindowDimensions, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import AuthScreen from "./screens/auth/Auth";
@@ -83,19 +84,21 @@ function AppContent() {
     : [styles.deviceFull, { backgroundColor: colors.bg3 }];
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <View style={outerStyle}>
-        {user ? (
-          <MainLayout />
-        ) : (
-          <View style={deviceStyle}>
-            <AuthScreen />
-          </View>
-        )}
+    <SafeAreaProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <View style={outerStyle}>
+          {user ? (
+            <MainLayout />
+          ) : (
+            <View style={deviceStyle}>
+              <AuthScreen />
+            </View>
+          )}
 
-        <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
-      </View>
-    </GestureHandlerRootView>
+          <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
+        </View>
+      </GestureHandlerRootView>
+    </SafeAreaProvider>
   );
 }
 
