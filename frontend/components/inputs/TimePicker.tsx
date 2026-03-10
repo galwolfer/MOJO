@@ -15,7 +15,6 @@
 
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   Dimensions,
   Modal,
   Platform,
@@ -407,13 +406,13 @@ export function TimePicker({
             {/* Action buttons */}
             <View style={[styles.btnRow, { zIndex: 10, elevation: 10 }]}>
               <RectButton
-                onPress={() => { Alert.alert("Debug", "Cancel pressed"); setVisible(false); }}
+                onPress={() => setVisible(false)}
                 style={{ backgroundColor: COLORS.lightGray, borderRadius: SPACING.xlg, paddingVertical: SPACING.sm, paddingHorizontal: SPACING.lg, width: "46%", alignItems: "center", minHeight: 44, justifyContent: "center" }}
               >
                 <AppText variant="boldText" style={{ color: COLORS.colorWhite }}>Cancel</AppText>
               </RectButton>
               <RectButton
-                onPress={() => { Alert.alert("Debug", "Done pressed"); confirm(); }}
+                onPress={confirm}
                 style={{ backgroundColor: accentColor, borderRadius: SPACING.xlg, paddingVertical: SPACING.sm, paddingHorizontal: SPACING.lg, width: "46%", alignItems: "center", minHeight: 44, justifyContent: "center" }}
               >
                 <AppText variant="boldText" style={{ color: COLORS.colorWhite }}>Done</AppText>

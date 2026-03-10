@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   AppState,
   AppStateStatus,
-  Alert,
 } from "react-native";
 
 import AppText from "../../components/common/AppText";
@@ -85,11 +84,6 @@ const MOCK_FRIENDS = [
 
 export default function UserProfileScreen() {
   const { user, signOut } = useAuth();
-
-  // DEBUG: confirm alerts are working
-  useEffect(() => {
-    Alert.alert("Debug", "Profile page loaded");
-  }, []);
 
   const { setHeaderConfig, navigationParams, activeTab, clearNavigationParams } = useNavigation();
   const colors = useColors();
