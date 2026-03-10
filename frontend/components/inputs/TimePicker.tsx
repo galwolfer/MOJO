@@ -15,6 +15,7 @@
 
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   Dimensions,
   Modal,
   Platform,
@@ -25,6 +26,7 @@ import {
   View,
   ViewStyle,
 } from "react-native";
+import { RectButton } from "react-native-gesture-handler";
 import { moderateScale } from "react-native-size-matters";
 import { COLORS, FONT_SIZES, FONTS, ICON_SIZES, SHADOWS, SPACING } from "../../theme";
 import AppText from "../common/AppText";
@@ -99,6 +101,7 @@ const WheelColumn: React.FC<WheelCol> = ({
   const isMomentumRef = useRef(false);
   const isDraggingRef = useRef(false);
   const mountedRef = useRef(false);
+  const userScrollRef = useRef(false);
   const itemCount = items.length;
 
   // Infinite loop: only repeat when the column has more than two values (hours/minutes).
@@ -136,9 +139,9 @@ const WheelColumn: React.FC<WheelCol> = ({
     mountedRef.current = true;
   }, [itemCount, recenterTo, selectedIndex]);
 
-  // Sync when parent changes selectedIndex (e.g. AM/PM flip).
+  // Sync only for *external* changes (e.g. AM/PM flip changes hour).
   useEffect(() => {
-    if (!mountedRef.current || !itemCount || isDraggingRef.current) return;
+    if (!mountedRef.current || !itemCount || userScrollRef.current) return;
     recenterTo(selectedIndex, false);
   }, [itemCount, recenterTo, selectedIndex]);
 
@@ -148,10 +151,12 @@ const WheelColumn: React.FC<WheelCol> = ({
       const snappedIndex = Math.round(offsetY / ITEM_H);
       const actualIdx = mod(snappedIndex, itemCount);
       if (actualIdx !== selectedIndex) onSelect(actualIdx);
-      // Keep the selected value in the middle copy to prevent end lockups.
-      recenterTo(actualIdx, false);
+      // Do NOT recenter here — let the scroll stay where it is.
+      // The list has 9 copies so the user won't reach the edge.
+      // Release the guard after a tick so the useEffect doesn't fight.
+      setTimeout(() => { userScrollRef.current = false; }, 150);
     },
-    [itemCount, onSelect, recenterTo, selectedIndex],
+    [itemCount, onSelect, selectedIndex],
   );
 
   return (
@@ -166,6 +171,7 @@ const WheelColumn: React.FC<WheelCol> = ({
         alwaysBounceVertical={false}
         overScrollMode="never"
         onScrollBeginDrag={() => {
+          userScrollRef.current = true;
           isDraggingRef.current = true;
           isMomentumRef.current = false;
         }}
@@ -347,8 +353,10 @@ export function TimePicker({
         statusBarTranslucent
         onRequestClose={() => setVisible(false)}
       >
-        <Pressable style={styles.overlay} onPress={() => setVisible(false)}>
-          <Pressable style={[styles.sheet, { backgroundColor: colors.bg1 }]} onPress={(e) => e.stopPropagation()}>
+        <View style={styles.overlay}>
+          {/* Tap background to dismiss — only covers the area above the sheet */}
+          <Pressable style={{ flex: 1 }} onPress={() => setVisible(false)} />
+          <View style={[styles.sheet, { backgroundColor: colors.bg1 }]}>
             {/* Header */}
             <AppText variant="title3" style={[styles.sheetTitle, { color: colors.text1 }]}>
               {label || "Select Time"}
@@ -397,12 +405,22 @@ export function TimePicker({
             </View>
 
             {/* Action buttons */}
-            <View style={styles.btnRow}>
-              <AppButton title="Cancel" mode="light" color="lightGray" onPress={() => setVisible(false)} width="46%" />
-              <AppButton title="Done" mode="filled" color={color} onPress={confirm} width="46%" />
+            <View style={[styles.btnRow, { zIndex: 10, elevation: 10 }]}>
+              <RectButton
+                onPress={() => { Alert.alert("Debug", "Cancel pressed"); setVisible(false); }}
+                style={{ backgroundColor: COLORS.lightGray, borderRadius: SPACING.xlg, paddingVertical: SPACING.sm, paddingHorizontal: SPACING.lg, width: "46%", alignItems: "center", minHeight: 44, justifyContent: "center" }}
+              >
+                <AppText variant="boldText" style={{ color: COLORS.colorWhite }}>Cancel</AppText>
+              </RectButton>
+              <RectButton
+                onPress={() => { Alert.alert("Debug", "Done pressed"); confirm(); }}
+                style={{ backgroundColor: accentColor, borderRadius: SPACING.xlg, paddingVertical: SPACING.sm, paddingHorizontal: SPACING.lg, width: "46%", alignItems: "center", minHeight: 44, justifyContent: "center" }}
+              >
+                <AppText variant="boldText" style={{ color: COLORS.colorWhite }}>Done</AppText>
+              </RectButton>
             </View>
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
     </View>
   );
