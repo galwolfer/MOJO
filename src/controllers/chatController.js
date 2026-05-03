@@ -7,23 +7,12 @@ import { AgentController } from "../agent/agentController.js";
 import { config } from "../config/env.js";
 import { User, Session } from "../models/index.js";
 
-// Lazy initialize the agent so the server can boot without an API key.
-let agent = null;
-
-function getAgent() {
-  if (!agent) {
-    if (!config.geminiApiKey) {
-      throw new Error("GEMINI_API_KEY or GOOGLE_API_KEY is required for chat features.");
-    }
-    agent = new AgentController(config.geminiApiKey);
-  }
-  return agent;
-}
+const agent = new AgentController(config.geminiApiKey);
 
 function sanitizeMessageForClient(message) {
   const sanitized = { ...message };
   if (typeof sanitized.content === "string") {
-    sanitized.content = getAgent()._sanitizeResponse(sanitized.content);
+    sanitized.content = agent._sanitizeResponse(sanitized.content);
   }
   delete sanitized.functionCall;
   delete sanitized.toolCalls;
@@ -73,11 +62,11 @@ export async function sendMessage(req, res, next) {
     const session = sessionId || `session_${Date.now()}`;
 
     // Process the message
-    const result = await getAgent().processMessage(session, message, userId);
+    const result = await agent.processMessage(session, message, userId);
 
     const response = {
       ...result,
-      response: typeof result.response === "string" ? getAgent()._sanitizeResponse(result.response) : result.response,
+      response: typeof result.response === "string" ? agent._sanitizeResponse(result.response) : result.response,
     };
     res.json(response);
   } catch (error) {
@@ -101,7 +90,7 @@ export async function resetSession(req, res, next) {
       });
     }
 
-    const result = getAgent().resetSession(sessionId, userId);
+    const result = agent.resetSession(sessionId, userId);
     res.json(result);
   } catch (error) {
     next(error);
@@ -129,7 +118,7 @@ export async function getHistory(req, res, next) {
     // If pagination query params are provided, return a page from the end of the session.
     // This keeps responses small for large sessions.
     if (typeof limit !== "undefined" || typeof offset !== "undefined") {
-      const page = await getAgent().getSessionHistoryPage(sessionId, userId, limit, offset);
+      const page = await agent.getSessionHistoryPage(sessionId, userId, limit, offset);
       return res.json({
         success: true,
         ...page,
@@ -138,7 +127,7 @@ export async function getHistory(req, res, next) {
     }
 
     // Backward-compatible full history (not recommended for large sessions)
-    const history = await getAgent().getSessionHistory(sessionId, userId);
+    const history = await agent.getSessionHistory(sessionId, userId);
 
     return res.json({
       success: true,
@@ -160,7 +149,7 @@ export async function getSessions(req, res, next) {
     const userId = req.user.userId;
     const { limit, cursor, includeMessages } = req.query;
 
-    const page = await getAgent().listUserSessions(userId, limit, cursor, includeMessages);
+    const page = await agent.listUserSessions(userId, limit, cursor, includeMessages);
     return res.json({
       success: true,
       ...page,
