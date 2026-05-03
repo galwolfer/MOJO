@@ -23,6 +23,29 @@ console.log("DEFAULT_MACHINE_IP:", DEFAULT_MACHINE_IP);
 // Initialize API base URL
 let API_BASE = "http://localhost:3000/api";
 
+function extractHost(candidate?: string | null): string | null {
+  if (!candidate || typeof candidate !== "string") return null;
+  const trimmed = candidate.trim();
+  if (!trimmed) return null;
+
+  // Accept either full URLs (http://x.y.z:port) or host:port values.
+  const withoutProto = trimmed.replace(/^https?:\/\//i, "");
+  const hostPort = withoutProto.split("/")[0] || "";
+  const host = hostPort.split(":")[0] || "";
+
+  if (!host || host === "localhost" || host === "127.0.0.1") return null;
+  return host;
+}
+
+function getBaseHost(baseUrl: string): string | null {
+  try {
+    const parsed = new URL(baseUrl);
+    return parsed.hostname || null;
+  } catch (_) {
+    return null;
+  }
+}
+
 // Initialize API base from environment or defaults
 function initializeApiBase(): string {
   let base = "http://localhost:3000/api";
@@ -61,33 +84,51 @@ function initializeApiBase(): string {
     // not running in Expo environment or expo-constants not installed — continue
   }
 
-  // On Android devices/emulators, prefer an explicit machine IP so physical
-  // devices and emulators can reach the server. If Metro provides a scriptURL
-  // with a host, override with that.
+  // On native devices/emulators, avoid localhost and prefer a reachable host.
+  // We infer host from Expo runtime metadata (hostUri/debuggerHost) first,
+  // then fall back to configured machine IP.
   try {
-    if (typeof Platform !== "undefined" && Platform.OS === "android") {
+    if (typeof Platform !== "undefined" && Platform.OS !== "web") {
+      const currentHost = getBaseHost(base);
+      const shouldRewriteLocalhostBase = !currentHost || currentHost === "localhost" || currentHost === "127.0.0.1";
+      if (!shouldRewriteLocalhostBase) {
+        return base;
+      }
+
       const envHost = typeof process !== "undefined" && process.env && (process.env.HOST_IP || process.env.LOCAL_IP);
-      const preferredHost = envHost || DEFAULT_MACHINE_IP;
       const envPort = typeof process !== "undefined" && process.env && (process.env.PORT || process.env.REACT_APP_PORT);
       const portToUse = envPort || "3000";
-      base = `http://${preferredHost}:${portToUse}/api`;
+
+      let inferredHost: string | null = null;
+
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const Constants = require("expo-constants");
+        const hostUri =
+          (Constants && Constants.expoConfig && Constants.expoConfig.hostUri) ||
+          (Constants && Constants.manifest2 && Constants.manifest2.extra && Constants.manifest2.extra.expoClient && Constants.manifest2.extra.expoClient.hostUri) ||
+          (Constants && Constants.manifest && (Constants.manifest.debuggerHost || Constants.manifest.hostUri)) ||
+          null;
+        inferredHost = extractHost(hostUri);
+      } catch (_) {
+        // ignore expo constants parsing failures
+      }
 
       try {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { NativeModules } = require("react-native");
         const scriptURL = (NativeModules && NativeModules.SourceCode && NativeModules.SourceCode.scriptURL) || null;
-        if (scriptURL && typeof scriptURL === "string") {
-          const m = scriptURL.match(/https?:\/\/([^:\/]+)(?::(\d+))?/);
-          if (m && m[1]) {
-            const hostIp = m[1];
-            const scriptPort = m[2];
-            const finalPort = envPort || scriptPort || "3000";
-            base = `http://${hostIp}:${finalPort}/api`;
-          }
+        const scriptHost = extractHost(scriptURL);
+        // Only use scriptURL as a fallback when Expo hostUri was not available.
+        if (!inferredHost && scriptHost) {
+          inferredHost = scriptHost;
         }
       } catch (_) {
-        // ignore — keep preferredHost
+        // ignore scriptURL parsing failures
       }
+
+      const preferredHost = inferredHost || envHost || DEFAULT_MACHINE_IP;
+      base = `http://${preferredHost}:${portToUse}/api`;
     }
   } catch (_) {}
 

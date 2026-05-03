@@ -8,6 +8,8 @@ type RequestOptions = {
   signal?: AbortSignal;
 };
 
+const DEFAULT_TIMEOUT_MS = 12000;
+
 // Auth token storage
 let authToken: string | null = null;
 
@@ -129,6 +131,10 @@ async function fetchWithTimeout(url: string, init: RequestInit, options?: Reques
  */
 export async function get<T>(endpoint: string, options?: RequestOptions): Promise<T> {
   const url = `${getApiBase()}${endpoint}`;
+  const requestOptions: RequestOptions = {
+    timeoutMs: options?.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    signal: options?.signal,
+  };
   // Debug: log outgoing GET request URL
   // eslint-disable-next-line no-console
   console.log("[httpClient] GET", url);
@@ -138,7 +144,7 @@ export async function get<T>(endpoint: string, options?: RequestOptions): Promis
       method: "GET",
       headers: getHeaders(),
     },
-    options
+    requestOptions
   );
   return handleResponse<T>(res);
 }
@@ -148,6 +154,10 @@ export async function get<T>(endpoint: string, options?: RequestOptions): Promis
  */
 export async function post<T>(endpoint: string, body?: any, options?: RequestOptions): Promise<T> {
   const url = `${getApiBase()}${endpoint}`;
+  const requestOptions: RequestOptions = {
+    timeoutMs: options?.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    signal: options?.signal,
+  };
   // Debug: log outgoing POST request URL and body summary
   // eslint-disable-next-line no-console
   console.log("[httpClient] POST", url, body ? { bodySummary: Object.keys(body || {}).slice(0, 10) } : {});
@@ -158,7 +168,7 @@ export async function post<T>(endpoint: string, body?: any, options?: RequestOpt
       headers: getHeaders(),
       body: body ? JSON.stringify(body) : undefined,
     },
-    options
+    requestOptions
   );
   return handleResponse<T>(res);
 }
@@ -168,6 +178,10 @@ export async function post<T>(endpoint: string, body?: any, options?: RequestOpt
  */
 export async function put<T>(endpoint: string, body?: any, options?: RequestOptions): Promise<T> {
   const url = `${getApiBase()}${endpoint}`;
+  const requestOptions: RequestOptions = {
+    timeoutMs: options?.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    signal: options?.signal,
+  };
   const res = await fetchWithTimeout(
     url,
     {
@@ -175,7 +189,7 @@ export async function put<T>(endpoint: string, body?: any, options?: RequestOpti
       headers: getHeaders(),
       body: body ? JSON.stringify(body) : undefined,
     },
-    options
+    requestOptions
   );
   return handleResponse<T>(res);
 }
@@ -185,13 +199,17 @@ export async function put<T>(endpoint: string, body?: any, options?: RequestOpti
  */
 export async function del<T>(endpoint: string, options?: RequestOptions): Promise<T> {
   const url = `${getApiBase()}${endpoint}`;
+  const requestOptions: RequestOptions = {
+    timeoutMs: options?.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    signal: options?.signal,
+  };
   const res = await fetchWithTimeout(
     url,
     {
       method: "DELETE",
       headers: getHeaders(),
     },
-    options
+    requestOptions
   );
   return handleResponse<T>(res);
 }
@@ -201,6 +219,10 @@ export async function del<T>(endpoint: string, options?: RequestOptions): Promis
  */
 export async function patch<T>(endpoint: string, body?: any, options?: RequestOptions): Promise<T> {
   const url = `${getApiBase()}${endpoint}`;
+  const requestOptions: RequestOptions = {
+    timeoutMs: options?.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    signal: options?.signal,
+  };
   const res = await fetchWithTimeout(
     url,
     {
@@ -208,7 +230,7 @@ export async function patch<T>(endpoint: string, body?: any, options?: RequestOp
       headers: getHeaders(),
       body: body ? JSON.stringify(body) : undefined,
     },
-    options
+    requestOptions
   );
   return handleResponse<T>(res);
 }

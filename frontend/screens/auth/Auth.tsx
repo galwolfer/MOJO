@@ -37,6 +37,7 @@ import {
   register as apiRegister,
   updateCategoryPriorities,
   setAuthToken,
+  getApiBase,
 } from "../../services/apiClient";
 
 export default function AuthScreen() {
@@ -54,6 +55,7 @@ export default function AuthScreen() {
   const [signupConfirm, setSignupConfirm] = useState("");
   const [profileImage, setProfileImage] = useState<string | File | null>(null);
   const [signupGender, setSignupGender] = useState<string | undefined>(undefined);
+  const [isSigningUp, setIsSigningUp] = useState(false);
   // Pre-signup display name (asked before the signup form)
   const [displayName, setDisplayName] = useState("");
 
@@ -144,6 +146,8 @@ export default function AuthScreen() {
   }
 
   async function handleSignup() {
+    if (isSigningUp) return;
+
     if (signupPassword !== signupConfirm) {
       setSignupError("Passwords do not match");
       return;
@@ -165,6 +169,8 @@ export default function AuthScreen() {
         setSignupError("Password must be at least 6 characters");
         return;
       }
+
+      setIsSigningUp(true);
 
       console.log("Signing up with profileImage:", profileImage ? "image provided" : "no image");
 
@@ -241,9 +247,17 @@ export default function AuthScreen() {
         throw new Error("Invalid response from server");
       }
     } catch (err: any) {
-      const msg = String(err?.message || err || "Signup failed");
+      const rawMsg = String(err?.message || err || "Signup failed");
+      const isNetworkIssue =
+        err?.name === "NetworkError" ||
+        /network request failed|request timed out|network error/i.test(rawMsg);
+      const msg = isNetworkIssue
+        ? `Cannot reach server at ${getApiBase()}. Make sure backend is running and EXPO_PUBLIC_API_BASE points to your machine IP.`
+        : rawMsg;
       console.error("Signup error:", msg);
       setSignupError(msg);
+    } finally {
+      setIsSigningUp(false);
     }
   }
 
@@ -345,6 +359,7 @@ export default function AuthScreen() {
             onBack={() => setScreen("name")}
             onSignup={handleSignup}
             displayName={displayName}
+            isSubmitting={isSigningUp}
           />
         </View>
       )}

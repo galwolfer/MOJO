@@ -36,6 +36,7 @@ interface Props {
   onBack: () => void;
   onSignup: () => void;
   displayName?: string;
+  isSubmitting?: boolean;
 }
 
 const SignupStep: React.FC<Props> = ({
@@ -55,6 +56,7 @@ const SignupStep: React.FC<Props> = ({
   onBack,
   onSignup,
   displayName,
+  isSubmitting = false,
 }) => {
   return (
     <View style={{ width: "100%" }}>
@@ -119,8 +121,22 @@ const SignupStep: React.FC<Props> = ({
 
             <AuthButtonsGroup
               entranceEnabled={typingDone}
-              left={{ title: "Back", onPress: onBack, icon: "left", iconPosition: "left", mode: "light" }}
-              right={{ title: "Next", onPress: onSignup, icon: "right", iconPosition: "right", color: "primary6" }}
+              left={{
+                title: "Back",
+                onPress: onBack,
+                icon: "left",
+                iconPosition: "left",
+                mode: "light",
+                disabled: isSubmitting,
+              }}
+              right={{
+                title: isSubmitting ? "Connecting..." : "Next",
+                onPress: onSignup,
+                icon: "right",
+                iconPosition: "right",
+                color: "primary6",
+                disabled: isSubmitting,
+              }}
             />
           </>
         )}
