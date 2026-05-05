@@ -29,7 +29,8 @@ import {
 
 const router = Router();
 
-// All notification routes require authentication
+// Apply rate limiting before authentication
+router.use(generalLimiter);
 router.use(requireAuth);
 
 /**

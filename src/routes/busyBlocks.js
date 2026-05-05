@@ -29,6 +29,7 @@ import { BusyBlock } from "../models/BusyBlock.js";
 import { triggerSchedulerUpdate } from "../services/schedulingService.js";
 
 const router = Router();
+router.use(generalLimiter);
 router.use(requireAuth);
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
