@@ -29,7 +29,7 @@ export function normalizeUsernameLookup(value) {
 }
 
 export function normalizeEmailLookup(value) {
-  if (typeof value !== "string") return null;
+  if (typeof value !== "string" || value.length > 254) return null;
   const trimmed = value.trim().toLowerCase();
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed) ? trimmed : null;
+  return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(trimmed) ? trimmed : null;
 }

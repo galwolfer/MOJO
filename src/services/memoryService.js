@@ -316,9 +316,9 @@ class MongoMemoryStore {
 
       // Update or create session in database
       await Session.findOneAndUpdate(
-        { sessionId },
+        { sessionId: normalizedSessionId },
         {
-          $setOnInsert: { userId },
+          $setOnInsert: { userId: normalizedUserId },
           $set: { lastActiveAt: new Date() },
           $push: { messages: message },
           $inc: { messageCount: 1 },

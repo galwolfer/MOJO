@@ -1172,7 +1172,7 @@ export async function completeTask({ taskId, userId }) {
     try {
       await SubTask.updateMany({ taskId, status: { $ne: "done" } }, { $set: { status: "done", completedAt: now } });
     } catch (err) {
-      console.warn(`[completeTask] Failed to mark subtasks completed for task ${taskId}:`, err && err.message);
+      console.warn("[completeTask] Failed to mark subtasks completed for task:", taskId, err && err.message);
     }
 
     // Mark all planned TaskSchedule sessions for this task as completed
