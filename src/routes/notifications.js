@@ -29,9 +29,7 @@ import {
 
 const router = Router();
 
-// Apply rate limiting before authentication
 router.use(generalLimiter);
-router.use(requireAuth);
 
 /**
  * POST /api/notifications/register
@@ -39,7 +37,7 @@ router.use(requireAuth);
  *
  * Body: { token: string, platform?: 'ios' | 'android' }
  */
-router.post("/register", strictLimiter, async (req, res) => {
+router.post("/register", strictLimiter, requireAuth, async (req, res) => {
   try {
     const { token, platform } = req.body;
 
@@ -73,7 +71,7 @@ router.post("/register", strictLimiter, async (req, res) => {
  * POST /api/notifications/unregister
  * Remove push token and disable notifications for the authenticated user
  */
-router.post("/unregister", strictLimiter, async (req, res) => {
+router.post("/unregister", strictLimiter, requireAuth, async (req, res) => {
   try {
     const result = await unregisterPushToken(req.user.userId);
 
@@ -139,7 +137,7 @@ router.get("/preferences", generalLimiter, async (req, res) => {
  *   timezone?: string (IANA timezone)
  * }
  */
-router.put("/preferences", strictLimiter, async (req, res) => {
+router.put("/preferences", strictLimiter, requireAuth, async (req, res) => {
   try {
     const preferences = req.body;
 
@@ -210,7 +208,7 @@ router.put("/preferences", strictLimiter, async (req, res) => {
  * POST /api/notifications/test
  * Send a test notification to verify push notification setup
  */
-router.post("/test", aiSuggestionsLimiter, async (req, res) => {
+router.post("/test", aiSuggestionsLimiter, requireAuth, async (req, res) => {
   try {
     const result = await sendTestNotification(req.user.userId);
 
@@ -235,7 +233,7 @@ router.post("/test", aiSuggestionsLimiter, async (req, res) => {
  * POST /api/notifications/test/start
  * Start periodic test notifications (every 1 minute)
  */
-router.post("/test/start", aiSuggestionsLimiter, async (req, res) => {
+router.post("/test/start", aiSuggestionsLimiter, requireAuth, async (req, res) => {
   try {
     const result = await startPeriodicTestNotifications(req.user.userId);
     return res.json(result);
@@ -252,7 +250,7 @@ router.post("/test/start", aiSuggestionsLimiter, async (req, res) => {
  * POST /api/notifications/test/stop
  * Stop periodic test notifications
  */
-router.post("/test/stop", aiSuggestionsLimiter, async (req, res) => {
+router.post("/test/stop", aiSuggestionsLimiter, requireAuth, async (req, res) => {
   try {
     const result = stopPeriodicTestNotifications(req.user.userId);
     return res.json(result);
@@ -281,7 +279,7 @@ router.get("/test/status", generalLimiter, (req, res) => {
  * POST /api/notifications/test/morning-digest
  * Manually trigger morning digest for testing (ignores daily limit)
  */
-router.post("/test/morning-digest", aiSuggestionsLimiter, async (req, res) => {
+router.post("/test/morning-digest", aiSuggestionsLimiter, requireAuth, async (req, res) => {
   try {
     const { testMorningDigestNotifications } = await import("../services/notificationService.js");
     const result = await testMorningDigestNotifications();
@@ -307,7 +305,7 @@ router.post("/test/morning-digest", aiSuggestionsLimiter, async (req, res) => {
  *   useSmartReminders?: boolean (default: true)
  * }
  */
-router.post("/test/task-reminder", aiSuggestionsLimiter, async (req, res) => {
+router.post("/test/task-reminder", aiSuggestionsLimiter, requireAuth, async (req, res) => {
   try {
     const { useSmartReminders = true } = req.body;
     const { testTaskReminderNotification } = await import("../services/notificationService.js");
@@ -332,7 +330,7 @@ router.post("/test/task-reminder", aiSuggestionsLimiter, async (req, res) => {
  *   useSmartReminders?: boolean (default: true)
  * }
  */
-router.post("/test/subtask-reminder", aiSuggestionsLimiter, async (req, res) => {
+router.post("/test/subtask-reminder", aiSuggestionsLimiter, requireAuth, async (req, res) => {
   try {
     const { useSmartReminders = true } = req.body;
     const { testSubtaskReminderNotification } = await import("../services/notificationService.js");
@@ -357,7 +355,7 @@ router.post("/test/subtask-reminder", aiSuggestionsLimiter, async (req, res) => 
  *   taskId?: string (optional - uses first upcoming task if not provided)
  * }
  */
-router.post("/test/smart-reminder", aiSuggestionsLimiter, async (req, res) => {
+router.post("/test/smart-reminder", aiSuggestionsLimiter, requireAuth, async (req, res) => {
   try {
     const { taskId } = req.body;
     const { testSmartReminderCalculation } = await import("../services/notificationService.js");
@@ -384,7 +382,7 @@ router.post("/test/smart-reminder", aiSuggestionsLimiter, async (req, res) => {
  *                    If not provided and smart reminders disabled, uses user's selected Ojo or mentorjo
  * }
  */
-router.post("/test/ojo-reminder", aiSuggestionsLimiter, async (req, res) => {
+router.post("/test/ojo-reminder", aiSuggestionsLimiter, requireAuth, async (req, res) => {
   try {
     const { ojoType } = req.body;
     const { testOjoReminderNotification } = await import("../services/notificationService.js");
@@ -507,7 +505,7 @@ router.get("/inbox/unread-count", generalLimiter, async (req, res) => {
  * PATCH /api/notifications/inbox/:id/read
  * Mark a single notification as read.
  */
-router.patch("/inbox/:id/read", strictLimiter, async (req, res) => {
+router.patch("/inbox/:id/read", strictLimiter, requireAuth, async (req, res) => {
   try {
     const notification = await InAppNotification.findOneAndUpdate(
       { _id: req.params.id, userId: req.user.userId },
@@ -530,7 +528,7 @@ router.patch("/inbox/:id/read", strictLimiter, async (req, res) => {
  * PATCH /api/notifications/inbox/read-all
  * Mark all notifications as read for the authenticated user.
  */
-router.patch("/inbox/read-all", strictLimiter, async (req, res) => {
+router.patch("/inbox/read-all", strictLimiter, requireAuth, async (req, res) => {
   try {
     const result = await InAppNotification.updateMany(
       { userId: req.user.userId, read: false },

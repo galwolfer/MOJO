@@ -30,7 +30,6 @@ import { triggerSchedulerUpdate } from "../services/schedulingService.js";
 
 const router = Router();
 router.use(generalLimiter);
-router.use(requireAuth);
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -146,7 +145,7 @@ function parseRecurrence(recurrence) {
 
 // ── GET /api/busy-blocks ────────────────────────────────────────────────────
 // Returns all active blocks: one-time (end > now) + recurring (not expired).
-router.get("/", generalLimiter, async (req, res, next) => {
+router.get("/", generalLimiter, requireAuth, async (req, res, next) => {
   try {
     const blocks = await getUpcomingBusyBlocks(req.user.userId);
     res.json({ success: true, busyBlocks: blocks });
@@ -156,7 +155,7 @@ router.get("/", generalLimiter, async (req, res, next) => {
 });
 
 // ── POST /api/busy-blocks ───────────────────────────────────────────────────
-router.post("/", strictLimiter, async (req, res, next) => {
+router.post("/", strictLimiter, requireAuth, async (req, res, next) => {
   try {
     const userId = req.user.userId;
     const {
@@ -245,7 +244,7 @@ router.post("/", strictLimiter, async (req, res, next) => {
 });
 
 // ── PUT /api/busy-blocks/:id ────────────────────────────────────────────────
-router.put("/:id", strictLimiter, async (req, res, next) => {
+router.put("/:id", strictLimiter, requireAuth, async (req, res, next) => {
   try {
     const userId = req.user.userId;
     const blockId = req.params.id;
@@ -312,7 +311,7 @@ router.put("/:id", strictLimiter, async (req, res, next) => {
 });
 
 // ── DELETE /api/busy-blocks/:id ─────────────────────────────────────────────
-router.delete("/:id", strictLimiter, async (req, res, next) => {
+router.delete("/:id", strictLimiter, requireAuth, async (req, res, next) => {
   try {
     const userId = req.user.userId;
     const blockId = req.params.id;
