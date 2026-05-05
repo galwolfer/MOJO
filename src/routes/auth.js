@@ -6,6 +6,7 @@
 import express from "express";
 import path from "path";
 import multer from "multer";
+import { generalLimiter, strictLimiter, authLimiter } from "../middlewares/rateLimiter.js";
 import {
   register,
   login,
@@ -51,10 +52,10 @@ const upload = multer({
  */
 
 // Register new user
-router.post("/register", register);
+router.post("/register", authLimiter, register);
 
 // Upload profile avatar (multipart/form-data with 'avatar' field)
-router.post("/upload-avatar", upload.single("avatar"), (req, res) => {
+router.post("/upload-avatar", strictLimiter, upload.single("avatar"), (req, res) => {
   try {
     const file = req.file;
     if (!file) return res.status(400).json({ success: false, error: "No file uploaded" });
@@ -67,30 +68,30 @@ router.post("/upload-avatar", upload.single("avatar"), (req, res) => {
   }
 });
 // Login user
-router.post("/login", login);
+router.post("/login", authLimiter, login);
 
 // Get current user (protected)
-router.get("/me", requireAuth, getMe);
+router.get("/me", generalLimiter, requireAuth, getMe);
 
 // Update user profile (protected)
-router.patch("/profile", requireAuth, updateProfile);
+router.patch("/profile", strictLimiter, requireAuth, updateProfile);
 
 // Delete account (protected)
-router.delete("/account", requireAuth, deleteAccount);
+router.delete("/account", strictLimiter, requireAuth, deleteAccount);
 
 // Update category priorities (protected)
-router.post("/category-priorities", requireAuth, updateCategoryPriorities);
+router.post("/category-priorities", strictLimiter, requireAuth, updateCategoryPriorities);
 
 // Get user preferences (protected)
-router.get("/preferences", requireAuth, getPreferences);
+router.get("/preferences", generalLimiter, requireAuth, getPreferences);
 
 // Update scheduling preferences (minGapMinutes, etc.)
-router.patch("/scheduling-preferences", requireAuth, updateSchedulingPreferences);
+router.patch("/scheduling-preferences", strictLimiter, requireAuth, updateSchedulingPreferences);
 
 // Memory management (primary memories the LLM uses for user context)
-router.get("/memories", requireAuth, getMemories);
-router.post("/memories", requireAuth, addMemory);
-router.patch("/memories/:memoryId", requireAuth, updateMemory);
-router.delete("/memories/:memoryId", requireAuth, deleteMemory);
+router.get("/memories", generalLimiter, requireAuth, getMemories);
+router.post("/memories", strictLimiter, requireAuth, addMemory);
+router.patch("/memories/:memoryId", strictLimiter, requireAuth, updateMemory);
+router.delete("/memories/:memoryId", strictLimiter, requireAuth, deleteMemory);
 
 export default router;

@@ -25,6 +25,7 @@ import {
 import { getUserStats } from "../controllers/userController.js";
 import { listOjoTypes, getOjoTypeByName } from "../controllers/ojoTypeController.js";
 import { requireAuth } from "../middlewares/auth.js";
+import { generalLimiter, strictLimiter, aiSuggestionsLimiter, bulkOperationLimiter } from "../middlewares/rateLimiter.js";
 
 const router = Router();
 
@@ -53,29 +54,29 @@ router.use("/notifications", notificationsRouter);
 
 // ==================== PROFILE — ROUTES (START) =====================
 // Base path for profile feature
-router.get("/profile", profileGet);
-router.put("/profile", profileUpdate);
+router.get("/profile", generalLimiter, profileGet);
+router.put("/profile", strictLimiter, profileUpdate);
 // Add more profile routes below
 // router.get('/profile/things', ...);
 // ==================== PROFILE — ROUTES (END) =======================
 
 // ==================== OJOTYPES — ROUTES (START) ====================
 // Public endpoints to read available OjoTypes (for the onboarding UI)
-router.get("/ojo-types", listOjoTypes);
-router.get("/ojo-types/:name", getOjoTypeByName);
+router.get("/ojo-types", generalLimiter, listOjoTypes);
+router.get("/ojo-types/:name", generalLimiter, getOjoTypeByName);
 // ==================== OJOTYPES — ROUTES (END) ======================
 
 // ==================== PRIORITY — ROUTES (START) ====================
-router.post("/priority/coach/next", priorityNext);
-router.post("/priority/coach/feedback", priorityFeedback);
+router.post("/priority/coach/next", aiSuggestionsLimiter, priorityNext);
+router.post("/priority/coach/feedback", aiSuggestionsLimiter, priorityFeedback);
 
-router.get("/priority/stats", priorityStats);
-router.post("/priority/job", priorityTriggerJob);
+router.get("/priority/stats", generalLimiter, priorityStats);
+router.post("/priority/job", bulkOperationLimiter, priorityTriggerJob);
 // ==================== PRIORITY — ROUTES (END) ======================
 
 // ==================== USER — ROUTES (START) ========================
 // User stats and gamification endpoints
-router.get("/user/stats", requireAuth, getUserStats);
+router.get("/user/stats", generalLimiter, requireAuth, getUserStats);
 // ==================== USER — ROUTES (END) ==========================
 
 export default router;

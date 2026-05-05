@@ -18,6 +18,7 @@
 
 import { Router } from "express";
 import { requireAuth } from "../middlewares/auth.js";
+import { generalLimiter, strictLimiter } from "../middlewares/rateLimiter.js";
 import {
   createBusyBlock,
   getUpcomingBusyBlocks,
@@ -144,7 +145,7 @@ function parseRecurrence(recurrence) {
 
 // ── GET /api/busy-blocks ────────────────────────────────────────────────────
 // Returns all active blocks: one-time (end > now) + recurring (not expired).
-router.get("/", async (req, res, next) => {
+router.get("/", generalLimiter, async (req, res, next) => {
   try {
     const blocks = await getUpcomingBusyBlocks(req.user.userId);
     res.json({ success: true, busyBlocks: blocks });
@@ -154,7 +155,7 @@ router.get("/", async (req, res, next) => {
 });
 
 // ── POST /api/busy-blocks ───────────────────────────────────────────────────
-router.post("/", async (req, res, next) => {
+router.post("/", strictLimiter, async (req, res, next) => {
   try {
     const userId = req.user.userId;
     const {
@@ -243,7 +244,7 @@ router.post("/", async (req, res, next) => {
 });
 
 // ── PUT /api/busy-blocks/:id ────────────────────────────────────────────────
-router.put("/:id", async (req, res, next) => {
+router.put("/:id", strictLimiter, async (req, res, next) => {
   try {
     const userId = req.user.userId;
     const blockId = req.params.id;
@@ -310,7 +311,7 @@ router.put("/:id", async (req, res, next) => {
 });
 
 // ── DELETE /api/busy-blocks/:id ─────────────────────────────────────────────
-router.delete("/:id", async (req, res, next) => {
+router.delete("/:id", strictLimiter, async (req, res, next) => {
   try {
     const userId = req.user.userId;
     const blockId = req.params.id;

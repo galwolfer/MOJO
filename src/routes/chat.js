@@ -4,6 +4,7 @@
  */
 
 import express from "express";
+import { generalLimiter, strictLimiter, aiSuggestionsLimiter } from "../middlewares/rateLimiter.js";
 import {
   sendMessage,
   resetSession,
@@ -22,21 +23,21 @@ const router = express.Router();
  */
 
 // Message route (protected)
-router.post("/message", requireAuth, sendMessage);
+router.post("/message", aiSuggestionsLimiter, requireAuth, sendMessage);
 
 // Reset session (protected)
-router.post("/reset", requireAuth, resetSession);
+router.post("/reset", strictLimiter, requireAuth, resetSession);
 
 // History retrieval (protected)
-router.get("/history/:sessionId", requireAuth, getHistory);
+router.get("/history/:sessionId", generalLimiter, requireAuth, getHistory);
 
 // Sessions list (protected)
-router.get("/sessions", requireAuth, getSessions);
+router.get("/sessions", generalLimiter, requireAuth, getSessions);
 
 // Quick sessions list from User.sessions (protected)
-router.get("/user-sessions", requireAuth, getUserSessionsDoc);
+router.get("/user-sessions", generalLimiter, requireAuth, getUserSessionsDoc);
 
 // Health check (public)
-router.get("/health", healthCheck);
+router.get("/health", generalLimiter, healthCheck);
 
 export default router;
