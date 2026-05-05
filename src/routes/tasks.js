@@ -5,6 +5,12 @@
 
 import { Router } from "express";
 import { requireAuth } from "../middlewares/auth.js";
+import {
+  generalLimiter,
+  strictLimiter,
+  bulkOperationLimiter,
+  aiSuggestionsLimiter,
+} from "../middlewares/rateLimiter.js";
 import * as taskController from "../controllers/taskController.js";
 import { Task } from "../models/Task.js";
 import { TaskSchedule } from "../models/TaskSchedule.js";
@@ -86,7 +92,7 @@ router.use(requireAuth);
  *
  * Returns suggested category and subcategory for autofill
  */
-router.post("/suggest-category", taskController.suggestCategory);
+router.post("/suggest-category", aiSuggestionsLimiter, taskController.suggestCategory);
 
 /* ─────────────────────────────────────────────────────────────────────────
    SUBCATEGORY MANAGEMENT
@@ -101,7 +107,7 @@ router.post("/suggest-category", taskController.suggestCategory);
  * Validates category exists (0-17) and prevents duplicates
  * Limited to 50 subcategories per category per user
  */
-router.post("/subcategories", async (req, res, next) => {
+router.post("/subcategories", strictLimiter, async (req, res, next) => {
   try {
     const { name, category, icon, color } = req.body;
     const userId = req.user.userId;
@@ -204,7 +210,7 @@ router.post("/subcategories", async (req, res, next) => {
  *
  * Also includes historical task-derived subcategories (merged and deduped)
  */
-router.get("/subcategories", async (req, res, next) => {
+router.get("/subcategories", generalLimiter, async (req, res, next) => {
   try {
     const { category } = req.query;
     const userId = req.user.userId;
@@ -315,7 +321,7 @@ router.get("/subcategories", async (req, res, next) => {
  * Removes subcategory from user profile
  * Does NOT affect existing tasks that use this subcategory
  */
-router.delete("/subcategories/:id", async (req, res, next) => {
+router.delete("/subcategories/:id", strictLimiter, async (req, res, next) => {
   try {
     const { id } = req.params;
     const { category } = req.query;
@@ -399,7 +405,7 @@ router.delete("/subcategories/:id", async (req, res, next) => {
  * PATCH /api/tasks/subcategories/:id
  * Body: { name?: string, icon?: string | null }
  */
-router.patch("/subcategories/:id", async (req, res, next) => {
+router.patch("/subcategories/:id", strictLimiter, async (req, res, next) => {
   try {
     const { id } = req.params;
     const { name, icon, color } = req.body;
@@ -485,16 +491,16 @@ router.patch("/subcategories/:id", async (req, res, next) => {
    ───────────────────────────────────────────────────────────────────────── */
 
 // Get tasks scheduled within the next N days (grouped by day)
-router.get("/scheduled/:days?", taskController.getScheduledTasks);
+router.get("/scheduled/:days?", generalLimiter, taskController.getScheduledTasks);
 
 // Get tasks due within the next N days (default: 7)
-router.get("/upcoming/:days?", taskController.getUpcomingTasks);
+router.get("/upcoming/:days?", generalLimiter, taskController.getUpcomingTasks);
 
 // Get all overdue tasks (past deadline + not completed)
-router.get("/overdue", taskController.getOverdueTasks);
+router.get("/overdue", generalLimiter, taskController.getOverdueTasks);
 
 // Decline overdue tasks – increments the per-task dismiss counter (3 declines = task hidden)
-router.post("/overdue/decline", taskController.declineOverdueTasks);
+router.post("/overdue/decline", strictLimiter, taskController.declineOverdueTasks);
 
 /* ─────────────────────────────────────────────────────────────────────────
    EXPIRED TASK MANAGEMENT
@@ -505,7 +511,7 @@ router.post("/overdue/decline", taskController.declineOverdueTasks);
  * Get all expired tasks
  * Returns tasks with dueDate in the past that aren't marked as done
  */
-router.get("/expired", async (req, res, next) => {
+router.get("/expired", generalLimiter, async (req, res, next) => {
   try {
     const userId = req.user.userId;
     const now = new Date();
@@ -543,7 +549,7 @@ router.get("/expired", async (req, res, next) => {
  * Quick check if user has any expired tasks
  * Useful for UI to decide whether to show a blocking modal
  */
-router.get("/expired/check", async (req, res, next) => {
+router.get("/expired/check", generalLimiter, async (req, res, next) => {
   try {
     const userId = req.user.userId;
     const now = new Date();
@@ -564,7 +570,7 @@ router.get("/expired/check", async (req, res, next) => {
  * Extend an expired task's deadline
  * Body: { newDeadline: "2025-12-31T23:59:59Z" }
  */
-router.patch("/expired/:id/extend", async (req, res, next) => {
+router.patch("/expired/:id/extend", strictLimiter, async (req, res, next) => {
   try {
     const { id: taskId } = req.params;
     const { newDeadline } = req.body;
@@ -604,7 +610,7 @@ router.patch("/expired/:id/extend", async (req, res, next) => {
  * Handle an expired task – extend its deadline
  * Body: { newDeadline: "ISO date" }
  */
-router.post("/expired/:id/handle", async (req, res, next) => {
+router.post("/expired/:id/handle", strictLimiter, async (req, res, next) => {
   try {
     const { id: taskId } = req.params;
     const { newDeadline } = req.body;
@@ -646,37 +652,37 @@ router.post("/expired/:id/handle", async (req, res, next) => {
    ───────────────────────────────────────────────────────────────────────── */
 
 // Create a new task
-router.post("/", taskController.createTask);
+router.post("/", strictLimiter, taskController.createTask);
 
 // Get all tasks (supports filters: tag, completed, dueBefore, dueAfter)
-router.get("/", taskController.getTasks);
+router.get("/", generalLimiter, taskController.getTasks);
 
 // Get subtasks for a task
-router.get("/:id/subtasks", taskController.getSubTasksForTask);
+router.get("/:id/subtasks", generalLimiter, taskController.getSubTasksForTask);
 
 // Get task progress with subtasks and schedule details
-router.get("/:id/progress", taskController.getTaskProgress);
+router.get("/:id/progress", generalLimiter, taskController.getTaskProgress);
 
 // Get a single subtask by ID
-router.get("/:taskId/subtasks/:subId", taskController.getSubTaskById);
+router.get("/:taskId/subtasks/:subId", generalLimiter, taskController.getSubTaskById);
 
 // Update a single subtask for a task (mark complete / update title)
-router.patch("/:taskId/subtasks/:subId", taskController.updateSubTask);
+router.patch("/:taskId/subtasks/:subId", strictLimiter, taskController.updateSubTask);
 
 // Mark subtask as complete (shortcut)
-router.post("/:taskId/subtasks/:subId/complete", taskController.markSubTaskComplete);
+router.post("/:taskId/subtasks/:subId/complete", strictLimiter, taskController.markSubTaskComplete);
 
 // Mark subtask as todo (shortcut)
-router.post("/:taskId/subtasks/:subId/todo", taskController.markSubTaskTodo);
+router.post("/:taskId/subtasks/:subId/todo", strictLimiter, taskController.markSubTaskTodo);
 
 // Update subtask status directly
-router.patch("/:taskId/subtasks/:subId/status", taskController.updateSubTaskStatus);
+router.patch("/:taskId/subtasks/:subId/status", strictLimiter, taskController.updateSubTaskStatus);
 
 /**
  * Delete a single subtask and its corresponding TaskSchedule entries
  * DELETE /api/tasks/:taskId/subtasks/:subId
  */
-router.delete("/:taskId/subtasks/:subId", requireAuth, async (req, res, next) => {
+router.delete("/:taskId/subtasks/:subId", strictLimiter, requireAuth, async (req, res, next) => {
   try {
     const { taskId, subId } = req.params;
     const userId = req.user.userId;
@@ -704,7 +710,7 @@ router.delete("/:taskId/subtasks/:subId", requireAuth, async (req, res, next) =>
 });
 
 // Bulk update task with subtasks in one call
-router.patch("/:id/full", taskController.bulkUpdateTaskWithSubtasks);
+router.patch("/:id/full", bulkOperationLimiter, taskController.bulkUpdateTaskWithSubtasks);
 
 /* ─────────────────────────────────────────────────────────────────────────
    SCHEDULED SESSIONS RETRIEVAL
@@ -728,7 +734,7 @@ router.patch("/:id/full", taskController.bulkUpdateTaskWithSubtasks);
  *   }>
  * }
  */
-router.get("/schedule/sessions", requireAuth, async (req, res, next) => {
+router.get("/schedule/sessions", generalLimiter, requireAuth, async (req, res, next) => {
   try {
     const userId = req.user.userId;
     const { startDate, endDate } = req.query;
@@ -853,7 +859,7 @@ router.get("/schedule/sessions", requireAuth, async (req, res, next) => {
  *
  * Response: { success, sessions: [{ _id, start, end, minutes, subtaskIndex, subtaskTitle, status, manuallyScheduled }] }
  */
-router.get("/:id/sessions", requireAuth, async (req, res, next) => {
+router.get("/:id/sessions", generalLimiter, requireAuth, async (req, res, next) => {
   try {
     const { id: taskId } = req.params;
     const userId = req.user.userId;
@@ -904,7 +910,7 @@ router.get("/:id/sessions", requireAuth, async (req, res, next) => {
  *
  * Response: { success, sessions: [...] }
  */
-router.patch("/:id/sessions", requireAuth, async (req, res, next) => {
+router.patch("/:id/sessions", strictLimiter, requireAuth, async (req, res, next) => {
   try {
     const { id: taskId } = req.params;
     const userId = req.user.userId;
@@ -1116,29 +1122,29 @@ router.patch("/:id/sessions", requireAuth, async (req, res, next) => {
 });
 
 // Get a single task by ID
-router.get("/:id", taskController.getTaskById);
+router.get("/:id", generalLimiter, taskController.getTaskById);
 
 // Update a task
-router.patch("/:id", taskController.updateTask);
+router.patch("/:id", strictLimiter, taskController.updateTask);
 
 // Delete a task
-router.delete("/:id", taskController.deleteTask);
+router.delete("/:id", strictLimiter, taskController.deleteTask);
 
 // Toggle task completion status
-router.post("/:id/toggle", taskController.toggleTaskCompletion);
+router.post("/:id/toggle", strictLimiter, taskController.toggleTaskCompletion);
 
 // Complete a task (with ML training)
-router.post("/:id/complete", taskController.completeTask);
+router.post("/:id/complete", strictLimiter, taskController.completeTask);
 
 /* ─────────────────────────────────────────────────────────────────────────
    DEBUG ENDPOINTS (for testing completedAt)
    ───────────────────────────────────────────────────────────────────────── */
 
 // DEBUG: Update task completedAt for testing
-router.patch("/:id/debug/completed-at", taskController.debugUpdateTaskCompletedAt);
+router.patch("/:id/debug/completed-at", generalLimiter, taskController.debugUpdateTaskCompletedAt);
 
 // DEBUG: Update subtask completedAt for testing
-router.patch("/:taskId/subtasks/:subId/debug/completed-at", taskController.debugUpdateSubtaskCompletedAt);
+router.patch("/:taskId/subtasks/:subId/debug/completed-at", generalLimiter, taskController.debugUpdateSubtaskCompletedAt);
 
 /* ─────────────────────────────────────────────────────────────────────────
    TASK SCHEDULING
@@ -1170,7 +1176,7 @@ router.patch("/:taskId/subtasks/:subId/debug/completed-at", taskController.debug
  *   scheduledCount: number
  * }
  */
-router.post("/:id/schedule", async (req, res, next) => {
+router.post("/:id/schedule", bulkOperationLimiter, async (req, res, next) => {
   try {
     const { id: taskId } = req.params;
     const { planningHorizonDays = 14 } = req.body;
@@ -1310,7 +1316,7 @@ router.post("/:id/schedule", async (req, res, next) => {
  *   plan: Array<{ start, end, minutes, taskId, subtaskIndex }>
  * }
  */
-router.post("/reschedule-all", async (req, res, next) => {
+router.post("/reschedule-all", bulkOperationLimiter, async (req, res, next) => {
   try {
     const userId = req.user.userId;
 
