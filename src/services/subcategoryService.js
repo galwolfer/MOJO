@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { Subcategory } from "../models/Subcategory.js";
 import { User } from "../models/User.js";
 import { CATEGORY_STRING_VALUES, getDisplayName, isValidCategory } from "../config/categories.js";
+import { normalizeObjectId } from "../utils/querySanitizers.js";
 
 function normalizeCategoryKey(category) {
   if (!category) return "";
@@ -17,11 +18,13 @@ function normalizeName(name) {
 const SYSTEM_USER_ID = "000000000000000000000000";
 
 export async function findSubcategoryById({ userId, subcategoryId }) {
-  if (!userId || !subcategoryId) return null;
+  const normalizedUserId = normalizeObjectId(userId);
+  const normalizedSubcategoryId = normalizeObjectId(subcategoryId);
+  if (!normalizedUserId || !normalizedSubcategoryId) return null;
   // Also accept system-wide (general) subcategories shared across all users
   return Subcategory.findOne({
-    _id: subcategoryId,
-    userId: { $in: [userId, SYSTEM_USER_ID] },
+    _id: normalizedSubcategoryId,
+    userId: { $in: [normalizedUserId, SYSTEM_USER_ID] },
   }).lean();
 }
 
@@ -31,13 +34,14 @@ export async function addSubcategoryToUser(userId, subcategoryId) {
 }
 
 export async function findSubcategoryByName({ userId, name, parent }) {
-  if (!userId) return null;
+  const normalizedUserId = normalizeObjectId(userId);
+  if (!normalizedUserId) return null;
   const trimmedName = normalizeName(name);
   const parentKey = normalizeCategoryKey(parent);
   if (!trimmedName || !parentKey || !isValidCategory(parentKey)) return null;
 
   return Subcategory.findOne({
-    userId,
+    userId: normalizedUserId,
     parent: parentKey,
     nameLower: trimmedName.toLowerCase(),
   }).lean();
@@ -52,7 +56,8 @@ export async function findOrCreateSubcategory({
   source = "user",
   confidence = 1,
 } = {}) {
-  if (!userId) return null;
+  const normalizedUserId = normalizeObjectId(userId);
+  if (!normalizedUserId) return null;
 
   const trimmedName = normalizeName(name);
   const parentKey = normalizeCategoryKey(parent);
@@ -60,14 +65,14 @@ export async function findOrCreateSubcategory({
   if (!trimmedName || !parentKey || !isValidCategory(parentKey)) return null;
 
   let sub = await Subcategory.findOne({
-    userId,
+    userId: normalizedUserId,
     parent: parentKey,
     nameLower: trimmedName.toLowerCase(),
   });
 
   if (!sub) {
     sub = await Subcategory.create({
-      userId,
+      userId: normalizedUserId,
       name: trimmedName,
       parent: parentKey,
       icon,
@@ -97,16 +102,18 @@ export async function resolveSubcategoryId({
   confidence = 1,
 } = {}) {
   let candidateId = subcategoryId || (subcategory && (subcategory._id || subcategory.id || subcategory.subcategoryId));
+  const normalizedUserId = normalizeObjectId(userId);
+  const normalizedCandidateId = normalizeObjectId(candidateId);
 
-  if (!candidateId && typeof subcategory === "string" && /^[a-fA-F0-9]{24}$/.test(subcategory)) {
+  if (!normalizedCandidateId && typeof subcategory === "string" && /^[a-fA-F0-9]{24}$/.test(subcategory)) {
     candidateId = subcategory;
   }
 
-  if (candidateId) {
+  if (normalizedCandidateId && normalizedUserId) {
     // Accept subcategories owned by the user OR the system-wide general ones
     const found = await Subcategory.findOne({
-      _id: candidateId,
-      userId: { $in: [userId, SYSTEM_USER_ID] },
+      _id: normalizedCandidateId,
+      userId: { $in: [normalizedUserId, SYSTEM_USER_ID] },
     }).lean();
     return found ? found._id : null;
   }

@@ -4,10 +4,12 @@
  */
 
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { User } from "../models/index.js";
 import { env } from "../config/env.js";
 import { getDefaultOjoType } from "../utils/ojoTypeUtils.js";
+import { normalizeEmailLookup, normalizeUsernameLookup } from "../utils/querySanitizers.js";
 
 const JWT_SECRET = env.JWT_SECRET || "your-secret-key-change-in-production";
 const JWT_EXPIRES_IN = "7d"; // Token valid for 7 days
@@ -80,8 +82,14 @@ export async function register(req, res, next) {
     }
 
     // Check if user already exists
+    const normalizedUsername = normalizeUsernameLookup(username);
+    const normalizedEmail = normalizeEmailLookup(email);
+    if (!normalizedUsername || !normalizedEmail) {
+      return res.status(400).json({ success: false, error: "Invalid username or email" });
+    }
+
     const existingUser = await User.findOne({
-      $or: [{ username }, { email }],
+      $or: [{ username: normalizedUsername }, { email: normalizedEmail }],
     });
 
     if (existingUser) {
@@ -99,8 +107,8 @@ export async function register(req, res, next) {
 
     // Create user
     const user = new User({
-      username,
-      email,
+      username: normalizedUsername,
+      email: normalizedEmail,
       passwordHash,
       profile: {
         name: displayName ? String(displayName).trim() : "",
@@ -157,7 +165,8 @@ export async function login(req, res, next) {
     const { username, password } = req.body;
 
     // Validation
-    if (!username || !password) {
+    const normalizedUsername = normalizeUsernameLookup(username);
+    if (!normalizedUsername || !password) {
       return res.status(400).json({
         success: false,
         error: "Username and password are required",
@@ -165,7 +174,7 @@ export async function login(req, res, next) {
     }
 
     // Find user
-    const user = await User.findOne({ username });
+    const user = await User.findOne({ username: normalizedUsername });
 
     if (!user) {
       return res.status(401).json({
@@ -311,26 +320,34 @@ export async function updateProfile(req, res, next) {
 
     // Check if username is being updated and if it's already taken
     if (username !== undefined && username !== user.username) {
-      const existingUserWithUsername = await User.findOne({ username, _id: { $ne: userId } });
+      const normalizedUsername = normalizeUsernameLookup(username);
+      if (!normalizedUsername) {
+        return res.status(400).json({ success: false, error: "Invalid username" });
+      }
+      const existingUserWithUsername = await User.findOne({ username: normalizedUsername, _id: { $ne: userId } });
       if (existingUserWithUsername) {
         return res.status(409).json({
           success: false,
           error: "Username already taken",
         });
       }
-      user.username = username;
+      user.username = normalizedUsername;
     }
 
     // Check if email is being updated and if it's already taken
     if (email !== undefined && email !== user.email) {
-      const existingUserWithEmail = await User.findOne({ email, _id: { $ne: userId } });
+      const normalizedEmail = normalizeEmailLookup(email);
+      if (!normalizedEmail) {
+        return res.status(400).json({ success: false, error: "Invalid email" });
+      }
+      const existingUserWithEmail = await User.findOne({ email: normalizedEmail, _id: { $ne: userId } });
       if (existingUserWithEmail) {
         return res.status(409).json({
           success: false,
           error: "Email already in use",
         });
       }
-      user.email = email;
+      user.email = normalizedEmail;
     }
 
     // Update profile fields
@@ -339,7 +356,7 @@ export async function updateProfile(req, res, next) {
     if (ojoTypeName) {
       // Import OjoType here to avoid circular imports
       const OjoType = (await import("../models/OjoType.js")).default;
-      const ojoType = await OjoType.findOne({ name: ojoTypeName.toLowerCase() });
+      const ojoType = await OjoType.findOne({ name: String(ojoTypeName).toLowerCase() });
       if (ojoType) {
         user.profile.ojoTypeId = ojoType._id;
       } else {

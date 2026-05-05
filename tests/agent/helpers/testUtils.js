@@ -1,8 +1,8 @@
 import { User } from "../../../src/models/User.js";
 
 export function parseResponseId(response) {
-  const idLine = response.split("\n").find((l) => l.startsWith("id="));
-  return idLine ? idLine.replace('id="', "").replace('"', "").trim() : null;
+  const match = response.match(/^id="([^"]+)"/m);
+  return match ? match[1].trim() : null;
 }
 
 export function parseSubcategories(response) {

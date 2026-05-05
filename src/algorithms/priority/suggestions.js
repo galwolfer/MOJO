@@ -133,7 +133,7 @@ export async function suggestTaskFromProfile(profile = {}, tasks = []) {
 
   const best = scoredCategories[0];
   const library = SUGGESTION_LIBRARY[best.category] || SUGGESTION_LIBRARY.uncategorized;
-  const suggestion = library[Math.floor(Math.random() * library.length)];
+  const suggestion = library[crypto.randomInt(library.length)];
   const trackingId = crypto.randomUUID();
 
   return {

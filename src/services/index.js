@@ -45,6 +45,7 @@ export const profileService = {
 // ==================== PRIORITY — SERVICES (START) ====================
 import { Task } from "../models/Task.js";
 import { scoreActivities } from "../algorithms/priority/priority.js";
+import { normalizeObjectId } from "../utils/querySanitizers.js";
 
 // Open = "todo" | "in-progress", Closed = "done"
 const mapStatus = (s) => (s === "todo" || s === "in-progress" ? "open" : s === "done" ? "closed" : "open");
@@ -52,9 +53,12 @@ const mapStatus = (s) => (s === "todo" || s === "in-progress" ? "open" : s === "
 export const coacherAlgorithm = {
   // importing tasks by username from the DB
   async computeFromDb(userId, userProfile = {}) {
+    const normalizedUserId = normalizeObjectId(userId);
+    if (!normalizedUserId) return [];
+
     // Only user's open tasks
     const tasks = await Task.find(
-      { userId, status: { $in: ["todo", "in-progress"] } },
+      { userId: normalizedUserId, status: { $in: ["todo", "in-progress"] } },
       {
         taskname: 1,
         importance: 1,

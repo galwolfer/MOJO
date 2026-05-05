@@ -231,7 +231,8 @@ function generateDeterministicVector(text, dim = 128) {
 
   // Fill vector using rolling hash of keywords
   // Each character contributes to multiple positions for better distribution
-  for (let i = 0; i < keywords.length; i++) {
+  const limit = Math.min(keywords.length, dim);
+  for (let i = 0; i < limit; i++) {
     const code = keywords.charCodeAt(i);
     const idx = i % dim; // Wrap around to fit into vector dimensions
     vec[idx] = (vec[idx] + (code % 97)) / 2 + Math.sin(code) * 0.0001;

@@ -5,6 +5,7 @@
 
 import express from "express";
 import path from "path";
+import crypto from "crypto";
 import multer from "multer";
 import { generalLimiter, strictLimiter, authLimiter } from "../middlewares/rateLimiter.js";
 import {
@@ -33,7 +34,7 @@ const storage = multer.diskStorage({
   },
   filename: function (_req, file, cb) {
     const ext = path.extname(file.originalname) || ".jpg";
-    const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
+    const name = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}${ext}`;
     cb(null, name);
   },
 });

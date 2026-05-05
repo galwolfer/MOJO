@@ -27,7 +27,12 @@ export function getIllegalCharsErrorMessage(fields) {
 
 export function sanitizeDisplayStringsDeep(value) {
   if (typeof value === "string") {
-    return value.replace(ILLEGAL_DISPLAY_CHARS_REGEX, "");
+    return value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
   if (value instanceof Date) return value;
   if (Array.isArray(value)) {

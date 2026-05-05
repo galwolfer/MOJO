@@ -18,6 +18,9 @@ import { SentReminder } from "../models/SentReminder.js";
 import { InAppNotification } from "../models/InAppNotification.js";
 import { logger } from "../utils/logger.js";
 import { startOfDay, addDays } from "../utils/dateUtils.js";
+import { normalizeObjectId } from "../utils/querySanitizers.js";
+import { normalizeObjectId } from "../utils/querySanitizers.js";
+import { normalizeObjectId } from "../utils/querySanitizers.js";
 import {
   generateOjoNotification,
   determineOjoTypeForNotification,
@@ -1724,7 +1727,12 @@ export async function testSmartReminderCalculation(userId, taskId = null) {
   logger.info(`🧪 Testing smart reminder calculation for user ${userId}`);
 
   try {
-    const user = await User.findById(userId).lean();
+    const normalizedUserId = normalizeObjectId(userId);
+    if (!normalizedUserId) {
+      return { success: false, error: "Invalid user ID" };
+    }
+
+    const user = await User.findById(normalizedUserId).lean();
 
     if (!user) {
       return { success: false, error: "User not found" };
@@ -1733,7 +1741,11 @@ export async function testSmartReminderCalculation(userId, taskId = null) {
     // Find the task
     let task;
     if (taskId) {
-      task = await Task.findOne({ _id: taskId, userId }).lean();
+      const normalizedTaskId = normalizeObjectId(taskId);
+      if (!normalizedTaskId) {
+        return { success: false, error: "Invalid task ID" };
+      }
+      task = await Task.findOne({ _id: normalizedTaskId, userId: normalizedUserId }).lean();
       if (!task) {
         return { success: false, error: "Task not found" };
       }
@@ -1741,7 +1753,7 @@ export async function testSmartReminderCalculation(userId, taskId = null) {
       // Find first upcoming task
       const now = new Date();
       task = await Task.findOne({
-        userId,
+        userId: normalizedUserId,
         status: { $ne: "done" },
         dueDate: { $gte: now },
       })
@@ -1750,7 +1762,7 @@ export async function testSmartReminderCalculation(userId, taskId = null) {
 
       if (!task) {
         task = await Task.findOne({
-          userId,
+          userId: normalizedUserId,
           status: { $ne: "done" },
         })
           .sort({ createdAt: -1 })

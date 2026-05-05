@@ -34,6 +34,7 @@ import { trainTask } from "./mlPredictionService.js";
 import { logger } from "../utils/logger.js";
 import { addDays, formatLocalDate, startOfDay } from "../utils/dateUtils.js";
 import { getIllegalDisplayFields, getIllegalCharsErrorMessage } from "../utils/illegalChars.js";
+import { normalizeObjectId, normalizeSearchRegex } from "../utils/querySanitizers.js";
 import {
   addSubcategoryToUser,
   findOrCreateSubcategory,
@@ -236,7 +237,9 @@ export async function createTask({
 export async function checkSuggestionFollowed({ userId, task, lastSuggestion, windowMs = 30 * 60 * 1000 }) {
   if (!lastSuggestion) return false;
 
-  const withinWindow = Date.now() - lastSuggestion.at <= windowMs;
+  const now = new Date().getTime();
+  const suggestedAt = Number(lastSuggestion.at);
+  const withinWindow = Number.isFinite(suggestedAt) && now - suggestedAt <= windowMs;
   if (!withinWindow) return false;
 
   const taskCategory = mapCategoryToLifecycle(task.category || "");
@@ -259,7 +262,21 @@ export async function checkSuggestionFollowed({ userId, task, lastSuggestion, wi
  * Fetch all tasks for a user.
  */
 export async function getTasksForUser(userId, filter = {}) {
-  const tasks = await Task.find({ userId, ...filter })
+  const normalizedUserId = normalizeObjectId(userId);
+  if (!normalizedUserId) return [];
+
+  const q = { userId: normalizedUserId };
+  const tag = typeof filter.tag === "string" ? filter.tag.trim() : null;
+  const category = typeof filter.category === "string" ? filter.category.trim() : null;
+  if (tag) q.category = tag;
+  if (category) q.category = category;
+  if (filter.completed !== undefined) q.status = filter.completed ? "done" : { $ne: "done" };
+  if (filter.dueBefore) q.dueDate = { ...q.dueDate, $lte: new Date(filter.dueBefore) };
+  if (filter.dueAfter) q.dueDate = { ...q.dueDate, $gte: new Date(filter.dueAfter) };
+  const search = normalizeSearchRegex(filter.search);
+  if (search) q.taskname = { $regex: search, $options: "i" };
+
+  const tasks = await Task.find(q)
     .populate("subCategory")
     .lean();
   tasks.forEach(attachSubcategoryLabel);
@@ -280,13 +297,19 @@ function attachSubcategoryLabel(task) {
  * Accepts filters: tag, completed (boolean), dueBefore, dueAfter, search
  */
 export async function getTasks(userId, filters = {}) {
-  const q = { userId };
-  if (filters.tag) q.category = filters.tag; // Map tag filter to category
-  if (filters.category) q.category = filters.category;
+  const normalizedUserId = normalizeObjectId(userId);
+  if (!normalizedUserId) return [];
+
+  const q = { userId: normalizedUserId };
+  const tag = typeof filters.tag === "string" ? filters.tag.trim() : null;
+  const category = typeof filters.category === "string" ? filters.category.trim() : null;
+  if (tag) q.category = tag; // Map tag filter to category
+  if (category) q.category = category;
   if (filters.completed !== undefined) q.status = filters.completed ? "done" : { $ne: "done" };
   if (filters.dueBefore) q.dueDate = { ...q.dueDate, $lte: new Date(filters.dueBefore) };
   if (filters.dueAfter) q.dueDate = { ...q.dueDate, $gte: new Date(filters.dueAfter) };
-  if (filters.search) q.taskname = { $regex: filters.search, $options: "i" };
+  const search = normalizeSearchRegex(filters.search);
+  if (search) q.taskname = { $regex: search, $options: "i" };
 
   const tasks = await Task.find(q).populate("subCategory").lean();
   tasks.forEach(attachSubcategoryLabel);
@@ -1189,14 +1212,12 @@ export async function completeTask({ taskId, userId }) {
           }),
         );
       } catch (err) {
-        console.log(
-          "[task_completed_training_start] taskId=%s userId=%s estimated=%s actual=%s",
-          taskId.toString(),
-          userId,
-          task.estimatedDuration,
-          actualCompletionMinutes,
-        );
-      }
+      console.log("[task_completed_training_start]", {
+        taskId: taskId.toString(),
+        userId,
+        estimated: task.estimatedDuration,
+        actual: actualCompletionMinutes,
+      });
 
       const trainingResult = await trainTask(updated);
 
@@ -1348,6 +1369,11 @@ export async function getSubTaskById({ userId, subTaskId }) {
  */
 export async function updateSubTask({ userId, subTaskId, updates }) {
   if (!subTaskId) return { success: false, error: "SubTask ID is required" };
+  const normalizedUserId = normalizeObjectId(userId);
+  const normalizedSubTaskId = normalizeObjectId(subTaskId);
+  if (!normalizedUserId || !normalizedSubTaskId) {
+    return { success: false, error: "Invalid subtask or user ID" };
+  }
 
   const allowed = ["title", "description", "minutes", "status"];
   const sanitized = {};
@@ -1366,8 +1392,8 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
   }
 
   // Use find + save instead of findOneAndUpdate to trigger Mongoose hooks
-  console.log(`[updateSubTask] Querying SubTask with:`, { _id: subTaskId, userId });
-  const subtask = await SubTask.findOne({ _id: subTaskId, userId });
+  console.log(`[updateSubTask] Querying SubTask with:`, { _id: normalizedSubTaskId, userId: normalizedUserId });
+  const subtask = await SubTask.findOne({ _id: normalizedSubTaskId, userId: normalizedUserId });
   console.log(`[updateSubTask] Query result:`, {
     found: !!subtask,
     subtaskId: subtask?._id,
@@ -1375,15 +1401,15 @@ export async function updateSubTask({ userId, subTaskId, updates }) {
   });
 
   if (!subtask) {
-    console.error(`[updateSubTask] SubTask not found! Queried with _id=${subTaskId}, userId=${userId}`);
+    console.error(`[updateSubTask] SubTask not found! Queried with _id=${normalizedSubTaskId}, userId=${normalizedUserId}`);
     // Debug: try to find without userId to see if it exists for other users
-    const anySubtask = await SubTask.findOne({ _id: subTaskId });
+    const anySubtask = await SubTask.findOne({ _id: normalizedSubTaskId });
     if (anySubtask) {
       console.error(
-        `[updateSubTask] SubTask exists with different userId! Expected userId=${userId}, actual userId=${anySubtask.userId}`,
+        `[updateSubTask] SubTask exists with different userId! Expected userId=${normalizedUserId}, actual userId=${anySubtask.userId}`,
       );
     } else {
-      console.error(`[updateSubTask] SubTask with _id=${subTaskId} doesn't exist in database at all`);
+      console.error(`[updateSubTask] SubTask with _id=${normalizedSubTaskId} doesn't exist in database at all`);
     }
     return { success: false, error: "SubTask not found or access denied" };
   }
@@ -1689,9 +1715,11 @@ async function findAllExpiredTasks() {
  */
 export async function findExpiredTasksForUser(userId) {
   const now = new Date();
+  const normalizedUserId = normalizeObjectId(userId);
+  if (!normalizedUserId) return [];
 
   const tasks = await Task.find({
-    userId,
+    userId: normalizedUserId,
     dueDate: { $exists: true, $lt: now },
     status: { $ne: "done" },
   })
@@ -1711,8 +1739,10 @@ export async function findExpiredTasksForUser(userId) {
  */
 export async function userHasExpiredTasks(userId) {
   const now = new Date();
+  const normalizedUserId = normalizeObjectId(userId);
+  if (!normalizedUserId) return false;
   const count = await Task.countDocuments({
-    userId,
+    userId: normalizedUserId,
     dueDate: { $exists: true, $lt: now },
     status: { $ne: "done" },
   });

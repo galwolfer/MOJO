@@ -5,6 +5,7 @@
 import { User, Session, Memory, OjoType } from "../models/index.js";
 import { config } from "../config/env.js";
 import { getDefaultOjoType } from "../utils/ojoTypeUtils.js";
+import { normalizeObjectId, normalizeSessionId } from "../utils/querySanitizers.js";
 import {
   storePrimaryMemory,
   storeConversationMemory,
@@ -117,7 +118,9 @@ class MongoMemoryStore {
    */
   async getSessionSummary(sessionId) {
     try {
-      const session = await Session.findOne({ sessionId }).select("summary");
+      const normalizedSessionId = normalizeSessionId(sessionId);
+      if (!normalizedSessionId) return "";
+      const session = await Session.findOne({ sessionId: normalizedSessionId }).select("summary");
       return session?.summary || "";
     } catch (error) {
       console.error("Error getting session summary:", error);
@@ -130,7 +133,9 @@ class MongoMemoryStore {
    */
   async updateSessionSummary(sessionId, summary) {
     try {
-      await Session.findOneAndUpdate({ sessionId }, { summary });
+      const normalizedSessionId = normalizeSessionId(sessionId);
+      if (!normalizedSessionId) return;
+      await Session.findOneAndUpdate({ sessionId: normalizedSessionId }, { summary });
     } catch (error) {
       console.error("Error updating session summary:", error);
     }
@@ -141,7 +146,9 @@ class MongoMemoryStore {
    */
   async getUserById(userId) {
     try {
-      const user = await User.findById(userId).select("-passwordHash");
+      const normalizedUserId = normalizeObjectId(userId);
+      if (!normalizedUserId) return null;
+      const user = await User.findById(normalizedUserId).select("-passwordHash");
       return user;
     } catch (error) {
       console.error("Error getting user:", error);
@@ -154,7 +161,17 @@ class MongoMemoryStore {
    */
   async getUserProfile(userId) {
     try {
-      const user = await User.findById(userId).populate("profile.ojoTypeId");
+      const normalizedUserId = normalizeObjectId(userId);
+      if (!normalizedUserId) {
+        const defaultOjoType = await getDefaultOjoType();
+        return {
+          userId,
+          ojoTypeId: defaultOjoType ? defaultOjoType._id : null,
+          ojoType: defaultOjoType,
+          settings: {},
+        };
+      }
+      const user = await User.findById(normalizedUserId).populate("profile.ojoTypeId");
 
       if (!user) {
         // Return default profile if user not found
@@ -192,7 +209,9 @@ class MongoMemoryStore {
    */
   async updateUserProfile(userId, updates) {
     try {
-      const user = await User.findById(userId);
+      const normalizedUserId = normalizeObjectId(userId);
+      if (!normalizedUserId) return null;
+      const user = await User.findById(normalizedUserId);
 
       if (!user) {
         console.error("User not found:", userId);
@@ -231,7 +250,12 @@ class MongoMemoryStore {
 
     // Load from database
     try {
-      const session = await Session.findOne({ sessionId, userId });
+      const normalizedSessionId = normalizeSessionId(sessionId);
+      const normalizedUserId = normalizeObjectId(userId);
+      if (!normalizedSessionId || !normalizedUserId) {
+        return [];
+      }
+      const session = await Session.findOne({ sessionId: normalizedSessionId, userId: normalizedUserId });
 
       if (session && session.messages.length > 0) {
         // Convert MongoDB documents to plain objects
@@ -280,8 +304,13 @@ class MongoMemoryStore {
       }
 
       // Prevent sessionId collisions across users
-      const existing = await Session.findOne({ sessionId }).select("userId");
-      if (existing && existing.userId && existing.userId.toString() !== userId.toString()) {
+      const normalizedSessionId = normalizeSessionId(sessionId);
+      const normalizedUserId = normalizeObjectId(userId);
+      if (!normalizedSessionId || !normalizedUserId) {
+        throw new Error("Invalid session or user ID");
+      }
+      const existing = await Session.findOne({ sessionId: normalizedSessionId }).select("userId");
+      if (existing && existing.userId && existing.userId.toString() !== normalizedUserId.toString()) {
         throw new Error("Session ID does not belong to this user");
       }
 
@@ -299,7 +328,7 @@ class MongoMemoryStore {
 
       // Also update lightweight recent sessions summary on the User document
       try {
-        const user = await User.findById(userId);
+        const user = await User.findById(normalizeObjectId(userId));
         if (user) {
           const existingEntry = (user.sessions || []).find((s) => s.sessionId === sessionId);
 
@@ -440,7 +469,9 @@ class MongoMemoryStore {
       }
       // Clear entity context for this session
       this.clearSessionEntityContext(sessionId);
-      await Session.deleteOne({ sessionId });
+      const normalizedSessionId = normalizeSessionId(sessionId);
+      if (!normalizedSessionId) return;
+      await Session.deleteOne({ sessionId: normalizedSessionId });
     } catch (error) {
       console.error("Error clearing session:", error);
     }
