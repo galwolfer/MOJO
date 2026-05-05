@@ -458,8 +458,12 @@ router.get("/sent-reminders", generalLimiter, async (req, res) => {
  *   before – ISO date cursor for pagination (fetch items older than this)
  *   unreadOnly – if "true", only return unread notifications
  */
-router.get("/inbox", generalLimiter, async (req, res) => {
+router.get("/inbox", requireAuth, generalLimiter, async (req, res) => {
   try {
+    if (!req.user || !req.user.userId) {
+      return res.status(401).json({ success: false, error: "Unauthorized: Missing user information" });
+    }
+
     const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
     const filter = { userId: req.user.userId };
 
@@ -488,8 +492,12 @@ router.get("/inbox", generalLimiter, async (req, res) => {
  * GET /api/notifications/inbox/unread-count
  * Quick endpoint that returns only the unread badge count.
  */
-router.get("/inbox/unread-count", generalLimiter, async (req, res) => {
+router.get("/inbox/unread-count", requireAuth, generalLimiter, async (req, res) => {
   try {
+    if (!req.user || !req.user.userId) {
+      return res.status(401).json({ success: false, error: "Unauthorized: Missing user information" });
+    }
+
     const unreadCount = await InAppNotification.countDocuments({
       userId: req.user.userId,
       read: false,

@@ -266,7 +266,7 @@ export function expandBusyBlock(block, fromDate, toDate) {
       return results;
     }
     // Recurring full days
-    const expiry = block.recurrenceEndDate ? new Date(block.recurrenceEndDate) : toDate;
+    const expiry = block.recurrenceEndDate ? new Date(block.recurrence.endDate) : toDate;
     const windowEnd = expiry < toDate ? expiry : toDate;
     let cursor = new Date(fromDate);
     while (cursor <= windowEnd) {
@@ -286,7 +286,7 @@ export function expandBusyBlock(block, fromDate, toDate) {
   // ── DAILY ───────────────────────────────────────────────────────────────
   if (type === "DAILY") {
     const timeSpans = block.times ?? [];
-    const expiry = block.recurrenceEndDate ? new Date(block.recurrenceEndDate) : toDate;
+    const expiry = block.recurrenceEndDate ? new Date(block.recurrence.endDate) : toDate;
     const windowEnd = expiry < toDate ? expiry : toDate;
     const results = [];
     let cursor = new Date(fromDate);
@@ -301,7 +301,7 @@ export function expandBusyBlock(block, fromDate, toDate) {
 
   // ── WEEKLY ──────────────────────────────────────────────────────────────
   if (type === "WEEKLY") {
-    const expiry = block.recurrenceEndDate ? new Date(block.recurrenceEndDate) : toDate;
+    const expiry = block.recurrence.endDate ? new Date(block.recurrence.endDate) : toDate;
     const windowEnd = expiry < toDate ? expiry : toDate;
     const results = [];
     let cursor = new Date(fromDate);
@@ -381,8 +381,8 @@ export async function triggerSchedulerUpdate(userId, operationType = "operation"
 
 // Use Python scheduler CLI instead of JS implementation.
 async function callPythonScheduler(tasks, options) {
-  // Try python3 first, then fallback to python (Windows)
-  const candidates = process.platform === "win32" ? ["python", "python3"] : ["python3", "python"];
+  // Updated Python command candidates to prioritize python3
+  const candidates = process.platform === "win32" ? ["python3", "python"] : ["python3"];
 
   let lastError = null;
   for (const cmd of candidates) {

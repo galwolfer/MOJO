@@ -104,7 +104,7 @@ async function callPythonService(command, jsonInput = null) {
       }
     }
 
-    const pythonProcess = spawn('python', args);
+    const pythonProcess = spawn('python3', args);
     
     let stdout = '';
     let stderr = '';

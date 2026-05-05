@@ -5,6 +5,7 @@
  */
 
 import rateLimit from "express-rate-limit";
+import { ipKeyGenerator } from "express-rate-limit";
 
 // Standard rate limiter for general API endpoints
 // 100 requests per 15 minutes per IP
@@ -20,8 +21,8 @@ export const generalLimiter = rateLimit({
     return false;
   },
   keyGenerator: (req) => {
-    // Rate limit by user ID if authenticated, otherwise by IP
-    return req.user?.userId || req.ip;
+    // Use ipKeyGenerator for IP-based rate limiting
+    return req.user?.userId || ipKeyGenerator(req);
   },
 });
 
@@ -34,8 +35,8 @@ export const strictLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => {
-    // Rate limit by user ID
-    return req.user?.userId || req.ip;
+    // Use ipKeyGenerator for IP-based rate limiting
+    return req.user?.userId || ipKeyGenerator(req);
   },
 });
 
@@ -58,7 +59,7 @@ export const bulkOperationLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => {
-    return req.user?.userId || req.ip;
+    return req.user?.userId || ipKeyGenerator(req);
   },
 });
 
@@ -71,6 +72,6 @@ export const aiSuggestionsLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => {
-    return req.user?.userId || req.ip;
+    return req.user?.userId || ipKeyGenerator(req);
   },
 });

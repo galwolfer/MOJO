@@ -1212,12 +1212,13 @@ export async function completeTask({ taskId, userId }) {
           }),
         );
       } catch (err) {
-      console.log("[task_completed_training_start]", {
-        taskId: taskId.toString(),
-        userId,
-        estimated: task.estimatedDuration,
-        actual: actualCompletionMinutes,
-      });
+        console.log("[task_completed_training_start]", {
+          taskId: taskId.toString(),
+          userId,
+          estimated: task.estimatedDuration,
+          actual: actualCompletionMinutes,
+        });
+      }
 
       const trainingResult = await trainTask(updated);
 
