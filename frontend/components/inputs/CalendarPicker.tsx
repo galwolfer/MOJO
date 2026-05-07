@@ -34,9 +34,11 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({
   lighterPastDates = false,
 }) => {
   let colors = getDynamicColors("light");
+  let resolvedTheme: "light" | "dark" = "light";
   try {
-    const { colors: themeColors } = useTheme();
+    const { colors: themeColors, resolvedTheme: themeMode } = useTheme();
     colors = themeColors;
+    resolvedTheme = themeMode;
   } catch {
     // Fall back to light tokens when rendered outside the theme provider.
   }
@@ -101,6 +103,15 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({
   };
 
   const handleDatePress = (dateString: string) => {
+    const selectedDateObject = new Date(dateString);
+    if (Number.isNaN(selectedDateObject.getTime())) {
+      return;
+    }
+
+    if (!selectedDateObject || selectedDateObject.getMonth() !== currentDate.getMonth() || selectedDateObject.getFullYear() !== currentDate.getFullYear()) {
+      setCurrentDate(new Date(selectedDateObject.getFullYear(), selectedDateObject.getMonth(), 1));
+    }
+
     onDateSelect(dateString);
   };
 
@@ -169,17 +180,24 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({
       <View style={styles.calendarGrid}>
         {calendarDays.map((day, index) => {
           const isPast = isDateInPast(day.dateString);
-          const isDisabled = !day.isCurrentMonth || (isPast && !allowPastDates);
+          const isOutsideMonth = !day.isCurrentMonth;
+          const isDisabled = !isOutsideMonth && isPast && !allowPastDates;
           const weeksCount = Math.ceil(calendarDays.length / 7);
           const lastRowStartIndex = (weeksCount - 1) * 7;
           const isLastRow = index >= lastRowStartIndex;
+          const outsideMonthColor = resolvedTheme === "dark" ? colors.gray2 : colors.gray1;
+          const pastInMonthColor = lighterPastDates
+            ? resolvedTheme === "dark"
+              ? colors.gray1
+              : colors.gray2
+            : colors.text1;
+
           return (
             <Pressable
               key={index}
               style={[
                 styles.dateCell,
-                !day.isCurrentMonth && styles.dateCellInactive,
-                isPast && (lighterPastDates ? styles.dateCellPastLighter : styles.dateCellPast),
+                isOutsideMonth && styles.dateCellInactive,
                 isDateSelected(day.dateString) && styles.dateCellSelected,
               ]}
               onPress={() => !isDisabled && handleDatePress(day.dateString)}
@@ -188,10 +206,12 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({
               <AppText
                 style={[
                   styles.dateText,
-                  { color: colors.text1 },
+                  {
+                    color: isOutsideMonth ? outsideMonthColor : isPast ? pastInMonthColor : colors.text1,
+                  },
                   !isLastRow && { marginBottom: SPACING.md },
-                  !day.isCurrentMonth && styles.dateTextInactive,
-                  isPast && (lighterPastDates ? styles.dateTextPastLighter : styles.dateTextPast),
+                  isOutsideMonth && styles.dateTextInactive,
+                  isPast && styles.dateTextPast,
                   isDateSelected(day.dateString) && styles.dateTextSelected,
                 ]}
               >
@@ -291,15 +311,13 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   dateTextInactive: {
-    color: COLORS.gray1,
     fontWeight: "400",
   },
   dateTextPast: {
-    color: COLORS.gray1,
     textDecorationLine: "line-through",
   },
   dateTextPastLighter: {
-    color: COLORS.gray2,
+    color: COLORS.lightGray,
   },
   dateTextSelected: {
     color: COLORS.white,
