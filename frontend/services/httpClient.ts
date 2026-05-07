@@ -12,12 +12,21 @@ const DEFAULT_TIMEOUT_MS = 12000;
 
 // Auth token storage
 let authToken: string | null = null;
+let unauthorizedHandler: (() => void | Promise<void>) | null = null;
 
 /**
  * Set the authentication token for all API requests
  */
 export function setAuthToken(token: string | null): void {
   authToken = token;
+}
+
+/**
+ * Register a callback that runs when the backend rejects a request with an
+ * invalid or expired token.
+ */
+export function setUnauthorizedHandler(handler: (() => void | Promise<void>) | null): void {
+  unauthorizedHandler = handler;
 }
 
 // Debug helper: return current auth token (used for diagnostics only)
@@ -54,6 +63,12 @@ async function handleResponse<T>(res: Response): Promise<T> {
     error.name = "ServerError";
     error.data = data;    // attach full response body so callers can read extra fields
     error.status = res.status;
+
+    if (res.status === 401 && (error.message.includes("Invalid token") || error.message.includes("Token expired"))) {
+      authToken = null;
+      void unauthorizedHandler?.();
+    }
+
     throw error;
   }
 
@@ -242,4 +257,5 @@ export default {
   patch,
   del,
   setAuthToken,
+  setUnauthorizedHandler,
 };

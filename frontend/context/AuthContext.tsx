@@ -8,6 +8,7 @@ import React, { createContext, useState, useEffect, useContext } from "react";
  */
 import { Platform } from "react-native";
 import { setAuthToken } from "../services/apiClient";
+import { setUnauthorizedHandler } from "../services/httpClient";
 
 // NOTE: You need to install expo-secure-store:
 // npx expo install expo-secure-store
@@ -74,6 +75,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     loadStorage();
+  }, []);
+
+  useEffect(() => {
+    setUnauthorizedHandler(async () => {
+      await signOut();
+    });
+
+    return () => {
+      setUnauthorizedHandler(null);
+    };
   }, []);
 
   const loadStorage = async () => {

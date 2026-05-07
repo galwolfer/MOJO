@@ -96,7 +96,7 @@ router.post("/unregister", strictLimiter, requireAuth, async (req, res) => {
  * GET /api/notifications/preferences
  * Get notification preferences for the authenticated user
  */
-router.get("/preferences", generalLimiter, async (req, res) => {
+router.get("/preferences", generalLimiter, requireAuth, async (req, res) => {
   try {
     const result = await getNotificationPreferences(req.user.userId);
 
@@ -267,7 +267,7 @@ router.post("/test/stop", aiSuggestionsLimiter, requireAuth, async (req, res) =>
  * GET /api/notifications/test/status
  * Check if periodic test mode is active
  */
-router.get("/test/status", generalLimiter, (req, res) => {
+router.get("/test/status", generalLimiter, requireAuth, (req, res) => {
   const isActive = isTestModeActive(req.user.userId);
   return res.json({
     success: true,

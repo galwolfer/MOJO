@@ -18,6 +18,12 @@ export const OjoProvider = ({ children }: { children: ReactNode }) => {
 
   const load = async () => {
     try {
+      if (!token) {
+        setGradient(null);
+        setOjoName(null);
+        return;
+      }
+
       const prefs = await getUserPreferences();
       const name = prefs?.ojoType?.name as any;
       const cfg = name ? getOjoType(name) : getOjoType("mentorjo");

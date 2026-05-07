@@ -27,6 +27,8 @@ interface UseOjoTypeReturn {
   refetch: () => Promise<void>;
 }
 
+let sharedInFlightFetch: Promise<void> | null = null;
+
 /**
  * Hook to manage OjoType selection
  * Handles fetching user's current OjoType and updating it
@@ -39,13 +41,20 @@ export function useOjoType(token?: string): UseOjoTypeReturn {
 
   const auth = useAuth();
 
-  // Dedupe in-flight fetches across hook instances so we don't spam requests
-  let inFlightFetch: Promise<void> | null = null;
-
   const fetchCurrentOjoType = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
+
+      if ((auth as any)?.isLoading) {
+        return;
+      }
+
+      if (!token && !(auth as any)?.token) {
+        setCurrentOjoType(null);
+        setOjoTypeData(null);
+        return;
+      }
 
       // If AuthContext already has user profile with OjoType, use it immediately
       if ((auth as any)?.user?.profile?.ojoType) {
@@ -56,8 +65,8 @@ export function useOjoType(token?: string): UseOjoTypeReturn {
       }
 
       // Dedupe concurrent fetches
-      if (inFlightFetch) return await inFlightFetch;
-      inFlightFetch = (async () => {
+      if (sharedInFlightFetch) return await sharedInFlightFetch;
+      sharedInFlightFetch = (async () => {
         try {
           const data = await httpGet<any>("/auth/me");
           const ojoType = data.user?.profile?.ojoType;
@@ -66,11 +75,11 @@ export function useOjoType(token?: string): UseOjoTypeReturn {
             setOjoTypeData(ojoType);
           }
         } finally {
-          inFlightFetch = null;
+          sharedInFlightFetch = null;
         }
       })();
 
-      await inFlightFetch;
+      await sharedInFlightFetch;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
       // If the server indicates no token/unauthorized, treat as unauthenticated and suppress noisy errors
@@ -96,7 +105,7 @@ export function useOjoType(token?: string): UseOjoTypeReturn {
     } finally {
       setLoading(false);
     }
-  }, [auth]);
+  }, [auth, token]);
 
   const updateOjoType = useCallback(
     async (ojoTypeName: OjoTypeName) => {
