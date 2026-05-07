@@ -40,6 +40,8 @@ import {
   getApiBase,
 } from "../../services/apiClient";
 
+const SIGNUP_USERNAME_PATTERN = /^[A-Za-z0-9._-]{3,64}$/;
+
 export default function AuthScreen() {
   const { signIn } = useAuth();
   const colors = useColors();
@@ -165,6 +167,16 @@ export default function AuthScreen() {
         setSignupError("Please enter your email");
         return;
       }
+      const normalizedUsername = signupUsername.trim();
+      const normalizedEmail = signupEmail.trim().toLowerCase();
+      if (!SIGNUP_USERNAME_PATTERN.test(normalizedUsername)) {
+        setSignupError("Username must be 3-64 characters and use only letters, numbers, dots, underscores, or hyphens");
+        return;
+      }
+      if (!/^([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+)\.([a-zA-Z]{2,})$/.test(normalizedEmail)) {
+        setSignupError("Please enter a valid email address");
+        return;
+      }
       if (!signupPassword || signupPassword.length < 6) {
         setSignupError("Password must be at least 6 characters");
         return;
@@ -230,8 +242,8 @@ export default function AuthScreen() {
 
       const { canonicalizeGender } = await import("../../utils/gender");
       const data = await apiRegister({
-        username: signupUsername,
-        email: signupEmail,
+        username: normalizedUsername,
+        email: normalizedEmail,
         password: signupPassword,
         displayName,
         profileImage: profileImageUrl,
