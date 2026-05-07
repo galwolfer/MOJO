@@ -185,10 +185,10 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({
           const weeksCount = Math.ceil(calendarDays.length / 7);
           const lastRowStartIndex = (weeksCount - 1) * 7;
           const isLastRow = index >= lastRowStartIndex;
-          const outsideMonthColor = resolvedTheme === "dark" ? colors.gray2 : colors.gray1;
+          const outsideMonthColor = resolvedTheme === "dark" ? colors.gray1 : colors.gray1;
           const pastInMonthColor = lighterPastDates
             ? resolvedTheme === "dark"
-              ? colors.gray1
+              ? colors.gray2
               : colors.gray2
             : colors.text1;
 
