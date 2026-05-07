@@ -692,13 +692,14 @@ const TextBouble: React.FC<Props> = ({
     );
 
   const shouldShowTypewriter = resolvedTypewriter && mode === "agent" && fullText != null;
+  const shouldShowConicLayer = (Platform as any).OS === "web" && showConic;
 
   return (
     <View style={[styles.wrapper, style]}>
       {mode === "agent" && (
         <>
           {/* Dynamic conic shadow (only while typing) */}
-          {showConic && (
+          {shouldShowConicLayer && (
             <Animated.View pointerEvents="none" style={[styles.shadowLayer, { opacity: conicOpacity }]}>
               <ConicGradientBubble
                 colors={
