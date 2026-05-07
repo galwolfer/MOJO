@@ -19,7 +19,8 @@
 
 import React, { useState, useCallback, useEffect } from "react";
 import { View, StyleSheet, Pressable, ActivityIndicator } from "react-native";
-import { COLORS, SPACING, FONT_SIZES, SHADOWS } from "../../../theme";
+import { COLORS, SPACING, FONT_SIZES, SHADOWS, getDynamicColors } from "../../../theme";
+import { useTheme } from "../../../context/ThemeContext";
 import AppText from "../../common/AppText";
 import AppButton from "../../common/AppButton";
 import Input from "../../inputs/Input";
@@ -131,6 +132,14 @@ const TaskScheduleEditor: React.FC<Props> = ({
   onPopup,
   onTaskUpdated,
 }) => {
+  let colors = getDynamicColors("light");
+  try {
+    const { colors: themeColors } = useTheme();
+    colors = themeColors;
+  } catch {
+    // Fall back to light tokens when rendered outside the theme provider.
+  }
+
   // ── Local state ────────────────────────────────────────────────────────────
   const [sessions, setSessions] = useState<EditableSession[]>(initialSessions);
   const [isManual, setIsManual] = useState(initialIsManualSchedule);
@@ -328,7 +337,7 @@ const TaskScheduleEditor: React.FC<Props> = ({
               </View>
 
               {activeCalendarIdx === idx && (
-                <View style={styles.inlineCalendar}>
+                <View style={[styles.inlineCalendar, { backgroundColor: colors.bg3 }]}>
                   <CalendarPicker
                     selectedDate={session.date}
                     onDateSelect={(d: string) => {
@@ -362,7 +371,7 @@ const TaskScheduleEditor: React.FC<Props> = ({
               </View>
 
               {activeEndCalendarIdx === idx && (
-                <View style={styles.inlineCalendar}>
+                <View style={[styles.inlineCalendar, { backgroundColor: colors.bg3 }]}>
                   <CalendarPicker
                     selectedDate={session.endDate ?? session.date}
                     onDateSelect={(d: string) => {
@@ -524,7 +533,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   inlineCalendar: {
-    backgroundColor: COLORS.white,
     borderRadius: 12,
     marginBottom: SPACING.sm,
     overflow: "hidden",

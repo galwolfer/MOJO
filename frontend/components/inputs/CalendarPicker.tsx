@@ -8,7 +8,8 @@
 import React, { useState, useMemo } from "react";
 import { View, StyleSheet, Pressable } from "react-native";
 import AppText from "../common/AppText";
-import { COLORS, SPACING, FONT_SIZES, SHADOWS, FONTS, ICON_SIZES } from "../../theme";
+import { COLORS, SPACING, FONT_SIZES, SHADOWS, FONTS, ICON_SIZES, getDynamicColors } from "../../theme";
+import { useTheme } from "../../context/ThemeContext";
 import { ICONS } from "../icons/icons";
 
 interface CalendarPickerProps {
@@ -32,6 +33,14 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({
   allowPreviousMonths = false,
   lighterPastDates = false,
 }) => {
+  let colors = getDynamicColors("light");
+  try {
+    const { colors: themeColors } = useTheme();
+    colors = themeColors;
+  } catch {
+    // Fall back to light tokens when rendered outside the theme provider.
+  }
+
   const [currentDate, setCurrentDate] = useState(new Date());
 
   const monthName = currentDate.toLocaleString("en-US", { month: "long", year: "numeric" });
@@ -118,29 +127,31 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({
     return currentDate.getMonth() === today.getMonth() && currentDate.getFullYear() === today.getFullYear();
   };
 
+  const isPrevMonthDisabled = !allowPreviousMonths && isCurrentMonth();
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.bg3 }]}>
       {/* Header with Month/Year and Navigation */}
       <View style={styles.header}>
         <Pressable
-          style={[styles.navButton, !allowPreviousMonths && isCurrentMonth() && styles.navButtonDisabled]}
+          style={[styles.navButton, { backgroundColor: colors.primary1 }, isPrevMonthDisabled && styles.navButtonDisabled]}
           onPress={handlePrevMonth}
-          disabled={!allowPreviousMonths && isCurrentMonth()}
+          disabled={isPrevMonthDisabled}
         >
           {ICONS.left &&
             React.createElement(ICONS.left, {
               size: ICON_SIZES.sm,
-              color: !allowPreviousMonths && isCurrentMonth() ? COLORS.lightGray : COLORS.white,
+              color: isPrevMonthDisabled ? colors.gray1 : colors.text2,
             })}
         </Pressable>
 
-        <AppText style={styles.monthYear}>{monthName}</AppText>
+        <AppText style={[styles.monthYear, { color: colors.primary1 }]}>{monthName}</AppText>
 
-        <Pressable style={styles.navButton} onPress={handleNextMonth}>
+        <Pressable style={[styles.navButton, { backgroundColor: colors.primary1 }]} onPress={handleNextMonth}>
           {ICONS.right &&
             React.createElement(ICONS.right, {
               size: ICON_SIZES.sm,
-              color: COLORS.white,
+              color: colors.text2,
             })}
         </Pressable>
       </View>
@@ -149,7 +160,7 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({
       <View style={styles.dayLabelsContainer}>
         {dayLabels.map((label) => (
           <View key={label} style={styles.dayLabelCell}>
-            <AppText style={styles.dayLabel}>{label}</AppText>
+            <AppText style={[styles.dayLabel, { color: colors.gray2 }]}>{label}</AppText>
           </View>
         ))}
       </View>
@@ -177,6 +188,7 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({
               <AppText
                 style={[
                   styles.dateText,
+                  { color: colors.text1 },
                   !isLastRow && { marginBottom: SPACING.md },
                   !day.isCurrentMonth && styles.dateTextInactive,
                   isPast && (lighterPastDates ? styles.dateTextPastLighter : styles.dateTextPast),
@@ -186,7 +198,13 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({
                 {day.date}
               </AppText>
               {isToday(day.dateString) && (
-                <View style={[styles.todayDot, isDateSelected(day.dateString) && styles.todayDotSelected]} />
+                <View
+                  style={[
+                    styles.todayDot,
+                    { backgroundColor: colors.primary1 },
+                    isDateSelected(day.dateString) && styles.todayDotSelected,
+                  ]}
+                />
               )}
             </Pressable>
           );
@@ -218,7 +236,6 @@ const styles = StyleSheet.create({
     ...(SHADOWS.card as object),
   },
   navButtonDisabled: {
-    backgroundColor: COLORS.white,
     opacity: 0.6,
   },
   monthYear: {
@@ -242,7 +259,6 @@ const styles = StyleSheet.create({
   },
   dayLabel: {
     fontSize: FONT_SIZES.sm,
-    color: COLORS.lightGray,
     fontWeight: "500",
   },
   calendarGrid: {
@@ -275,15 +291,15 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   dateTextInactive: {
-    color: COLORS.lightGray,
+    color: COLORS.gray1,
     fontWeight: "400",
   },
   dateTextPast: {
-    color: COLORS.white3,
+    color: COLORS.gray1,
     textDecorationLine: "line-through",
   },
   dateTextPastLighter: {
-    color: COLORS.white2,
+    color: COLORS.gray2,
   },
   dateTextSelected: {
     color: COLORS.white,
@@ -294,7 +310,6 @@ const styles = StyleSheet.create({
     width: ICON_SIZES.sm,
     height: SPACING.xs,
     borderRadius: SPACING.xs,
-    backgroundColor: COLORS.primary1,
   },
   todayDotSelected: {
     backgroundColor: COLORS.white,

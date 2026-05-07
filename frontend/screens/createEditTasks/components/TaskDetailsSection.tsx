@@ -14,7 +14,8 @@
 
 import React from "react";
 import { View, StyleSheet } from "react-native";
-import { COLORS, SPACING, SHADOWS } from "../../../theme";
+import { COLORS, SPACING, SHADOWS, getDynamicColors } from "../../../theme";
+import { useTheme } from "../../../context/ThemeContext";
 import Input from "../../../components/inputs/Input";
 import SliderComponent from "../../../components/inputs/Slider";
 import CalendarPicker from "../../../components/inputs/CalendarPicker";
@@ -75,6 +76,14 @@ const TaskDetailsSection: React.FC<Props> = ({
   onDescriptionChange,
   boxContentStyle,
 }) => {
+  let colors = getDynamicColors("light");
+  try {
+    const { colors: themeColors } = useTheme();
+    colors = themeColors;
+  } catch {
+    // Fall back to light tokens when rendered outside the theme provider.
+  }
+
   return (
     <Box title="TASK DETAILS" style={[styles.boxContent, boxContentStyle]}>
       {/* Task Name */}
@@ -99,7 +108,7 @@ const TaskDetailsSection: React.FC<Props> = ({
           />
 
           {isCalendarVisible && (
-            <View style={styles.inlineCalendarContainer}>
+            <View style={[styles.inlineCalendarContainer, { backgroundColor: colors.bg3 }]}>
               <CalendarPicker
                 onDateSelect={(d: string) => {
                   onDateSelect(d);
@@ -196,7 +205,6 @@ const styles = StyleSheet.create({
     overflow: "visible",
   },
   inlineCalendarContainer: {
-    backgroundColor: COLORS.white,
     borderRadius: SPACING.lg,
     marginTop: SPACING.sm,
     marginBottom: SPACING.sm,

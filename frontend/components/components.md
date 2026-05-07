@@ -49,6 +49,9 @@ Update this file whenever you add, remove, or change a component.
 - `Input` — `frontend/components/inputs/Input.tsx`
   - Flexible input component supporting multiple types (text, email, password, number). Styled using theme values with consistent spacing, colors, and shadows. Supports label and error states. When `options` prop is provided, acts as a dropdown selector. Use `multiSelect` prop to enable multiple selections with checkboxes; otherwise, it's single select without checkboxes. The dropdown is rendered in a Modal to "fly over" other content, and clicking outside closes it.
 
+- `CalendarPicker` — `frontend/components/inputs/CalendarPicker.tsx`
+   - Inline month grid date picker used across task creation, task editing, calendar views, and scheduling. Uses the active theme for the surface, labels, and date text so dark mode remains readable.
+
 - `AppButton` — `frontend/components/common/AppButton.tsx`
    - Reusable button component that supports an icon (choose any key from `frontend/components/icons/icons.tsx`) placed on the left or right via the `iconPosition` prop. Two visual modes are available: `filled` (solid background) and `light` (transparent background with border). Color can be selected from `COLORS` in `frontend/theme.ts` by passing the color key (e.g. `primary1`) or a CSS color string. Uses `SHADOWS.card` for consistent surface shadowing across platforms.
 
@@ -168,6 +171,7 @@ Update this file whenever you add, remove, or change a component.
 2. When updating a component, update this file with the change summary and date. Example:
    - `2026-01-11` — Added `AnimatedButtonsContainer` (`common`) and `Widget` (`special`); refactored auth steps to use `AnimatedButtonsContainer` and added Welcome screen stagger behavior.
    - `2026-01-15` — Added `UserProfileScreen` with `StatBadge`, `ProgressGraph`, and `FriendListItem` components for the new profile page design.
+   - `2026-05-07` — Updated `CalendarPicker` and task form wrappers to use theme-aware dark-mode surfaces and readable date text in create/edit flows.
 
 3. Keep `components/index.ts` in sync so imports across the app can use `import { Box } from './components'`.
 

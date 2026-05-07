@@ -12,7 +12,8 @@
 
 import React, { useState } from "react";
 import { View, Pressable, StyleSheet } from "react-native";
-import { COLORS, SPACING, FONT_SIZES, SHADOWS, FONTS } from "../../../theme";
+import { COLORS, SPACING, FONT_SIZES, SHADOWS, FONTS, getDynamicColors } from "../../../theme";
+import { useTheme } from "../../../context/ThemeContext";
 import AppText from "../../../components/common/AppText";
 import Input from "../../../components/inputs/Input";
 import CalendarPicker from "../../../components/inputs/CalendarPicker";
@@ -36,6 +37,13 @@ interface Props {
 const ScheduleToggle: React.FC<Props> = ({ schedule, onChange }) => {
   const [showCalendar, setShowCalendar] = useState(false);
   const isManual = schedule.mode === "manual";
+  let colors = getDynamicColors("light");
+  try {
+    const { colors: themeColors } = useTheme();
+    colors = themeColors;
+  } catch {
+    // Fall back to light tokens when rendered outside the theme provider.
+  }
 
   // Detect overnight: if both times are set and endTime ≤ startTime the session
   // crosses midnight (e.g. 21:00 → 05:00). We show a hint so the user knows.
@@ -84,7 +92,7 @@ const ScheduleToggle: React.FC<Props> = ({ schedule, onChange }) => {
           />
 
           {showCalendar && (
-            <View style={styles.inlineCalendar}>
+            <View style={[styles.inlineCalendar, { backgroundColor: colors.bg3 }]}>
               <CalendarPicker
                 selectedDate={schedule.date}
                 onDateSelect={(d: string) => {
@@ -163,7 +171,6 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   inlineCalendar: {
-    backgroundColor: COLORS.white,
     borderRadius: 12,
     marginBottom: SPACING.sm,
     overflow: "hidden",
